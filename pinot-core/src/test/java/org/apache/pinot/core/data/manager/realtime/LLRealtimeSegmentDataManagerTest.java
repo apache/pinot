@@ -143,11 +143,13 @@ public class LLRealtimeSegmentDataManagerTest {
     InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
     RealtimeTableDataManager tableDataManager = createTableDataManager();
     String resourceDir = _segmentDir;
+    LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
+    _partitionIdToSemaphoreMap.putIfAbsent(_partitionId, new Semaphore(1));
     Schema schema = Schema.fromString(makeSchema());
     ServerMetrics serverMetrics = new ServerMetrics(new MetricsRegistry());
     FakeLLRealtimeSegmentDataManager segmentDataManager =
-        new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, tableDataManager,
-            resourceDir, schema, _partitionIdToSemaphoreMap, serverMetrics);
+        new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, resourceDir, schema,
+            llcSegmentName, _partitionIdToSemaphoreMap, serverMetrics);
     return segmentDataManager;
   }
 
@@ -698,11 +700,12 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     public FakeLLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
-        InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager,
-        String resourceDataDir, Schema schema, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics)
+        RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
+        LLCSegmentName llcSegmentName, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics)
         throws Exception {
-      super(segmentZKMetadata, tableConfig, instanceZKMetadata, realtimeTableDataManager, resourceDataDir,
-          new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, semaphoreMap, serverMetrics);
+      super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
+          new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
+          semaphoreMap.get(llcSegmentName.getPartitionId()), serverMetrics);
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");

@@ -41,7 +41,6 @@ import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -235,7 +234,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _streamTopic;
   private final int _streamPartitionId;
   final String _clientId;
-  private final LLCSegmentName _segmentName;
+  private final LLCSegmentName _llcSegmentName;
   private final RecordTransformer _recordTransformer;
   private PartitionLevelConsumer _partitionLevelConsumer = null;
   private StreamMetadataProvider _streamMetadataProvider = null;
@@ -1042,8 +1041,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // Assume that this is called only on OFFLINE to CONSUMING transition.
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, Map<Integer, Semaphore> partitionIdToSemaphoreMap,
+      RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
+      IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionConsumerSemaphore,
       ServerMetrics serverMetrics) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
@@ -1065,10 +1064,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
     _streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
-    _segmentName = new LLCSegmentName(_segmentNameStr);
-    _streamPartitionId = _segmentName.getPartitionId();
-    partitionIdToSemaphoreMap.putIfAbsent(_streamPartitionId, new Semaphore(1));
-    _partitionConsumerSemaphore = partitionIdToSemaphoreMap.get(_streamPartitionId);
+    _llcSegmentName = llcSegmentName;
+    _streamPartitionId = _llcSegmentName.getPartitionId();
+    _partitionConsumerSemaphore = partitionConsumerSemaphore;
     _acquireConsumerSemaphore = new AtomicBoolean(false);
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _streamPartitionId;
@@ -1081,18 +1079,18 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
       segmentLogger.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
-          _segmentName);
+          _llcSegmentName);
       _sortedColumn = null;
     } else {
       String firstSortedColumn = sortedColumns.get(0);
       if (_schema.hasColumn(firstSortedColumn)) {
         segmentLogger.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
-            firstSortedColumn, _segmentName);
+            firstSortedColumn, _llcSegmentName);
         _sortedColumn = firstSortedColumn;
       } else {
         segmentLogger
             .warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
-                firstSortedColumn, _segmentName);
+                firstSortedColumn, _llcSegmentName);
         _sortedColumn = null;
       }
     }
@@ -1200,7 +1198,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _indexLoadingConfig, _protocolHandler);
 
     segmentLogger
-        .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _segmentName,
+        .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,
             _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();
   }
