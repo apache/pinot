@@ -37,8 +37,10 @@ public class DatasetConfigBean extends AbstractBean {
 
   public static final String DEFAULT_COMPLETENESS_ALGORITHM = Wo4WAvgDataCompletenessAlgorithm.class.getName();
   public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
-  public static TimeGranularity DEFAULT_HOURLY_EXPECTED_DELAY = new TimeGranularity(8, TimeUnit.HOURS);
-  public static TimeGranularity DEFAULT_DAILY_EXPECTED_DELAY = new TimeGranularity(36, TimeUnit.HOURS);
+  // This is the expected delay for the hourly/daily data source.
+  // 1 hour delay means we always expect to have 1 hour's before's data.
+  public static TimeGranularity DEFAULT_HOURLY_EXPECTED_DELAY = new TimeGranularity(1, TimeUnit.HOURS);
+  public static TimeGranularity DEFAULT_DAILY_EXPECTED_DELAY = new TimeGranularity(24, TimeUnit.HOURS);
 
   private String dataset;
 

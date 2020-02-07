@@ -62,6 +62,7 @@ import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -74,6 +75,7 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Period;
 import org.slf4j.Logger;
@@ -391,6 +393,26 @@ public abstract class ThirdEyeUtils {
       return functions.stream().map(
           f -> datasetConfigManager.findByDataset(f.getDataset())).collect(Collectors.toList());
     }
+  }
+
+  /**
+   * Get the expected delay for the detection pipeline.
+   * This delay should be the longest of the expected delay of the underline datasets.
+   *
+   * @param config The detection config.
+   * @return The expected delay for this alert in milliseconds.
+   */
+  public static long getDetectionExpectedDelay(DetectionConfigDTO config) {
+    long maxExpectedDelay = 0;
+    Set<String> metricUrns = DetectionConfigFormatter
+        .extractMetricUrnsFromProperties(config.getProperties());
+    for (String urn : metricUrns) {
+      List<DatasetConfigDTO> datasets = ThirdEyeUtils.getDatasetConfigsFromMetricUrn(urn);
+      for (DatasetConfigDTO dataset : datasets) {
+        maxExpectedDelay = Math.max(dataset.getExpectedDelay().toMillis(), maxExpectedDelay);
+      }
+    }
+    return maxExpectedDelay;
   }
 
   public static MetricConfigDTO getMetricConfigFromId(Long metricId) {

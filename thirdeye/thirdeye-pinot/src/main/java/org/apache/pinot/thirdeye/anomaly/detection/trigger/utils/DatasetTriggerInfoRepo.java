@@ -103,7 +103,7 @@ public class DatasetTriggerInfoRepo {
     List<DetectionConfigDTO> detectionConfigs = detectionConfigDAO.findAllActive();
     LOG.info(String.format("Found %d active detection configs", detectionConfigs.size()));
     for (DetectionConfigDTO detectionConfig : detectionConfigs) {
-      List<String> metricUrns = DetectionConfigFormatter
+      Set<String> metricUrns = DetectionConfigFormatter
           .extractMetricUrnsFromProperties(detectionConfig.getProperties());
       for (String urn : metricUrns) {
         MetricEntity me = MetricEntity.fromURN(urn);
