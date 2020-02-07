@@ -159,12 +159,14 @@ public class PinotHelixResourceManager {
               public String load(String instanceId) {
                 InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
                 Preconditions.checkNotNull(instanceConfig, "Failed to find instance config for: %s", instanceId);
-                ZNRecord record = instanceConfig.getRecord();
-                String[] hostnameSplit = instanceConfig.getHostName().split("_");
-                Preconditions.checkState(hostnameSplit.length >= 2);
-                String adminPort = record
-                    .getStringField(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(Server.DEFAULT_ADMIN_API_PORT));
-                return hostnameSplit[1] + ":" + adminPort;
+                // Backward-compatible with legacy hostname of format 'Server_<hostname>'
+                String hostname = instanceConfig.getHostName();
+                if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+                  hostname = hostname.substring(Helix.PREFIX_OF_SERVER_INSTANCE.length());
+                }
+                int adminPort = instanceConfig.getRecord()
+                    .getIntField(Helix.Instance.ADMIN_PORT_KEY, Server.DEFAULT_ADMIN_API_PORT);
+                return hostname + ":" + adminPort;
               }
             });
   }
