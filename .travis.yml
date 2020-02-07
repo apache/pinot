@@ -7,16 +7,6 @@ before_install:
   - export PATH=$PATH:~/bin
   - jq --version
 
-env:
-  global:
-    - JOBS=1
-  matrix:
-    - TEST_CATEGORY=INTEGRATION_TEST
-      KAFKA_VERSION=2.0
-    - TEST_CATEGORY=UNIT_TEST
-      KAFKA_VERSION=2.0
-    - TEST_CATEGORY=QUICKSTART
-      KAFKA_VERSION=2.0
 jdk:
   - oraclejdk8
 
@@ -37,3 +27,32 @@ script:
 branches:
   only:
     - master
+
+jobs:
+  include:
+    - name: "Integration Tests - OracleJDK 8"
+      jdk: oraclejdk8
+      env:
+        - TEST_CATEGORY=INTEGRATION_TEST
+        - KAFKA_VERSION=2.0
+    - name: "Unit Tests - OracleJDK 8"
+      jdk: oraclejdk8
+      env:
+        - TEST_CATEGORY=UNIT_TEST
+        - KAFKA_VERSION=2.0
+    - jdk: oraclejdk8
+      env:
+        - TEST_CATEGORY=QUICKSTART
+        - KAFKA_VERSION=2.0
+    - jdk: oraclejdk11
+      env:
+        - TEST_CATEGORY=QUICKSTART
+        - KAFKA_VERSION=2.0
+    - jdk: openjdk8
+      env:
+        - TEST_CATEGORY=QUICKSTART
+        - KAFKA_VERSION=2.0
+    - jdk: openjdk11
+      env:
+        - TEST_CATEGORY=QUICKSTART
+        - KAFKA_VERSION=2.0

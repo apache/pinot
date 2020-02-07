@@ -47,28 +47,24 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
-# Only run tests for JDK 8
-if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
-  echo 'Skip tests for version other than oracle jdk8.'
-  # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
-  rm -rf ~/.m2/repository/com/linkedin/pinot
-  exit 0
-fi
-
 passed=0
 
 KAFKA_BUILD_OPTS=""
-if [ "$KAFKA_VERSION" != '2.0' ]; then
-  git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-connectors)'
-  if [ $? -ne 0 ]; then
-    echo "No Pinot Connector Changes, Skip tests for Kafka Connector: ${KAFKA_VERSION}."
-    exit 0
-  fi
+if [ "$KAFKA_VERSION" != '2.0' ] && [ "$KAFKA_VERSION" != '' ]; then
   KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"
 fi
 
 # Only run integration tests if needed
 if [ "$TEST_CATEGORY" == 'INTEGRATION_TEST' ]; then
+
+  # Only run tests for JDK 8
+  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
+    echo 'Skip tests for version other than oracle jdk8.'
+    # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
+    rm -rf ~/.m2/repository/com/linkedin/pinot
+    exit 0
+  fi
+
   mvn test -B -P travis,travis-integration-tests-only ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
@@ -77,15 +73,24 @@ fi
 
 # Unit test
 if [ "$TEST_CATEGORY" == 'UNIT_TEST' ]; then
+
+  # Only run tests for JDK 8
+  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
+    echo 'Skip tests for version other than oracle jdk8.'
+    # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
+    rm -rf ~/.m2/repository/com/linkedin/pinot
+    exit 0
+  fi
+
   mvn test -B -P travis,travis-no-integration-tests ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi
 fi
 
+
 # Quickstart
 if [ "$TEST_CATEGORY" == 'QUICKSTART' ]; then
-  mvn clean install -DskipTests -Pbin-dist ${KAFKA_BUILD_OPTS}
   DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
   cd $DIST_BIN_DIR
 
