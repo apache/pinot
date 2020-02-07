@@ -52,6 +52,7 @@ import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This class is to schedule detection tasks based on data availability events.
  */
