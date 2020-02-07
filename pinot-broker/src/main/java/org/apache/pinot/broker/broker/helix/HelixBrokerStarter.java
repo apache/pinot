@@ -36,7 +36,6 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -182,12 +181,8 @@ public class HelixBrokerStarter {
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
     String enableCaseInsensitivePql = configAccessor.get(helixConfigScope, Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY);
     _brokerConf.setProperty(Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.valueOf(enableCaseInsensitivePql));
-    String maxQuerySelectionLimitStr = configAccessor.get(helixConfigScope, Helix.MAX_QUERY_SELECTION_LIMIT_KEY);
-    try {
-      _brokerConf.setProperty(Helix.MAX_QUERY_SELECTION_LIMIT_KEY, Integer.valueOf(maxQuerySelectionLimitStr));
-    } catch (NumberFormatException e) {
-      LOGGER.error("Unable to parse config [{}] value [{}] to Integer.", Helix.MAX_QUERY_SELECTION_LIMIT_KEY, maxQuerySelectionLimitStr, e);
-    }
+    String enableBrokerQueryLimitOverride = configAccessor.get(helixConfigScope, Helix.ENABLE_BROKER_QUERY_LIMIT_OVERRIDE_KEY);
+    _brokerConf.setProperty(Helix.ENABLE_BROKER_QUERY_LIMIT_OVERRIDE_KEY, Boolean.valueOf(enableBrokerQueryLimitOverride));
     _brokerServerBuilder = new BrokerServerBuilder(_brokerConf, _helixExternalViewBasedRouting,
         _helixExternalViewBasedRouting.getTimeBoundaryService(), _helixExternalViewBasedQueryQuotaManager, _propertyStore);
     BrokerRequestHandler brokerRequestHandler = _brokerServerBuilder.getBrokerRequestHandler();

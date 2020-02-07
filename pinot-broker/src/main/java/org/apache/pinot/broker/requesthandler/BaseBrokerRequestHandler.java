@@ -105,7 +105,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final AtomicInteger _numDroppedLog;
 
   private final boolean _enableCaseInsensitivePql;
-  private final int _maxQuerySelectionLimit;
+  private final boolean _enableBrokerQueryLimitOverride;
   private final TableCache _tableCache;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
@@ -125,7 +125,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _tableCache = null;
     }
 
-    _maxQuerySelectionLimit = _config.getInt(CommonConstants.Helix.MAX_QUERY_SELECTION_LIMIT_KEY, CommonConstants.Helix.DEFAULT_MAX_QUERY_SELECTION_LIMIT);
+    _enableBrokerQueryLimitOverride = _config.getBoolean(CommonConstants.Helix.ENABLE_BROKER_QUERY_LIMIT_OVERRIDE_KEY, false);
 
     _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
@@ -180,7 +180,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               e.getMessage());
         }
       }
-      handleMaxQuerySelectionLimit(brokerRequest, _maxQuerySelectionLimit);
+      if (_enableBrokerQueryLimitOverride) {
+        handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
+      }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -371,17 +373,27 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Reset limit for selection query if it exceeds maxQuerySelectionLimit.
    * @param brokerRequest
-   * @param maxQuerySelectionLimit
+   * @param queryLimit
    *
    */
-  static void handleMaxQuerySelectionLimit(BrokerRequest brokerRequest, int maxQuerySelectionLimit) {
-    if (maxQuerySelectionLimit > 0) {
-      if ((brokerRequest.getGroupBy() == null) && (brokerRequest.getLimit() > maxQuerySelectionLimit)) {
-        brokerRequest.setLimit(maxQuerySelectionLimit);
+  static void handleQueryLimitOverride(BrokerRequest brokerRequest, int queryLimit) {
+    if (queryLimit > 0) {
+      // Handle GroupBy for BrokerRequest
+      if (brokerRequest.getGroupBy() != null) {
+        if (brokerRequest.getGroupBy().getTopN() > queryLimit) {
+          brokerRequest.getGroupBy().setTopN(queryLimit);
+        }
       }
-      if ((brokerRequest.getPinotQuery()!= null) && (brokerRequest.getPinotQuery().getGroupByList() == null)) {
-        if (brokerRequest.getPinotQuery().getLimit() > maxQuerySelectionLimit) {
-          brokerRequest.getPinotQuery().setLimit(maxQuerySelectionLimit);
+
+      // Handle Selection for BrokerRequest
+      if (brokerRequest.getLimit() > queryLimit) {
+        brokerRequest.setLimit(queryLimit);
+      }
+
+      // Handle Selection & GroupBy for PinotQuery
+      if (brokerRequest.getPinotQuery()!= null) {
+        if (brokerRequest.getPinotQuery().getLimit() > queryLimit) {
+          brokerRequest.getPinotQuery().setLimit(queryLimit);
         }
       }
     }
