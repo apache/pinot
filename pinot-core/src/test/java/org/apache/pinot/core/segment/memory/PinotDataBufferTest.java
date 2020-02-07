@@ -116,6 +116,62 @@ public class PinotDataBufferTest {
   }
 
   @Test
+  public void testPinotNativeUnsafeByteBuffer()
+      throws Exception {
+    try (PinotDataBuffer buffer = PinotNativeUnsafeByteBuffer.allocateDirect(BUFFER_SIZE)) {
+      testPinotDataBuffer(buffer);
+    }
+    try (PinotDataBuffer buffer = PinotNativeUnsafeByteBuffer.allocateDirect(BUFFER_SIZE)) {
+      testPinotDataBuffer(buffer);
+    }
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(TEMP_FILE, "rw")) {
+      randomAccessFile.setLength(FILE_OFFSET + BUFFER_SIZE);
+      try (PinotDataBuffer buffer = PinotNativeUnsafeByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE)) {
+        testPinotDataBuffer(buffer);
+      }
+      try (PinotDataBuffer buffer = PinotNativeUnsafeByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE)) {
+        testPinotDataBuffer(buffer);
+      }
+      try (PinotDataBuffer buffer = PinotNativeUnsafeByteBuffer.mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE)) {
+        testPinotDataBuffer(buffer);
+      }
+      try (PinotDataBuffer buffer = PinotNativeUnsafeByteBuffer.mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE)) {
+        testPinotDataBuffer(buffer);
+      }
+    } finally {
+      FileUtils.forceDelete(TEMP_FILE);
+    }
+  }
+
+  @Test
+  public void testPinotNonNativeUnsafeByteBuffer()
+      throws Exception {
+    try (PinotDataBuffer buffer = PinotNonNativeUnsafeByteBuffer.allocateDirect(BUFFER_SIZE)) {
+      testPinotDataBuffer(buffer);
+    }
+    try (PinotDataBuffer buffer = PinotNonNativeUnsafeByteBuffer.allocateDirect(BUFFER_SIZE)) {
+      testPinotDataBuffer(buffer);
+    }
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(TEMP_FILE, "rw")) {
+      randomAccessFile.setLength(FILE_OFFSET + BUFFER_SIZE);
+      try (PinotDataBuffer buffer = PinotNonNativeUnsafeByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE)) {
+        testPinotDataBuffer(buffer);
+      }
+      try (PinotDataBuffer buffer = PinotNonNativeUnsafeByteBuffer.loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE)) {
+        testPinotDataBuffer(buffer);
+      }
+      try (PinotDataBuffer buffer = PinotNonNativeUnsafeByteBuffer.mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE)) {
+        testPinotDataBuffer(buffer);
+      }
+      try (PinotDataBuffer buffer = PinotNonNativeUnsafeByteBuffer.mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE)) {
+        testPinotDataBuffer(buffer);
+      }
+    } finally {
+      FileUtils.forceDelete(TEMP_FILE);
+    }
+  }
+
+  @Test
   public void testPinotNativeOrderLBuffer()
       throws Exception {
     try (PinotDataBuffer buffer = PinotNativeOrderLBuffer.allocateDirect(BUFFER_SIZE)) {
@@ -366,6 +422,44 @@ public class PinotDataBufferTest {
       }
       try (PinotDataBuffer readBuffer = PinotByteBuffer
           .mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {
+        getInts(readBuffer);
+      }
+    } finally {
+      FileUtils.forceDelete(TEMP_FILE);
+    }
+  }
+
+  @Test
+  public void testPinotNativeUnsafeByteBufferReadWriteFile()
+      throws Exception {
+    try (PinotDataBuffer writeBuffer = PinotNativeUnsafeByteBuffer
+        .mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE)) {
+      putInts(writeBuffer);
+      try (PinotDataBuffer readBuffer = PinotNativeUnsafeByteBuffer
+          .loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE)) {
+        getInts(readBuffer);
+      }
+      try (PinotDataBuffer readBuffer = PinotNativeUnsafeByteBuffer
+          .mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE)) {
+        getInts(readBuffer);
+      }
+    } finally {
+      FileUtils.forceDelete(TEMP_FILE);
+    }
+  }
+
+  @Test
+  public void testPinotNonNativeUnsafeByteBufferReadWriteFile()
+      throws Exception {
+    try (PinotDataBuffer writeBuffer = PinotNonNativeUnsafeByteBuffer
+        .mapFile(TEMP_FILE, false, FILE_OFFSET, BUFFER_SIZE)) {
+      putInts(writeBuffer);
+      try (PinotDataBuffer readBuffer = PinotNonNativeUnsafeByteBuffer
+          .loadFile(TEMP_FILE, FILE_OFFSET, BUFFER_SIZE)) {
+        getInts(readBuffer);
+      }
+      try (PinotDataBuffer readBuffer = PinotNonNativeUnsafeByteBuffer
+          .mapFile(TEMP_FILE, true, FILE_OFFSET, BUFFER_SIZE)) {
         getInts(readBuffer);
       }
     } finally {

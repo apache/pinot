@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.memory;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
@@ -29,198 +30,214 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.core.util.CleanerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.misc.Unsafe;
+import sun.nio.ch.DirectBuffer;
 
 
 @ThreadSafe
-public class PinotByteBuffer extends PinotDataBuffer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotByteBuffer.class);
-  private final ByteBuffer _buffer;
+public class PinotNativeUnsafeByteBuffer extends PinotDataBuffer {
+  private final DirectBuffer _buffer;
+  private final long _address;
   private final boolean _flushable;
+  private static final Unsafe UNSAFE = getUnsafe();
 
-  public static PinotByteBuffer allocateDirect(int size, ByteOrder byteOrder) {
-    return new PinotByteBuffer(ByteBuffer.allocateDirect(size).order(byteOrder), true, false);
+  private static Unsafe getUnsafe() {
+    try {
+      Field var0 = Unsafe.class.getDeclaredField("theUnsafe");
+      var0.setAccessible(true);
+      return (Unsafe)(var0.get((Object)null));
+    } catch (NoSuchFieldException e) {
+      throw new IllegalStateException("sun.misc.Unsafe is not available in this JVM", e);
+    } catch (IllegalAccessException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
-  static PinotByteBuffer loadFile(File file, long offset, int size, ByteOrder byteOrder)
+  public static PinotNativeUnsafeByteBuffer allocateDirect(int size) {
+    return new PinotNativeUnsafeByteBuffer(ByteBuffer.allocateDirect(size), true, false);
+  }
+
+  static PinotNativeUnsafeByteBuffer loadFile(File file, long offset, int size)
       throws IOException {
-    PinotByteBuffer buffer = allocateDirect(size, byteOrder);
+    PinotNativeUnsafeByteBuffer buffer = allocateDirect(size);
     buffer.readFrom(0, file, offset, size);
     return buffer;
   }
 
-  static PinotByteBuffer mapFile(File file, boolean readOnly, long offset, int size, ByteOrder byteOrder)
+  static PinotNativeUnsafeByteBuffer mapFile(File file, boolean readOnly, long offset, int size)
       throws IOException {
     if (readOnly) {
       try (FileChannel fileChannel = new RandomAccessFile(file, "r").getChannel()) {
-        ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, offset, size).order(byteOrder);
-        return new PinotByteBuffer(buffer, true, false);
+        ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, offset, size);
+        return new PinotNativeUnsafeByteBuffer(buffer, true, false);
       }
     } else {
       try (FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel()) {
-        ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, offset, size).order(byteOrder);
-        return new PinotByteBuffer(buffer, true, true);
+        ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, offset, size);
+        return new PinotNativeUnsafeByteBuffer(buffer, true, true);
       }
     }
   }
 
-  private PinotByteBuffer(ByteBuffer buffer, boolean closeable, boolean flushable) {
+  private PinotNativeUnsafeByteBuffer(ByteBuffer buffer, boolean closeable, boolean flushable) {
     super(closeable);
-    _buffer = buffer;
+    _buffer = (DirectBuffer)buffer;
+    _address = _buffer.address();
     _flushable = flushable;
   }
 
   @Override
   public byte getByte(int offset) {
-    return _buffer.get(offset);
+    return UNSAFE.getByte(_address + offset);
   }
 
   @Override
   public byte getByte(long offset) {
     assert offset <= Integer.MAX_VALUE;
-    return _buffer.get((int) offset);
+    return UNSAFE.getByte(_address + (int) offset);
   }
 
   @Override
   public void putByte(int offset, byte value) {
-    _buffer.put(offset, value);
+    UNSAFE.putByte(_address + offset, value);
   }
 
   @Override
   public void putByte(long offset, byte value) {
     assert offset <= Integer.MAX_VALUE;
-    _buffer.put((int) offset, value);
+    UNSAFE.putByte(_address + (int) offset, value);
   }
 
   @Override
   public char getChar(int offset) {
-    return _buffer.getChar(offset);
+    return UNSAFE.getChar(_address + offset);
   }
 
   @Override
   public char getChar(long offset) {
     assert offset <= Integer.MAX_VALUE;
-    return _buffer.getChar((int) offset);
+    return UNSAFE.getChar(_address + (int) offset);
   }
 
   @Override
   public void putChar(int offset, char value) {
-    _buffer.putChar(offset, value);
+    UNSAFE.putChar(_address + offset, value);
   }
 
   @Override
   public void putChar(long offset, char value) {
     assert offset <= Integer.MAX_VALUE;
-    _buffer.putChar((int) offset, value);
+    UNSAFE.putChar(_address + (int) offset, value);
   }
 
   @Override
   public short getShort(int offset) {
-    return _buffer.getShort(offset);
+    return UNSAFE.getShort(_address + offset);
   }
 
   @Override
   public short getShort(long offset) {
     assert offset <= Integer.MAX_VALUE;
-    return _buffer.getShort((int) offset);
+    return UNSAFE.getShort(_address + (int) offset);
   }
 
   @Override
   public void putShort(int offset, short value) {
-    _buffer.putShort(offset, value);
+    UNSAFE.putShort(_address + offset, value);
   }
 
   @Override
   public void putShort(long offset, short value) {
     assert offset <= Integer.MAX_VALUE;
-    _buffer.putShort((int) offset, value);
+    UNSAFE.putShort(_address + (int) offset, value);
   }
 
   @Override
   public int getInt(int offset) {
-    return _buffer.getInt(offset);
+    return UNSAFE.getInt(_address + offset);
   }
 
   @Override
   public int getInt(long offset) {
     assert offset <= Integer.MAX_VALUE;
-    return _buffer.getInt((int) offset);
+    return UNSAFE.getInt(_address + (int) offset);
   }
 
   @Override
   public void putInt(int offset, int value) {
-    _buffer.putInt(offset, value);
+    UNSAFE.putInt(_address + offset, value);
   }
 
   @Override
   public void putInt(long offset, int value) {
     assert offset <= Integer.MAX_VALUE;
-    _buffer.putInt((int) offset, value);
+    UNSAFE.putInt(_address + (int) offset, value);
   }
 
   @Override
   public long getLong(int offset) {
-    return _buffer.getLong(offset);
+    return UNSAFE.getLong(_address + offset);
   }
 
   @Override
   public long getLong(long offset) {
     assert offset <= Integer.MAX_VALUE;
-    return _buffer.getLong((int) offset);
+    return UNSAFE.getLong(_address + (int) offset);
   }
 
   @Override
   public void putLong(int offset, long value) {
-    _buffer.putLong(offset, value);
+    UNSAFE.putLong(_address + offset, value);
   }
 
   @Override
   public void putLong(long offset, long value) {
     assert offset <= Integer.MAX_VALUE;
-    _buffer.putLong((int) offset, value);
+    UNSAFE.putLong(_address + (int) offset, value);
   }
 
   @Override
   public float getFloat(int offset) {
-    return _buffer.getFloat(offset);
+    return UNSAFE.getFloat(_address + offset);
   }
 
   @Override
   public float getFloat(long offset) {
     assert offset <= Integer.MAX_VALUE;
-    return _buffer.getFloat((int) offset);
+    return UNSAFE.getFloat(_address + (int) offset);
   }
 
   @Override
   public void putFloat(int offset, float value) {
-    _buffer.putFloat(offset, value);
+    UNSAFE.putFloat(_address + offset, value);
   }
 
   @Override
   public void putFloat(long offset, float value) {
     assert offset <= Integer.MAX_VALUE;
-    _buffer.putFloat((int) offset, value);
+    UNSAFE.putFloat(_address + (int) offset, value);
   }
 
   @Override
   public double getDouble(int offset) {
-    return _buffer.getDouble(offset);
+    return UNSAFE.getDouble(_address + offset);
   }
 
   @Override
   public double getDouble(long offset) {
     assert offset <= Integer.MAX_VALUE;
-    return _buffer.getDouble((int) offset);
+    return UNSAFE.getDouble(_address + (int) offset);
   }
 
   @Override
   public void putDouble(int offset, double value) {
-    _buffer.putDouble(offset, value);
+    UNSAFE.putDouble(_address + offset, value);
   }
 
   @Override
   public void putDouble(long offset, double value) {
     assert offset <= Integer.MAX_VALUE;
-    _buffer.putDouble((int) offset, value);
+    UNSAFE.putDouble(_address + (int) offset, value);
   }
 
   @Override
@@ -233,7 +250,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
         buffer[i] = getByte(intOffset++);
       }
     } else {
-      ByteBuffer duplicate = _buffer.duplicate();
+      ByteBuffer duplicate = ((ByteBuffer)_buffer).duplicate();
       duplicate.position(intOffset);
       duplicate.get(buffer, destOffset, size);
     }
@@ -245,7 +262,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     assert size <= Integer.MAX_VALUE;
     int start = (int) offset;
     int end = start + (int) size;
-    ByteBuffer duplicate = _buffer.duplicate();
+    ByteBuffer duplicate = ((ByteBuffer)_buffer).duplicate();
     duplicate.position(start).limit(end);
     buffer.readFrom(destOffset, duplicate);
   }
@@ -260,7 +277,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
         putByte(intOffset++, buffer[i]);
       }
     } else {
-      ByteBuffer duplicate = _buffer.duplicate();
+      ByteBuffer duplicate = ((ByteBuffer)_buffer).duplicate();
       duplicate.position(intOffset);
       duplicate.put(buffer, srcOffset, size);
     }
@@ -269,7 +286,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   @Override
   public void readFrom(long offset, ByteBuffer buffer) {
     assert offset <= Integer.MAX_VALUE;
-    ByteBuffer duplicate = _buffer.duplicate();
+    ByteBuffer duplicate = ((ByteBuffer)_buffer).duplicate();
     duplicate.position((int) offset);
     duplicate.put(buffer);
   }
@@ -280,7 +297,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     assert offset <= Integer.MAX_VALUE;
     assert size <= Integer.MAX_VALUE;
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r")) {
-      ByteBuffer duplicate = _buffer.duplicate();
+      ByteBuffer duplicate = ((ByteBuffer)_buffer).duplicate();
       int start = (int) offset;
       int end = start + (int) size;
       duplicate.position(start).limit(end);
@@ -290,23 +307,23 @@ public class PinotByteBuffer extends PinotDataBuffer {
 
   @Override
   public long size() {
-    return _buffer.limit();
+    return ((ByteBuffer)_buffer).limit();
   }
 
   @Override
   public ByteOrder order() {
-    return _buffer.order();
+    return ((ByteBuffer)_buffer).order();
   }
 
   @Override
   public PinotDataBuffer view(long start, long end, ByteOrder byteOrder) {
     assert start <= end;
     assert end <= Integer.MAX_VALUE;
-    ByteBuffer duplicate = _buffer.duplicate();
+    ByteBuffer duplicate = ((ByteBuffer)_buffer).duplicate();
     duplicate.position((int) start).limit((int) end);
     ByteBuffer buffer = duplicate.slice();
     buffer.order(byteOrder);
-    return new PinotByteBuffer(buffer, false, false);
+    return new PinotNativeUnsafeByteBuffer(buffer, false, false);
   }
 
   @Override
@@ -314,7 +331,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     assert offset <= Integer.MAX_VALUE;
     int start = (int) offset;
     int end = start + size;
-    ByteBuffer duplicate = _buffer.duplicate();
+    ByteBuffer duplicate = ((ByteBuffer)_buffer).duplicate();
     duplicate.position(start).limit(end);
     ByteBuffer buffer = duplicate.slice();
     buffer.order(byteOrder);
@@ -332,7 +349,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   protected void release()
       throws IOException {
     if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.getCleaner().freeBuffer(_buffer);
+      CleanerUtil.getCleaner().freeBuffer((ByteBuffer)_buffer);
     }
   }
 }
