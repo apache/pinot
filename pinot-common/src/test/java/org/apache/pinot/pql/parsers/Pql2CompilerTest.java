@@ -30,7 +30,6 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.PinotQueryParserFactory;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
