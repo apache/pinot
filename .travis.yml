@@ -21,9 +21,6 @@ addons:
 install:
   - ./.travis_install.sh
 
-script:
-  - ./.travis_test.sh
-
 branches:
   only:
     - master
@@ -32,27 +29,29 @@ jobs:
   include:
     - name: "Integration Tests - OracleJDK 8"
       jdk: oraclejdk8
+      script:
+        - ./.travis_test.sh
       env:
-        - TEST_CATEGORY=INTEGRATION_TEST
-        - KAFKA_VERSION=2.0
+        - RUN_INTEGRATION_TESTS=true
     - name: "Unit Tests - OracleJDK 8"
       jdk: oraclejdk8
+      script:
+        - ./.travis_test.sh
       env:
-        - TEST_CATEGORY=UNIT_TEST
-        - KAFKA_VERSION=2.0
-    - jdk: oraclejdk8
-      env:
-        - TEST_CATEGORY=QUICKSTART
-        - KAFKA_VERSION=2.0
-    - jdk: oraclejdk11
-      env:
-        - TEST_CATEGORY=QUICKSTART
-        - KAFKA_VERSION=2.0
-    - jdk: openjdk8
-      env:
-        - TEST_CATEGORY=QUICKSTART
-        - KAFKA_VERSION=2.0
-    - jdk: openjdk11
-      env:
-        - TEST_CATEGORY=QUICKSTART
-        - KAFKA_VERSION=2.0
+        - RUN_INTEGRATION_TESTS=false
+    - name: "QuickStart - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OracleJDK 11"
+      jdk: oraclejdk11
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OpenJDK 8"
+      jdk: openjdk8
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OpenJDK 11"
+      jdk: openjdk11
+      script:
+        - ./.travis_quickstart.sh

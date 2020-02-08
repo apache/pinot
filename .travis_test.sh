@@ -29,7 +29,7 @@ if [ $? -eq 0 ]; then
     exit 0
   fi
 
-  if [ "$TEST_CATEGORY" == 'UNIT_TEST' ]; then
+  if [ "RUN_INTEGRATION_TESTS" == 'false' ]; then
     echo 'Skip ThirdEye tests when integration tests off'
     rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
     exit 0
@@ -47,6 +47,14 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
+# Only run tests for JDK 8
+if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
+  echo 'Skip tests for version other than oracle jdk8.'
+  # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
+  rm -rf ~/.m2/repository/com/linkedin/pinot
+  exit 0
+fi
+
 passed=0
 
 KAFKA_BUILD_OPTS=""
@@ -55,73 +63,14 @@ if [ "$KAFKA_VERSION" != '2.0' ] && [ "$KAFKA_VERSION" != '' ]; then
 fi
 
 # Only run integration tests if needed
-if [ "$TEST_CATEGORY" == 'INTEGRATION_TEST' ]; then
-
-  # Only run tests for JDK 8
-  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
-    echo 'Skip tests for version other than oracle jdk8.'
-    # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
-    rm -rf ~/.m2/repository/com/linkedin/pinot
-    exit 0
-  fi
-
+if [ "$RUN_INTEGRATION_TESTS" != 'false' ]; then
   mvn test -B -P travis,travis-integration-tests-only ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi
-fi
-
-# Unit test
-if [ "$TEST_CATEGORY" == 'UNIT_TEST' ]; then
-
-  # Only run tests for JDK 8
-  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
-    echo 'Skip tests for version other than oracle jdk8.'
-    # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
-    rm -rf ~/.m2/repository/com/linkedin/pinot
-    exit 0
-  fi
-
+else
   mvn test -B -P travis,travis-no-integration-tests ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
-    passed=1
-  fi
-fi
-
-
-# Quickstart
-if [ "$TEST_CATEGORY" == 'QUICKSTART' ]; then
-  DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
-  cd $DIST_BIN_DIR
-
-  # Test quick-start-batch
-  passed_batch=0
-  bin/quick-start-batch.sh &
-  PID=$!
-  sleep 60
-  COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  if [ ${COUNT_STAR_RES} -eq 97889 ]; then
-    passed_batch=1
-  fi
-  kill $PID
-  sleep 30
-
-  # Test quick-start-streaming
-  passed_streaming=0
-  bin/quick-start-streaming.sh &
-  PID=$!
-  sleep 60
-  COUNT_STAR_RES_1=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  sleep 5
-  COUNT_STAR_RES_2=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  sleep 5
-  COUNT_STAR_RES_3=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  if [ ${COUNT_STAR_RES_3} -gt ${COUNT_STAR_RES_2} ] && [ ${COUNT_STAR_RES_2} -gt ${COUNT_STAR_RES_1} ]; then
-    passed_streaming=1
-  fi
-  kill $PID
-  sleep 30
-  if [ ${passed_batch} -eq 1 ] && [ ${passed_streaming} -eq 1 ]; then
     passed=1
   fi
 fi
@@ -130,10 +79,8 @@ fi
 rm -rf ~/.m2/repository/com/linkedin/pinot
 
 if [ $passed -eq 1 ]; then
-  if [ -f ".codecov_bash" ]; then
-    # Only send code coverage data if passed
-    bash <(cat .codecov_bash)
-  fi
+  # Only send code coverage data if passed
+  bash <(cat .codecov_bash)
   exit 0
 else
   exit 1
