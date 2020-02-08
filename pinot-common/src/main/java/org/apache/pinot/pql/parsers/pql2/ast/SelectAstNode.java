@@ -22,7 +22,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.request.PinotQueryParserFactory;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;

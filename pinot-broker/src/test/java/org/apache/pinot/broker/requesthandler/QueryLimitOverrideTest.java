@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.requesthandler;
 
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQueryParserFactory;
 import org.apache.pinot.parsers.AbstractCompiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
