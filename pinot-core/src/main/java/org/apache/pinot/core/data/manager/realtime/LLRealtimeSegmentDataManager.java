@@ -203,10 +203,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
-  // Semaphore for each partitionId only. See the comments in {@link RealtimeTableDataManager}.
+  // Semaphore for each partitionId only, which is to prevent two different Kafka consumers
+  // from consuming with the same partitionId in parallel in the same host.
+  // See the comments in {@link RealtimeTableDataManager}.
   private final Semaphore _partitionConsumerSemaphore;
-  // A boolean flag to check whether the current thread acquires the semaphore, so that the semaphore be released only once within the same thread.
-  private final AtomicBoolean _acquireConsumerSemaphore;
+  // A boolean flag to check whether the current thread has acquired the semaphore.
+  // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
+  // modify the permit. This boolean make sure the semaphore gets released only once within the same thread.
+  private final AtomicBoolean _acquiredConsumerSemaphore;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
   private final MutableSegmentImpl _realtimeSegment;
@@ -682,8 +686,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @VisibleForTesting
-  protected AtomicBoolean getAcquireConsumerSemaphore() {
-    return _acquireConsumerSemaphore;
+  protected AtomicBoolean getAcquiredConsumerSemaphore() {
+    return _acquiredConsumerSemaphore;
   }
 
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
@@ -830,7 +834,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private void closeKafkaConsumers() {
     closePartitionLevelConsumer();
     closeStreamMetadataProvider();
-    if (_acquireConsumerSemaphore.compareAndSet(true, false)) {
+    if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
       _partitionConsumerSemaphore.release();
     }
   }
@@ -1064,7 +1068,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _llcSegmentName = llcSegmentName;
     _streamPartitionId = _llcSegmentName.getPartitionId();
     _partitionConsumerSemaphore = partitionConsumerSemaphore;
-    _acquireConsumerSemaphore = new AtomicBoolean(false);
+    _acquiredConsumerSemaphore = new AtomicBoolean(false);
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _streamPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
@@ -1143,7 +1147,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Acquire semaphore to create Kafka consumers
     try {
       _partitionConsumerSemaphore.acquire();
-      _acquireConsumerSemaphore.set(true);
+      _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring semaphore for Segment: " + _segmentNameStr;
       segmentLogger.error(errorMsg);

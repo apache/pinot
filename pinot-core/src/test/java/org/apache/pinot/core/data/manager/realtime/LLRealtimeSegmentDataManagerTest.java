@@ -647,7 +647,7 @@ public class LLRealtimeSegmentDataManagerTest {
       throws Exception {
     long timeout = 2_000L;
     FakeLLRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
-    Assert.assertTrue(firstSegmentDataManager.getAcquireConsumerSemaphore().get());
+    Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
     Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
 
     // Release semaphore after timeout.
@@ -666,7 +666,7 @@ public class LLRealtimeSegmentDataManagerTest {
     FakeLLRealtimeSegmentDataManager secondSegmentDataManager = createFakeSegmentManager();
     Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore(),
         secondSegmentDataManager.getPartitionConsumerSemaphore());
-    Assert.assertTrue(secondSegmentDataManager.getAcquireConsumerSemaphore().get());
+    Assert.assertTrue(secondSegmentDataManager.getAcquiredConsumerSemaphore().get());
     Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
 
     // Call destroy method the 2nd time on the first segment manager, the permits in semaphore won't increase.

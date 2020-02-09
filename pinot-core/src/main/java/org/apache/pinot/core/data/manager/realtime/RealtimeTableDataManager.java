@@ -63,8 +63,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
   private final Semaphore _segmentBuildSemaphore;
-  // Maintains a map for the partitionIds and its related semaphores, which is to prevent two different Kafka consumers
-  // from consuming with the same partitionId in parallel in the same host.
+  // Maintains a map of partitionIds to semaphores.
+  // The semaphore ensures that exactly one PartitionConsumer instance consumes from any stream partition.
+  // In some streams, it's possible that having multiple consumers (with the same consumer name on the same host) consuming from the same stream partition can lead to bugs.
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
   private final Map<Integer, Semaphore> _partitionIdToSemaphoreMap = new ConcurrentHashMap<>();
