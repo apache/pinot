@@ -2,18 +2,10 @@ language: java
 sudo: false
 dist: trusty
 
-env:
-  global:
-    - JOBS=1
-  matrix:
-    - RUN_INTEGRATION_TESTS=true
-      KAFKA_VERSION=2.0
-    - RUN_INTEGRATION_TESTS=false
-      KAFKA_VERSION=2.0
-    - RUN_INTEGRATION_TESTS=true
-      KAFKA_VERSION=0.9
-    - RUN_INTEGRATION_TESTS=false
-      KAFKA_VERSION=0.9
+before_install:
+  - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
+  - export PATH=$PATH:~/bin
+  - jq --version
 
 jdk:
   - oraclejdk8
@@ -29,9 +21,37 @@ addons:
 install:
   - ./.travis_install.sh
 
-script:
-  - ./.travis_test.sh
-
 branches:
   only:
     - master
+
+jobs:
+  include:
+    - name: "Integration Tests - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_test.sh
+      env:
+        - RUN_INTEGRATION_TESTS=true
+    - name: "Unit Tests - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_test.sh
+      env:
+        - RUN_INTEGRATION_TESTS=false
+    - name: "QuickStart - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OracleJDK 11"
+      jdk: oraclejdk11
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OpenJDK 8"
+      jdk: openjdk8
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OpenJDK 11"
+      jdk: openjdk11
+      script:
+        - ./.travis_quickstart.sh

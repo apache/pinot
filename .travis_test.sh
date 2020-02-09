@@ -29,7 +29,7 @@ if [ $? -eq 0 ]; then
     exit 0
   fi
 
-  if [ "$RUN_INTEGRATION_TESTS" == 'false' ]; then
+  if [ "RUN_INTEGRATION_TESTS" == 'false' ]; then
     echo 'Skip ThirdEye tests when integration tests off'
     rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
     exit 0
@@ -58,12 +58,7 @@ fi
 passed=0
 
 KAFKA_BUILD_OPTS=""
-if [ "$KAFKA_VERSION" != '2.0' ]; then
-  git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-connectors)'
-  if [ $? -ne 0 ]; then
-    echo "No Pinot Connector Changes, Skip tests for Kafka Connector: ${KAFKA_VERSION}."
-    exit 0
-  fi
+if [ "$KAFKA_VERSION" != '2.0' ] && [ "$KAFKA_VERSION" != '' ]; then
   KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"
 fi
 

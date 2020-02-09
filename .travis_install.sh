@@ -39,14 +39,25 @@ if [ $noThirdEyeChange -eq 0 ]; then
 fi
 
 KAFKA_BUILD_OPTS=""
-if [ "$KAFKA_VERSION" != '2.0' ]; then
+if [ "$KAFKA_VERSION" != '2.0' ] && [ "$KAFKA_VERSION" != '' ]; then
   KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"
 fi
 
 if [ $noThirdEyeChange -ne 0 ]; then
   echo "Full Pinot build"
   echo "No ThirdEye changes"
-  mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true ${KAFKA_BUILD_OPTS} || exit $?
+  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
+    # JDK 11 prints more logs exceeding Travis limits.
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true ${KAFKA_BUILD_OPTS} > /tmp/mvn_build_log
+    if [ $? -eq 0 ]; then
+      exit 0
+    else
+      tail -1000 /tmp/mvn_build_log
+      exit 1
+    fi
+  else
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true ${KAFKA_BUILD_OPTS} || exit $?
+  fi
 fi
 
 # Build ThirdEye for ThirdEye related changes
