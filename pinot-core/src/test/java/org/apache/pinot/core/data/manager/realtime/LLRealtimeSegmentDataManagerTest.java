@@ -28,6 +28,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -45,6 +46,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -645,37 +647,53 @@ public class LLRealtimeSegmentDataManagerTest {
   @Test
   public void testOnlyOneSegmentHoldingTheSemaphoreForParticularPartition()
       throws Exception {
-    long timeout = 2_000L;
+    long timeout = 10_000L;
     FakeLLRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
     Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
-    Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
+    Semaphore firstSemaphore = firstSegmentDataManager.getPartitionConsumerSemaphore();
+    Assert.assertEquals(firstSemaphore.availablePermits(), 0);
+    Assert.assertFalse(firstSemaphore.hasQueuedThreads());
 
-    // Release semaphore after timeout.
-    Thread releaseSemaphore = new Thread(() -> {
+    AtomicReference<FakeLLRealtimeSegmentDataManager> secondSegmentDataManager = new AtomicReference<>(null);
+
+    // Construct the second segment manager, which will be blocked on the semaphore.
+    Thread constructSecondSegmentManager = new Thread(() -> {
       try {
-        Thread.sleep(timeout);
-      } catch (InterruptedException e) {
-        throw new RuntimeException("InterruptedException when sleeping for " + timeout + "ms");
-      } finally {
-        firstSegmentDataManager.destroy();
+        secondSegmentDataManager.set(createFakeSegmentManager());
+      } catch (Exception e) {
+        throw new RuntimeException("Exception when sleeping for " + timeout + "ms", e);
       }
     });
-    releaseSemaphore.start();
+    constructSecondSegmentManager.start();
 
-    // The second segment will be hanged until the semaphore gets released.
-    FakeLLRealtimeSegmentDataManager secondSegmentDataManager = createFakeSegmentManager();
-    Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore(),
-        secondSegmentDataManager.getPartitionConsumerSemaphore());
-    Assert.assertTrue(secondSegmentDataManager.getAcquiredConsumerSemaphore().get());
-    Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
+    // Wait until the second segment manager gets blocked on the semaphore.
+    TestUtils.waitForCondition(aVoid -> {
+      if (firstSemaphore.hasQueuedThreads()) {
+        // Once verified the second segment gets blocked, release the semaphore.
+        firstSegmentDataManager.destroy();
+        return true;
+      } else {
+        return false;
+      }
+    }, timeout, "Failed to wait for the second segment blocked on semaphore");
+
+    // Wait for the second segment manager finished the construction.
+    TestUtils.waitForCondition(aVoid -> secondSegmentDataManager.get() != null, timeout,
+        "Failed to acquire the semaphore for the second segment manager in " + timeout + "ms");
+
+    Assert.assertTrue(secondSegmentDataManager.get().getAcquiredConsumerSemaphore().get());
+    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionConsumerSemaphore();
+    Assert.assertEquals(firstSemaphore, secondSemaphore);
+    Assert.assertEquals(secondSemaphore.availablePermits(), 0);
+    Assert.assertFalse(secondSemaphore.hasQueuedThreads());
 
     // Call destroy method the 2nd time on the first segment manager, the permits in semaphore won't increase.
     firstSegmentDataManager.destroy();
     Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
 
     // The permit finally gets released in the Semaphore.
-    secondSegmentDataManager.destroy();
-    Assert.assertEquals(secondSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 1);
+    secondSegmentDataManager.get().destroy();
+    Assert.assertEquals(secondSegmentDataManager.get().getPartitionConsumerSemaphore().availablePermits(), 1);
   }
 
   public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
@@ -906,4 +924,8 @@ public class LLRealtimeSegmentDataManagerTest {
       }
     }
   }
+
+//  public static class FakeSemaphore extends Semaphore {
+//
+//  }
 }

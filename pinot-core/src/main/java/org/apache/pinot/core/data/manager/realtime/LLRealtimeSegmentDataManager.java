@@ -209,7 +209,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final Semaphore _partitionConsumerSemaphore;
   // A boolean flag to check whether the current thread has acquired the semaphore.
   // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
-  // modify the permit. This boolean make sure the semaphore gets released only once within the same thread.
+  // modify the permit. This boolean make sure the semaphore gets released only once when the partition stops consuming.
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
@@ -1149,7 +1149,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _partitionConsumerSemaphore.acquire();
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
-      String errorMsg = "InterruptedException when acquiring semaphore for Segment: " + _segmentNameStr;
+      String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
       segmentLogger.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }
