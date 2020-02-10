@@ -65,7 +65,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         let foundAlert = alerts.find(yamlAlert => yamlAlert.id === id);
         if (foundAlert) {
           Object.assign(foundAlert, {
-            application: subscriptionGroup.application,
+            application: foundAlert.application ? foundAlert.application + ", " + subscriptionGroup.application : subscriptionGroup.application,
             group: foundAlert.group ? foundAlert.group + ", " + subscriptionGroup.name : subscriptionGroup.name
           });
         }
@@ -162,6 +162,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
           if (groups) {
             groups.split(", ").forEach(g => {
               alertPropertyArray.push(g);
+            });
+          }
+        });
+      } else if (filter.name === 'application') {
+        // Make sure applications are not bundled for filter parameters
+        model.alerts.forEach(alert => {
+          let applications = alert[filterToPropertyMap[filter.name]];
+          if (applications) {
+            applications.split(", ").forEach(a => {
+              alertPropertyArray.push(a);
             });
           }
         });

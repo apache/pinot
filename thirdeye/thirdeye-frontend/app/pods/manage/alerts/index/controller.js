@@ -303,6 +303,16 @@ export default Controller.extend({
           });
         }
       });
+    } else if (blockItem.name === 'application') {
+      // Make sure applications are not bundled for filter parameters
+      alertsCollection.forEach(alert => {
+        let applications = alert[filterToPropertyMap[blockItem.name]];
+        if (applications) {
+          applications.split(", ").forEach(a => {
+            alertPropsAsKeys.push(a);
+          });
+        }
+      });
     } else {
       alertPropsAsKeys = alertsCollection.map(alert => alert[filterToPropertyMap[blockItem.name]]);
     }
@@ -344,8 +354,16 @@ export default Controller.extend({
           // See 'filterToPropertyMap' in route. For filterKey = 'owner' this would map alerts by alert['createdBy'] = x
           const targetAlertPropertyValue = alert[filterToPropertyMap[filterKey]];
           let alertMeetsCriteria = false;
-          // In the case for subscription, there can be multiple groups.  We just need to match on one
+          // In the cases for subscription and application, there can be multiple values.  We just need to match on one
           if (filterKey === "subscription") {
+            if (targetAlertPropertyValue) {
+              filterValueArray.forEach(val => {
+                if (targetAlertPropertyValue.includes(val)) {
+                  alertMeetsCriteria = true;
+                }
+              });
+            }
+          } else if (filterKey === "application") {
             if (targetAlertPropertyValue) {
               filterValueArray.forEach(val => {
                 if (targetAlertPropertyValue.includes(val)) {
