@@ -1151,7 +1151,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
       segmentLogger.error(errorMsg);
-      throw new RuntimeException(errorMsg);
+      throw new RuntimeException(errorMsg + " for segment: " + _segmentNameStr);
     }
     makeStreamConsumer("Starting");
     makeStreamMetadataProvider("Starting");

@@ -924,8 +924,4 @@ public class LLRealtimeSegmentDataManagerTest {
       }
     }
   }
-
-//  public static class FakeSemaphore extends Semaphore {
-//
-//  }
 }
