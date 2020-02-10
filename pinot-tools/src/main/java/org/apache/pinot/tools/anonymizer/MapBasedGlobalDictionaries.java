@@ -197,7 +197,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     while (sortedIterator.hasNext()) {
       Map.Entry<Object, DerivedValue> entry = sortedIterator.next();
       DerivedValue derivedValue = entry.getValue();
-      derivedValue._derivedValue = INT_BASE_VALUE + i;
+      derivedValue._derivedValue = INT_BASE_VALUE + i++;
     }
   }
 
@@ -207,7 +207,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     while (sortedIterator.hasNext()) {
       Map.Entry<Object, DerivedValue> entry = sortedIterator.next();
       DerivedValue derivedValue = entry.getValue();
-      derivedValue._derivedValue = LONG_BASE_VALUE + i;
+      derivedValue._derivedValue = LONG_BASE_VALUE + i++;
     }
   }
 
@@ -217,7 +217,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     while (sortedIterator.hasNext()) {
       Map.Entry<Object, DerivedValue> entry = sortedIterator.next();
       DerivedValue derivedValue = entry.getValue();
-      derivedValue._derivedValue = FLOAT_BASE_VALUE + i;
+      derivedValue._derivedValue = FLOAT_BASE_VALUE + i++;
     }
   }
 
@@ -227,7 +227,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     while (sortedIterator.hasNext()) {
       Map.Entry<Object, DerivedValue> entry = sortedIterator.next();
       DerivedValue derivedValue = entry.getValue();
-      derivedValue._derivedValue = DOUBLE_BASE_VALUE + i;
+      derivedValue._derivedValue = DOUBLE_BASE_VALUE + i++;
     }
   }
 
