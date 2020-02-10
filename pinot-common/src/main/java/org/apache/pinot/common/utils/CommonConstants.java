@@ -42,7 +42,6 @@ public class CommonConstants {
 
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
     public static final String ENABLE_CASE_INSENSITIVE_PQL_KEY = "enable.case.insensitive.pql";
-    public static final String ENABLE_BROKER_QUERY_LIMIT_OVERRIDE_KEY = "enable.broker.query.limit.override";
 
 
     // More information on why these numbers are set can be found in the following doc:
@@ -166,6 +165,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+    public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "enable.broker.query.limit.override";
 
     public static class Request {
       public static final String PQL = "pql";
