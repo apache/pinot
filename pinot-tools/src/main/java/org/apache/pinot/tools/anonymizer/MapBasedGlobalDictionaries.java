@@ -151,6 +151,16 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     }
   }
 
+  /**
+   * This wrapper is needed so that we can set the derived values in global dictionary
+   * in sorted order while iterating over it. When we iterate over TreeMap, we get the
+   * map's entries as a set. Since doing a put() while iteration is not going to work,
+   * we create a wrapper and simply set the derived value to whatever the generated
+   * value is as we iterate on the sorted map to go over all original dictionary values.
+   *
+   * TODO: May be if we can do entry.setValue() on Map.Entry, then we don't need this wrapper
+   * and we can safely update the TreeMap during iteration.
+   */
   private static class DerivedValue {
     Object _derivedValue;
     DerivedValue() { }
