@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.PinotDataAndQueryAnonymizer;
+import org.apache.pinot.tools.anonymizer.PinotDataAndQueryAnonymizer;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
@@ -62,6 +62,9 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
 
   @Option(name = "-filterColumns", handler = StringArrayOptionHandler.class, usage = "Set of filter columns and their cardinalities. Global dictionaries will be built for these columns. Use -help option to see usage example")
   private String[] _columnsParticipatingInFilter;
+
+  @Option(name = "-mapBasedGlobalDictionaries", metaVar = "<boolean>", usage = "Whether to use map based global dictionary for improved performance of building global dictionary but with additional heap overhead. True by default")
+  private boolean _mapBasedGlobalDictionaries = true;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message")
   private boolean _help = false;
@@ -116,7 +119,8 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
           _outputDir,
           _avroFileNamePrefix,
           filterColumnCardinalityMap,
-          columnsToRetainDataFor);
+          columnsToRetainDataFor,
+          _mapBasedGlobalDictionaries);
       // first build global dictionaries
       pinotDataGenerator.buildGlobalDictionaries();
       // use global dictionaries to generate Avro files

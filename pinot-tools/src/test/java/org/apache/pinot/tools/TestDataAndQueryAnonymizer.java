@@ -26,6 +26,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.pinot.tools.anonymizer.PinotDataAndQueryAnonymizer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
