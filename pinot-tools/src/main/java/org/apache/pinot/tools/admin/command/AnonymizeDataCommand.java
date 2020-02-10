@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.PinotDataAndQueryAnonymizer;
+import org.apache.pinot.tools.anonymizer.PinotDataAndQueryAnonymizer;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
@@ -116,7 +116,8 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
           _outputDir,
           _avroFileNamePrefix,
           filterColumnCardinalityMap,
-          columnsToRetainDataFor);
+          columnsToRetainDataFor,
+          true);
       // first build global dictionaries
       pinotDataGenerator.buildGlobalDictionaries();
       // use global dictionaries to generate Avro files
