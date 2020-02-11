@@ -103,7 +103,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final AtomicInteger _numDroppedLog;
 
   private final boolean _enableCaseInsensitivePql;
-  private final boolean _enableBrokerQueryLimitOverride;
+  private final boolean _enableQueryLimitOverride;
   private final TableCache _tableCache;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
@@ -123,7 +123,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _tableCache = null;
     }
 
-    _enableBrokerQueryLimitOverride = _config.getBoolean(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
+    _enableQueryLimitOverride = _config.getBoolean(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
 
     _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
@@ -178,7 +178,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               e.getMessage());
         }
       }
-      if (_enableBrokerQueryLimitOverride) {
+      if (_enableQueryLimitOverride) {
         handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
       }
     } catch (Exception e) {
