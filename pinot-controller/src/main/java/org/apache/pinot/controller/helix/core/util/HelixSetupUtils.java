@@ -76,7 +76,7 @@ public class HelixSetupUtils {
           new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
       admin.setConfig(configScope, Collections.singletonMap(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, "true"));
       admin.setConfig(configScope, Collections.singletonMap(ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.FALSE.toString()));
-      admin.setConfig(configScope, Collections.singletonMap(ENABLE_BROKER_QUERY_LIMIT_OVERRIDE_KEY, Boolean.FALSE.toString()));
+      admin.setConfig(configScope, Collections.singletonMap(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.FALSE.toString()));
       LOGGER.info("New Helix cluster: {} created", helixClusterName);
     }
   }

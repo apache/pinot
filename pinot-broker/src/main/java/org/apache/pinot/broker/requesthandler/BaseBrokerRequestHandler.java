@@ -123,7 +123,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _tableCache = null;
     }
 
-    _enableBrokerQueryLimitOverride = _config.getBoolean(CommonConstants.Helix.ENABLE_BROKER_QUERY_LIMIT_OVERRIDE_KEY, false);
+    _enableBrokerQueryLimitOverride = _config.getBoolean(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
 
     _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
