@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,13 @@
 # under the License.
 #
 
-*
-!bin/
-!examples/
-!requirements-db.txt
+set -e
+
+# Create an admin user
+FLASK_APP=superset flask fab create-admin $@
+
+# Initialize the database
+superset db upgrade
+
+# Create default roles and permissions
+superset init

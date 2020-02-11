@@ -26,10 +26,10 @@ impyla==0.14.0
 mysqlclient==1.4.2
 psycopg2==2.7.6.1
 pyathena==1.5.1
-pybigquery==0.4.10
 pyhive==0.5.1
 pyldap==2.4.28
 pymssql==2.1.4
 redis==3.2.1
 sqlalchemy-redshift==0.7.1
 pinotdb==0.2.4
+requests-oauthlib<1.0.0
