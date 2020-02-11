@@ -130,7 +130,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     int length = origMultiValues.length;
     Object[] derivedMultiValues = new Object[length];
     for (int i = 0; i < length; i++) {
-      derivedMultiValues[i] = sortedMap.get(origMultiValues[i]);
+      derivedMultiValues[i] = sortedMap.get(origMultiValues[i])._derivedValue;
     }
     return derivedMultiValues;
   }
