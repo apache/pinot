@@ -54,8 +54,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class is to schedule detection tasks based on data availability events.
- *
- * TODO: Make use of the ThirdEyeScheduler interface
  */
 public class DataAvailabilityTaskScheduler implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DataAvailabilityTaskScheduler.class);
@@ -67,7 +65,7 @@ public class DataAvailabilityTaskScheduler implements Runnable {
 
   // Maintains mapping from each detection to the detection end time of it's last run.
   // Fallback runs based on the last task run (successful or not).
-  private Map<Long, Long> detectionIdToWatermarkMap;
+  private Map<Long, Long> detectionIdToLastTaskEndTimeMap;
 
   private TaskManager taskDAO;
   private DetectionConfigManager detectionConfigDAO;
@@ -82,7 +80,7 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     this.delayInSec = delayInSec;
     this.fallBackTimeInSec = fallBackTimeInSec;
     this.schedulingWindowInSec = schedulingWindowInSec;
-    this.detectionIdToWatermarkMap = new HashMap<>();
+    this.detectionIdToLastTaskEndTimeMap = new HashMap<>();
     this.executorService = Executors.newSingleThreadScheduledExecutor();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
@@ -105,7 +103,7 @@ public class DataAvailabilityTaskScheduler implements Runnable {
               //TODO: additional check is required if detection is based on aggregated value across multiple data points
               long endtime = System.currentTimeMillis();
               createDetectionTask(detectionConfig, endtime);
-              detectionIdToWatermarkMap.put(detectionConfig.getId(), endtime);
+              detectionIdToLastTaskEndTimeMap.put(detectionConfig.getId(), endtime);
               ThirdeyeMetricsUtil.eventScheduledTaskCounter.inc();
               taskCount++;
             } else {
@@ -122,11 +120,11 @@ public class DataAvailabilityTaskScheduler implements Runnable {
             createDetectionTask(detectionConfig, endtime);
 
             if (DetectionUtils.isDataAvailabilityCheckEnabled(detectionConfig)) {
-              createDataAvailabilityTask(detectionConfig, endtime);
+              createDataSLACheckTask(detectionConfig, endtime);
               LOG.info("Scheduling a task for data availability {} due to the fallback mechanism.", detectionConfigId);
             }
 
-            detectionIdToWatermarkMap.put(detectionConfig.getId(), endtime);
+            detectionIdToLastTaskEndTimeMap.put(detectionConfig.getId(), endtime);
             ThirdeyeMetricsUtil.eventScheduledTaskFallbackCounter.inc();
             taskCount++;
           }
@@ -220,8 +218,8 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     return createTask(TaskConstants.TaskType.DETECTION, detectionConfig, end);
   }
 
-  private long createDataAvailabilityTask(DetectionConfigDTO detectionConfig, long end) throws JsonProcessingException {
-    return createTask(TaskConstants.TaskType.DATA_AVAILABILITY, detectionConfig, end);
+  private long createDataSLACheckTask(DetectionConfigDTO detectionConfig, long end) throws JsonProcessingException {
+    return createTask(TaskConstants.TaskType.DATA_SLA, detectionConfig, end);
   }
 
   private void loadLatestTaskCreateTime(DetectionConfigDTO detectionConfig) throws Exception {
@@ -229,12 +227,12 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     List<TaskDTO> tasks = taskDAO.findByNameOrderByCreateTime(TaskConstants.TaskType.DETECTION.toString() +
         "_" + detectionConfigId, 1,false);
     if (tasks.size() == 0) {
-      detectionIdToWatermarkMap.put(detectionConfigId, detectionConfig.getLastTimestamp());
+      detectionIdToLastTaskEndTimeMap.put(detectionConfigId, detectionConfig.getLastTimestamp());
     } else {
       // Load the watermark
       DetectionPipelineTaskInfo taskInfo = (DetectionPipelineTaskInfo) TaskInfoFactory.getTaskInfoFromTaskType(
           TaskConstants.TaskType.DETECTION, tasks.get(0).getTaskInfo());
-      detectionIdToWatermarkMap.put(detectionConfigId, taskInfo.getEnd());
+      detectionIdToLastTaskEndTimeMap.put(detectionConfigId, taskInfo.getEnd());
     }
   }
 
@@ -249,10 +247,10 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     long detectionConfigId = detectionConfig.getId();
     long notRunThreshold = ((detectionConfig.getTaskTriggerFallBackTimeInSec() == 0) ?
         fallBackTimeInSec : detectionConfig.getTaskTriggerFallBackTimeInSec()) * 1000;
-    if (!detectionIdToWatermarkMap.containsKey(detectionConfigId)) {
+    if (!detectionIdToLastTaskEndTimeMap.containsKey(detectionConfigId)) {
       loadLatestTaskCreateTime(detectionConfig);
     }
-    long lastRunTime = detectionIdToWatermarkMap.get(detectionConfigId);
+    long lastRunTime = detectionIdToLastTaskEndTimeMap.get(detectionConfigId);
     return (System.currentTimeMillis() - lastRunTime >= notRunThreshold);
   }
 

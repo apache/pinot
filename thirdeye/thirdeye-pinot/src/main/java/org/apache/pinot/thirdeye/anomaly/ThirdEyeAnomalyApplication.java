@@ -41,8 +41,8 @@ import org.apache.pinot.thirdeye.dashboard.resources.EmailResource;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
-import org.apache.pinot.thirdeye.scheduler.DetectionScheduler;
-import org.apache.pinot.thirdeye.scheduler.SubscriptionScheduler;
+import org.apache.pinot.thirdeye.scheduler.DetectionCronScheduler;
+import org.apache.pinot.thirdeye.scheduler.SubscriptionCronScheduler;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
@@ -75,8 +75,8 @@ public class ThirdEyeAnomalyApplication
   private RequestStatisticsLogger requestStatisticsLogger = null;
   private DataAvailabilityEventListenerDriver dataAvailabilityEventListenerDriver = null;
   private DataAvailabilityTaskScheduler dataAvailabilityTaskScheduler = null;
-  private DetectionScheduler detectionScheduler = null;
-  private SubscriptionScheduler subscriptionScheduler = null;
+  private DetectionCronScheduler detectionScheduler = null;
+  private SubscriptionCronScheduler subscriptionScheduler = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -180,11 +180,11 @@ public class ThirdEyeAnomalyApplication
           environment.jersey().register(new PinotDataSourceResource());
         }
         if (config.isDetectionPipeline()) {
-          detectionScheduler = new DetectionScheduler(DAORegistry.getInstance().getDetectionConfigManager());
+          detectionScheduler = new DetectionCronScheduler(DAORegistry.getInstance().getDetectionConfigManager());
           detectionScheduler.start();
         }
         if (config.isDetectionAlert()) {
-          subscriptionScheduler = new SubscriptionScheduler();
+          subscriptionScheduler = new SubscriptionCronScheduler();
           subscriptionScheduler.start();
         }
         if (config.isDataAvailabilityEventListener()) {

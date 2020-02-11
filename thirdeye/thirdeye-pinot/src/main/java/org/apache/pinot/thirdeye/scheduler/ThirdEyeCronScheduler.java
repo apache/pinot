@@ -31,7 +31,7 @@ import org.quartz.SchedulerException;
 /**
  * Interface for ThirdEye's scheduling components
  */
-public interface ThirdEyeScheduler extends Runnable {
+public interface ThirdEyeCronScheduler extends Runnable {
 
   // Initialize and prepare the scheduler
   void start() throws SchedulerException;

@@ -54,8 +54,8 @@ import org.slf4j.LoggerFactory;
  * The Detection alert scheduler. Schedule new detection alert jobs or update existing detection alert jobs
  * in the cron scheduler.
  */
-public class SubscriptionScheduler implements ThirdEyeScheduler {
-  private static final Logger LOG = LoggerFactory.getLogger(SubscriptionScheduler.class);
+public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
+  private static final Logger LOG = LoggerFactory.getLogger(SubscriptionCronScheduler.class);
   private static final int DEFAULT_ALERT_DELAY = 1;
   private static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
 
@@ -63,7 +63,7 @@ public class SubscriptionScheduler implements ThirdEyeScheduler {
   private ScheduledExecutorService scheduledExecutorService;
   private DetectionAlertConfigManager alertConfigDAO;
 
-  public SubscriptionScheduler() throws SchedulerException {
+  public SubscriptionCronScheduler() throws SchedulerException {
     this.scheduler = StdSchedulerFactory.getDefaultScheduler();
     this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     this.alertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();

@@ -253,7 +253,7 @@ public class DataAvailabilityTaskSchedulerTest {
     jobNames.add(waitingTasks.get(0).getJobName());
     jobNames.add(waitingTasks.get(1).getJobName());
     Assert.assertTrue(jobNames.contains(TaskConstants.TaskType.DETECTION.toString() + "_" + detection1));
-    Assert.assertTrue(jobNames.contains(TaskConstants.TaskType.DATA_AVAILABILITY.toString() + "_" + detection1));
+    Assert.assertTrue(jobNames.contains(TaskConstants.TaskType.DATA_SLA.toString() + "_" + detection1));
   }
 
   private long createDataset(int intSuffix, long refreshTime, long refreshEventTime) {

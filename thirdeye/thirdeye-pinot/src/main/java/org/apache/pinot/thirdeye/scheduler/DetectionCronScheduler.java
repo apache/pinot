@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
-import org.apache.pinot.thirdeye.detection.DetectionDataAvailabilityJob;
+import org.apache.pinot.thirdeye.detection.DetectionDataSLAJob;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineJob;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.TaskUtils;
@@ -50,8 +50,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DetectionScheduler implements ThirdEyeScheduler {
-  private static final Logger LOG = LoggerFactory.getLogger(DetectionScheduler.class);
+public class DetectionCronScheduler implements ThirdEyeCronScheduler {
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionCronScheduler.class);
 
   public static final int DEFAULT_DETECTION_DELAY = 1;
   public static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
@@ -60,7 +60,7 @@ public class DetectionScheduler implements ThirdEyeScheduler {
   final Scheduler scheduler;
   final ScheduledExecutorService executorService;
 
-  public DetectionScheduler(DetectionConfigManager detectionDAO) throws Exception {
+  public DetectionCronScheduler(DetectionConfigManager detectionDAO) throws Exception {
     this.detectionDAO = detectionDAO;
     this.scheduler = StdSchedulerFactory.getDefaultScheduler();
     this.executorService = Executors.newSingleThreadScheduledExecutor();
@@ -151,11 +151,11 @@ public class DetectionScheduler implements ThirdEyeScheduler {
     this.scheduler.scheduleJob(detectionJob, trigger);
     LOG.info(String.format("scheduled detection pipeline job %s", detectionJob.getKey().getName()));
 
-    // Data availability alerts will be scheduled only when enabled by the user.
+    // Data SLA alerts will be scheduled only when enabled by the user.
     if (DetectionUtils.isDataAvailabilityCheckEnabled((DetectionConfigDTO) config)) {
-      JobDetail dataAvailabilityJob = JobBuilder.newJob(DetectionDataAvailabilityJob.class).withIdentity(key).build();
-      this.scheduler.scheduleJob(dataAvailabilityJob, trigger);
-      LOG.info(String.format("scheduled data availability jobs %s", dataAvailabilityJob.getKey().getName()));
+      JobDetail dataSLAJob = JobBuilder.newJob(DetectionDataSLAJob.class).withIdentity(key).build();
+      this.scheduler.scheduleJob(dataSLAJob, trigger);
+      LOG.info(String.format("scheduled data availability jobs %s", dataSLAJob.getKey().getName()));
     }
   }
 
