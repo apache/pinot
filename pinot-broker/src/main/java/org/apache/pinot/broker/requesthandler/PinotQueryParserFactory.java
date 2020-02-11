@@ -33,7 +33,7 @@ public class PinotQueryParserFactory {
   private static final CalciteSqlCompiler CALCITE_SQL_COMPILER = new CalciteSqlCompiler();
 
   public static AbstractCompiler get(String queryFormat) {
-    switch (queryFormat) {
+    switch (queryFormat.toLowerCase()) {
       case PQL:
         return PQL_2_COMPILER;
       case SQL:

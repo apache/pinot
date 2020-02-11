@@ -44,7 +44,6 @@ public class CommonConstants {
     public static final String ENABLE_CASE_INSENSITIVE_PQL_KEY = "enable.case.insensitive.pql";
 
 
-
     // More information on why these numbers are set can be found in the following doc:
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
@@ -166,6 +165,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+    public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
     public static class Request {
       public static final String PQL = "pql";

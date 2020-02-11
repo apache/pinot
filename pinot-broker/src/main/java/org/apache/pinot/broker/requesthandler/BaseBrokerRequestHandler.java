@@ -60,7 +60,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
-import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -104,6 +103,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final AtomicInteger _numDroppedLog;
 
   private final boolean _enableCaseInsensitivePql;
+  private final boolean _enableQueryLimitOverride;
   private final TableCache _tableCache;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
@@ -122,6 +122,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } else {
       _tableCache = null;
     }
+
+    _enableQueryLimitOverride = _config.getBoolean(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
+
     _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
@@ -174,6 +177,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           LOGGER.info("Caught exception while rewriting PQL to make it case-insensitive {}: {}, {}", requestId, query,
               e.getMessage());
         }
+      }
+      if (_enableQueryLimitOverride) {
+        handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
       }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
@@ -360,6 +366,35 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _numDroppedLog.incrementAndGet();
     }
     return brokerResponse;
+  }
+
+  /**
+   * Reset limit for selection query if it exceeds maxQuerySelectionLimit.
+   * @param brokerRequest
+   * @param queryLimit
+   *
+   */
+  static void handleQueryLimitOverride(BrokerRequest brokerRequest, int queryLimit) {
+    if (queryLimit > 0) {
+      // Handle GroupBy for BrokerRequest
+      if (brokerRequest.getGroupBy() != null) {
+        if (brokerRequest.getGroupBy().getTopN() > queryLimit) {
+          brokerRequest.getGroupBy().setTopN(queryLimit);
+        }
+      }
+
+      // Handle Selection for BrokerRequest
+      if (brokerRequest.getLimit() > queryLimit) {
+        brokerRequest.setLimit(queryLimit);
+      }
+
+      // Handle Selection & GroupBy for PinotQuery
+      if (brokerRequest.getPinotQuery()!= null) {
+        if (brokerRequest.getPinotQuery().getLimit() > queryLimit) {
+          brokerRequest.getPinotQuery().setLimit(queryLimit);
+        }
+      }
+    }
   }
 
   /**
