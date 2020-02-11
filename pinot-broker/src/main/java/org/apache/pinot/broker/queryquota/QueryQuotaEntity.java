@@ -19,17 +19,23 @@
 package org.apache.pinot.broker.queryquota;
 
 import com.google.common.util.concurrent.RateLimiter;
-import javax.annotation.Nonnull;
 
 
-public class QueryQuotaConfig {
+public class QueryQuotaEntity {
 
   private RateLimiter _rateLimiter;
   private HitCounter _hitCounter;
+  private int _numOnlineBrokers;
+  private double _overallRate;
+  private int _tableConfigStatVersion;
 
-  public QueryQuotaConfig(@Nonnull RateLimiter rateLimiter, @Nonnull HitCounter hitCounter) {
+  public QueryQuotaEntity(RateLimiter rateLimiter, HitCounter hitCounter, int numOnlineBrokers, double overallRate,
+      int tableConfigStatVersion) {
     _rateLimiter = rateLimiter;
     _hitCounter = hitCounter;
+    _numOnlineBrokers = numOnlineBrokers;
+    _overallRate = overallRate;
+    _tableConfigStatVersion = tableConfigStatVersion;
   }
 
   public RateLimiter getRateLimiter() {
@@ -38,5 +44,29 @@ public class QueryQuotaConfig {
 
   public HitCounter getHitCounter() {
     return _hitCounter;
+  }
+
+  public int getNumOnlineBrokers() {
+    return _numOnlineBrokers;
+  }
+
+  public void setNumOnlineBrokers(int numOnlineBrokers) {
+    _numOnlineBrokers = numOnlineBrokers;
+  }
+
+  public double getOverallRate() {
+    return _overallRate;
+  }
+
+  public void setOverallRate(double overallRate) {
+    _overallRate = overallRate;
+  }
+
+  public int getTableConfigStatVersion() {
+    return _tableConfigStatVersion;
+  }
+
+  public void setTableConfigStatVersion(int tableConfigStatVersion) {
+    _tableConfigStatVersion = tableConfigStatVersion;
   }
 }
