@@ -334,6 +334,14 @@ public class DetectionUtils {
     return df;
   }
 
+  /**
+   * Verify if this detection has data availability checks enabled
+   */
+  public static boolean isDataAvailabilityCheckEnabled(DetectionConfigDTO detectionConfig) {
+    return detectionConfig.getDataAvailabilityProperties() != null
+        && !detectionConfig.getDataAvailabilityProperties().isEmpty();
+  }
+
   public static long makeTimeout(long deadline) {
     long diff = deadline - System.currentTimeMillis();
     return diff > 0 ? diff : 0;

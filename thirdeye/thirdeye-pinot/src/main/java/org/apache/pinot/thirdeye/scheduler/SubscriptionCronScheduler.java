@@ -17,19 +17,23 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.alert;
+package org.apache.pinot.thirdeye.scheduler;
 
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionAlertConfigBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.TaskUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertJob;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -50,8 +54,8 @@ import org.slf4j.LoggerFactory;
  * The Detection alert scheduler. Schedule new detection alert jobs or update existing detection alert jobs
  * in the cron scheduler.
  */
-public class DetectionAlertScheduler implements Runnable {
-  private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertScheduler.class);
+public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
+  private static final Logger LOG = LoggerFactory.getLogger(SubscriptionCronScheduler.class);
   private static final int DEFAULT_ALERT_DELAY = 1;
   private static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
 
@@ -59,34 +63,19 @@ public class DetectionAlertScheduler implements Runnable {
   private ScheduledExecutorService scheduledExecutorService;
   private DetectionAlertConfigManager alertConfigDAO;
 
-  public DetectionAlertScheduler() throws SchedulerException {
+  public SubscriptionCronScheduler() throws SchedulerException {
     this.scheduler = StdSchedulerFactory.getDefaultScheduler();
     this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     this.alertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
   }
 
-  private Set<JobKey> getScheduledJobs() throws SchedulerException {
-    return scheduler.getJobKeys(GroupMatcher.jobGroupEquals(TaskConstants.TaskType.DETECTION_ALERT.toString()));
-  }
-
+  @Override
   public void start() throws SchedulerException {
     this.scheduler.start();
     this.scheduledExecutorService.scheduleWithFixedDelay(this, 0, DEFAULT_ALERT_DELAY, DEFAULT_ALERT_DELAY_UNIT);
   }
 
-  public void shutdown() throws SchedulerException {
-    AnomalyUtils.safelyShutdownExecutionService(scheduledExecutorService, this.getClass());
-    this.scheduler.shutdown();
-  }
-
-  private void stopJob(JobKey key) throws SchedulerException {
-    if (!scheduler.checkExists(key)) {
-      throw new IllegalStateException("Cannot stop alert config " + key + ", it has not been scheduled");
-    }
-    scheduler.deleteJob(key);
-    LOG.info("Stopped alert config {}", key);
-  }
-
+  @Override
   public void run() {
     try {
       // read all alert configs
@@ -119,32 +108,47 @@ public class DetectionAlertScheduler implements Runnable {
     }
   }
 
-  private String getJobKey(Long id) {
-    String jobKey = String.format("%s_%d", TaskConstants.TaskType.DETECTION_ALERT, id);
-    return jobKey;
+  @Override
+  public Set<JobKey> getScheduledJobs() throws SchedulerException {
+    return scheduler.getJobKeys(GroupMatcher.jobGroupEquals(TaskConstants.TaskType.DETECTION_ALERT.toString()));
+  }
+
+  @Override
+  public void shutdown() throws SchedulerException {
+    AnomalyUtils.safelyShutdownExecutionService(scheduledExecutorService, this.getClass());
+    this.scheduler.shutdown();
+  }
+
+  @Override
+  public void startJob(AbstractBean config, JobKey key) throws SchedulerException {
+    Trigger trigger = TriggerBuilder.newTrigger().withSchedule(
+        CronScheduleBuilder.cronSchedule(((DetectionAlertConfigBean) config).getCronExpression())).build();
+    JobDetail job = JobBuilder.newJob(DetectionAlertJob.class).withIdentity(key).build();
+    this.scheduler.scheduleJob(job, trigger);
+    LOG.info(String.format("scheduled subscription pipeline job %s", key.getName()));
+  }
+
+  @Override
+  public void stopJob(JobKey key) throws SchedulerException {
+    if (!scheduler.checkExists(key)) {
+      throw new IllegalStateException("Cannot stop alert config " + key + ", it has not been scheduled");
+    }
+    scheduler.deleteJob(key);
+    LOG.info("Stopped alert config {}", key);
+  }
+
+  @Override
+  public String getJobKey(Long id) {
+    return String.format("%s_%d", TaskConstants.TaskType.DETECTION_ALERT, id);
   }
 
   private void deleteAlertJob(JobKey scheduledJobKey) throws SchedulerException {
-    Long configId = getIdFromJobKey(scheduledJobKey);
+    Long configId = TaskUtils.getIdFromJobKey(scheduledJobKey.getName());
     DetectionAlertConfigDTO alertConfigSpec = alertConfigDAO.findById(configId);
     if (alertConfigSpec == null) {
       LOG.info("Found scheduled, but not in database {}", configId);
       stopJob(scheduledJobKey);
     }
-  }
-
-  private Long getIdFromJobKey(JobKey jobKey) {
-    String[] tokens = jobKey.getName().split("_");
-    String id = tokens[tokens.length - 1];
-    return Long.valueOf(id);
-  }
-
-  private void startJob(DetectionAlertConfigDTO config, JobKey key) throws SchedulerException {
-    Trigger trigger =
-        TriggerBuilder.newTrigger().withSchedule(CronScheduleBuilder.cronSchedule(config.getCronExpression())).build();
-    JobDetail job = JobBuilder.newJob(DetectionAlertJob.class).withIdentity(key).build();
-    this.scheduler.scheduleJob(job, trigger);
-    LOG.info(String.format("scheduled detection pipeline job %s", key.getName()));
   }
 
   private void createOrUpdateAlertJob(Set<JobKey> scheduledJobs, DetectionAlertConfigDTO alertConfig)

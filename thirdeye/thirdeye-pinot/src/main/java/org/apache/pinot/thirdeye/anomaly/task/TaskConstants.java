@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.anomaly.task;
 public class TaskConstants {
 
   public enum TaskType {
+    DATA_SLA,
     DETECTION,
     DETECTION_ALERT,
     YAML_DETECTION_ONBOARD,
