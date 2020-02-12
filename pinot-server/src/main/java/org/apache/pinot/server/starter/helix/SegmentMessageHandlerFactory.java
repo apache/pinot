@@ -88,7 +88,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       case SegmentReloadMessage.RELOAD_SEGMENT_MSG_SUB_TYPE:
         return new SegmentReloadMessageHandler(new SegmentReloadMessage(message), _metrics, context);
       default:
-        throw new UnsupportedOperationException("Unsupported user defined message sub type: " + msgSubType);
+        LOGGER.error("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
+            message.getPartitionName());
+        return new DefaultMessageHandler(message, _metrics, context);
     }
   }
 
@@ -103,19 +105,10 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     LOGGER.info("Reset called");
   }
 
-  private class SegmentRefreshMessageHandler extends MessageHandler {
-    private final String _segmentName;
-    private final String _tableNameWithType;
-    private final ServerMetrics _metrics;
-    private final Logger _logger;
-
-    public SegmentRefreshMessageHandler(SegmentRefreshMessage refreshMessage, ServerMetrics metrics,
+  private class SegmentRefreshMessageHandler extends DefaultMessageHandler {
+    SegmentRefreshMessageHandler(SegmentRefreshMessage refreshMessage, ServerMetrics metrics,
         NotificationContext context) {
-      super(refreshMessage, context);
-      _segmentName = refreshMessage.getPartitionName();
-      _tableNameWithType = refreshMessage.getResourceName();
-      _metrics = metrics;
-      _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + SegmentRefreshMessageHandler.class);
+      super(refreshMessage, metrics, context);
     }
 
     @Override
@@ -136,26 +129,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       }
       return result;
     }
-
-    @Override
-    public void onError(Exception e, ErrorCode code, ErrorType type) {
-      _logger.error("onError: {}, {}", type, code, e);
-    }
   }
 
-  private class SegmentReloadMessageHandler extends MessageHandler {
-    private final String _segmentName;
-    private final String _tableNameWithType;
-    private final ServerMetrics _metrics;
-    private final Logger _logger;
-
-    public SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
+  private class SegmentReloadMessageHandler extends DefaultMessageHandler {
+    SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
-      super(segmentReloadMessage, context);
-      _segmentName = segmentReloadMessage.getPartitionName();
-      _tableNameWithType = segmentReloadMessage.getResourceName();
-      _metrics = metrics;
-      _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + SegmentReloadMessageHandler.class);
+      super(segmentReloadMessage, metrics, context);
     }
 
     @Override
@@ -184,6 +163,29 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       } finally {
         releaseSema();
       }
+      return helixTaskResult;
+    }
+  }
+
+  private static class DefaultMessageHandler extends MessageHandler {
+    final String _segmentName;
+    final String _tableNameWithType;
+    final ServerMetrics _metrics;
+    final Logger _logger;
+
+    DefaultMessageHandler(Message message, ServerMetrics metrics, NotificationContext context) {
+      super(message, context);
+      _segmentName = message.getPartitionName();
+      _tableNameWithType = message.getResourceName();
+      _metrics = metrics;
+      _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + this.getClass().getSimpleName());
+    }
+
+    @Override
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      helixTaskResult.setSuccess(true);
       return helixTaskResult;
     }
 
