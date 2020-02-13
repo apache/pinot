@@ -57,12 +57,14 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.Instance;
+import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableCustomConfig;
@@ -74,6 +76,7 @@ import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.messages.QueryQuotaUpdateMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -1342,6 +1345,9 @@ public class PinotHelixResourceManager {
       default:
         throw new InvalidTableConfigException("Unsupported table type: " + tableType);
     }
+
+    // Send update query quota message if quota is specified
+    sendUpdateQueryQuotaMessage(tableConfig);
   }
 
   public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs)
@@ -1717,6 +1723,41 @@ public class PinotHelixResourceManager {
           offlineTableName);
     } else {
       LOGGER.warn("No refresh message sent to brokers for segment: {} of table: {}", segmentName, offlineTableName);
+    }
+  }
+
+  private void sendUpdateQueryQuotaMessage(TableConfig tableConfig) {
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null) {
+      return;
+    }
+    final int timeoutMs = -1; // Infinite timeout on the recipient.
+    String tableNameWithType = tableConfig.getTableName();
+    QueryQuotaUpdateMessage refreshMessage = new QueryQuotaUpdateMessage(tableNameWithType);
+
+    Criteria recipientCriteria = new Criteria();
+    // Currently Helix does not support send message to a Spectator. So we walk around the problem by sending the
+    // message to participants. Note that brokers are also participants.
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setDataSource(Criteria.DataSource.EXTERNALVIEW);
+    // The brokerResource field in the EXTERNALVIEW stores the offline table name in the Partition subfield.
+    recipientCriteria.setPartition(tableNameWithType);
+
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    LOGGER.info("Sending query quota update message for table {}:{} to recipients {}",
+        tableNameWithType, refreshMessage, recipientCriteria);
+    // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
+    int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, timeoutMs);
+    if (nMsgsSent > 0) {
+      // TODO Would be nice if we can get the name of the instances to which messages were sent.
+      LOGGER.info("Sent {} query quota update msgs for table {}", nMsgsSent, tableNameWithType);
+    } else {
+      // May be the case when none of the brokers are up yet. That is OK, because when they come up they will get
+      // the latest query quota info from table config.
+      LOGGER.warn("Unable to send query quota update message for table {}, nMsgs={}", tableNameWithType, nMsgsSent);
     }
   }
 
