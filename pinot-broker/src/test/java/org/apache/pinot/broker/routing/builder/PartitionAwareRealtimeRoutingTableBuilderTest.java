@@ -346,7 +346,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     SegmentPartitionConfig partitionConfig = new SegmentPartitionConfig(metadataMap);
 
     // Create the routing config
-    RoutingConfig routingConfig = new RoutingConfig("PartitionAwareOffline", null);
+    RoutingConfig routingConfig = new RoutingConfig("PartitionAwareOffline", null, null, null);
 
     // Create table config
     TableConfig tableConfig =
