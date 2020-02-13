@@ -93,6 +93,7 @@ public class DetectionHealth {
     private EvaluationManager evaluationDAO;
     private MergedAnomalyResultManager anomalyDAO;
     private TaskManager taskDAO;
+    // the number of task DTO returned in the detectionHealth
     private long taskLimit;
     private boolean provideOverallHealth;
 
@@ -243,11 +244,7 @@ public class DetectionHealth {
               Predicate.IN(COL_NAME_TASK_STATUS, new String[]{TaskConstants.TaskStatus.COMPLETED.toString(),
                   TaskConstants.TaskStatus.FAILED.toString(), TaskConstants.TaskStatus.TIMEOUT.toString(),
                   TaskConstants.TaskStatus.WAITING.toString()})));
-      tasks.sort(Comparator.comparingLong(TaskBean::getStartTime).reversed());
-      // limit the task size
-      tasks = tasks.stream().limit(this.taskLimit).collect(Collectors.toList());
-
-      return DetectionTaskStatus.fromTasks(tasks);
+      return DetectionTaskStatus.fromTasks(tasks, this.taskLimit);
     }
 
     private static HealthStatus classifyOverallHealth(DetectionHealth health) {
