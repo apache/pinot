@@ -126,11 +126,36 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(String value) {
+  public static Expression createNewLiteralExpression() {
     Expression expression = new Expression(ExpressionType.LITERAL);
     Literal literal = new Literal();
-    literal.setStringValue(value);
     expression.setLiteral(literal);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(String value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setStringValue(value);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(Integer value) {
+    return getLiteralExpression(value.longValue());
+  }
+
+  public static Expression getLiteralExpression(Long value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setLongValue(value);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(Float value) {
+    return getLiteralExpression(value.doubleValue());
+  }
+
+  public static Expression getLiteralExpression(Double value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setDoubleValue(value);
     return expression;
   }
 

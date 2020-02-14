@@ -273,7 +273,7 @@ public class CalciteSqlParser {
         }
 
         if (selectSqlNode.getWhere() != null) {
-          pinotQuery.setFilterExpression(toExpression(selectSqlNode.getWhere()));
+          pinotQuery.setFilterExpression(rewritePredicate(toExpression(selectSqlNode.getWhere())));
         }
         if (selectSqlNode.getGroup() != null) {
           pinotQuery.setGroupByList(convertSelectList(selectSqlNode.getGroup()));
@@ -287,6 +287,54 @@ public class CalciteSqlParser {
     applyAlias(aliasMap, pinotQuery);
     validate(aliasMap, pinotQuery);
     return pinotQuery;
+  }
+
+  private static Expression rewritePredicate(Expression expression) {
+    Function functionCall = expression.getFunctionCall();
+    if (functionCall != null) {
+      switch (SqlKind.valueOf(functionCall.getOperator().toUpperCase())) {
+        case EQUALS:
+        case NOT_EQUALS:
+        case GREATER_THAN:
+        case GREATER_THAN_OR_EQUAL:
+        case LESS_THAN:
+        case LESS_THAN_OR_EQUAL:
+          Expression comparisonFunction = RequestUtils.getFunctionExpression(functionCall.getOperator());
+          List<Expression> exprList = new ArrayList<>();
+          exprList.add(getLeftOperand(functionCall));
+          exprList.add(RequestUtils.getLiteralExpression(0));
+          comparisonFunction.getFunctionCall().setOperands(exprList);
+          return comparisonFunction;
+        default:
+          List<Expression> operands = functionCall.getOperands();
+          List<Expression> newOperands = new ArrayList<>();
+          for (int i = 0; i < operands.size(); i++) {
+            newOperands.add(rewritePredicate(operands.get(i)));
+          }
+          functionCall.setOperands(newOperands);
+      }
+    }
+    return expression;
+  }
+
+  private static Expression getLeftOperand(Function functionCall) {
+    Expression minusFunction = RequestUtils.getFunctionExpression(SqlKind.MINUS.toString());
+    List<Expression> updatedOperands = new ArrayList<>();
+    for (Expression operand : functionCall.getOperands()) {
+      updatedOperands.add(rewritePredicate(operand));
+    }
+    minusFunction.getFunctionCall().setOperands(updatedOperands);
+    return minusFunction;
+  }
+
+  private static Expression getRightOperand(Function functionCall) {
+    Expression minusFunction = RequestUtils.getFunctionExpression(SqlKind.MINUS.toString());
+    List<Expression> updatedOperands = new ArrayList<>();
+    for (Expression operand : functionCall.getOperands()) {
+      updatedOperands.add(rewritePredicate(operand));
+    }
+    minusFunction.getFunctionCall().setOperands(updatedOperands);
+    return minusFunction;
   }
 
   private static void applyAlias(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery) {
