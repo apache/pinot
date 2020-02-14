@@ -273,7 +273,7 @@ public class CalciteSqlParser {
         }
 
         if (selectSqlNode.getWhere() != null) {
-          pinotQuery.setFilterExpression(rewritePredicate(toExpression(selectSqlNode.getWhere())));
+          pinotQuery.setFilterExpression(updateComparisonPredicate(toExpression(selectSqlNode.getWhere())));
         }
         if (selectSqlNode.getGroup() != null) {
           pinotQuery.setGroupByList(convertSelectList(selectSqlNode.getGroup()));
@@ -289,7 +289,11 @@ public class CalciteSqlParser {
     return pinotQuery;
   }
 
-  private static Expression rewritePredicate(Expression expression) {
+  // This method converts a predicate expression to the what Pinot could evaluate.
+  // For comparison expression, left operand could be any expression, but right operand only
+  // supports literal.
+  // E.g. 'WHERE a > b' will be updated to 'WHERE a - b > 0'
+  private static Expression updateComparisonPredicate(Expression expression) {
     Function functionCall = expression.getFunctionCall();
     if (functionCall != null) {
       SqlKind sqlKind = SqlKind.OTHER_FUNCTION;
@@ -305,6 +309,14 @@ public class CalciteSqlParser {
         case GREATER_THAN_OR_EQUAL:
         case LESS_THAN:
         case LESS_THAN_OR_EQUAL:
+          // Handle predicate like 'WHERE 10=a'
+          if (functionCall.getOperands().get(0).getLiteral() != null) {
+            functionCall.setOperator(getOppositeOperator(functionCall.getOperator()));
+            List<Expression> oldOperands = functionCall.getOperands();
+            Expression tempExpr = oldOperands.get(0);
+            oldOperands.set(0, oldOperands.get(1));
+            oldOperands.set(1, tempExpr);
+          }
           if (functionCall.getOperands().get(1).getLiteral() != null) {
             return expression;
           }
@@ -318,7 +330,7 @@ public class CalciteSqlParser {
           List<Expression> operands = functionCall.getOperands();
           List<Expression> newOperands = new ArrayList<>();
           for (int i = 0; i < operands.size(); i++) {
-            newOperands.add(rewritePredicate(operands.get(i)));
+            newOperands.add(updateComparisonPredicate(operands.get(i)));
           }
           functionCall.setOperands(newOperands);
       }
@@ -326,11 +338,27 @@ public class CalciteSqlParser {
     return expression;
   }
 
+  private static String getOppositeOperator(String operator) {
+    switch (operator.toUpperCase()) {
+      case "GREATER_THAN":
+        return "LESS_THAN";
+      case "GREATER_THAN_OR_EQUAL":
+        return "LESS_THAN_OR_EQUAL";
+      case "LESS_THAN":
+        return "GREATER_THAN";
+      case "LESS_THAN_OR_EQUAL":
+        return "GREATER_THAN_OR_EQUAL";
+      default:
+        // Do nothing
+        return operator;
+    }
+  }
+
   private static Expression getLeftOperand(Function functionCall) {
     Expression minusFunction = RequestUtils.getFunctionExpression(SqlKind.MINUS.toString());
     List<Expression> updatedOperands = new ArrayList<>();
     for (Expression operand : functionCall.getOperands()) {
-      updatedOperands.add(rewritePredicate(operand));
+      updatedOperands.add(updateComparisonPredicate(operand));
     }
     minusFunction.getFunctionCall().setOperands(updatedOperands);
     return minusFunction;
@@ -340,7 +368,7 @@ public class CalciteSqlParser {
     Expression minusFunction = RequestUtils.getFunctionExpression(SqlKind.MINUS.toString());
     List<Expression> updatedOperands = new ArrayList<>();
     for (Expression operand : functionCall.getOperands()) {
-      updatedOperands.add(rewritePredicate(operand));
+      updatedOperands.add(updateComparisonPredicate(operand));
     }
     minusFunction.getFunctionCall().setOperands(updatedOperands);
     return minusFunction;

@@ -127,6 +127,15 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "a");
     Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "b");
     Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 0L);
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where 0 < a-b");
+    func = pinotQuery.getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN.name());
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "MINUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "a");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "b");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 0L);
+
+
     pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where b < 100 + c");
     func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.LESS_THAN.name());
@@ -136,13 +145,27 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getLiteral().getLongValue(), 100L);
     Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "c");
     Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 0L);
-    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where 10 >= c");
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where b -(100+c)< 0");
+    func = pinotQuery.getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), SqlKind.LESS_THAN.name());
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "MINUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "b");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getLiteral().getLongValue(), 100L);
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "c");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 0L);
+
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where c >= 10");
     func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN_OR_EQUAL.name());
-    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "MINUS");
-    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getLiteral().getLongValue(), 10L);
-    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "c");
-    Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 0L);
+    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "c");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 10L);
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where 10 <= c");
+    func = pinotQuery.getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN_OR_EQUAL.name());
+    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "c");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 10L);
   }
 
   @Test
