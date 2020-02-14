@@ -292,13 +292,22 @@ public class CalciteSqlParser {
   private static Expression rewritePredicate(Expression expression) {
     Function functionCall = expression.getFunctionCall();
     if (functionCall != null) {
-      switch (SqlKind.valueOf(functionCall.getOperator().toUpperCase())) {
+      SqlKind sqlKind = SqlKind.OTHER_FUNCTION;
+      try {
+        sqlKind = SqlKind.valueOf(functionCall.getOperator().toUpperCase());
+      } catch (Exception e) {
+        // Do nothing
+      }
+      switch (sqlKind) {
         case EQUALS:
         case NOT_EQUALS:
         case GREATER_THAN:
         case GREATER_THAN_OR_EQUAL:
         case LESS_THAN:
         case LESS_THAN_OR_EQUAL:
+          if (functionCall.getOperands().get(1).getLiteral() != null) {
+            return expression;
+          }
           Expression comparisonFunction = RequestUtils.getFunctionExpression(functionCall.getOperator());
           List<Expression> exprList = new ArrayList<>();
           exprList.add(getLeftOperand(functionCall));
