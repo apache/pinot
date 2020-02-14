@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
@@ -29,6 +30,7 @@ import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -101,6 +103,13 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     @Override
     public Pairs.IntPair getDocIds(int dictId) {
       return new Pairs.IntPair(dictId, dictId);
+    }
+
+    @Override
+    public Pairs.IntPair getDocIds(Object value) {
+      // This should not be called from anywhere. If it happens, there is a bug
+      // and that's why we throw illegal state exception
+      throw new IllegalStateException("sorted inverted index reader supports lookup only using dictionary id");
     }
 
     @Override

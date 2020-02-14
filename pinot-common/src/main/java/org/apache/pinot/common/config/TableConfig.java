@@ -647,6 +647,11 @@ public class TableConfig extends BaseJsonConfig {
     }
 
     public Builder setFieldConfigList(List<FieldConfig> fieldConfigList) {
+      // eventually this validation will be generic but since we are initially
+      // using FieldConfig only for text columns (and migrate to expand its usage
+      // soon after), just validate the field config list from text index creation
+      // perspective.
+      TextIndexConfigValidator.validate(fieldConfigList);
       _fieldConfigList = fieldConfigList;
       return this;
     }

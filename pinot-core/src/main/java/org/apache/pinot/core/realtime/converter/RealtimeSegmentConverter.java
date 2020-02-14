@@ -19,6 +19,7 @@
 package org.apache.pinot.core.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,6 +53,7 @@ public class RealtimeSegmentConverter {
   private String segmentName;
   private String sortedColumn;
   private List<String> invertedIndexColumns;
+  private List<String> textIndexColumns;
   private List<String> noDictionaryColumns;
   private StarTreeIndexSpec starTreeIndexSpec;
   private List<String> varLengthDictionaryColumns;
@@ -59,12 +61,8 @@ public class RealtimeSegmentConverter {
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String timeColumnName, String segmentName, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns,
-      StarTreeIndexSpec starTreeIndexSpec, boolean nullHandlingEnabled) {
-    if (new File(outputPath).exists()) {
-      throw new IllegalAccessError("path already exists:" + outputPath);
-    }
-
+      List<String> invertedIndexColumns, List<String> textIndexColumns, List<String> noDictionaryColumns,
+      List<String> varLengthDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec, boolean nullHandlingEnabled) {
     this.realtimeSegmentImpl = realtimeSegment;
     this.outputPath = outputPath;
     this.invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
@@ -79,13 +77,24 @@ public class RealtimeSegmentConverter {
     this.varLengthDictionaryColumns = varLengthDictionaryColumns;
     this.starTreeIndexSpec = starTreeIndexSpec;
     this._nullHandlingEnabled = nullHandlingEnabled;
+    this.textIndexColumns = textIndexColumns;
   }
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String timeColumnName, String segmentName, String sortedColumn) {
-    this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn, new ArrayList<>(),
-        new ArrayList<>(), new ArrayList<>(), null/*StarTreeIndexSpec*/, false/*nullHandlingEnabled*/);
+      String tableName, String timeColumnName, String segmentName, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns,
+      StarTreeIndexSpec starTreeIndexSpec, boolean nullHandlingEnabled) {
+    this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn,
+        invertedIndexColumns, new ArrayList<>(), noDictionaryColumns, varLengthDictionaryColumns,
+        starTreeIndexSpec, nullHandlingEnabled);
   }
+
+  // Used in RealtimeSegmentConverterTest
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
+        String tableName, String timeColumnName, String segmentName, String sortedColumn) {
+      this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn, new ArrayList<>(),
+          new ArrayList<>(), new ArrayList<>(), null/*StarTreeIndexSpec*/, false/*nullHandlingEnabled*/);
+    }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
@@ -135,6 +144,7 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(tableName);
     genConfig.setOutDir(outputPath);
     genConfig.setSegmentName(segmentName);
+    genConfig.setTextIndexCreationColumns(textIndexColumns);
     SegmentPartitionConfig segmentPartitionConfig = realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);

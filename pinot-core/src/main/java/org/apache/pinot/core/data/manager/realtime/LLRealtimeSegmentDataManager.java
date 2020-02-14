@@ -248,6 +248,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _tableNameWithType;
   private final String _timeColumnName;
   private final List<String> _invertedIndexColumns;
+  private final List<String> _textIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
   private final StarTreeIndexSpec _starTreeIndexSpec;
@@ -709,8 +710,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
               _tableNameWithType, _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
-              _invertedIndexColumns, _noDictionaryColumns, _varLengthDictionaryColumns, _starTreeIndexSpec,
-              _nullHandlingEnabled);
+              _invertedIndexColumns, _textIndexColumns, _noDictionaryColumns, _varLengthDictionaryColumns,
+              _starTreeIndexSpec, _nullHandlingEnabled);
       segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1125,17 +1126,23 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
+    Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
+    _textIndexColumns = new ArrayList<>(textIndexColumns);
+
     // Start new realtime segment
+    String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setSegmentName(_segmentNameStr).setStreamName(_streamTopic)
             .setSchema(_schema).setCapacity(_segmentMaxRowCount)
             .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
+            .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
+            .setRealtimeSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-            .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled);
+            .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
+            .setConsumerDir(consumerDir);
 
     // Create message decoder
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);

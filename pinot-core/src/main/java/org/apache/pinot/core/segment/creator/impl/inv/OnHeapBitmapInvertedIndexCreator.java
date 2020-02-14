@@ -60,6 +60,11 @@ public final class OnHeapBitmapInvertedIndexCreator implements InvertedIndexCrea
   }
 
   @Override
+  public void addDoc(Object document, int docIdCounter) {
+    throw new IllegalStateException("Bitmap inverted index creator does not support Object type currently");
+  }
+
+  @Override
   public void seal()
       throws IOException {
     try (DataOutputStream out = new DataOutputStream(

@@ -28,6 +28,7 @@ import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.SelectionSort;
@@ -511,5 +512,17 @@ public class Pql2CompilerTest {
       Assert.assertEquals(orderBy.getColumn(), orderBys.get(i));
       Assert.assertEquals(orderBy.isIsAsc(), isAscs.get(i).booleanValue());
     }
+  }
+
+  @Test
+  public void testTextMatch() {
+    Pql2Compiler.ENABLE_TEXT_MATCH = true;
+    String query = "SELECT text_col FROM foo WHERE TEXT_MATCH(text_col, '\"Foo bar\"')";
+    BrokerRequest request = COMPILER.compileToBrokerRequest(query);
+    FilterQuery filterQuery = request.getFilterQuery();
+    Assert.assertEquals(filterQuery.getColumn(), "text_col");
+    Assert.assertEquals(filterQuery.getValue().size(), 1);
+    Assert.assertEquals(filterQuery.getValue().get(0), "\"Foo bar\"");
+    Assert.assertEquals(filterQuery.getOperator(), FilterOperator.TEXT_MATCH);
   }
 }

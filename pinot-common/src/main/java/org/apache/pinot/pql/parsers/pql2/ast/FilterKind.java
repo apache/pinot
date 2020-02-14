@@ -32,5 +32,6 @@ public enum FilterKind {
   NOT_IN,
   REGEXP_LIKE,
   IS_NULL,
-  IS_NOT_NULL
+  IS_NOT_NULL,
+  TEXT_MATCH
 }

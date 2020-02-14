@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -94,6 +95,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int docIdCounter;
   private boolean _nullHandlingEnabled;
 
+  private final Set<String> _textIndexColumns = new HashSet<>();
+
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
       Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
@@ -119,6 +122,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create inverted index for column: %s because it is not in schema", columnName);
       invertedIndexColumns.add(columnName);
+    }
+
+    for (String columnName : config.getTextIndexCreationColumns()) {
+      Preconditions.checkState(schema.hasColumn(columnName),
+          "Cannot create text index for column: %s because it is not in schema", columnName);
+      _textIndexColumns.add(columnName);
     }
 
     // Initialize creators for dictionary, forward index and inverted index
@@ -193,6 +202,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         _forwardIndexCreatorMap.put(columnName,
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
                 indexCreationInfo.getLengthOfLongestEntry()));
+
+        // Initialize text index creator
+        if (_textIndexColumns.contains(columnName)) {
+          _invertedIndexCreatorMap.put(columnName, new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
+        }
       }
 
       _nullHandlingEnabled = config.isNullHandlingEnabled();
@@ -251,6 +265,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       FieldSpec spec) {
     String column = spec.getName();
 
+    if (_textIndexColumns.contains(column)) {
+      // TODO: Explore creating dictionary for such columns
+      return false;
+    }
+
     if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
         .containsKey(column)) {
       if (!spec.isSingleValueField()) {
@@ -272,19 +291,36 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         throw new RuntimeException("Null value for column:" + columnName);
       }
 
+      boolean isSingleValue = schema.getFieldSpecFor(columnName).isSingleValueField();
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-      if (schema.getFieldSpecFor(columnName).isSingleValueField()) {
+
+      if (isSingleValue) {
+        // SV column
         if (dictionaryCreator != null) {
+          // dictionary encoded SV column
+          // get dictID from dictionary
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
+          // store the docID -> dictID mapping in forward index
           ((SingleValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter, dictId);
           if (_invertedIndexCreatorMap.containsKey(columnName)) {
+            // if inverted index enabled during segment creation,
+            // then store dictID -> docID mapping in inverted index
             _invertedIndexCreatorMap.get(columnName).add(dictId);
           }
         } else {
+          // non-dictionary encoded SV column
+          // store the docId -> raw value mapping in forward index
           ((SingleValueRawIndexCreator) _forwardIndexCreatorMap.get(columnName))
               .index(docIdCounter, columnValueToIndex);
+          // text-search enabled column
+          if (_textIndexColumns.contains(columnName)) {
+            InvertedIndexCreator textInvertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
+            // add the column value to lucene index
+            textInvertedIndexCreator.addDoc(columnValueToIndex, docIdCounter);
+          }
         }
       } else {
+        // MV column (always dictionary encoded)
         int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
         ((MultiValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter, dictIds);
         if (_invertedIndexCreatorMap.containsKey(columnName)) {
@@ -319,7 +355,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     writeMetadata();
   }
 
-  void writeMetadata()
+  private void writeMetadata()
       throws ConfigurationException {
     PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));

@@ -29,12 +29,13 @@ import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
+import org.apache.pinot.core.common.predicate.TextMatchPredicate;
 
 
 public abstract class Predicate {
 
   public enum Type {
-    EQ, NEQ, REGEXP_LIKE, RANGE, IN, NOT_IN, IS_NULL, IS_NOT_NULL;
+    EQ, NEQ, REGEXP_LIKE, RANGE, IN, NOT_IN, IS_NULL, IS_NOT_NULL, TEXT_MATCH;
 
     public boolean isExclusive() {
       return this == NEQ || this == NOT_IN;
@@ -99,6 +100,9 @@ public abstract class Predicate {
         break;
       case IS_NOT_NULL:
         predicate = new IsNotNullPredicate(column);
+        break;
+      case TEXT_MATCH:
+        predicate = new TextMatchPredicate(column, value);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported filterType:" + filterType);

@@ -21,6 +21,7 @@ package org.apache.pinot.core.realtime.impl.invertedindex;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -58,6 +59,13 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
       // Bitmap for the dictionary id already exists, check and add document id into the bitmap
       _bitmaps.get(dictId).checkAndAdd(docId);
     }
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(Object value) {
+    // This should not be called from anywhere. If it happens, there is a bug
+    // and that's why we throw illegal state exception
+    throw new IllegalStateException("realtime bitmap inverted index reader supports lookup only on dictionary id");
   }
 
   @Override

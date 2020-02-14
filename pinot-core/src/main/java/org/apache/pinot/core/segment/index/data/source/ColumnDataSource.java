@@ -19,6 +19,8 @@
 package org.apache.pinot.core.segment.index.data.source;
 
 import com.google.common.base.Preconditions;
+import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
+import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Constants;
@@ -92,7 +94,9 @@ public final class ColumnDataSource extends DataSource {
       }
     } else {
       // Raw index
-      Preconditions.checkState(invertedIndex == null);
+      // inverted index creation is supported for text index enabled columns
+      // these columns are not dictionary encoded.
+      Preconditions.checkState(invertedIndex == null || invertedIndex instanceof LuceneTextIndexReader || invertedIndex instanceof RealtimeLuceneTextIndexReader);
     }
 
     _operatorName = "ColumnDataSource [" + columnName + "]";
