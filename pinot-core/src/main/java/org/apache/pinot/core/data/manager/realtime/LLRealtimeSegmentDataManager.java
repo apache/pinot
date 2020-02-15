@@ -814,7 +814,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     // Asynchronously upload the segment file to Pinot FS for backup. The upload result does not change the segment
     // completion protocol flow.
-    if (!_indexLoadingConfig.isEnableSegmentUploadToController()) {
+    if (!_indexLoadingConfig.isEnableSegmentUploadToController() && _realtimeTableDataManager.isSegmentStoreConfigured()) {
       uploadSegmentToSegmentStore(segTarFile);
     }
     // Reset the flag regardless of the upload results and this means the tar file is free to be removed.
