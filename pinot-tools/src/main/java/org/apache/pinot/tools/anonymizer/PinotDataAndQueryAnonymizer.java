@@ -45,6 +45,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByExpressionAstNode;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -257,16 +258,19 @@ public class PinotDataAndQueryAnonymizer {
    */
 
   public void buildGlobalDictionaries() throws Exception {
+    File segmentParentDirectory = new File(_segmentDir);
+    _segmentDirectories = segmentParentDirectory.list();
+    _numFilesToGenerate = _segmentDirectories.length;
+    LOGGER.info("Total number of segments: " + _numFilesToGenerate);
+
     if (_globalDictionaryColumns.isEmpty()) {
-      LOGGER.info("Set of global dictionary columns is empty");
+      LOGGER.info("Set of global dictionary columns is empty. Not building global dictionaries");
+      getSchemaFromFirstSegment(_segmentDir +"/" + _segmentDirectories[0]);
+      writeColumnMapping();
       return;
     }
 
     _timeToBuildDictionaries.start();
-
-    File segmentParentDirectory = new File(_segmentDir);
-    _segmentDirectories = segmentParentDirectory.list();
-    _numFilesToGenerate = _segmentDirectories.length;
 
     // STEP 1 for building global dictionary
     for (String segmentDirectory : _segmentDirectories) {
@@ -287,6 +291,24 @@ public class PinotDataAndQueryAnonymizer {
     LOGGER.info("Finished building global dictionaries. Time taken: {}secs", _timeToBuildDictionaries.elapsed(TimeUnit.SECONDS));
   }
 
+  private void getSchemaFromFirstSegment(String segmentDirectory) throws Exception {
+    LOGGER.info("Reading metadata from segment: " + segmentDirectory);
+    File segmentIndexDir = new File(segmentDirectory);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentIndexDir);
+    pinotToAvroSchema(segmentMetadata);
+  }
+
+  private void pinotToAvroSchema(SegmentMetadata segmentMetadata) {
+    if (_pinotSchema == null) {
+      // only do this for first segment
+      _pinotSchema = segmentMetadata.getSchema();
+      anonymizeColumnNames(_pinotSchema);
+      _avroSchema = getAvroSchemaFromPinotSchema(_pinotSchema);
+      LOGGER.info("Pinot schema: " + _pinotSchema.toPrettyJsonString());
+      LOGGER.info("Avro schema: " + _avroSchema.toString(true));
+    }
+  }
+
 
   /**
    * Read dictionaries from a single segment
@@ -296,13 +318,7 @@ public class PinotDataAndQueryAnonymizer {
   private void readDictionariesFromSegment(String segmentDirectory) throws Exception {
     File segmentIndexDir = new File(segmentDirectory);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentIndexDir);
-
-    if (_pinotSchema == null) {
-      // only do this for first segment
-      _pinotSchema = segmentMetadata.getSchema();
-      anonymizeColumnNames(_pinotSchema);
-      _avroSchema = getAvroSchemaFromPinotSchema(_pinotSchema);
-    }
+    pinotToAvroSchema(segmentMetadata);
 
     // read dictionaries from segment and build equivalent dictionary of random values
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(segmentIndexDir, ReadMode.mmap);
@@ -339,6 +355,14 @@ public class PinotDataAndQueryAnonymizer {
     // write column name mapping
     Stopwatch stopwatch = Stopwatch.createUnstarted();
     stopwatch.start();
+    writeColumnMapping();
+    _globalDictionaries.serialize(_outputDir);
+    stopwatch.stop();
+    LOGGER.info("Finished writing global dictionaries and column name mapping to disk. Time taken: {}secs. Please see the files in {}",
+        stopwatch.elapsed(TimeUnit.SECONDS), _outputDir);
+  }
+
+  private void writeColumnMapping() throws Exception {
     PrintWriter columnMappingWriter = new PrintWriter(new BufferedWriter(new FileWriter(_outputDir + "/" + COLUMN_MAPPING_FILE_KEY)));
     for (Map.Entry<String, String> entry : _origToDerivedColumnsMap.entrySet()) {
       String columnName = entry.getKey();
@@ -346,10 +370,6 @@ public class PinotDataAndQueryAnonymizer {
       columnMappingWriter.println(columnName + COLUMN_MAPPING_SEPARATOR + derivedColumnName);
     }
     columnMappingWriter.flush();
-    _globalDictionaries.serialize(_outputDir);
-    stopwatch.stop();
-    LOGGER.info("Finished writing global dictionaries and column name mapping to disk. Time taken: {}secs. Please see the files in {}",
-        stopwatch.elapsed(TimeUnit.SECONDS), _outputDir);
   }
 
 
