@@ -45,6 +45,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByExpressionAstNode;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -294,6 +295,10 @@ public class PinotDataAndQueryAnonymizer {
     LOGGER.info("Reading metadata from segment: " + segmentDirectory);
     File segmentIndexDir = new File(segmentDirectory);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentIndexDir);
+    pinotToAvroSchema(segmentMetadata);
+  }
+
+  private void pinotToAvroSchema(SegmentMetadata segmentMetadata) {
     if (_pinotSchema == null) {
       // only do this for first segment
       _pinotSchema = segmentMetadata.getSchema();
@@ -313,13 +318,7 @@ public class PinotDataAndQueryAnonymizer {
   private void readDictionariesFromSegment(String segmentDirectory) throws Exception {
     File segmentIndexDir = new File(segmentDirectory);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentIndexDir);
-
-    if (_pinotSchema == null) {
-      // only do this for first segment
-      _pinotSchema = segmentMetadata.getSchema();
-      anonymizeColumnNames(_pinotSchema);
-      _avroSchema = getAvroSchemaFromPinotSchema(_pinotSchema);
-    }
+    pinotToAvroSchema(segmentMetadata);
 
     // read dictionaries from segment and build equivalent dictionary of random values
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(segmentIndexDir, ReadMode.mmap);
