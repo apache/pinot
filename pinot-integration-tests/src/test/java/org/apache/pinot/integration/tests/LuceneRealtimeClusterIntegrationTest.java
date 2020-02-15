@@ -127,11 +127,9 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   private File createAvroFile()
       throws Exception {
     // read the skills file
-    URL resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/skills.txt");
-    File skillFile = new File(resourceUrl.getFile());
     String[] skills = new String[100];
     int skillCount = 0;
-    try (InputStream inputStream = new FileInputStream(skillFile);
+    try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/text_search_data/skills.txt");
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       String line;
       while ((line = reader.readLine()) != null) {
