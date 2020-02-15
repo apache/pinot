@@ -830,16 +830,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
         .withInstanceId(_instanceId).withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
-        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis())
-        .withSegmentUploadToController(_indexLoadingConfig.isEnableSegmentUploadToController());
+        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
 
-    // When the server does not upload the segment to controller, it will upload the segment tar file to a predefined
-    // segment store location. Thus there is no need to wait for the segment upload to finish.
+    // By-passing segment upload to controller is turn off by default for backward compatibility.
     if (!_indexLoadingConfig.isEnableSegmentUploadToController()) {
-      params.withSegmentLocation(StringUtil.join(File.separator,
-          _realtimeTableDataManager.getTableSegmentStoreRootDir(), _tableNameWithType,
-          new File(_segmentBuildDescriptor.getSegmentTarFilePath()).getName()));
+      params.withSegmentUploadToController(false);
+      // If the server has deep store configured for segment storage, put the deep store uri as the segment location.
+      if (_realtimeTableDataManager.isSegmentStoreConfigured()) {
+        params.withSegmentLocation(StringUtil
+            .join(File.separator, _realtimeTableDataManager.getTableSegmentStoreRootDir(), _tableNameWithType,
+                new File(_segmentBuildDescriptor.getSegmentTarFilePath()).getName()));
+      }
     }
+
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }

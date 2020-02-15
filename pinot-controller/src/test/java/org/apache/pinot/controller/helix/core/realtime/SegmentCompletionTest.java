@@ -1160,7 +1160,8 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    public void commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    public void commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor,
+        String segmentFinalLocation) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       _segmentMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
       _segmentMetadata.setDownloadUrl(URIUtils.constructDownloadUrl(CONTROLLER_CONF.generateVipUrl(), rawTableName,
@@ -1169,8 +1170,9 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    public void commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    public String commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       Preconditions.checkState(!committingSegmentDescriptor.getSegmentLocation().equals("doNotCommitMe"));
+      return committingSegmentDescriptor.getSegmentLocation();
     }
 
     @Override

@@ -67,6 +67,10 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_SEGMENT_STORE_ROOT_DIR);
   }
 
+  public boolean isSegmentStoreConfigured() {
+    return _tableDataManagerConfig.containsKey(TABLE_SEGMENT_STORE_ROOT_DIR);
+  }
+
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();

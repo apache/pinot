@@ -298,7 +298,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
          }
       }
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
-      _logger.warn("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
+      _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
       FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], segmentFolder);
       _logger.warn("Replacing LLC Segment {}", segmentName);
       replaceLLSegment(segmentName, indexLoadingConfig);
@@ -445,5 +445,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public String getTableSegmentStoreRootDir() {
     return _tableDataManagerConfig.getTableSegmentStoreRootDir();
+  }
+
+  public boolean isSegmentStoreConfigured() {
+    return _tableDataManagerConfig.isSegmentStoreConfigured();
   }
 }
