@@ -29,6 +29,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.IOUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 
 

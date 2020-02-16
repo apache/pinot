@@ -32,6 +32,7 @@ import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
+import org.apache.pinot.tools.admin.command.GetClusterConfigsCommand;
 import org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
 import org.apache.pinot.tools.admin.command.OfflineSegmentIntervalCheckerCommand;
@@ -47,6 +48,7 @@ import org.apache.pinot.tools.admin.command.StartServerCommand;
 import org.apache.pinot.tools.admin.command.StartZookeeperCommand;
 import org.apache.pinot.tools.admin.command.StopProcessCommand;
 import org.apache.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
+import org.apache.pinot.tools.admin.command.UpdateClusterConfigCommand;
 import org.apache.pinot.tools.admin.command.UploadSegmentCommand;
 import org.apache.pinot.tools.admin.command.ValidateConfigCommand;
 import org.apache.pinot.tools.admin.command.VerifyClusterStateCommand;
@@ -89,6 +91,8 @@ public class PinotAdministrator {
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
       @SubCommand(name = "QuickStart", impl = QuickStartCommand.class),
+      @SubCommand(name = "GetClusterConfigs", impl = GetClusterConfigsCommand.class),
+      @SubCommand(name = "UpdateClusterConfig", impl = UpdateClusterConfigCommand.class),
       @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
       @SubCommand(name = "LaunchDataIngestionJob", impl = LaunchDataIngestionJobCommand.class),
       @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
