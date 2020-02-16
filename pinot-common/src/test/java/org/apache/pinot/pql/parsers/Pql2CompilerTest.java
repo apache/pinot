@@ -516,7 +516,6 @@ public class Pql2CompilerTest {
 
   @Test
   public void testTextMatch() {
-    Pql2Compiler.ENABLE_TEXT_MATCH = true;
     String query = "SELECT text_col FROM foo WHERE TEXT_MATCH(text_col, '\"Foo bar\"')";
     BrokerRequest request = COMPILER.compileToBrokerRequest(query);
     FilterQuery filterQuery = request.getFilterQuery();

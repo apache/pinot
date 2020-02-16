@@ -103,6 +103,8 @@ public class V1Constants {
       public static final String PARTITION_VALUES = "partitionValues";
       public static final String DATETIME_FORMAT = "datetimeFormat";
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
+      public static final String HAS_TEXT_INDEX = "hasTextIndex";
+      public static final String TEXT_INDEX_TYPE = "textIndexType";
 
       private static final String COLUMN_PROPS_KEY_PREFIX = "column.";
 

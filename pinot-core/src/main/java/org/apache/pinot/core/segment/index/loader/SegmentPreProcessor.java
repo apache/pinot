@@ -19,9 +19,11 @@
 package org.apache.pinot.core.segment.index.loader;
 
 import java.io.File;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -87,7 +89,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       if (_schema != null) {
         DefaultColumnHandler defaultColumnHandler =
             DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
-        defaultColumnHandler.updateDefaultColumns();
+        defaultColumnHandler.updateDefaultColumns(_indexLoadingConfig);
         _segmentMetadata = new SegmentMetadataImpl(_indexDir);
         _segmentDirectory.reloadMetadata();
       }
@@ -96,6 +98,14 @@ public class SegmentPreProcessor implements AutoCloseable {
       InvertedIndexHandler invertedIndexHandler =
           new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
+
+      Set<String> textIndexColumns = _indexLoadingConfig.getTextIndexColumns();
+      if (textIndexColumns.size() > 0) {
+        TextIndexHandler textIndexHandler =
+            new TextIndexHandler(_indexDir, _segmentMetadata, textIndexColumns, segmentWriter);
+        textIndexHandler.createTextIndexesOnSegmentLoad();
+      }
+
 
       // Create bloom filter if required
       BloomFilterHandler bloomFilterHandler =

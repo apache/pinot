@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.ByteOrder;
@@ -35,6 +36,7 @@ import java.util.TreeMap;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
@@ -80,6 +82,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   public SingleFileIndexDirectory(File segmentDirectory, SegmentMetadataImpl metadata, ReadMode readMode)
       throws IOException, ConfigurationException {
     super(segmentDirectory, metadata, readMode);
+
     indexFile = new File(segmentDirectory, DEFAULT_INDEX_FILE_NAME);
     if (!indexFile.exists()) {
       indexFile.createNewFile();
@@ -121,8 +124,27 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
+    if (type == ColumnIndexType.TEXT_INDEX) {
+      return hasTextIndex(column);
+    }
     IndexKey key = new IndexKey(column, type);
     return columnEntries.containsKey(key);
+  }
+
+  private boolean hasTextIndex(String column) {
+    String suffix = LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(suffix) && name.startsWith(column);
+      }
+    });
+    if (textIndexFiles.length > 0) {
+      Preconditions.checkState(textIndexFiles.length == 1,
+          "Illegal number of text index directories for columns " + column  + " segment directory " + segmentDirectory.getAbsolutePath());
+      return true;
+    }
+    return false;
   }
 
   @Override

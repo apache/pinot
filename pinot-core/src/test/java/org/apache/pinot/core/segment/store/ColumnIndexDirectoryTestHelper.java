@@ -36,7 +36,8 @@ import static org.mockito.Mockito.when;
 public class ColumnIndexDirectoryTestHelper {
   private static Logger LOGGER = LoggerFactory.getLogger(ColumnIndexDirectoryTestHelper.class);
 
-  static ColumnIndexType[] indexTypes = ColumnIndexType.values();
+  static ColumnIndexType[] indexTypes = {ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX,
+  ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR};
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {

@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -460,9 +461,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         hllOriginColumn = derivedHllFieldToOriginMap.get(column);
       }
 
+      boolean hasTextIndex = _textIndexColumns.contains(column);
+      TextIndexType textIndexType = hasTextIndex ? TextIndexType.LUCENE : null;
+
       addColumnMetadataInfo(properties, column, columnIndexCreationInfo, totalDocs, totalRawDocs, totalAggDocs,
           schema.getFieldSpecFor(column), _dictionaryCreatorMap.containsKey(column), dictionaryElementSize,
-          hasInvertedIndex, hllOriginColumn);
+          hasInvertedIndex, hllOriginColumn, hasTextIndex, textIndexType);
     }
 
     properties.save();
@@ -471,7 +475,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnIndexCreationInfo columnIndexCreationInfo, int totalDocs, int totalRawDocs, int totalAggDocs,
       FieldSpec fieldSpec, boolean hasDictionary, int dictionaryElementSize, boolean hasInvertedIndex,
-      String hllOriginColumn) {
+      String hllOriginColumn, boolean hasTextIndex, TextIndexType textIndexType) {
     int cardinality = columnIndexCreationInfo.getDistinctValueCount();
     properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
@@ -485,6 +489,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnIndexCreationInfo.isSorted()));
     properties.setProperty(getKeyFor(column, HAS_NULL_VALUE), String.valueOf(columnIndexCreationInfo.hasNulls()));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
+    properties.setProperty(getKeyFor(column, HAS_TEXT_INDEX), String.valueOf(hasTextIndex));
+    if (textIndexType != null) {
+      properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), textIndexType.name());
+    }
     properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
         String.valueOf(hasInvertedIndex));
     properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SINGLE_VALUED),

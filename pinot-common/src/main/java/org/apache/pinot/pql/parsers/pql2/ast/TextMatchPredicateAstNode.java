@@ -40,11 +40,6 @@ public class TextMatchPredicateAstNode extends PredicateAstNode {
 
   @Override
   public void addChild(AstNode childNode) {
-    if (!Pql2Compiler.ENABLE_TEXT_MATCH) {
-      // TODO: TEXT index is currently disabled until support segment reload is added
-      // remove this check once support for segment reload is added.
-      throw new Pql2CompilationException("TEXT_MATCH operation is currently not enabled");
-    }
     if (childNode instanceof IdentifierAstNode) {
       if (_identifier == null) {
         IdentifierAstNode node = (IdentifierAstNode) childNode;

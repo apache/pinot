@@ -68,7 +68,6 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   @BeforeClass
   public void setUp()
       throws Exception {
-    Pql2Compiler.ENABLE_TEXT_MATCH = true;
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)

@@ -26,6 +26,7 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
@@ -178,6 +179,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
         break;
       case NULLVALUE_VECTOR:
         filename = metadata.getNullValueVectorFileName(column);
+        break;
+      case TEXT_INDEX:
+        filename = column + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
         break;
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());

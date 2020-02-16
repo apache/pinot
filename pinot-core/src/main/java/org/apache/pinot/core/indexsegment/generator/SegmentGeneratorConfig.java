@@ -241,11 +241,6 @@ public class SegmentGeneratorConfig {
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          if (!Pql2Compiler.ENABLE_TEXT_MATCH) {
-            // TODO: TEXT index is currently disabled until support segment reload is added
-            // remove this check once support for segment reload is added.
-            throw new UnsupportedOperationException("TEXT_MATCH is currently not supported");
-          }
           _textIndexCreationColumns.add(fieldConfig.getName());
         }
       }
@@ -327,7 +322,6 @@ public class SegmentGeneratorConfig {
   public void setTextIndexCreationColumns(List<String> textIndexCreationColumns) {
     if (textIndexCreationColumns != null) {
       _textIndexCreationColumns.addAll(textIndexCreationColumns);
-      _rawIndexCreationColumns.addAll(textIndexCreationColumns);
     }
   }
 

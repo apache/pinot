@@ -23,27 +23,34 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.ForwardIndexType;
 import org.apache.pinot.core.segment.creator.InvertedIndexType;
+import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,13 +89,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   protected final File _indexDir;
   protected final Schema _schema;
   protected final SegmentMetadataImpl _segmentMetadata;
+  protected final SegmentDirectory.Writer _segmentWriter;
 
   private final PropertiesConfiguration _segmentProperties;
 
-  protected BaseDefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata) {
+  protected BaseDefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata,
+      SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _schema = schema;
     _segmentMetadata = segmentMetadata;
+    _segmentWriter = segmentWriter;
     _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
   }
 
@@ -96,7 +106,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * {@inheritDoc}
    */
   @Override
-  public void updateDefaultColumns()
+  public void updateDefaultColumns(IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     // Compute the action needed for each column.
     Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
@@ -107,7 +117,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Update each default column based on the default column action.
     for (Map.Entry<String, DefaultColumnAction> entry : defaultColumnActionMap.entrySet()) {
       // This method updates the metadata properties, need to save it later.
-      updateDefaultColumn(entry.getKey(), entry.getValue());
+      updateDefaultColumn(entry.getKey(), entry.getValue(), indexLoadingConfig);
     }
 
     // Update the segment metadata.
@@ -262,7 +272,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * @param action default column action.
    * @throws Exception
    */
-  protected abstract void updateDefaultColumn(String column, DefaultColumnAction action)
+  protected abstract void updateDefaultColumn(String column, DefaultColumnAction action, IndexLoadingConfig indexLoadingConfig)
       throws Exception;
 
   /**
@@ -283,6 +293,82 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
+  }
+
+  /**
+   * Right now the text index is supported on RAW (non-dictionary encoded)
+   * single-value STRING columns. Eventually we will relax the constraints
+   * step by step.
+   * For example, later on user should be able to create text index on
+   * a dictionary encoded STRING column that also has native Pinot's inverted
+   * index. We can also support it on BYTE columns later.
+   * @param column column name
+   * @param indexLoadingConfig index loading config
+   * @param fieldSpec field spec
+   */
+  private void checkUnsupportedOperationsForTextIndex(String column, IndexLoadingConfig indexLoadingConfig,
+      FieldSpec fieldSpec) {
+    if (!indexLoadingConfig.getNoDictionaryColumns().contains(column)) {
+      throw new UnsupportedOperationException("Text index is currently not supported on dictionary encoded column: "+column);
+    }
+
+    Set<String> sortedColumns = new HashSet<>(indexLoadingConfig.getSortedColumns());
+    if (sortedColumns.contains(column)) {
+      // since Pinot's current implementation doesn't support raw sorted columns,
+      // we need to check for this too
+      throw new UnsupportedOperationException("Text index is currently not supported on sorted column: "+column);
+    }
+
+    if (!fieldSpec.isSingleValueField()) {
+      throw new UnsupportedOperationException("Text index is currently not supported on multi-value column: "+column);
+    }
+
+    if (fieldSpec.getDataType() != FieldSpec.DataType.STRING) {
+      throw new UnsupportedOperationException("Text index is currently only supported on STRING column:"+column);
+    }
+  }
+
+  void createV1ForwardIndexForTextIndex(String column, IndexLoadingConfig indexLoadingConfig)
+      throws IOException {
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+    Preconditions.checkNotNull(fieldSpec);
+    checkUnsupportedOperationsForTextIndex(column, indexLoadingConfig, fieldSpec);
+
+    int totalDocs = _segmentMetadata.getTotalDocs();
+    int totalRawDocs = _segmentMetadata.getTotalRawDocs();
+    int totalAggDocs = totalRawDocs - totalDocs;
+    Object defaultValue = fieldSpec.getDefaultNullValue();
+    String stringDefaultValue = (String)defaultValue;
+    int lengthOfLongestEntry = stringDefaultValue.length();
+    int dictionaryElementSize = 0;
+
+    SingleValueVarByteRawIndexCreator rawIndexCreator =
+        new SingleValueVarByteRawIndexCreator(_indexDir, ChunkCompressorFactory.CompressionType.SNAPPY, column, totalDocs, lengthOfLongestEntry);
+
+    for (int docId = 0; docId < totalDocs; docId++) {
+      rawIndexCreator.index(docId, defaultValue);
+    }
+
+    rawIndexCreator.close();
+
+    // even though the column is sorted, we should pass it as false so that during
+    // TEXT_MATCH query time, when index reader is created, we create TextIndexReader
+    // and not SortedIndexReader.
+    Object sortedArray = new String[]{(String)defaultValue};
+    DefaultColumnStatistics columnStatistics =
+        new DefaultColumnStatistics(defaultValue /* min */, defaultValue /* max */, sortedArray, false,
+            totalDocs, 0);
+
+    ColumnIndexCreationInfo columnIndexCreationInfo =
+        new ColumnIndexCreationInfo(columnStatistics, false/*createDictionary*/, false,
+            null, null, true/*isAutoGenerated*/,
+            defaultValue/*defaultNullValue*/);
+
+    // Add the column metadata information to the metadata properties.
+    SegmentColumnarIndexCreator
+        .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, totalRawDocs,
+            totalAggDocs, fieldSpec, false/*hasDictionary*/, dictionaryElementSize, false/*hasInvertedIndex*/,
+            null/*hllOriginColumn*/, true /* hasTextIndex */, TextIndexType.LUCENE);
   }
 
   /**
@@ -381,6 +467,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     SegmentColumnarIndexCreator
         .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, totalRawDocs,
             totalAggDocs, fieldSpec, true/*hasDictionary*/, dictionaryElementSize, true/*hasInvertedIndex*/,
-            null/*hllOriginColumn*/);
+            null/*hllOriginColumn*/, false /* hasTextIndex */, null);
   }
 }
