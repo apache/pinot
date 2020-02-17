@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -483,7 +484,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Runs 4 different queries with predicates.
    * @throws Exception
    */
-  @Test(dependsOnMethods = {"testDistinctInterSegmentInterServer"})
+  @Test
   public void testDistinctWithFilter()
       throws Exception {
     try {
@@ -512,6 +513,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
         _indexSegments.add(segment);
         _segmentDataManagers = Arrays.asList(new ImmutableSegmentDataManager(segment), new ImmutableSegmentDataManager(segment));
+
+        String emptyResultQuery = "SELECT DISTINCT(State, City) FROM " + tableName + " WHERE SaleAmount >= 1000000";
+        runEmptyResultQueryInterSegment(emptyResultQuery, new String[]{"State", "City"});
 
         // without ORDER BY
         runFilterQueryInnerSegment(q1ExpectedResults, query1, new String[]{"State", "City"},
@@ -689,6 +693,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     } finally {
       destroySegments();
     }
+  }
+
+  private void runEmptyResultQueryInterSegment(String query, String[] columnNames) {
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    SelectionResults selectionResults = brokerResponse.getSelectionResults();
+    List<String> columns = selectionResults.getColumns();
+    Assert.assertEquals(columns, Lists.newArrayList(columnNames));
+    List<Serializable[]> rows = selectionResults.getRows();
+    Assert.assertEquals(0, rows.size());
   }
 
   /**

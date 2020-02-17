@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
@@ -139,6 +140,12 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
 
   @Override
   public DistinctTable extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    if (_distinctTable == null) {
+      ColumnDataType[] columnDataTypes = new ColumnDataType[_columnNames.length];
+      Arrays.fill(columnDataTypes, ColumnDataType.STRING);
+      DataSchema dataSchema = new DataSchema(_columnNames, columnDataTypes);
+      _distinctTable = new DistinctTable(dataSchema, _orderBy, _limit);
+    }
     return _distinctTable;
   }
 
