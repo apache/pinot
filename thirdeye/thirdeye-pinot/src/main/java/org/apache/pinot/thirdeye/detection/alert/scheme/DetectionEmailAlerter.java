@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -68,6 +69,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
 
   private static final String PROP_EMAIL_WHITELIST = "emailWhitelist";
   private static final String PROP_ADMIN_RECIPIENTS = "adminRecipients";
+  private static final String PROP_FROM_ADDRESS = "fromAddress";
 
   public static final String PROP_EMAIL_SCHEME = "emailScheme";
 
@@ -79,7 +81,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private SmtpConfiguration smtpConfig;
 
   public DetectionEmailAlerter(DetectionAlertConfigDTO subsConfig, ThirdEyeAnomalyConfiguration thirdeyeConfig,
-      DetectionAlertFilterResult result) throws Exception {
+      DetectionAlertFilterResult result) {
     super(subsConfig, result);
     this.teConfig = thirdeyeConfig;
     this.smtpConfig = SmtpConfiguration.createFromProperties(this.teConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY));
@@ -148,6 +150,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, subsConfig)
         .getEmailEntity(anomalies);
     if (Strings.isNullOrEmpty(this.subsConfig.getFrom())) {
+      this.subsConfig.setFrom(MapUtils.getString(this.teConfig.getAlerterConfiguration(), PROP_FROM_ADDRESS));
       throw new IllegalArgumentException("Invalid sender's email");
     }
 
