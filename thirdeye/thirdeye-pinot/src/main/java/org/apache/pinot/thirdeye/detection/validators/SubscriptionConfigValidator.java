@@ -45,7 +45,6 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
     // Check for all the required fields in the alert
     Preconditions.checkArgument(!StringUtils.isEmpty(alertConfig.getName()), "Subscription group name field cannot be left empty.");
     Preconditions.checkArgument(!StringUtils.isEmpty(alertConfig.getApplication()), "Application field cannot be left empty");
-    Preconditions.checkArgument(!StringUtils.isEmpty(alertConfig.getFrom()), "From address field cannot be left empty");
 
     // Empty subscription properties
     Preconditions.checkArgument((alertConfig.getProperties() != null
