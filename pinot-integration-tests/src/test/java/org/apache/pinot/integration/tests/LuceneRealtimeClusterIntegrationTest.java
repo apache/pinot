@@ -108,7 +108,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
         null, null, getTaskConfig(), getStreamConsumerFactoryClassName(),
         1, textIndexColumns);
 
-    // just wait for 1sec for few docs to be loaded
+    // just wait for 2sec for few docs to be loaded
     waitForDocsLoaded(2000L, false );
   }
 
@@ -182,6 +182,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
         Assert.assertTrue(result >= prevResult);
       }
       prevResult = result;
+      Thread.sleep(10);
     }
   }
 }
