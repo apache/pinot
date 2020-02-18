@@ -150,8 +150,11 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, subsConfig)
         .getEmailEntity(anomalies);
     if (Strings.isNullOrEmpty(this.subsConfig.getFrom())) {
-      this.subsConfig.setFrom(MapUtils.getString(this.teConfig.getAlerterConfiguration(), PROP_FROM_ADDRESS));
-      throw new IllegalArgumentException("Invalid sender's email");
+      String fromAddress = MapUtils.getString(this.teConfig.getAlerterConfiguration(), PROP_FROM_ADDRESS);
+      if (Strings.isNullOrEmpty(fromAddress)) {
+        throw new IllegalArgumentException("Invalid sender's email");
+      }
+      this.subsConfig.setFrom(fromAddress);
     }
 
     HtmlEmail email = emailEntity.getContent();
