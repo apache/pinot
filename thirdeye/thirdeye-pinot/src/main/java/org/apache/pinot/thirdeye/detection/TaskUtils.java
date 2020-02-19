@@ -33,6 +33,8 @@ import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobKey;
 
+import static org.apache.pinot.thirdeye.util.ThirdEyeUtils.getDetectionExpectedDelay;
+
 
 /**
  * Holds utility functions related to ThirdEye Tasks
@@ -86,9 +88,12 @@ public class TaskUtils {
     Long id = getIdFromJobKey(jobKey.getName());
     DetectionConfigDTO configDTO = DAORegistry.getInstance().getDetectionConfigManager().findById(id);
 
-    // Make sure start time is not out of DETECTION_TASK_MAX_LOOKBACK_WINDOW
-    long end = System.currentTimeMillis();
-    long start = Math.max(configDTO.getLastTimestamp(), end  - ThirdEyeUtils.DETECTION_TASK_MAX_LOOKBACK_WINDOW);
+    return buildTaskInfoFromDetectionConfig(configDTO, System.currentTimeMillis());
+  }
+
+  public static DetectionPipelineTaskInfo buildTaskInfoFromDetectionConfig(DetectionConfigDTO configDTO, long end) {
+    long delay = getDetectionExpectedDelay(configDTO);
+    long start = Math.max(configDTO.getLastTimestamp(), end  - ThirdEyeUtils.DETECTION_TASK_MAX_LOOKBACK_WINDOW - delay);
     return new DetectionPipelineTaskInfo(configDTO.getId(), start, end);
   }
 }

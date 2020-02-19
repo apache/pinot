@@ -52,6 +52,7 @@ import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This class is to schedule detection tasks based on data availability events.
  */
@@ -156,7 +157,7 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     List<DetectionConfigDTO> detectionConfigs = detectionConfigDAO.findAllActive()
         .stream().filter(DetectionConfigBean::isDataAvailabilitySchedule).collect(Collectors.toList());
     for (DetectionConfigDTO detectionConfig : detectionConfigs) {
-      List<String> metricUrns = DetectionConfigFormatter
+      Set<String> metricUrns = DetectionConfigFormatter
           .extractMetricUrnsFromProperties(detectionConfig.getProperties());
       Set<String> datasets = new HashSet<>();
       for (String urn : metricUrns) {
@@ -198,17 +199,9 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     return res;
   }
 
-  private DetectionPipelineTaskInfo getDetectionPipelineTaskInfo(DetectionConfigDTO detectionConfig, long end) {
-    // Make sure start time is not out of DETECTION_TASK_MAX_LOOKBACK_WINDOW
-    long start = Math.max(detectionConfig.getLastTimestamp(),
-        end - ThirdEyeUtils.DETECTION_TASK_MAX_LOOKBACK_WINDOW);
-
-    return new DetectionPipelineTaskInfo(detectionConfig.getId(), start, end);
-  }
-
   private long createTask(TaskConstants.TaskType taskType, DetectionConfigDTO detectionConfig, long end)
       throws JsonProcessingException {
-    DetectionPipelineTaskInfo taskInfo = getDetectionPipelineTaskInfo(detectionConfig, end);
+    DetectionPipelineTaskInfo taskInfo = TaskUtils.buildTaskInfoFromDetectionConfig(detectionConfig, end);
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
     TaskDTO taskDTO = TaskUtils.buildTask(detectionConfig.getId(), taskInfoJson, taskType);
     long id = taskDAO.save(taskDTO);

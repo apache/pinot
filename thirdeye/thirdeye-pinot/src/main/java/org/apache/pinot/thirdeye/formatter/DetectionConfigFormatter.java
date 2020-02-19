@@ -23,10 +23,12 @@ package org.apache.pinot.thirdeye.formatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
@@ -77,6 +79,7 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   static final String ATTR_GRANULARITY = "monitoringGranularity";
   static final String ATTR_HEALTH = "health";
 
+  private static final String PROP_METRIC_URNS_KEY = "metricUrn";
   private static final String PROP_NESTED_METRIC_URNS_KEY = "nestedMetricUrns";
   private static final String PROP_NESTED_PROPERTIES_KEY = "nested";
   private static final String PROP_MONITORING_GRANULARITY = "monitoringGranularity";
@@ -122,7 +125,7 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     output.put(ATTR_LAST_TIMESTAMP, config.getLastTimestamp());
     output.put(ATTR_HEALTH, getDetectionHealth(config));
 
-    List<String> metricUrns = extractMetricUrnsFromProperties(config.getProperties());
+    Set<String> metricUrns = extractMetricUrnsFromProperties(config.getProperties());
 
     Map<String, MetricConfigDTO> metricUrnToMetricDTOs = new HashMap<>();
     for (String metricUrn : metricUrns) {
@@ -157,8 +160,11 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
    * @param properties the detection config properties
    * @return the list of metric urns
    */
-  public static List<String> extractMetricUrnsFromProperties(Map<String, Object> properties) {
-    List<String> metricUrns = new ArrayList<>();
+  public static Set<String> extractMetricUrnsFromProperties(Map<String, Object> properties) {
+    Set<String> metricUrns = new HashSet<>();
+    if (properties.containsKey(PROP_METRIC_URNS_KEY)) {
+      metricUrns.add((String)properties.get(PROP_METRIC_URNS_KEY));
+    }
     if (properties.containsKey(PROP_NESTED_METRIC_URNS_KEY)) {
       metricUrns.addAll(ConfigUtils.getList(properties.get(PROP_NESTED_METRIC_URNS_KEY)));
     }
