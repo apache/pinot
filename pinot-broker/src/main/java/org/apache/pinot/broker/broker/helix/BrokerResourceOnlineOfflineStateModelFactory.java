@@ -28,8 +28,7 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
-import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.broker.routing.v2.RoutingManager;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.slf4j.Logger;
@@ -49,16 +48,16 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final HelixDataAccessor _helixDataAccessor;
-  private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
-  private final HelixExternalViewBasedQueryQuotaManager _helixExternalViewBasedQueryQuotaManager;
+  private final RoutingManager _routingManager;
+  private final HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
 
   public BrokerResourceOnlineOfflineStateModelFactory(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      HelixDataAccessor helixDataAccessor, HelixExternalViewBasedRouting helixExternalViewBasedRouting,
-      HelixExternalViewBasedQueryQuotaManager helixExternalViewBasedQueryQuotaManager) {
+      HelixDataAccessor helixDataAccessor, RoutingManager routingManager,
+      HelixExternalViewBasedQueryQuotaManager queryQuotaManager) {
     _helixDataAccessor = helixDataAccessor;
     _propertyStore = propertyStore;
-    _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
-    _helixExternalViewBasedQueryQuotaManager = helixExternalViewBasedQueryQuotaManager;
+    _routingManager = routingManager;
+    _queryQuotaManager = queryQuotaManager;
   }
 
   public static String getStateModelDef() {
@@ -66,7 +65,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
   }
 
   @Override
-  public StateModel createNewStateModel(String resourceName) {
+  public StateModel createNewStateModel(String resourceName, String partitionName) {
     return new BrokerResourceOnlineOfflineStateModel();
   }
 
@@ -75,68 +74,56 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
+      String tableNameWithType = message.getPartitionName();
+      LOGGER.info("Processing transition from OFFLINE to ONLINE for table: {}", tableNameWithType);
       try {
-        LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
-        String tableName = message.getPartitionName();
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
-
-        _helixExternalViewBasedRouting.markDataResourceOnline(tableConfig,
-            _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(tableName)),
-            _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs()));
-        _helixExternalViewBasedQueryQuotaManager.initTableQueryQuota(tableConfig,
+        _routingManager.buildRouting(tableNameWithType);
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+        _queryQuotaManager.initTableQueryQuota(tableConfig,
             _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
       } catch (Exception e) {
-        LOGGER.error("Caught exception during OFFLINE -> ONLINE transition", e);
-        Utils.rethrowException(e);
-        throw new AssertionError("Should not reach this");
+        LOGGER.error("Caught exception while processing transition from OFFLINE to ONLINE for table: {}",
+            tableNameWithType, e);
+        throw e;
       }
     }
 
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
+      String tableNameWithType = message.getPartitionName();
+      LOGGER.info("Processing transition from ONLINE to OFFLINE for table: {}", tableNameWithType);
       try {
-        LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
-        String tableName = message.getPartitionName();
-        _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _helixExternalViewBasedQueryQuotaManager.dropTableQueryQuota(tableName);
+        _routingManager.removeRouting(tableNameWithType);
+        _queryQuotaManager.dropTableQueryQuota(tableNameWithType);
       } catch (Exception e) {
-        LOGGER.error("Caught exception during ONLINE -> OFFLINE transition", e);
-        Utils.rethrowException(e);
-        throw new AssertionError("Should not reach this");
+        LOGGER.error("Caught exception while processing transition from ONLINE to OFFLINE for table: {}",
+            tableNameWithType, e);
+        throw e;
       }
     }
 
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
-      try {
-        LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
-        String tableName = message.getPartitionName();
-        _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _helixExternalViewBasedQueryQuotaManager.dropTableQueryQuota(tableName);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception during OFFLINE -> DROPPED transition", e);
-        Utils.rethrowException(e);
-        throw new AssertionError("Should not reach this");
-      }
+      LOGGER.info("Transition from OFFLINE to DROPPED is no-op for table: {}", message.getPartitionName());
     }
 
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
+      String tableNameWithType = message.getPartitionName();
+      LOGGER.info("Processing transition from ONLINE to DROPPED for table: {}", tableNameWithType);
       try {
-        LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
-        String tableName = message.getPartitionName();
-        _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _helixExternalViewBasedQueryQuotaManager.dropTableQueryQuota(tableName);
+        _routingManager.removeRouting(tableNameWithType);
+        _queryQuotaManager.dropTableQueryQuota(tableNameWithType);
       } catch (Exception e) {
-        LOGGER.error("Caught exception during ONLINE -> DROPPED transition", e);
-        Utils.rethrowException(e);
-        throw new AssertionError("Should not reach this");
+        LOGGER.error("Caught exception while processing transition from ONLINE to DROPPED for table: {}",
+            tableNameWithType, e);
+        throw e;
       }
     }
 
     @Transition(from = "ERROR", to = "OFFLINE")
     public void onBecomeOfflineFromError(Message message, NotificationContext context) {
-      LOGGER.info("Resetting the state for broker resource:{} from ERROR to OFFLINE", message.getPartitionName());
+      LOGGER.info("Transition from ERROR to OFFLINE is no-op for table: {}", message.getPartitionName());
     }
   }
 }

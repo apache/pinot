@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Function;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -29,11 +28,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
@@ -172,14 +169,19 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     List<String> h2queries;
-    query = "SELECT count(*) FROM mytable WHERE AirlineID > 20355 AND OriginState BETWEEN 'PA' AND 'DE' AND DepTime <> 2202 LIMIT 21";
+    query =
+        "SELECT count(*) FROM mytable WHERE AirlineID > 20355 AND OriginState BETWEEN 'PA' AND 'DE' AND DepTime <> 2202 LIMIT 21";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
+    query =
+        "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' ORDER BY ArrTime DESC";
+    query =
+        "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' ORDER BY ArrTime DESC";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303, 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
-    h2queries = Arrays.asList("SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN (1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000");
+    query =
+        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303, 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
+    h2queries = Arrays.asList(
+        "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN (1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000");
     testSqlQuery(query, h2queries);
     query = "SELECT MAX(Quarter), MAX(FlightNum) FROM mytable LIMIT 8";
     h2queries = Arrays.asList("SELECT MAX(Quarter),MAX(FlightNum) FROM mytable LIMIT 10000");
@@ -427,108 +429,71 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     checkForEmptyRoutingTable(false);
 
     // Check on each server instance
-    for (String instanceName : instances) {
-      if (!instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+    for (String instance : instances) {
+      if (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
         continue;
       }
 
       // Ensure that the random instance is in the routing table
-      checkForInstanceInRoutingTable(true, instanceName);
+      checkForInstanceInRoutingTable(instance, true);
 
       // Mark the server instance as shutting down
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instanceName);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(getHelixClusterName(), instanceName, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
 
       // Check that it is not in the routing table
-      checkForInstanceInRoutingTable(false, instanceName);
+      checkForInstanceInRoutingTable(instance, false);
 
       // Re-enable the server instance
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(getHelixClusterName(), instanceName, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
 
       // Check that it is in the routing table
-      checkForInstanceInRoutingTable(true, instanceName);
+      checkForInstanceInRoutingTable(instance, true);
     }
   }
 
-  private void checkForInstanceInRoutingTable(final boolean shouldExist, final String instanceName) {
+  private void checkForInstanceInRoutingTable(String instance, boolean shouldExist) {
     String errorMessage;
     if (shouldExist) {
-      errorMessage = "Routing table does not contain expected instance: " + instanceName;
+      errorMessage = "Routing table does not contain expected instance: " + instance;
     } else {
-      errorMessage = "Routing table contains unexpected instance: " + instanceName;
+      errorMessage = "Routing table contains unexpected instance: " + instance;
     }
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          JsonNode routingTableSnapshot =
-              getDebugInfo("debug/routingTable/" + getTableName()).get("routingTableSnapshot");
-          int numTables = routingTableSnapshot.size();
-          for (int i = 0; i < numTables; i++) {
-            JsonNode tableRouting = routingTableSnapshot.get(i);
-            String tableNameWithType = tableRouting.get("tableName").asText();
-            if (TableNameBuilder.extractRawTableName(tableNameWithType).equals(getTableName())) {
-              JsonNode routingTableEntries = tableRouting.get("routingTableEntries");
-              int numRoutingTableEntries = routingTableEntries.size();
-              for (int j = 0; j < numRoutingTableEntries; j++) {
-                JsonNode routingTableEntry = routingTableEntries.get(j);
-                if (routingTableEntry.has(instanceName)) {
-                  return shouldExist;
-                }
-              }
-            }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
+        for (JsonNode routingTable : routingTables) {
+          if (routingTable.has(instance)) {
+            return shouldExist;
           }
-          return !shouldExist;
-        } catch (Exception e) {
-          return null;
         }
+        return !shouldExist;
+      } catch (Exception e) {
+        return null;
       }
     }, 60_000L, errorMessage);
   }
 
-  private void checkForEmptyRoutingTable(final boolean shouldBeEmpty)
-      throws Exception {
+  private void checkForEmptyRoutingTable(boolean shouldBeEmpty) {
     String errorMessage;
     if (shouldBeEmpty) {
       errorMessage = "Routing table is not empty";
     } else {
       errorMessage = "Routing table is empty";
     }
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          JsonNode routingTableSnapshot =
-              getDebugInfo("debug/routingTable/" + getTableName()).get("routingTableSnapshot");
-          int numTables = routingTableSnapshot.size();
-          for (int i = 0; i < numTables; i++) {
-            JsonNode tableRouting = routingTableSnapshot.get(i);
-            String tableNameWithType = tableRouting.get("tableName").asText();
-            if (TableNameBuilder.extractRawTableName(tableNameWithType).equals(getTableName())) {
-              JsonNode routingTableEntries = tableRouting.get("routingTableEntries");
-              int numRoutingTableEntries = routingTableEntries.size();
-              for (int j = 0; j < numRoutingTableEntries; j++) {
-                JsonNode routingTableEntry = routingTableEntries.get(j);
-                if (routingTableEntry.size() == 0) {
-                  if (!shouldBeEmpty) {
-                    return false;
-                  }
-                } else {
-                  if (shouldBeEmpty) {
-                    return false;
-                  }
-                }
-              }
-            }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
+        for (JsonNode routingTable : routingTables) {
+          if ((routingTable.size() == 0) != shouldBeEmpty) {
+            return false;
           }
-          return true;
-        } catch (Exception e) {
-          return null;
         }
+        return true;
+      } catch (Exception e) {
+        return null;
       }
     }, 60_000L, errorMessage);
   }

@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import java.io.File;
-import org.apache.pinot.common.response.BrokerResponseFactory;
 
 
 public class CommonConstants {
@@ -152,13 +151,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
-    public static final BrokerResponseFactory.ResponseType DEFAULT_BROKER_RESPONSE_TYPE =
-        BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
-    // The sleep interval time of the thread used by the Brokers to refresh TimeboundaryInfo upon segment refreshing
-    // events.
-    public static final String CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL =
-        "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
-    public static final long DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS = 10000L;
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.

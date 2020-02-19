@@ -19,52 +19,60 @@
 package org.apache.pinot.common.messages;
 
 import java.util.UUID;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
 
 
 /**
- * This (helix) message is sent from the controller to the server when a request is received to refresh
+ * This (Helix) message is sent from the controller to brokers and servers when a request is received to refresh
  * an existing segment.
  *
- * There is one mandatory field in the message -- the CRC of the new segment.
+ * NOTE: Changing this class to include new fields is a change in the protocol, so the new fields must be made optional,
+ * and coded in such a way that either controller, broker or server may be upgraded first.
  *
- * @note
- * Changing this class to include new fields is a change in the protocol, so the new fields must be made optional,
- * and coded in such a way that either controller or server may be upgraded first.
+ * TODO: "tableName" and "segmentName" are new added fields. Change SegmentMessageHandlerFactory to use these 2 fields
+ *       in the next release for backward-compatibility
  */
 public class SegmentRefreshMessage extends Message {
   public static final String REFRESH_SEGMENT_MSG_SUB_TYPE = "REFRESH_SEGMENT";
 
-  private static final String SIMPLE_FIELD_CRC = "PINOT_SEGMENT_CRC";
+  private static final String TABLE_NAME_KEY = "tableName";
+  private static final String SEGMENT_NAME_KEY = "segmentName";
 
   /**
-   *
-   * @param tableName is the offline table name
-   * @param segmentName is name of the segment
-   * @param crc is the CRC of the new segment
+   * Constructor for the sender.
    */
-  public SegmentRefreshMessage(String tableName, String segmentName, long crc) {
+  public SegmentRefreshMessage(String tableNameWithType, String segmentName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
-    setResourceName(tableName);
-    setPartitionName(segmentName);
     setMsgSubType(REFRESH_SEGMENT_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
-    getRecord().setSimpleField(SIMPLE_FIELD_CRC, Long.toString(crc));
+    // Set the Pinot specific fields
+    // NOTE: DO NOT use Helix fields "RESOURCE_NAME" and "PARTITION_NAME" for them because these 2 fields can be
+    // overridden by Helix while sending the message
+    ZNRecord znRecord = getRecord();
+    znRecord.setSimpleField(TABLE_NAME_KEY, tableNameWithType);
+    znRecord.setSimpleField(SEGMENT_NAME_KEY, segmentName);
   }
 
   /**
+   * Constructor for the receiver.
+   *
    * @param message The incoming message that has been received from helix.
    * @throws IllegalArgumentException if the message is not of right sub-type
    */
-  public SegmentRefreshMessage(final Message message) {
+  public SegmentRefreshMessage(Message message) {
     super(message.getRecord());
     if (!message.getMsgSubType().equals(REFRESH_SEGMENT_MSG_SUB_TYPE)) {
       throw new IllegalArgumentException("Invalid message subtype:" + message.getMsgSubType());
     }
   }
 
-  public long getCrc() {
-    return Long.valueOf(getRecord().getSimpleField(SIMPLE_FIELD_CRC));
+  public String getTableNameWithType() {
+    return getRecord().getSimpleField(TABLE_NAME_KEY);
+  }
+
+  public String getSegmentName() {
+    return getRecord().getSimpleField(SEGMENT_NAME_KEY);
   }
 }

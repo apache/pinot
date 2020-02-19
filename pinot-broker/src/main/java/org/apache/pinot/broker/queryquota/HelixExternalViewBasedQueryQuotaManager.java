@@ -56,12 +56,16 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedQueryQuotaManager.class);
   private static final int TIME_RANGE_IN_SECOND = 1;
 
+  private final BrokerMetrics _brokerMetrics;
   private final AtomicInteger _lastKnownBrokerResourceVersion = new AtomicInteger(-1);
   private final Map<String, QueryQuotaEntity> _rateLimiterMap = new ConcurrentHashMap<>();
 
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private BrokerMetrics _brokerMetrics;
+
+  public HelixExternalViewBasedQueryQuotaManager(BrokerMetrics brokerMetrics) {
+    _brokerMetrics = brokerMetrics;
+  }
 
   @Override
   public void init(HelixManager helixManager) {
@@ -266,10 +270,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
     // Token is successfully acquired.
     return true;
-  }
-
-  public void setBrokerMetrics(BrokerMetrics brokerMetrics) {
-    _brokerMetrics = brokerMetrics;
   }
 
   @VisibleForTesting

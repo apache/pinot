@@ -29,8 +29,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.RoutingTable;
-import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.broker.routing.v2.RoutingManager;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -55,10 +54,10 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryRouter _queryRouter;
 
-  public SingleConnectionBrokerRequestHandler(Configuration config, RoutingTable routingTable,
-      TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    super(config, routingTable, timeBoundaryService, accessControlFactory, queryQuotaManager, brokerMetrics, propertyStore);
+  public SingleConnectionBrokerRequestHandler(Configuration config, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    super(config, routingManager, accessControlFactory, queryQuotaManager, brokerMetrics, propertyStore);
     _queryRouter = new QueryRouter(_brokerId, brokerMetrics);
   }
 
