@@ -44,6 +44,8 @@ public class DataAvailabilitySchedulingConfiguration {
   private long taskTriggerFallBackTimeInSec = TimeUnit.DAYS.toSeconds(1);
   // scheduling window for data availability scheduling to avoid over-scheduling if watermarks do not move forward
   private long schedulingWindowInSec = TimeUnit.MINUTES.toSeconds(30);
+  // schedule delay upon receiving data update trigger in case the visibility of data in source is delayed
+  private long scheduleDelayInSec = TimeUnit.MINUTES.toSeconds(10);
 
   public String getConsumerClass() {
     return consumerClass;
@@ -155,5 +157,13 @@ public class DataAvailabilitySchedulingConfiguration {
 
   public void setSchedulingWindowInSec(long schedulingWindowInSec) {
     this.schedulingWindowInSec = schedulingWindowInSec;
+  }
+
+  public long getScheduleDelayInSec() {
+    return scheduleDelayInSec;
+  }
+
+  public void setScheduleDelayInSec(long scheduleDelayInSec) {
+    this.scheduleDelayInSec = scheduleDelayInSec;
   }
 }

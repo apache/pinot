@@ -195,7 +195,8 @@ public class ThirdEyeAnomalyApplication
           dataAvailabilityTaskScheduler = new DataAvailabilityTaskScheduler(
               config.getDataAvailabilitySchedulingConfiguration().getSchedulerDelayInSec(),
               config.getDataAvailabilitySchedulingConfiguration().getTaskTriggerFallBackTimeInSec(),
-              config.getDataAvailabilitySchedulingConfiguration().getSchedulingWindowInSec());
+              config.getDataAvailabilitySchedulingConfiguration().getSchedulingWindowInSec(),
+              config.getDataAvailabilitySchedulingConfiguration().getScheduleDelayInSec());
           dataAvailabilityTaskScheduler.start();
         }
       }

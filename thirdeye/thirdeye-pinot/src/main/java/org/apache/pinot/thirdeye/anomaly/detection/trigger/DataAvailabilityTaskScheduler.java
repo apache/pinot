@@ -59,9 +59,10 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DataAvailabilityTaskScheduler.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private ScheduledExecutorService executorService;
-  private long delayInSec;
+  private long sleepPerRunInSec;
   private long fallBackTimeInSec;
   private long schedulingWindowInSec;
+  private long scheduleDelayInSec;
 
   // Maintains mapping from each detection to the detection end time of it's last run.
   // Fallback runs based on the last task run (successful or not).
@@ -73,13 +74,14 @@ public class DataAvailabilityTaskScheduler implements Runnable {
 
   /**
    * Construct an instance of {@link DataAvailabilityTaskScheduler}
-   * @param delayInSec delay after each run to avoid polling the database too often
+   * @param sleepPerRunInSec delay after each run to avoid polling the database too often
    * @param fallBackTimeInSec global threshold for fallback if detection level one is not set
    */
-  public DataAvailabilityTaskScheduler(long delayInSec, long fallBackTimeInSec, long schedulingWindowInSec) {
-    this.delayInSec = delayInSec;
+  public DataAvailabilityTaskScheduler(long sleepPerRunInSec, long fallBackTimeInSec, long schedulingWindowInSec, long scheduleDelayInSec) {
+    this.sleepPerRunInSec = sleepPerRunInSec;
     this.fallBackTimeInSec = fallBackTimeInSec;
     this.schedulingWindowInSec = schedulingWindowInSec;
+    this.scheduleDelayInSec = scheduleDelayInSec;
     this.detectionIdToLastTaskEndTimeMap = new HashMap<>();
     this.executorService = Executors.newSingleThreadScheduledExecutor();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
@@ -140,7 +142,7 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   }
 
   public void start() {
-    executorService.scheduleWithFixedDelay(this, 0, delayInSec, TimeUnit.SECONDS);
+    executorService.scheduleWithFixedDelay(this, 0, sleepPerRunInSec, TimeUnit.SECONDS);
   }
 
   public void close() {
@@ -239,7 +241,9 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   private boolean isAllDatasetUpdated(DetectionConfigDTO detectionConfig, Set<String> datasets,
       Map<String, DatasetConfigDTO> datasetConfigMap) {
     long lastTimestamp = detectionConfig.getLastTimestamp();
-    return datasets.stream().allMatch(d -> datasetConfigMap.get(d).getLastRefreshTime() > lastTimestamp);
+    long curr = System.currentTimeMillis();
+    return datasets.stream().allMatch(d -> datasetConfigMap.get(d).getLastRefreshTime() > lastTimestamp
+        && curr - datasetConfigMap.get(d).getLastRefreshEventTime() >= TimeUnit.SECONDS.toMillis(scheduleDelayInSec));
   }
 
   /* check if the fallback cron need to be triggered if the detection has not been run for long time */
