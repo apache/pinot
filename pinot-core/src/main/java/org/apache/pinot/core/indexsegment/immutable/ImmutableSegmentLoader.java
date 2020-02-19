@@ -25,6 +25,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.index.column.ColumnContext;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
@@ -35,9 +36,8 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
-import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
-import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
-import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.core.segment.index.column.ColumnProvider;
+import org.apache.pinot.core.segment.virtualcolumn.ColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -117,14 +117,14 @@ public class ImmutableSegmentLoader {
     }
 
     // Ensure that the schema has the virtual columns added
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
+    ColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
 
     // Instantiate virtual columns
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (fieldSpec.isVirtualColumn()) {
         String columnName = fieldSpec.getName();
-        VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
-        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
+        ColumnContext context = new ColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
+        ColumnProvider provider = ColumnProviderFactory.buildProvider(context);
         indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
         segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
       }

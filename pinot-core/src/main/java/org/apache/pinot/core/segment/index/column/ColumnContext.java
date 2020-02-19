@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.segment.index.column;
 
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Miscellaneous context information about the virtual column.
- * It will be used to build various components (dictionary, reader, etc) in the virtual column provider.
+ * Miscellaneous context information about the column (virtual column, constant-value column, etc).
+ * It will be used to build various components (dictionary, reader, etc) in the column provider.
  */
-public class VirtualColumnContext {
+public class ColumnContext {
   private FieldSpec _fieldSpec;
   private int _totalDocCount;
 
-  public VirtualColumnContext(FieldSpec fieldSpec, int totalDocCount) {
+  public ColumnContext(FieldSpec fieldSpec, int totalDocCount) {
     _fieldSpec = fieldSpec;
     _totalDocCount = totalDocCount;
   }

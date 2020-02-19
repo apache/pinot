@@ -16,26 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.segment.index.column;
 
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ConstantMultiValueInvertedIndex;
 import org.apache.pinot.core.io.reader.impl.ConstantSingleValueInvertedIndex;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Shared implementation code between virtual column providers.
+ * Shared implementation code between column providers.
  */
-public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
+public abstract class BaseColumnProvider implements ColumnProvider {
 
-  ColumnIndexContainer _columnIndexContainer;
+  org.apache.pinot.core.segment.index.column.ColumnIndexContainer _columnIndexContainer;
   InvertedIndexReader _invertedIndexReader;
 
-  public DataFileReader buildReader(VirtualColumnContext context) {
+  public DataFileReader buildReader(ColumnContext context) {
     if (context.getFieldSpec().isSingleValueField()) {
       return new ConstantSingleValueInvertedIndex(0);
     } else {
@@ -43,14 +42,14 @@ public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider
     }
   }
 
-  protected ColumnMetadata.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
+  protected ColumnMetadata.Builder getColumnMetadataBuilder(ColumnContext context) {
     FieldSpec fieldSpec = context.getFieldSpec();
     return new ColumnMetadata.Builder().setVirtual(true).setColumnName(fieldSpec.getName())
         .setFieldType(fieldSpec.getFieldType()).setDataType(fieldSpec.getDataType())
         .setTotalDocs(context.getTotalDocCount()).setSingleValue(fieldSpec.isSingleValueField());
   }
 
-  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
+  public InvertedIndexReader buildInvertedIndex(ColumnContext context) {
     if (context.getFieldSpec().isSingleValueField()) {
       _invertedIndexReader = new ConstantSingleValueInvertedIndex(context.getTotalDocCount());
     } else {
@@ -60,9 +59,9 @@ public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider
   }
 
   @Override
-  public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
+  public ColumnIndexContainer buildColumnIndexContainer(ColumnContext context) {
     _columnIndexContainer =
-        new VirtualColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
+        new BaseColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
     return _columnIndexContainer;
   }
 

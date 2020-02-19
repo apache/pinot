@@ -103,11 +103,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public Set<String> getColumnNamesForSelectStar() {
-    return getPhysicalColumnNames();
-  }
-
-  @Override
   public void destroy() {
     LOGGER.info("Trying to destroy segment : {}", this.getSegmentName());
     for (String column : _indexContainerMap.keySet()) {

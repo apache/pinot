@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.segment.index.column;
 
 import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
@@ -27,14 +26,14 @@ import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 
 
 /**
- * Column index container for virtual columns.
+ * Base column index container for columns.
  */
-public class VirtualColumnIndexContainer implements ColumnIndexContainer {
+public class BaseColumnIndexContainer implements ColumnIndexContainer {
   private DataFileReader _forwardIndex;
   private InvertedIndexReader _invertedIndex;
   private Dictionary _dictionary;
 
-  public VirtualColumnIndexContainer(DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
+  public BaseColumnIndexContainer(DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
       Dictionary dictionary) {
     _forwardIndex = forwardIndex;
     _invertedIndex = invertedIndex;

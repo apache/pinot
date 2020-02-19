@@ -222,7 +222,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 300_000L, "Failed to generate default values for new columns");
+    }, 1_000L, 300_000L, "Failed to generate default values for new columns");
 
     // Test select star query. All columns should be returned with no exceptions.
     queryResponse = postQuery(String.format(TEST_SELECT_QUERY_TEMPLATE, "*", "mytable"));

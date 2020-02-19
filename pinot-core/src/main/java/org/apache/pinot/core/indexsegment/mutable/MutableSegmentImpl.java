@@ -52,6 +52,10 @@ import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefr
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.core.realtime.impl.nullvalue.RealtimeNullValueVectorReaderWriter;
+import org.apache.pinot.core.segment.index.column.ColumnContext;
+import org.apache.pinot.core.segment.index.column.ColumnProvider;
+import org.apache.pinot.core.segment.index.column.DefaultNullValueColumnProvider;
+import org.apache.pinot.core.segment.virtualcolumn.ColumnProviderFactory;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
@@ -59,10 +63,6 @@ import org.apache.pinot.core.segment.index.loader.defaultcolumn.BaseDefaultColum
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.apache.pinot.core.segment.virtualcolumn.DefaultNullValueVirtualColumnProvider;
-import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
-import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
-import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
@@ -131,7 +131,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private RealtimeLuceneReaders _realtimeLuceneReaders;
   // If the table schema is changed before the consuming segment is committed, newly added columns would appear in _newlyAddedColumnsFieldMap.
   private volatile Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
-  private volatile Map<String, VirtualColumnProvider> _virtualColumnProviderMap = new ConcurrentHashMap<>();
+  private volatile Map<String, ColumnProvider> _newlyAddedColumnsProviderMap = new ConcurrentHashMap<>();
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -313,15 +313,9 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return true if column is no-dictionary, false if dictionary encoded
    */
   private boolean isNoDictionaryColumn(Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
-<<<<<<< HEAD
       Set<String> textIndexColumns, FieldSpec fieldSpec, String column) {
     return textIndexColumns.contains(column) || (noDictionaryColumns.contains(column) && fieldSpec.isSingleValueField()
         && !invertedIndexColumns.contains(column));
-=======
-      FieldSpec fieldSpec, String column) {
-    return noDictionaryColumns.contains(column) && fieldSpec.isSingleValueField() && !invertedIndexColumns
-        .contains(column);
->>>>>>> cache virtual column provider
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -337,19 +331,11 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   public void addExtraColumns(Schema newSchema) {
-    Map<String, BaseDefaultColumnHandler.DefaultColumnAction> defaultColumnActionMap =
-        BaseDefaultColumnHandler.computeDefaultColumnActionMap(newSchema, (SegmentMetadataImpl) getSegmentMetadata());
-    defaultColumnActionMap.forEach(((columnName, defaultColumnAction) -> {
-      if (newSchema.getFieldSpecFor(columnName).isVirtualColumn()) {
-        _logger.info("Skipped virtual column {}", columnName);
-      } else if (defaultColumnAction.isAddAction()) {
+    for (String columnName : newSchema.getPhysicalColumnNames()) {
+      if (!_schema.getPhysicalColumnNames().contains(columnName)) {
         _newlyAddedColumnsFieldMap.put(columnName, newSchema.getFieldSpecFor(columnName));
-      } else if (defaultColumnAction.isUpdateAction()) {
-        _logger.warn("New schema is backward incompatible. Column {} is updated.", columnName);
-      } else if (defaultColumnAction.isRemoveAction()) {
-        _logger.warn("New schema is backward incompatible. Column {} is removed.", columnName);
       }
-    }));
+    }
     _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
   }
 
@@ -581,11 +567,6 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public Set<String> getColumnNamesForSelectStar() {
-    return Sets.union(getPhysicalColumnNames(), _newlyAddedColumnsFieldMap.keySet());
-  }
-
-  @Override
   public ColumnDataSource getDataSource(String columnName) {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
     if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
@@ -595,22 +576,19 @@ public class MutableSegmentImpl implements MutableSegment {
         fieldSpec = _newlyAddedColumnsFieldMap.get(columnName);
         Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + columnName + " should not be null");
       }
-      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
-
-      _virtualColumnProviderMap
-          .putIfAbsent(columnName, VirtualColumnProviderFactory.buildProvider(virtualColumnContext));
-      VirtualColumnProvider virtualColumnProvider = _virtualColumnProviderMap.get(columnName);
-      if (virtualColumnProvider instanceof DefaultNullValueVirtualColumnProvider) {
+      ColumnContext columnContext = new ColumnContext(fieldSpec, _numDocsIndexed);
+      ColumnProvider columnProvider = _newlyAddedColumnsProviderMap.getOrDefault(columnName, ColumnProviderFactory.buildProvider(columnContext));
+      if (columnProvider instanceof DefaultNullValueColumnProvider) {
         _logger.debug("Updating number of rows for {}", columnName);
         // We just need to update _numDocsIndexed, and return default values
-        ((DefaultNullValueVirtualColumnProvider) virtualColumnProvider)
-            .updateInvertedIndex(columnName, virtualColumnContext);
+        ((DefaultNullValueColumnProvider) columnProvider)
+            .updateInvertedIndex(columnName, columnContext);
         return new ColumnDataSource(
-            ((DefaultNullValueVirtualColumnProvider) virtualColumnProvider).getColumnIndexContainer(),
-            ((DefaultNullValueVirtualColumnProvider) virtualColumnProvider).getColumnMetadata());
+            ((DefaultNullValueColumnProvider) columnProvider).getColumnIndexContainer(),
+            ((DefaultNullValueColumnProvider) columnProvider).getColumnMetadata());
       } else {
-        return new ColumnDataSource(virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext),
-            virtualColumnProvider.buildMetadata(virtualColumnContext));
+        return new ColumnDataSource(columnProvider.buildColumnIndexContainer(columnContext),
+            columnProvider.buildMetadata(columnContext));
       }
     } else {
       return new ColumnDataSource(fieldSpec, _numDocsIndexed, _maxNumValuesMap.get(columnName),

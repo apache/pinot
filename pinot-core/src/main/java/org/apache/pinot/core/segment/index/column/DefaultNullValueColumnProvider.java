@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.segment.index.column;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.core.io.reader.impl.ConstantMultiValueInvertedIndex;
@@ -35,26 +35,26 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * Provide the default null value.
  */
-public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProvider {
+public class DefaultNullValueColumnProvider extends BaseColumnProvider {
 
   Dictionary _dictionary;
   ColumnMetadata _columnMetadata;
 
-  DefaultNullValueVirtualColumnProvider(VirtualColumnContext virtualColumnContext) {
-    buildDictionary(virtualColumnContext);
-    buildMetadata(virtualColumnContext);
-    buildColumnIndexContainer(virtualColumnContext);
+  public DefaultNullValueColumnProvider(ColumnContext columnContext) {
+    buildDictionary(columnContext);
+    buildMetadata(columnContext);
+    buildColumnIndexContainer(columnContext);
   }
 
   @Override
-  public ColumnMetadata buildMetadata(VirtualColumnContext context) {
+  public ColumnMetadata buildMetadata(ColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
     columnMetadataBuilder.setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true);
     _columnMetadata = columnMetadataBuilder.build();
     return _columnMetadata;
   }
 
-  public Dictionary buildDictionary(VirtualColumnContext context) {
+  public Dictionary buildDictionary(ColumnContext context) {
     FieldSpec fieldSpec = context.getFieldSpec();
     DataType dataType = fieldSpec.getDataType().getStoredType();
     if (dataType.equals(DataType.STRING)) {
@@ -74,16 +74,16 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
     return _dictionary;
   }
 
-  public void updateInvertedIndex(String str, VirtualColumnContext virtualColumnContext) {
+  public void updateInvertedIndex(String str, ColumnContext columnContext) {
     Preconditions.checkState(
         _columnIndexContainer.getInvertedIndex() instanceof ConstantSingleValueInvertedIndex || _columnIndexContainer
             .getInvertedIndex() instanceof ConstantMultiValueInvertedIndex, "column index should have constant value");
     if (_columnIndexContainer.getInvertedIndex() instanceof ConstantSingleValueInvertedIndex) {
       ((ConstantSingleValueInvertedIndex) _columnIndexContainer.getInvertedIndex())
-          .setLength(virtualColumnContext.getTotalDocCount());
+          .setLength(columnContext.getTotalDocCount());
     } else {
       ((ConstantMultiValueInvertedIndex) _columnIndexContainer.getInvertedIndex())
-          .setLength(virtualColumnContext.getTotalDocCount());
+          .setLength(columnContext.getTotalDocCount());
     }
   }
 

@@ -44,6 +44,13 @@ public class ConstantMultiValueInvertedIndex extends BaseSingleColumnMultiValueR
   }
 
   @Override
+  public Pairs.IntPair getDocIds(Object value) {
+    // This should not be called from anywhere. If it happens, there is a bug
+    // and that's why we throw illegal state exception
+    throw new IllegalStateException("sorted inverted index reader supports lookup only using dictionary id");
+  }
+
+  @Override
   public int getIntArray(int row, int[] intArray) {
     return 0;
   }

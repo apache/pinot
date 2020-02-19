@@ -20,36 +20,36 @@ package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReaderImpl;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.column.BaseColumnProvider;
+import org.apache.pinot.core.segment.index.column.ColumnContext;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.DocIdDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
  * Virtual column provider that returns the current document id.
  */
-public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
+public class DocIdVirtualColumnProvider extends BaseColumnProvider {
 
   @Override
-  public DataFileReader buildReader(VirtualColumnContext context) {
+  public DataFileReader buildReader(ColumnContext context) {
     return new DocIdSingleValueReader();
   }
 
   @Override
-  public Dictionary buildDictionary(VirtualColumnContext context) {
+  public Dictionary buildDictionary(ColumnContext context) {
     return new DocIdDictionary(context.getTotalDocCount());
   }
 
   @Override
-  public ColumnMetadata buildMetadata(VirtualColumnContext context) {
+  public ColumnMetadata buildMetadata(ColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
     columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setHasDictionary(true).setHasInvertedIndex(true)
         .setSingleValue(true).setIsSorted(true);
@@ -58,7 +58,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
   }
 
   @Override
-  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
+  public InvertedIndexReader buildInvertedIndex(ColumnContext context) {
     return new DocIdInvertedIndex();
   }
 

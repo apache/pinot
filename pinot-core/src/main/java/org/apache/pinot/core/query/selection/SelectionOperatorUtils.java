@@ -31,6 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -94,7 +95,10 @@ public class SelectionOperatorUtils {
       IndexSegment indexSegment) {
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
       // For 'SELECT *', sort all physical columns so that the order is deterministic
-      selectionColumns = new ArrayList<>(indexSegment.getColumnNamesForSelectStar());
+      selectionColumns = new ArrayList<>(
+          // For "select *" queries, ignore columns that start with "$"
+          indexSegment.getColumnNames().stream().filter(column -> column.charAt(0) != '$')
+              .collect(Collectors.toList()));
       selectionColumns.sort(null);
 
       List<TransformExpressionTree> expressions = new ArrayList<>(selectionColumns.size());
@@ -135,11 +139,12 @@ public class SelectionOperatorUtils {
 
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
       // For 'SELECT *', sort all physical columns so that the order is deterministic
-      selectionColumns = new ArrayList<>(indexSegment.getColumnNamesForSelectStar());
+      selectionColumns = new ArrayList<>(indexSegment.getColumnNames());
       selectionColumns.sort(null);
 
       for (String selectionColumn : selectionColumns) {
-        if (!columnSet.contains(selectionColumn)) {
+        if (!columnSet.contains(selectionColumn) && selectionColumn.charAt(0) != '$') {
+          // For "select *" queries, ignore columns that start with "$"
           expressions.add(new TransformExpressionTree(new IdentifierAstNode(selectionColumn)));
         }
       }

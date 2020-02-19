@@ -59,13 +59,6 @@ public interface IndexSegment {
   Set<String> getPhysicalColumnNames();
 
   /**
-   * Returns all columns for the "select *" query
-   *
-   * @return Set of column names
-   */
-  Set<String> getColumnNamesForSelectStar();
-
-  /**
    * Returns the {@link DataSource} for the given column.
    *
    * @param columnName Column name
