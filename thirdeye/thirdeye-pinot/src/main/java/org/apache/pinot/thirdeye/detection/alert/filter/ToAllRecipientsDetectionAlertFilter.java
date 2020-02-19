@@ -34,6 +34,8 @@ import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
+
 
 /**
  * The detection alert filter that sends the anomaly email to all recipients
@@ -69,11 +71,15 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
     // Fetch all the anomalies to be notified to the recipients
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
-    this.config.setAlertSchemes(generateNotificationSchemeProps(
-        this.config,
-        this.recipients.get(PROP_TO),
-        this.recipients.get(PROP_CC),
-        this.recipients.get(PROP_BCC)));
+    // Handle legacy recipients yaml syntax
+    Map<String, Object> emailProps = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
+    if (emailProps.get(PROP_TO) == null && this.recipients.get(PROP_TO) != null) {
+      this.config.setAlertSchemes(generateNotificationSchemeProps(
+          this.config,
+          this.recipients.get(PROP_TO),
+          this.recipients.get(PROP_CC),
+          this.recipients.get(PROP_BCC)));
+    }
 
     return result.addMapping(new DetectionAlertFilterNotification(this.config), anomalies);
   }

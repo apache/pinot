@@ -41,8 +41,8 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
  * to a set of unconditional and another set of conditional recipients, based on the
  * value of a specified anomaly dimension combinations.
  *
- * Unlike {@link DimensionDetectionAlertFilter}, here you can configure multiple dimension
- * combinations along with a variety of alerting channels and reference links.
+ * You can configure multiple dimension combinations along with a variety of alerting
+ * channels and reference links.
  *
  * <pre>
  * dimensionRecipients:
