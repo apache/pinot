@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.HybridQuickstart;
 import org.apache.pinot.tools.Quickstart;
@@ -69,20 +70,21 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
   @Override
   public boolean execute()
       throws Exception {
+    PluginManager.get().init();
     switch (_type.toUpperCase()) {
       case "OFFLINE":
       case "BATCH":
-        Quickstart.main(new String[]{});
+        new Quickstart().execute();
         break;
       case "REALTIME":
       case "STREAM":
-        RealtimeQuickStart.main(new String[]{});
+        new RealtimeQuickStart().execute();
         break;
       case "HYBRID":
-        HybridQuickstart.main(new String[]{});
+        new HybridQuickstart().execute();
         break;
       default:
-        throw new UnsupportedOperationException("Unsupported quickstart type: " + _type);
+        throw new UnsupportedOperationException("Unsupported QuickStart type: " + _type);
     }
     return true;
   }

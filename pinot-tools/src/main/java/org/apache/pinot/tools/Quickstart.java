@@ -30,8 +30,6 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
 public class Quickstart {
-  private Quickstart() {
-  }
 
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
