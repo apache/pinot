@@ -39,9 +39,6 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class RealtimeQuickStart {
   private StreamDataServerStartable _kafkaStarter;
 
-  private RealtimeQuickStart() {
-  }
-
   public static void main(String[] args)
       throws Exception {
     PluginManager.get().init();

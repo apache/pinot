@@ -47,9 +47,6 @@ public class HybridQuickstart {
   private File _dataFile;
   private File _ingestionJobSpecFile;
 
-  private HybridQuickstart() {
-  }
-
   public static void main(String[] args)
       throws Exception {
     // TODO: Explicitly call below method to load dependencies from pinot-plugins libs which are excluded from pinot-tools packaging.
