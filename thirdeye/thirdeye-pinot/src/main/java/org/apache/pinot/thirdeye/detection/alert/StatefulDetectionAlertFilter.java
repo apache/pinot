@@ -119,13 +119,16 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
    * Extracts the alert schemes from config and also merges (overrides)
    * recipients explicitly defined outside the scope of alert schemes.
    */
-  protected Map<String, Object> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
+  protected Map<String, Object> generateAlertSchemeProps(DetectionAlertConfigDTO config,
       Set<String> to, Set<String> cc, Set<String> bcc) {
     Map<String, Object> notificationSchemeProps = new HashMap<>();
 
     // Copy over all the alert schemes
     if (config.getAlertSchemes() != null) {
-      notificationSchemeProps.putAll(config.getAlertSchemes());
+      for (Map.Entry<Object, Object> alertSchemeEntry : ConfigUtils.getMap(config.getAlertSchemes()).entrySet()) {
+        notificationSchemeProps.put(alertSchemeEntry.getKey().toString(), ConfigUtils.getMap(alertSchemeEntry.getValue()));
+        //notificationSchemeProps.putAll(ConfigUtils.getMap(config.getAlertSchemes()));
+      }
     }
 
     // Overrider the email alert scheme

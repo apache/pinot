@@ -72,9 +72,8 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
     // Handle legacy recipients yaml syntax
-    Map<String, Object> emailProps = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
-    if (emailProps.get(PROP_TO) == null && this.recipients.get(PROP_TO) != null) {
-      this.config.setAlertSchemes(generateNotificationSchemeProps(
+    if (SubscriptionUtils.isEmptyEmailRecipients(this.config) && this.recipients.get(PROP_TO) != null) {
+      this.config.setAlertSchemes(generateAlertSchemeProps(
           this.config,
           this.recipients.get(PROP_TO),
           this.recipients.get(PROP_CC),

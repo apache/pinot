@@ -106,13 +106,18 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
     }
 
     // Safe guard: Per user dimension alerter works only with email alerter
-    if (this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME) != null) {
+    if (!SubscriptionUtils.isEmptyEmailRecipients(this.config)) {
       Map<String, Object> emailProps = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
+      Map<String, Object> recipients = ConfigUtils.getMap(emailProps.get(PROP_RECIPIENTS));
+
       for (Map.Entry<String, List<MergedAnomalyResultDTO>> userAnomalyMapping : perUserAnomalies.entrySet()) {
-        DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(this.config,
-            generateNotificationSchemeProps(this.config,
-                this.makeGroupRecipients(ConfigUtils.getList(emailProps.get(PROP_TO)), userAnomalyMapping.getKey()), new HashSet<>(ConfigUtils.getList(emailProps.get(PROP_CC))),
-                new HashSet<>(ConfigUtils.getList(emailProps.get(PROP_BCC)))), this.config.getReferenceLinks());
+        Map<String, Object> generatedAlertSchemes = generateAlertSchemeProps(this.config,
+            this.makeGroupRecipients(ConfigUtils.getList(recipients.get(PROP_TO)), userAnomalyMapping.getKey()),
+            new HashSet<>(ConfigUtils.getList(recipients.get(PROP_CC))),
+            new HashSet<>(ConfigUtils.getList(recipients.get(PROP_BCC))));
+
+        DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
+            this.config, generatedAlertSchemes, this.config.getReferenceLinks());
 
         result.addMapping(new DetectionAlertFilterNotification(subsConfig), new HashSet<>(userAnomalyMapping.getValue()));
       }
