@@ -123,15 +123,14 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
       Set<String> to, Set<String> cc, Set<String> bcc) {
     Map<String, Object> notificationSchemeProps = new HashMap<>();
 
-    // Copy over all the alert schemes
+    // Make a copy of the current alert schemes
     if (config.getAlertSchemes() != null) {
       for (Map.Entry<Object, Object> alertSchemeEntry : ConfigUtils.getMap(config.getAlertSchemes()).entrySet()) {
         notificationSchemeProps.put(alertSchemeEntry.getKey().toString(), ConfigUtils.getMap(alertSchemeEntry.getValue()));
-        //notificationSchemeProps.putAll(ConfigUtils.getMap(config.getAlertSchemes()));
       }
     }
 
-    // Overrider the email alert scheme
+    // Override the email alert scheme
     Map<String, Object> recipients = new HashMap<>();
     recipients.put(PROP_TO, cleanupRecipients(to));
     recipients.put(PROP_CC, cleanupRecipients(cc));

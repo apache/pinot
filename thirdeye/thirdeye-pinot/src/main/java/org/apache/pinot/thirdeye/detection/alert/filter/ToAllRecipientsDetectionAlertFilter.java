@@ -73,6 +73,7 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
 
     // Handle legacy recipients yaml syntax
     if (SubscriptionUtils.isEmptyEmailRecipients(this.config) && this.recipients.get(PROP_TO) != null) {
+      // recipients are configured using the older syntax
       this.config.setAlertSchemes(generateAlertSchemeProps(
           this.config,
           this.recipients.get(PROP_TO),

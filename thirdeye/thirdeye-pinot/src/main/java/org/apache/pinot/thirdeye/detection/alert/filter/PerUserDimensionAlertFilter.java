@@ -105,7 +105,7 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
       }
     }
 
-    // Safe guard: Per user dimension alerter works only with email alerter
+    // Per user dimension alerter works only with email alerter
     if (!SubscriptionUtils.isEmptyEmailRecipients(this.config)) {
       Map<String, Object> emailProps = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
       Map<String, Object> recipients = ConfigUtils.getMap(emailProps.get(PROP_RECIPIENTS));
