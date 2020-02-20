@@ -58,7 +58,7 @@ public class PinotClusterConfigs {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List cluster configurations", notes = "List cluster level configurations")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
-  public String getTableInstances() {
+  public String listClusterConfigs() {
     HelixAdmin helixAdmin = pinotHelixResourceManager.getHelixAdmin();
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(pinotHelixResourceManager.getHelixClusterName()).build();
@@ -76,7 +76,7 @@ public class PinotClusterConfigs {
   @ApiOperation(value = "Update cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error updating configuration")})
-  public SuccessResponse updateIndexingConfig(String body) {
+  public SuccessResponse updateClusterConfig(String body) {
     try {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(body);
       HelixAdmin admin = pinotHelixResourceManager.getHelixAdmin();
