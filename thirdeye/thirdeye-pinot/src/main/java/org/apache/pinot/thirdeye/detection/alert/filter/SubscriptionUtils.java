@@ -60,6 +60,9 @@ public class SubscriptionUtils {
     return subsConfig;
   }
 
+  /**
+   * Validates if the subscription config has email recipients configured or not.
+   */
   public static boolean isEmptyEmailRecipients(DetectionAlertConfigDTO detectionAlertConfigDTO) {
     Map<String, Object> emailProps = ConfigUtils.getMap(detectionAlertConfigDTO.getAlertSchemes().get(PROP_EMAIL_SCHEME));
     Map<String, Object> recipients = ConfigUtils.getMap(emailProps.get(PROP_RECIPIENTS));
