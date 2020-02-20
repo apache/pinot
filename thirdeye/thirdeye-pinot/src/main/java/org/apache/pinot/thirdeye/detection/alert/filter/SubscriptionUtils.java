@@ -19,13 +19,17 @@
 
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
-import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
 
 
 public class SubscriptionUtils {
+
+  public static final String PROP_RECIPIENTS = "recipients";
+  public static final String PROP_TO = "to";
 
   /**
    * Make a new(child) subscription group from given(parent) subscription group.
@@ -54,5 +58,14 @@ public class SubscriptionUtils {
     subsConfig.setReferenceLinks(refLinks);
 
     return subsConfig;
+  }
+
+  /**
+   * Validates if the subscription config has email recipients configured or not.
+   */
+  public static boolean isEmptyEmailRecipients(DetectionAlertConfigDTO detectionAlertConfigDTO) {
+    Map<String, Object> emailProps = ConfigUtils.getMap(detectionAlertConfigDTO.getAlertSchemes().get(PROP_EMAIL_SCHEME));
+    Map<String, Object> recipients = ConfigUtils.getMap(emailProps.get(PROP_RECIPIENTS));
+    return recipients.isEmpty() || ConfigUtils.getList(recipients.get(PROP_TO)).isEmpty();
   }
 }

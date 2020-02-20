@@ -43,6 +43,8 @@ import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
 public class ToAllRecipientsDetectionAlertFilterTest {
 
   private static final String PROP_RECIPIENTS = "recipients";
+  private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_EMAIL_SCHEME = "emailScheme";
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";
@@ -84,13 +86,18 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     DetectionAlertConfigDTO alertConfig = new DetectionAlertConfigDTO();
 
     Map<String, Object> properties = new HashMap<>();
+    properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
+    alertConfig.setProperties(properties);
+
+    Map<String, Object> alertSchemes = new HashMap<>();
+    Map<String, Object> emailScheme = new HashMap<>();
     Map<String, Set<String>> recipients = new HashMap<>();
     recipients.put(PROP_TO, PROP_TO_VALUE);
     recipients.put(PROP_CC, PROP_CC_VALUE);
     recipients.put(PROP_BCC, PROP_BCC_VALUE);
-    properties.put(PROP_RECIPIENTS, recipients);
-    properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
-    alertConfig.setProperties(properties);
+    emailScheme.put(PROP_RECIPIENTS, recipients);
+    alertSchemes.put(PROP_EMAIL_SCHEME, emailScheme);
+    alertConfig.setAlertSchemes(alertSchemes);
 
     Map<Long, Long> vectorClocks = new HashMap<>();
     vectorClocks.put(PROP_ID_VALUE.get(0), 0L);
