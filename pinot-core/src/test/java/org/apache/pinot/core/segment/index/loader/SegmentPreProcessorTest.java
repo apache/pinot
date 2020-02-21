@@ -26,8 +26,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -42,6 +40,8 @@ import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -58,6 +58,7 @@ public class SegmentPreProcessorTest {
   private static final String COLUMN7_NAME = "column7";
   private static final String COLUMN13_NAME = "column13";
   private static final String NO_SUCH_COLUMN_NAME = "noSuchColumn";
+  private static final String NEW_COLUMN_INVERTED_INDEX = "newStringMVDimension";
 
   // For update default value tests.
   private static final String NEW_COLUMNS_SCHEMA1 = "data/newColumnsSchema1.json";
@@ -268,7 +269,10 @@ public class SegmentPreProcessorTest {
   public void testV1UpdateDefaultColumns()
       throws Exception {
     constructV1Segment();
-    checkUpdateDefaultColumns();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(
+        Arrays.asList(COLUMN1_NAME, COLUMN7_NAME, COLUMN13_NAME, NO_SUCH_COLUMN_NAME, NEW_COLUMN_INVERTED_INDEX)));
+    checkUpdateDefaultColumns(indexLoadingConfig);
 
     // Try to use the third schema and update default value again.
     // For the third schema, we changed the default value for column 'newStringMVDimension' to 'notSameLength', which
@@ -289,10 +293,10 @@ public class SegmentPreProcessorTest {
         "0000000141ba085ee15d2f3241ba085ee15d2f324059000000000000000000013ff000000000000041ba085ee15d2f32");
   }
 
-  private void checkUpdateDefaultColumns()
+  private void checkUpdateDefaultColumns(IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     // Update default value.
-    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, _newColumnsSchema1)) {
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, indexLoadingConfig, _newColumnsSchema1)) {
       processor.process();
     }
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);

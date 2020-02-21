@@ -120,6 +120,8 @@ public abstract class SegmentDirectory implements Closeable {
     return SegmentLocalFSDirectory.loadSegmentMetadata(directory);
   }
 
+  public abstract void reloadMetadata() throws Exception;
+
   /**
    * Get the path/URL for the directory
    * @return

@@ -84,6 +84,12 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
+  @Override
+  public void reloadMetadata() throws Exception {
+    this.segmentMetadata = loadSegmentMetadata(segmentDirectory);
+    columnIndexDirectory.metadata = this.segmentMetadata;
+  }
+
   private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
     if (segmentVersion == SegmentVersion.v1 || segmentVersion == SegmentVersion.v2) {
       return segmentDirectory;
