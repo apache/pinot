@@ -30,8 +30,10 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.slf4j.LoggerFactory;
 
 
@@ -79,7 +81,9 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit) {
     _textColumn = column;
     try {
-      File indexFile = new File(segmentIndexDir.getPath() + "/" + _textColumn + LUCENE_TEXT_INDEX_FILE_EXTENSION);
+      // segment generation is always in V1 and later we convert (as part of post creation processing)
+      // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
+      File indexFile = getV1TextIndexFile(segmentIndexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
@@ -154,5 +158,10 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
   @Override
   public void add(int[] dictIds, int length) {
     throw new IllegalStateException("Lucene text inverted index is not dictionary based");
+  }
+
+  private File getV1TextIndexFile(File indexDir) {
+    String luceneIndexDirectory = _textColumn + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    return new File(indexDir, luceneIndexDirectory);
   }
 }
