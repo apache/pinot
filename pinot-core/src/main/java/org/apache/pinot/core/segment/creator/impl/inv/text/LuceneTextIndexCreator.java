@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.creator.impl.inv.text;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.logging.Logger;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -30,10 +29,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.slf4j.LoggerFactory;
 
 
