@@ -21,6 +21,8 @@ package org.apache.pinot.thirdeye.detection.alert.filter;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.util.Collections;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -72,7 +74,7 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
     // Handle legacy recipients yaml syntax
-    if (SubscriptionUtils.isEmptyEmailRecipients(this.config) && this.recipients.get(PROP_TO) != null) {
+    if (SubscriptionUtils.isEmptyEmailRecipients(this.config) && CollectionUtils.isNotEmpty(this.recipients.get(PROP_TO))) {
       // recipients are configured using the older syntax
       this.config.setAlertSchemes(generateAlertSchemeProps(
           this.config,
