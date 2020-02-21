@@ -89,6 +89,7 @@ public class SegmentPreProcessor implements AutoCloseable {
             DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
         defaultColumnHandler.updateDefaultColumns();
         _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+        _segmentDirectory.reloadMetadata();
       }
 
       // Create column inverted indices according to the index config.
