@@ -19,22 +19,16 @@
 package org.apache.pinot.core.segment.index;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.segment.StarTreeMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import org.apache.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
-import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -89,8 +83,6 @@ public class ColumnMetadataTest {
     Assert.assertEquals(col7Meta.getColumnName(), "column7");
     Assert.assertEquals(col7Meta.getCardinality(), 359);
     Assert.assertEquals(col7Meta.getTotalDocs(), 100000);
-    Assert.assertEquals(col7Meta.getTotalRawDocs(), 100000);
-    Assert.assertEquals(col7Meta.getTotalAggDocs(), 0);
     Assert.assertEquals(col7Meta.getDataType(), FieldSpec.DataType.INT);
     Assert.assertEquals(col7Meta.getBitsPerElement(), 9);
     Assert.assertEquals(col7Meta.getColumnMaxLength(), 0);
@@ -110,8 +102,6 @@ public class ColumnMetadataTest {
     Assert.assertEquals(col3Meta.getColumnName(), "column3");
     Assert.assertEquals(col3Meta.getCardinality(), 5);
     Assert.assertEquals(col3Meta.getTotalDocs(), 100000);
-    Assert.assertEquals(col3Meta.getTotalRawDocs(), 100000);
-    Assert.assertEquals(col3Meta.getTotalAggDocs(), 0);
     Assert.assertEquals(col3Meta.getDataType(), FieldSpec.DataType.STRING);
     Assert.assertEquals(col3Meta.getBitsPerElement(), 3);
     Assert.assertEquals(col3Meta.getColumnMaxLength(), 4);
@@ -131,8 +121,6 @@ public class ColumnMetadataTest {
     Assert.assertEquals(timeColumn.getColumnName(), "daysSinceEpoch");
     Assert.assertEquals(timeColumn.getCardinality(), 1);
     Assert.assertEquals(timeColumn.getTotalDocs(), 100000);
-    Assert.assertEquals(timeColumn.getTotalRawDocs(), 100000);
-    Assert.assertEquals(timeColumn.getTotalAggDocs(), 0);
     Assert.assertEquals(timeColumn.getDataType(), FieldSpec.DataType.INT);
     Assert.assertEquals(timeColumn.getBitsPerElement(), 1);
     Assert.assertEquals(timeColumn.getColumnMaxLength(), 0);
@@ -203,35 +191,6 @@ public class ColumnMetadataTest {
     // Make sure we get null for creator name.
     char paddingCharacter = metadata.getPaddingCharacter();
     Assert.assertEquals(paddingCharacter, '\0');
-  }
-
-  @Test
-  public void testHllIndexRelatedMetadata()
-      throws Exception {
-    SegmentWithHllIndexCreateHelper helper = null;
-    try {
-      // Build the Segment metadata.
-      helper = new SegmentWithHllIndexCreateHelper("testHllIndexRelatedMetadata",
-          getClass().getClassLoader().getResource("data/test_data-sv.avro"), "daysSinceEpoch", TimeUnit.DAYS,
-          "starTreeSegment");
-      helper.build(true, new HllConfig(9, new HashSet<>(Arrays.asList("column7")), "_hllSuffix"));
-
-      // Load segment metadata.
-      IndexSegment segment = ImmutableSegmentLoader.load(helper.getSegmentDirectory(), ReadMode.mmap);
-      SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
-      Assert.assertEquals(metadata.getHllLog2m(), 9);
-
-      // Verify Hll Related Info
-      StarTreeMetadata starTreeMetadata = metadata.getStarTreeMetadata();
-      Assert.assertNotNull(starTreeMetadata);
-      ColumnMetadata column = metadata.getColumnMetadataFor("column7_hllSuffix");
-      Assert.assertEquals(column.getDerivedMetricType(), MetricFieldSpec.DerivedMetricType.HLL);
-      Assert.assertEquals(column.getOriginColumnName(), "column7");
-    } finally {
-      if (helper != null) {
-        helper.cleanTempDir();
-      }
-    }
   }
 }
 

@@ -89,7 +89,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     }
 
     final long timeConsumed = System.currentTimeMillis() - committingSegmentZKMetadata.getCreationTime();
-    final long numRowsConsumed = committingSegmentZKMetadata.getTotalRawDocs();
+    final long numRowsConsumed = committingSegmentZKMetadata.getTotalDocs();
     final int numRowsThreshold = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
     LOGGER.info("{}: Data from committing segment: Time {}  numRows {} threshold {} segmentSize(bytes) {}",
         newSegmentName, TimeUtils.convertMillisToPeriod(timeConsumed), numRowsConsumed, numRowsThreshold,

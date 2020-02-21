@@ -103,7 +103,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(segmentMetadata.getTimeInterval()).thenReturn(INTERVAL);
     when(segmentMetadata.getCrc()).thenReturn(CRC);
     when(segmentMetadata.getVersion()).thenReturn(SEGMENT_VERSION);
-    when(segmentMetadata.getTotalRawDocs()).thenReturn(NUM_DOCS);
+    when(segmentMetadata.getTotalDocs()).thenReturn(NUM_DOCS);
     return segmentMetadata;
   }
 
@@ -212,7 +212,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getTimeInterval(), INTERVAL);
     assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
     assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION);
-    assertEquals(committedSegmentZKMetadata.getTotalRawDocs(), NUM_DOCS);
+    assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
 
     LLCRealtimeSegmentZKMetadata consumingSegmentZKMetadata =
         segmentManager._segmentZKMetadataMap.get(consumingSegment);

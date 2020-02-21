@@ -48,7 +48,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -68,7 +68,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
     Assert.assertEquals(selectionDataSchema.size(), 10);
@@ -92,7 +92,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 100L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -117,7 +117,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 79L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 100L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -147,7 +147,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -172,7 +172,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 79L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -202,7 +202,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 400000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -227,7 +227,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 272276L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 62480L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 

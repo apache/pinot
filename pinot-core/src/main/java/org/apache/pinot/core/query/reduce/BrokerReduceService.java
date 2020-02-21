@@ -64,7 +64,7 @@ public class BrokerReduceService {
     long numSegmentsMatched = 0L;
     long numConsumingSegmentsProcessed = 0L;
     long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
-    long numTotalRawDocs = 0L;
+    long numTotalDocs = 0L;
     boolean numGroupsLimitReached = false;
 
     // Cache a data schema from data tables (try to cache one with data rows associated with it).
@@ -128,9 +128,9 @@ public class BrokerReduceService {
             Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
       }
 
-      String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
-      if (numTotalRawDocsString != null) {
-        numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
+      String numTotalDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
+      if (numTotalDocsString != null) {
+        numTotalDocs += Long.parseLong(numTotalDocsString);
       }
       numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY));
 
@@ -158,7 +158,7 @@ public class BrokerReduceService {
     brokerResponseNative.setNumSegmentsQueried(numSegmentsQueried);
     brokerResponseNative.setNumSegmentsProcessed(numSegmentsProcessed);
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
-    brokerResponseNative.setTotalDocs(numTotalRawDocs);
+    brokerResponseNative.setTotalDocs(numTotalDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
     if (numConsumingSegmentsProcessed > 0) {
       brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsProcessed);
@@ -206,8 +206,7 @@ public class BrokerReduceService {
     }
     for (int i = 0; i < selectListSize; i++) {
       Function selectFunc = selectList.get(i).getFunctionCall();
-      if (selectFunc != null && selectFunc.getOperator()
-          .equalsIgnoreCase(SqlKind.AS.toString())) {
+      if (selectFunc != null && selectFunc.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
         columnNames[i] = selectFunc.getOperands().get(1).getIdentifier().getName();
       }
     }

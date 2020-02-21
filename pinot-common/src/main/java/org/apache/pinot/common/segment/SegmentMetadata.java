@@ -20,7 +20,6 @@ package org.apache.pinot.common.segment;
 
 import java.io.File;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -54,8 +53,6 @@ public interface SegmentMetadata {
   String getShardingKey();
 
   int getTotalDocs();
-
-  int getTotalRawDocs();
 
   File getIndexDir();
 
@@ -91,10 +88,6 @@ public interface SegmentMetadata {
 
   boolean hasDictionary(String columnName);
 
-  boolean hasStarTree();
-
-  StarTreeMetadata getStarTreeMetadata();
-
   String getForwardIndexFileName(String column);
 
   String getDictionaryFileName(String column);
@@ -108,18 +101,6 @@ public interface SegmentMetadata {
   String getCreatorName();
 
   char getPaddingCharacter();
-
-  int getHllLog2m();
-
-  /**
-   * Get the derived column name for the given original column and derived metric type.
-   *
-   * @param column original column name.
-   * @param derivedMetricType derived metric type.
-   * @return derived column name if exists.
-   *         null if not.
-   */
-  String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType);
 
   boolean close();
 }

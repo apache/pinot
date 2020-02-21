@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -43,20 +42,20 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
-  private final long _numTotalRawDocs;
+  private final long _numTotalDocs;
   private final boolean _useStarTree;
 
   private ExecutionStatistics _executionStatistics;
 
-  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator,
-      long numTotalRawDocs, boolean useStarTree) {
+  public AggregationGroupByOperator(AggregationFunctionContext[] functionContexts, GroupBy groupBy,
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, long numTotalDocs,
+      boolean useStarTree) {
     _functionContexts = functionContexts;
     _groupBy = groupBy;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
-    _numTotalRawDocs = numTotalRawDocs;
+    _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
   }
 
@@ -86,8 +85,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            _numTotalRawDocs);
+        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalDocs);
 
     // Build intermediate result block based on aggregation group-by result from the executor
     return new IntermediateResultsBlock(_functionContexts, groupByResult);

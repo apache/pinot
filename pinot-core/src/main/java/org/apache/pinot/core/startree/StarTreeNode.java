@@ -35,7 +35,6 @@ public interface StarTreeNode {
 
   /**
    * Get the value (dictionary id) of the dimension.
-   * @return
    */
   int getDimensionValue();
 

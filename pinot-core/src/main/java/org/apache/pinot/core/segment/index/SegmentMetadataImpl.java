@@ -43,20 +43,16 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
-import org.apache.pinot.startree.hll.HllConstants;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -64,7 +60,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.*;
 
 
 public class SegmentMetadataImpl implements SegmentMetadata {
@@ -89,15 +84,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _latestIngestionTime = Long.MIN_VALUE;
 
   private SegmentVersion _segmentVersion;
-  private boolean _hasStarTree;
-  private StarTreeMetadata _starTreeMetadata;
   private List<StarTreeV2Metadata> _starTreeV2MetadataList;
   private String _creatorName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
-  private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
-  private final Map<String, String> _hllDerivedColumnMap = new HashMap<>();
   private int _totalDocs;
-  private int _totalRawDocs;
   private long _segmentStartTime;
   private long _segmentEndTime;
 
@@ -122,7 +112,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     setTimeInfo(segmentMetadataPropertiesConfiguration);
     _totalDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_DOCS);
-    _totalRawDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_RAW_DOCS, _totalDocs);
   }
 
   /**
@@ -146,7 +135,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       segmentMetadataPropertiesConfiguration.addProperty(TIME_UNIT, null);
     }
 
-    segmentMetadataPropertiesConfiguration.addProperty(SEGMENT_TOTAL_DOCS, segmentMetadata.getTotalRawDocs());
+    segmentMetadataPropertiesConfiguration.addProperty(SEGMENT_TOTAL_DOCS, segmentMetadata.getTotalDocs());
 
     _crc = segmentMetadata.getCrc();
     _creationTime = segmentMetadata.getCreationTime();
@@ -157,7 +146,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _allColumns = schema.getColumnNames();
     _schema = schema;
     _totalDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_DOCS);
-    _totalRawDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_RAW_DOCS, _totalDocs);
   }
 
   public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
@@ -246,24 +234,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // Set segment name.
     _segmentName = segmentMetadataPropertiesConfiguration.getString(SEGMENT_NAME);
 
-    // Set hll log2m.
-    _hllLog2m = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_HLL_LOG2M, HllConstants.DEFAULT_LOG2M);
-
     // Build column metadata map, schema and hll derived column map.
     for (String column : _allColumns) {
       ColumnMetadata columnMetadata =
           ColumnMetadata.fromPropertiesConfiguration(column, segmentMetadataPropertiesConfiguration);
       _columnMetadataMap.put(column, columnMetadata);
       _schema.addField(columnMetadata.getFieldSpec());
-      if (columnMetadata.getDerivedMetricType() == MetricFieldSpec.DerivedMetricType.HLL) {
-        _hllDerivedColumnMap.put(columnMetadata.getOriginColumnName(), columnMetadata.getColumnName());
-      }
-    }
-
-    // Build star-tree metadata.
-    _hasStarTree = segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
-    if (_hasStarTree) {
-      initStarTreeMetadata(segmentMetadataPropertiesConfiguration);
     }
 
     // Build star-tree v2 metadata
@@ -287,43 +263,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       if (!column.isEmpty() && column.charAt(0) != '$') {
         dest.add(column);
       }
-    }
-  }
-
-  /**
-   * Reads and initializes the star tree metadata from segment metadata properties.
-   */
-  private void initStarTreeMetadata(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
-    _starTreeMetadata = new StarTreeMetadata();
-
-    // Set the dimensions split order
-    List<String> dimensionsSplitOrder = new ArrayList<>();
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(STAR_TREE_SPLIT_ORDER), dimensionsSplitOrder);
-    _starTreeMetadata.setDimensionsSplitOrder(dimensionsSplitOrder);
-
-    // Set dimensions for which star node creation is to be skipped.
-    List<String> skipStarNodeCreationForDimensions = new ArrayList<>();
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS),
-        skipStarNodeCreationForDimensions);
-    _starTreeMetadata.setSkipStarNodeCreationForDimensions(skipStarNodeCreationForDimensions);
-
-    // Set dimensions for which to skip materialization.
-    List<String> skipMaterializationForDimensions = new ArrayList<>();
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS),
-        skipMaterializationForDimensions);
-    _starTreeMetadata.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
-
-    // Set the maxLeafRecords
-    String maxLeafRecordsString = segmentMetadataPropertiesConfiguration.getString(STAR_TREE_MAX_LEAF_RECORDS);
-    if (maxLeafRecordsString != null) {
-      _starTreeMetadata.setMaxLeafRecords(Integer.parseInt(maxLeafRecordsString));
-    }
-
-    // Skip skip materialization cardinality.
-    String skipMaterializationCardinalityString =
-        segmentMetadataPropertiesConfiguration.getString(STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY);
-    if (skipMaterializationCardinalityString != null) {
-      _starTreeMetadata.setSkipMaterializationCardinality(Integer.parseInt(skipMaterializationCardinalityString));
     }
   }
 
@@ -397,11 +336,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public int getTotalDocs() {
     return _totalDocs;
-  }
-
-  @Override
-  public int getTotalRawDocs() {
-    return _totalRawDocs;
   }
 
   @Override
@@ -482,16 +416,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return false;
   }
 
-  @Override
-  public boolean hasStarTree() {
-    return _hasStarTree;
-  }
-
-  @Override
-  public StarTreeMetadata getStarTreeMetadata() {
-    return _starTreeMetadata;
-  }
-
   public List<StarTreeV2Metadata> getStarTreeV2MetadataList() {
     return _starTreeV2MetadataList;
   }
@@ -549,22 +473,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _paddingCharacter;
   }
 
-  @Override
-  public int getHllLog2m() {
-    return _hllLog2m;
-  }
-
-  @Nullable
-  @Override
-  public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
-    switch (derivedMetricType) {
-      case HLL:
-        return _hllDerivedColumnMap.get(column);
-      default:
-        throw new IllegalArgumentException();
-    }
-  }
-
   /**
    * Converts segment metadata to json
    * @param columnFilter list only  the columns in the set. Lists all the columns if
@@ -604,10 +512,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("refreshTimeReadable", refreshTimeStr);
 
     segmentMetadata.put("segmentVersion", _segmentVersion.toString());
-    segmentMetadata.put("hasStarTree", hasStarTree());
     segmentMetadata.put("creatorName", _creatorName);
     segmentMetadata.put("paddingCharacter", String.valueOf(_paddingCharacter));
-    segmentMetadata.put("hllLog2m", _hllLog2m);
 
     ArrayNode columnsMetadata = JsonUtils.newArrayNode();
     for (String column : _allColumns) {

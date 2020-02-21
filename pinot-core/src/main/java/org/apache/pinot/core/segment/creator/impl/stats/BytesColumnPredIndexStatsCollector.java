@@ -18,86 +18,46 @@
  */
 package org.apache.pinot.core.segment.creator.impl.stats;
 
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
  * Extension of {@link AbstractColumnStatisticsCollector} for byte[] column type.
  */
 public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private ByteArray _min = null;
-  private ByteArray _max = null;
+  private final Set<ByteArray> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
 
-  private int _lengthOfShortestEntry = Integer.MAX_VALUE;
-  private int _lengthOfLongestEntry = 0;
-
-  private final Set<ByteArray> _rawBytesSet;
-  private final Set<ByteArray> _aggregateBytesSet;
-
-  private ByteArray[] _sortedBytesList;
+  private int _minLength = Integer.MAX_VALUE;
+  private int _maxLength = 0;
+  private ByteArray[] _sortedValues;
   private boolean _sealed = false;
 
   public BytesColumnPredIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    _rawBytesSet = new HashSet<>(INITIAL_HASH_SET_SIZE);
-    _aggregateBytesSet = new HashSet<>(INITIAL_HASH_SET_SIZE);
   }
 
-  /**
-   * Collect statistics for the given entry.
-   * - Add it to the passed in set (which could be raw or aggregated)
-   * - Update maximum number of values for Multi-valued entries
-   * - Update Total number of entries
-   * - Check if entry is sorted.
-   *
-   * @param entry Entry value
-   * @param set Set containing entries
-   */
-  private void collectEntry(byte[] entry, Set<ByteArray> set) {
-    ByteArray value = new ByteArray(entry);
-    addressSorted(value);
-    updatePartition(value);
-    set.add(value);
-
-    int valueLength = value.length();
-    _lengthOfShortestEntry = Math.min(_lengthOfShortestEntry, valueLength);
-    _lengthOfLongestEntry = Math.max(_lengthOfLongestEntry, valueLength);
-
-    totalNumberOfEntries++;
-  }
-
-  /**
-   * {@inheritDoc}
-   * @param entry Entry to be collected
-   * @param isAggregated True for aggregated, False for raw.
-   */
-  @Override
-  public void collect(Object entry, boolean isAggregated) {
-    assert entry instanceof byte[];
-    if (isAggregated) {
-      collectEntry((byte[]) entry, _aggregateBytesSet);
-    } else {
-      collectEntry((byte[]) entry, _rawBytesSet);
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   * @param entry Entry to be collected
-   */
   @Override
   public void collect(Object entry) {
-    collect(entry, false /* isAggregated */);
+    ByteArray value = new ByteArray((byte[]) entry);
+    addressSorted(value);
+    updatePartition(value);
+    _values.add(value);
+
+    int length = value.length();
+    _minLength = Math.min(_minLength, length);
+    _maxLength = Math.max(_maxLength, length);
+
+    totalNumberOfEntries++;
   }
 
   @Override
   public ByteArray getMinValue() {
     if (_sealed) {
-      return _min;
+      return _sortedValues[0];
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
@@ -105,7 +65,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public ByteArray getMaxValue() {
     if (_sealed) {
-      return _max;
+      return _sortedValues[_sortedValues.length - 1];
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
@@ -113,20 +73,20 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public ByteArray[] getUniqueValuesSet() {
     if (_sealed) {
-      return _sortedBytesList;
+      return _sortedValues;
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
 
   @Override
   public int getLengthOfShortestElement() {
-    return _lengthOfShortestEntry;
+    return _minLength;
   }
 
   @Override
   public int getLengthOfLargestElement() {
     if (_sealed) {
-      return _lengthOfLongestEntry;
+      return _maxLength;
     }
     throw new IllegalStateException("you must seal the collector first before asking for longest value");
   }
@@ -134,7 +94,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public int getCardinality() {
     if (_sealed) {
-      return _sortedBytesList.length;
+      return _sortedValues.length;
     }
     throw new IllegalStateException("you must seal the collector first before asking for cardinality");
   }
@@ -146,20 +106,8 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void seal() {
-    _sortedBytesList = _rawBytesSet.toArray(new ByteArray[_rawBytesSet.size()]);
-    Arrays.sort(_sortedBytesList);
-
-    // Update min/max based on raw docs.
-    _min = _sortedBytesList[0];
-    _max = _sortedBytesList[_sortedBytesList.length - 1];
-
-    // Merge the raw and aggregated docs, so stats for dictionary creation are collected correctly.
-    if (!_aggregateBytesSet.isEmpty()) {
-      _rawBytesSet.addAll(_aggregateBytesSet);
-      _sortedBytesList = _rawBytesSet.toArray(new ByteArray[_rawBytesSet.size()]);
-      Arrays.sort(_sortedBytesList);
-    }
-
+    _sortedValues = _values.toArray(new ByteArray[_values.size()]);
+    Arrays.sort(_sortedValues);
     _sealed = true;
   }
 }

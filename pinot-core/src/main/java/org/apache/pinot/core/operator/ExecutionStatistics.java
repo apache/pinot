@@ -34,7 +34,7 @@ public class ExecutionStatistics {
   private long _numEntriesScannedInFilter;
   // Equal to numDocsScanned * numberProjectedColumns.
   private long _numEntriesScannedPostFilter;
-  private long _numTotalRawDocs;
+  private long _numTotalDocs;
   private long _numSegmentsProcessed;
   private long _numSegmentsMatched;
 
@@ -42,11 +42,11 @@ public class ExecutionStatistics {
   }
 
   public ExecutionStatistics(long numDocsScanned, long numEntriesScannedInFilter, long numEntriesScannedPostFilter,
-      long numTotalRawDocs) {
+      long numTotalDocs) {
     _numDocsScanned = numDocsScanned;
     _numEntriesScannedInFilter = numEntriesScannedInFilter;
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
-    _numTotalRawDocs = numTotalRawDocs;
+    _numTotalDocs = numTotalDocs;
     _numSegmentsProcessed = 1;
     _numSegmentsMatched = (numDocsScanned == 0) ? 0 : 1;
   }
@@ -63,8 +63,8 @@ public class ExecutionStatistics {
     return _numEntriesScannedPostFilter;
   }
 
-  public long getNumTotalRawDocs() {
-    return _numTotalRawDocs;
+  public long getNumTotalDocs() {
+    return _numTotalDocs;
   }
 
   public long getNumSegmentsProcessed() {
@@ -84,7 +84,7 @@ public class ExecutionStatistics {
     _numDocsScanned += executionStatisticsToMerge._numDocsScanned;
     _numEntriesScannedInFilter += executionStatisticsToMerge._numEntriesScannedInFilter;
     _numEntriesScannedPostFilter += executionStatisticsToMerge._numEntriesScannedPostFilter;
-    _numTotalRawDocs += executionStatisticsToMerge._numTotalRawDocs;
+    _numTotalDocs += executionStatisticsToMerge._numTotalDocs;
     _numSegmentsProcessed += executionStatisticsToMerge._numSegmentsProcessed;
     _numSegmentsMatched += executionStatisticsToMerge._numSegmentsMatched;
   }
@@ -93,7 +93,7 @@ public class ExecutionStatistics {
   public String toString() {
     return "Execution Statistics:" + "\n  numDocsScanned: " + _numDocsScanned + "\n  numEntriesScannedInFilter: "
         + _numEntriesScannedInFilter + "\n  numEntriesScannedPostFilter: " + _numEntriesScannedPostFilter
-        + "\n  numTotalRawDocs: " + _numTotalRawDocs + "\n  numSegmentsProcessed: " + _numSegmentsProcessed
+        + "\n  numTotalDocs: " + _numTotalDocs + "\n  numSegmentsProcessed: " + _numSegmentsProcessed
         + "\n  numSegmentsMatched: " + _numSegmentsMatched;
   }
 }

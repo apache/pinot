@@ -183,14 +183,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTable dataTable = null;
     try {
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      long totalRawDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
+      long numTotalDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
       segmentPruneTimer.stopAndRecord();
       int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
       LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
       if (numSegmentsMatchedAfterPruning == 0) {
         dataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
         Map<String, String> metadata = dataTable.getMetadata();
-        metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+        metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(numTotalDocs));
         metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
         metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
         metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
@@ -214,7 +214,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         planExecTimer.stopAndRecord();
 
         // Update the total docs in the metadata based on un-pruned segments.
-        dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(totalRawDocs));
+        dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(numTotalDocs));
       }
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(brokerRequest, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
@@ -267,21 +267,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    */
   private long pruneSegments(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
       ServerQueryRequest serverQueryRequest) {
-    long totalRawDocs = 0;
+    long numTotalDocs = 0;
 
     Iterator<SegmentDataManager> iterator = segmentDataManagers.iterator();
     while (iterator.hasNext()) {
       SegmentDataManager segmentDataManager = iterator.next();
       IndexSegment indexSegment = segmentDataManager.getSegment();
       // We need to compute the total raw docs for the table before any pruning.
-      totalRawDocs += indexSegment.getSegmentMetadata().getTotalRawDocs();
+      numTotalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
       if (_segmentPrunerService.prune(indexSegment, serverQueryRequest)) {
         iterator.remove();
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
 
-    return totalRawDocs;
+    return numTotalDocs;
   }
 
   @Override

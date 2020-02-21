@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
@@ -47,20 +46,20 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
-  private final long _numTotalRawDocs;
+  private final long _numTotalDocs;
   private final boolean _useStarTree;
 
   private ExecutionStatistics _executionStatistics;
 
-  public AggregationGroupByOrderByOperator(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator,
-      long numTotalRawDocs, boolean useStarTree) {
+  public AggregationGroupByOrderByOperator(AggregationFunctionContext[] functionContexts, GroupBy groupBy,
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, long numTotalDocs,
+      boolean useStarTree) {
     _functionContexts = functionContexts;
     _groupBy = groupBy;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
-    _numTotalRawDocs = numTotalRawDocs;
+    _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
@@ -117,8 +116,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            _numTotalRawDocs);
+        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalDocs);
 
     // Build intermediate result block based on aggregation group-by result from the executor
     return new IntermediateResultsBlock(_functionContexts, groupByResult, _dataSchema);

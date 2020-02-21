@@ -23,12 +23,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -39,6 +37,8 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
@@ -161,10 +161,9 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     // Create execution statistics.
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
-    long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
+    long numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            numTotalRawDocs);
+        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs);
 
     return new IntermediateResultsBlock(_dataSchema, _rows);
   }

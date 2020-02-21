@@ -48,7 +48,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
     Assert.assertEquals(selectionDataSchema.size(), 11);
@@ -67,7 +67,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -92,7 +92,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 110L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
     Assert.assertEquals(selectionDataSchema.size(), 11);
@@ -117,7 +117,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 48241L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 110L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
     Assert.assertEquals(selectionDataSchema.size(), 11);
@@ -147,7 +147,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -172,7 +172,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 48241L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
     Assert.assertEquals(selectionDataSchema.size(), 3);
@@ -201,7 +201,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 120000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -226,7 +226,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 84134L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 24516L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -256,7 +256,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 330000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 
@@ -282,7 +282,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 84134L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 67419);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), 30000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
 

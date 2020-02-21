@@ -73,9 +73,6 @@ public class SegmentV1V2ToV3FormatConverterTest {
     driver.init(config);
     driver.build();
     _segmentDirectory = new File(_indexDir, driver.getSegmentName());
-    File starTreeFile = new File(_segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
-    FileUtils.touch(starTreeFile);
-    FileUtils.writeStringToFile(starTreeFile, "This is a star tree index");
 
     _v3IndexLoadingConfig = new IndexLoadingConfig();
     _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
@@ -101,14 +98,10 @@ public class SegmentV1V2ToV3FormatConverterTest {
     File v3Location = SegmentDirectoryPaths.segmentDirectoryFor(_segmentDirectory, SegmentVersion.v3);
     Assert.assertTrue(v3Location.exists());
     Assert.assertTrue(v3Location.isDirectory());
-    Assert.assertTrue(new File(v3Location, V1Constants.STAR_TREE_INDEX_FILE).exists());
 
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(v3Location);
     Assert.assertEquals(metadata.getVersion(), SegmentVersion.v3.toString());
     Assert.assertTrue(new File(v3Location, V1Constants.SEGMENT_CREATION_META).exists());
-    // Drop the star tree index file because it has invalid data
-    new File(v3Location, V1Constants.STAR_TREE_INDEX_FILE).delete();
-    new File(_segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE).delete();
     FileTime afterConversionTime = Files.getLastModifiedTime(v3Location.toPath());
 
     // verify that the segment loads correctly. This is necessary and sufficient

@@ -108,8 +108,8 @@ public class ImmutableSegmentLoader {
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      indexContainerMap
-          .put(entry.getKey(), new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
+      indexContainerMap.put(entry.getKey(),
+          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
     }
 
     if (schema == null) {
@@ -133,7 +133,7 @@ public class ImmutableSegmentLoader {
 
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentMetadata.getStarTreeV2MetadataList() != null || segmentMetadata.getStarTreeMetadata() != null) {
+    if (segmentMetadata.getStarTreeV2MetadataList() != null) {
       starTreeIndexContainer =
           new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
               indexContainerMap, readMode);

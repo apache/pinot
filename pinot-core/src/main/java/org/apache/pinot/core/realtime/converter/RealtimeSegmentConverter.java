@@ -19,8 +19,6 @@
 package org.apache.pinot.core.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,11 +26,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
@@ -42,6 +35,10 @@ import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 
 
 public class RealtimeSegmentConverter {
@@ -55,14 +52,13 @@ public class RealtimeSegmentConverter {
   private List<String> invertedIndexColumns;
   private List<String> textIndexColumns;
   private List<String> noDictionaryColumns;
-  private StarTreeIndexSpec starTreeIndexSpec;
   private List<String> varLengthDictionaryColumns;
   private final boolean _nullHandlingEnabled;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String timeColumnName, String segmentName, String sortedColumn,
       List<String> invertedIndexColumns, List<String> textIndexColumns, List<String> noDictionaryColumns,
-      List<String> varLengthDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec, boolean nullHandlingEnabled) {
+      List<String> varLengthDictionaryColumns, boolean nullHandlingEnabled) {
     this.realtimeSegmentImpl = realtimeSegment;
     this.outputPath = outputPath;
     this.invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
@@ -75,7 +71,6 @@ public class RealtimeSegmentConverter {
     this.segmentName = segmentName;
     this.noDictionaryColumns = noDictionaryColumns;
     this.varLengthDictionaryColumns = varLengthDictionaryColumns;
-    this.starTreeIndexSpec = starTreeIndexSpec;
     this._nullHandlingEnabled = nullHandlingEnabled;
     this.textIndexColumns = textIndexColumns;
   }
@@ -83,18 +78,17 @@ public class RealtimeSegmentConverter {
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String timeColumnName, String segmentName, String sortedColumn,
       List<String> invertedIndexColumns, List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns,
-      StarTreeIndexSpec starTreeIndexSpec, boolean nullHandlingEnabled) {
+      boolean nullHandlingEnabled) {
     this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn,
-        invertedIndexColumns, new ArrayList<>(), noDictionaryColumns, varLengthDictionaryColumns,
-        starTreeIndexSpec, nullHandlingEnabled);
+        invertedIndexColumns, new ArrayList<>(), noDictionaryColumns, varLengthDictionaryColumns, nullHandlingEnabled);
   }
 
   // Used in RealtimeSegmentConverterTest
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-        String tableName, String timeColumnName, String segmentName, String sortedColumn) {
-      this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn, new ArrayList<>(),
-          new ArrayList<>(), new ArrayList<>(), null/*StarTreeIndexSpec*/, false/*nullHandlingEnabled*/);
-    }
+      String tableName, String timeColumnName, String segmentName, String sortedColumn) {
+    this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn, new ArrayList<>(),
+        new ArrayList<>(), new ArrayList<>(), null/*StarTreeIndexSpec*/, false/*nullHandlingEnabled*/);
+  }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
@@ -131,11 +125,6 @@ public class RealtimeSegmentConverter {
 
     if (varLengthDictionaryColumns != null) {
       genConfig.setVarLengthDictionaryColumns(varLengthDictionaryColumns);
-    }
-
-    // Presence of the spec enables star tree generation.
-    if (starTreeIndexSpec != null) {
-      genConfig.enableStarTreeIndex(starTreeIndexSpec);
     }
 
     if (segmentVersion != null) {

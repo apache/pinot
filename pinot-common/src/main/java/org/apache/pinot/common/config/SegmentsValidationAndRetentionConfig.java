@@ -21,7 +21,6 @@ package org.apache.pinot.common.config;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.startree.hll.HllConfig;
 
 
 public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
@@ -37,7 +36,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _segmentAssignmentStrategy;
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
-  private HllConfig _hllConfig;
 
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
   private String _replicasPerPartition;
@@ -142,14 +140,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setCompletionConfig(CompletionConfig completionConfig) {
     _completionConfig = completionConfig;
-  }
-
-  public HllConfig getHllConfig() {
-    return _hllConfig;
-  }
-
-  public void setHllConfig(HllConfig hllConfig) {
-    _hllConfig = hllConfig;
   }
 
   @JsonIgnore

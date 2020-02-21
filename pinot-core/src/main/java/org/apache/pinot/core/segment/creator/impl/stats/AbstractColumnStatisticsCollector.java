@@ -95,19 +95,9 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   /**
-   * Collect statistics for given the entry.
-   * Entry is expected to be 'raw', and not pre-aggregated (for star-tree).
-   * @param entry Entry to be collected
+   * Collects statistics for the given entry (entry can be either single-valued or multi-valued).
    */
   public abstract void collect(Object entry);
-
-  /**
-   * Collected statistics for the given entry.
-   *
-   * @param entry Entry to be collected
-   * @param isAggregated True for aggregated, False for raw.
-   */
-  public abstract void collect(Object entry, boolean isAggregated);
 
   public abstract Object getMinValue();
 

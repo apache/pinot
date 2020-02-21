@@ -25,9 +25,5 @@ public interface SegmentPreIndexStatsContainer {
   ColumnStatistics getColumnProfileFor(String column)
       throws Exception;
 
-  int getRawDocCount();
-
-  int getAggregatedDocCount();
-
   int getTotalDocCount();
 }

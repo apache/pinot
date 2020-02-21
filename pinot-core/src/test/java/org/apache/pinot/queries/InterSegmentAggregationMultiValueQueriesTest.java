@@ -19,16 +19,13 @@
 package org.apache.pinot.queries;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import org.apache.pinot.core.startree.hll.HllUtil;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -66,24 +63,25 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   public void testCastCountMV() {
     String query = "SELECT COUNTMV(column6) as cnt_column6 FROM testTable";
     BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
-    DataSchema expectedDataSchema = new DataSchema(new String[]{"cnt_column6"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 400000L, 400000L, Arrays.asList(new Long[][]{new Long[]{426752L}}), 1, expectedDataSchema);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"cnt_column6"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 400000L, 400000L,
+        Arrays.asList(new Long[][]{new Long[]{426752L}}), 1, expectedDataSchema);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "cnt_column6");
 
     brokerResponse = getBrokerResponseForSqlQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 62480L, 869592L, 62480L, 400000L, Arrays.asList(new Long[][]{new Long[]{62480L}}), 1, expectedDataSchema);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 62480L, 869592L, 62480L, 400000L,
+        Arrays.asList(new Long[][]{new Long[]{62480L}}), 1, expectedDataSchema);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "cnt_column6");
 
     brokerResponse = getBrokerResponseForSqlQuery(query + SV_GROUP_BY + ORDER_BY_ALIAS);
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, Arrays.asList(new Long[][]{new Long[]{231056L}}), 10, expectedDataSchema);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        Arrays.asList(new Long[][]{new Long[]{231056L}}), 10, expectedDataSchema);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "cnt_column6");
 
     brokerResponse = getBrokerResponseForSqlQuery(query + MV_GROUP_BY + ORDER_BY_ALIAS);
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, Arrays.asList(new Long[][]{new Long[]{199896L}}), 10, expectedDataSchema);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        Arrays.asList(new Long[][]{new Long[]{199896L}}), 10, expectedDataSchema);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "cnt_column6");
   }
 
@@ -237,8 +235,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   @Test
   public void testDistinctCountRawHLLMV() {
     String query = "SELECT DISTINCTCOUNTRAWHLLMV(column6) FROM testTable";
-    Function<Serializable, String> cardinalityExtractor =
-        value -> String.valueOf(HllUtil.buildHllFromBytes(BytesUtils.toBytes((String) value)).cardinality());
+    Function<Serializable, String> cardinalityExtractor = value -> String
+        .valueOf(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality());
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils

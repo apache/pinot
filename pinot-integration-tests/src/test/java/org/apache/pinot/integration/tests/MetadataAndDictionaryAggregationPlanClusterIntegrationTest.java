@@ -67,7 +67,6 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
 
-  @Nonnull
   @Override
   protected String getSchemaFileName() {
     return SCHEMA_FILE_NAME;
@@ -78,7 +77,6 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
 
   private String _currentTable;
 
-  @Nonnull
   @Override
   protected String getTableName() {
     return _currentTable;
@@ -133,8 +131,8 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, createStarTreeIndex, null,
-            rawIndexColumns, pinotSchema, executor);
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, null, rawIndexColumns, pinotSchema,
+            executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 

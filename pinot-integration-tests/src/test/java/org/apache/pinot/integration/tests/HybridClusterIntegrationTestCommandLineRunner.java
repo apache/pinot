@@ -36,10 +36,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
@@ -281,8 +281,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       ExecutorService executor = Executors.newCachedThreadPool();
       Schema schema = Schema.fromFile(_schemaFile);
       ClusterIntegrationTestUtils
-          .buildSegmentsFromAvro(_offlineAvroFiles, 0, _segmentDir, _tarDir, _tableName, false, null,
-              getRawIndexColumns(), schema, executor);
+          .buildSegmentsFromAvro(_offlineAvroFiles, 0, _segmentDir, _tarDir, _tableName, null, getRawIndexColumns(),
+              schema, executor);
       executor.shutdown();
       executor.awaitTermination(10, TimeUnit.MINUTES);
 

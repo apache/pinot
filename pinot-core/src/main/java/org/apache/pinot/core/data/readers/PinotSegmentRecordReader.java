@@ -74,7 +74,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
       SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
-      _numDocs = segmentMetadata.getTotalRawDocs();
+      _numDocs = segmentMetadata.getTotalDocs();
       if (schema == null) {
         // In order not to expose virtual columns to client, schema shouldn't be fetched from segmentMetadata;
         // otherwise the original metadata will be modified. Hence, initialize a new schema.

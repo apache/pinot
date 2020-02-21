@@ -24,19 +24,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,12 +118,6 @@ public class SegmentPurger {
         }
       }
       config.setInvertedIndexCreationColumns(invertedIndexCreationColumns);
-
-      // Generate star-tree if it exists in the original segment
-      StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
-      if (starTreeMetadata != null) {
-        config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
-      }
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       purgeRecordReader.rewind();

@@ -30,17 +30,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.core.segment.creator.TextIndexType;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.FileUtils;
-import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
@@ -53,6 +43,7 @@ import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
@@ -60,8 +51,15 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
-import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 import org.joda.time.format.DateTimeFormat;
@@ -71,7 +69,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.*;
 
 
 /**
@@ -91,8 +88,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Schema schema;
   private File _indexDir;
   private int totalDocs;
-  private int totalRawDocs;
-  private int totalAggDocs;
   private int docIdCounter;
   private boolean _nullHandlingEnabled;
 
@@ -114,8 +109,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     this.schema = schema;
     this.totalDocs = segmentIndexCreationInfo.getTotalDocs();
-    this.totalAggDocs = segmentIndexCreationInfo.getTotalAggDocs();
-    this.totalRawDocs = segmentIndexCreationInfo.getTotalRawDocs();
 
     Collection<FieldSpec> fieldSpecs = schema.getAllFieldSpecs();
     Set<String> invertedIndexColumns = new HashSet<>();
@@ -206,7 +199,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
         // Initialize text index creator
         if (_textIndexColumns.contains(columnName)) {
-          _invertedIndexCreatorMap.put(columnName, new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
+          _invertedIndexCreatorMap
+              .put(columnName, new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
         }
       }
 
@@ -369,29 +363,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(METRICS, config.getMetrics());
     properties.setProperty(DATETIME_COLUMNS, config.getDateTimeColumnNames());
     properties.setProperty(TIME_COLUMN_NAME, config.getTimeColumnName());
-    properties.setProperty(SEGMENT_TOTAL_RAW_DOCS, String.valueOf(totalRawDocs));
-    properties.setProperty(SEGMENT_TOTAL_AGGREGATE_DOCS, String.valueOf(totalAggDocs));
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
-    properties.setProperty(STAR_TREE_ENABLED, String.valueOf(config.isEnableStarTreeIndex()));
-
-    StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();
-    if (starTreeIndexSpec != null) {
-      properties.setProperty(STAR_TREE_SPLIT_ORDER, starTreeIndexSpec.getDimensionsSplitOrder());
-      properties.setProperty(STAR_TREE_MAX_LEAF_RECORDS, starTreeIndexSpec.getMaxLeafRecords());
-      properties.setProperty(STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
-          starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
-      properties.setProperty(STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY,
-          starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
-      properties.setProperty(STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS,
-          starTreeIndexSpec.getSkipMaterializationForDimensions());
-    }
-
-    HllConfig hllConfig = config.getHllConfig();
-    Map<String, String> derivedHllFieldToOriginMap = null;
-    if (hllConfig != null) {
-      properties.setProperty(SEGMENT_HLL_LOG2M, hllConfig.getHllLog2m());
-      derivedHllFieldToOriginMap = hllConfig.getDerivedHllFieldToOriginMap();
-    }
 
     // Write time related metadata (start time, end time, time unit)
     String timeColumn = config.getTimeColumnName();
@@ -425,7 +397,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (!config.isSkipTimeValueCheck()) {
-        Interval timeInterval = new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
+        Interval timeInterval =
+            new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
         Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
             "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
             timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumn,
@@ -456,34 +429,25 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       //    boolean hasInvertedIndex = invertedIndexCreatorMap.containsKey();
       boolean hasInvertedIndex = true;
 
-      String hllOriginColumn = null;
-      if (derivedHllFieldToOriginMap != null) {
-        hllOriginColumn = derivedHllFieldToOriginMap.get(column);
-      }
-
       boolean hasTextIndex = _textIndexColumns.contains(column);
       // for new generated segment we write as NONE if text index does not exist
       // for reading existing segments that don't have this property, non-existence
       // of this property will be treated as NONE. See the builder in ColumnMetadata
       TextIndexType textIndexType = hasTextIndex ? TextIndexType.LUCENE : TextIndexType.NONE;
 
-      addColumnMetadataInfo(properties, column, columnIndexCreationInfo, totalDocs, totalRawDocs, totalAggDocs,
-          schema.getFieldSpecFor(column), _dictionaryCreatorMap.containsKey(column), dictionaryElementSize,
-          hasInvertedIndex, hllOriginColumn, textIndexType);
+      addColumnMetadataInfo(properties, column, columnIndexCreationInfo, totalDocs, schema.getFieldSpecFor(column),
+          _dictionaryCreatorMap.containsKey(column), dictionaryElementSize, hasInvertedIndex, textIndexType);
     }
 
     properties.save();
   }
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
-      ColumnIndexCreationInfo columnIndexCreationInfo, int totalDocs, int totalRawDocs, int totalAggDocs,
-      FieldSpec fieldSpec, boolean hasDictionary, int dictionaryElementSize, boolean hasInvertedIndex,
-      String hllOriginColumn, TextIndexType textIndexType) {
+      ColumnIndexCreationInfo columnIndexCreationInfo, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
+      int dictionaryElementSize, boolean hasInvertedIndex, TextIndexType textIndexType) {
     int cardinality = columnIndexCreationInfo.getDistinctValueCount();
     properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
-    properties.setProperty(getKeyFor(column, TOTAL_RAW_DOCS), String.valueOf(totalRawDocs));
-    properties.setProperty(getKeyFor(column, TOTAL_AGG_DOCS), String.valueOf(totalAggDocs));
     properties.setProperty(getKeyFor(column, DATA_TYPE), String.valueOf(fieldSpec.getDataType()));
     properties.setProperty(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
@@ -523,12 +487,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           dateTimeFieldSpec.getGranularity());
     }
 
-    // HLL derived fields
-    if (hllOriginColumn != null) {
-      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, ORIGIN_COLUMN), hllOriginColumn);
-      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DERIVED_METRIC_TYPE), "HLL");
-    }
-
     Object defaultNullValue = columnIndexCreationInfo.getDefaultNullValue();
     if (defaultNullValue instanceof byte[]) {
       String defaultNullValueString = BytesUtils.toHexString((byte[]) defaultNullValue);
@@ -549,8 +507,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
     properties.clearProperty(getKeyFor(column, CARDINALITY));
     properties.clearProperty(getKeyFor(column, TOTAL_DOCS));
-    properties.clearProperty(getKeyFor(column, TOTAL_RAW_DOCS));
-    properties.clearProperty(getKeyFor(column, TOTAL_AGG_DOCS));
     properties.clearProperty(getKeyFor(column, DATA_TYPE));
     properties.clearProperty(getKeyFor(column, BITS_PER_ELEMENT));
     properties.clearProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE));
@@ -564,8 +520,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.clearProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES));
     properties.clearProperty(getKeyFor(column, IS_AUTO_GENERATED));
     properties.clearProperty(getKeyFor(column, DEFAULT_NULL_VALUE));
-    properties.clearProperty(getKeyFor(column, DERIVED_METRIC_TYPE));
-    properties.clearProperty(getKeyFor(column, ORIGIN_COLUMN));
     properties.clearProperty(getKeyFor(column, MIN_VALUE));
     properties.clearProperty(getKeyFor(column, MAX_VALUE));
   }
@@ -621,7 +575,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void close()
       throws IOException {
     FileUtils.close(Iterables
-        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(), _nullValueVectorCreatorMap
-            .values()));
+        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(),
+            _nullValueVectorCreatorMap.values()));
   }
 }

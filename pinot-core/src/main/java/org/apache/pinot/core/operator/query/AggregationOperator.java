@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.query;
 
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -39,16 +38,16 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
   private final AggregationFunctionContext[] _functionContexts;
   private final TransformOperator _transformOperator;
-  private final long _numTotalRawDocs;
+  private final long _numTotalDocs;
   private final boolean _useStarTree;
 
   private ExecutionStatistics _executionStatistics;
 
-  public AggregationOperator(@Nonnull AggregationFunctionContext[] functionContexts,
-      @Nonnull TransformOperator transformOperator, long numTotalRawDocs, boolean useStarTree) {
+  public AggregationOperator(AggregationFunctionContext[] functionContexts, TransformOperator transformOperator,
+      long numTotalDocs, boolean useStarTree) {
     _functionContexts = functionContexts;
     _transformOperator = transformOperator;
-    _numTotalRawDocs = numTotalRawDocs;
+    _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
   }
 
@@ -74,8 +73,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            _numTotalRawDocs);
+        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalDocs);
 
     // Build intermediate result block based on aggregation result from the executor
     return new IntermediateResultsBlock(_functionContexts, aggregationResult, false);

@@ -127,25 +127,6 @@ public class FieldSpecTest {
   }
 
   /**
-   * Test derived {@link MetricFieldSpec}.
-   */
-  @Test
-  public void testDerivedMetricFieldSpec()
-      throws Exception {
-    MetricFieldSpec derivedMetricField =
-        new MetricFieldSpec("derivedMetric", STRING, 10, MetricFieldSpec.DerivedMetricType.HLL);
-    Assert.assertEquals(derivedMetricField.getFieldSize(), 10);
-    Assert.assertTrue(derivedMetricField.isDerivedMetric());
-    Assert.assertEquals(derivedMetricField.getDerivedMetricType(), MetricFieldSpec.DerivedMetricType.HLL);
-    Assert.assertEquals(derivedMetricField.getDefaultNullValue(), "null");
-
-    // Test serialize deserialize.
-    MetricFieldSpec derivedMetricField2 =
-        JsonUtils.stringToObject(derivedMetricField.toJsonObject().toString(), MetricFieldSpec.class);
-    Assert.assertEquals(derivedMetricField2, derivedMetricField);
-  }
-
-  /**
    * Test {@link TimeFieldSpec} constructors.
    */
   @Test

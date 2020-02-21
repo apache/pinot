@@ -107,7 +107,6 @@ abstract class ColumnIndexDirectory implements Closeable {
   public abstract PinotDataBuffer getBloomFilterBufferFor(String column)
       throws IOException;
 
-
   /**
    * Get null value vector buffer for a column
    * @param column column name
@@ -187,9 +186,4 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return true if the index removal is supported
    */
   public abstract boolean isIndexRemovalSupported();
-
-  protected File starTreeIndexFile() {
-    // this is not version dependent for now
-    return new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
-  }
 }

@@ -23,31 +23,26 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
-import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.startree.hll.HllConfig;
-import org.apache.pinot.startree.hll.HllConstants;
+import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
+import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -57,6 +52,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to implement CreateSegment command.
  *
+ * TODO: Support star-tree creation
  */
 public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
@@ -90,21 +86,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   @Option(name = "-readerConfigFile", metaVar = "<string>", usage = "Config file for record reader.")
   private String _readerConfigFile;
-
-  @Option(name = "-enableStarTreeIndex", usage = "Enable Star Tree Index.")
-  boolean _enableStarTreeIndex = false;
-
-  @Option(name = "-starTreeIndexSpecFile", metaVar = "<string>", usage = "Config file for star tree index.")
-  private String _starTreeIndexSpecFile;
-
-  @Option(name = "-hllSize", metaVar = "<5,6,7,8,9>", usage = "HLL size (log scale), default is 9.")
-  private int _hllSize = 9;
-
-  @Option(name = "-hllColumns", metaVar = "<string>", usage = "Columns to compute HLL.")
-  private String _hllColumns;
-
-  @Option(name = "-hllSuffix", metaVar = "<string>", usage = "Suffix for the derived HLL columns")
-  private String _hllSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
 
   @Option(name = "-numThreads", metaVar = "<int>", usage = "Parallelism while generating segments, default is 1.")
   private int _numThreads = 1;
@@ -169,16 +150,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
-  public CreateSegmentCommand setEnableStarTreeIndex(boolean enableStarTreeIndex) {
-    _enableStarTreeIndex = enableStarTreeIndex;
-    return this;
-  }
-
-  public CreateSegmentCommand setStarTreeIndexSpecFile(String starTreeIndexSpecFile) {
-    _starTreeIndexSpecFile = starTreeIndexSpecFile;
-    return this;
-  }
-
   public CreateSegmentCommand setRetry(int retry) {
     _retry = retry;
     return this;
@@ -187,18 +158,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   public CreateSegmentCommand setPostCreationVerification(boolean postCreationVerification) {
     _postCreationVerification = postCreationVerification;
     return this;
-  }
-
-  public void setHllSize(int hllSize) {
-    _hllSize = hllSize;
-  }
-
-  public void setHllColumns(String hllColumns) {
-    _hllColumns = hllColumns;
-  }
-
-  public void setHllSuffix(String hllSuffix) {
-    _hllSuffix = hllSuffix;
   }
 
   public CreateSegmentCommand setNumThreads(int numThreads) {
@@ -211,9 +170,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return ("CreateSegment  -generatorConfigFile " + _generatorConfigFile + " -dataDir " + _dataDir + " -format "
         + _format + " -outDir " + _outDir + " -overwrite " + _overwrite + " -tableName " + _tableName + " -segmentName "
         + _segmentName + " -timeColumnName " + _timeColumnName + " -schemaFile " + _schemaFile + " -readerConfigFile "
-        + _readerConfigFile + " -enableStarTreeIndex " + _enableStarTreeIndex + " -starTreeIndexSpecFile "
-        + _starTreeIndexSpecFile + " -hllSize " + _hllSize + " -hllColumns " + _hllColumns + " -hllSuffix " + _hllSuffix
-        + " -numThreads " + _numThreads);
+        + _readerConfigFile + " -numThreads " + _numThreads);
   }
 
   @Override
@@ -364,27 +321,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
             _readerConfigFile);
       }
       segmentGeneratorConfig.setReaderConfigFile(_readerConfigFile);
-    }
-
-    if (_starTreeIndexSpecFile != null) {
-      StarTreeIndexSpec starTreeIndexSpec = StarTreeIndexSpec.fromFile(new File(_starTreeIndexSpecFile));
-
-      // Specifying star-tree index file enables star tree generation, even if _enableStarTreeIndex is not specified.
-      segmentGeneratorConfig.enableStarTreeIndex(starTreeIndexSpec);
-    } else if (_enableStarTreeIndex) {
-      segmentGeneratorConfig.enableStarTreeIndex(null);
-    }
-
-    if (_hllColumns != null) {
-      String[] hllColumns = StringUtils.split(StringUtils.deleteWhitespace(_hllColumns), ',');
-      if (hllColumns.length != 0) {
-        LOGGER.info("Derive HLL fields on columns: {} with size: {} and suffix: {}", Arrays.toString(hllColumns),
-            _hllSize, _hllSuffix);
-        HllConfig hllConfig = new HllConfig(_hllSize);
-        hllConfig.setColumnsToDeriveHllFields(new HashSet<>(Arrays.asList(hllColumns)));
-        hllConfig.setHllDeriveColumnSuffix(_hllSuffix);
-        segmentGeneratorConfig.setHllConfig(hllConfig);
-      }
     }
 
     ExecutorService executor = Executors.newFixedThreadPool(_numThreads);

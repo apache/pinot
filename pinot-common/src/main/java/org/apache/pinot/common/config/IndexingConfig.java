@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
 
 
 public class IndexingConfig extends BaseJsonConfig {
@@ -38,7 +37,6 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _noDictionaryColumns; // TODO: replace this with noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig;
   private List<String> _onHeapDictionaryColumns;
-  private StarTreeIndexSpec _starTreeIndexSpec;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
@@ -145,14 +143,6 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setOnHeapDictionaryColumns(List<String> onHeapDictionaryColumns) {
     _onHeapDictionaryColumns = onHeapDictionaryColumns;
-  }
-
-  public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
-    _starTreeIndexSpec = starTreeIndexSpec;
-  }
-
-  public StarTreeIndexSpec getStarTreeIndexSpec() {
-    return _starTreeIndexSpec;
   }
 
   public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {

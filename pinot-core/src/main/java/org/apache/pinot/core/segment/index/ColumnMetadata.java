@@ -24,20 +24,18 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.segment.creator.TextIndexType;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec.DerivedMetricType;
 import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.startree.hll.HllSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,8 +51,6 @@ public class ColumnMetadata {
   private final String columnName;
   private final int cardinality;
   private final int totalDocs;
-  private final int totalRawDocs;
-  private final int totalAggDocs;
   private final DataType dataType;
   private final int bitsPerElement;
   private final int columnMaxLength;
@@ -74,9 +70,6 @@ public class ColumnMetadata {
   private final String defaultNullValueString;
   private final TimeUnit timeUnit;
   private final char paddingCharacter;
-  private final DerivedMetricType derivedMetricType;
-  private final int fieldSize;
-  private final String originColumnName;
   private final Comparable minValue;
   private final Comparable maxValue;
   private final PartitionFunction partitionFunction;
@@ -93,8 +86,6 @@ public class ColumnMetadata {
     builder.setCardinality(config.getInt(getKeyFor(column, CARDINALITY)));
     int totalDocs = config.getInt(getKeyFor(column, TOTAL_DOCS));
     builder.setTotalDocs(totalDocs);
-    builder.setTotalRawDocs(config.getInt(getKeyFor(column, TOTAL_RAW_DOCS), totalDocs));
-    builder.setTotalAggDocs(config.getInt(getKeyFor(column, TOTAL_AGG_DOCS), 0));
     DataType dataType = DataType.valueOf(config.getString(getKeyFor(column, DATA_TYPE)).toUpperCase());
     builder.setDataType(dataType);
     builder.setBitsPerElement(config.getInt(getKeyFor(column, BITS_PER_ELEMENT)));
@@ -127,32 +118,6 @@ public class ColumnMetadata {
     String dateTimeGranularity = config.getString(getKeyFor(column, DATETIME_GRANULARITY), null);
     if (dateTimeGranularity != null) {
       builder.setDateTimeGranularity(dateTimeGranularity);
-    }
-
-    // DERIVED_METRIC_TYPE property is used to check whether this field is derived or not
-    // ORIGIN_COLUMN property is used to indicate the origin field of this derived metric
-    String typeStr = config.getString(getKeyFor(column, DERIVED_METRIC_TYPE), null);
-    DerivedMetricType derivedMetricType = (typeStr == null) ? null : DerivedMetricType.valueOf(typeStr.toUpperCase());
-
-    if (derivedMetricType != null) {
-      switch (derivedMetricType) {
-        case HLL:
-          try {
-            final int hllLog2m = config.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_HLL_LOG2M);
-            builder.setFieldSize(HllSizeUtils.getHllFieldSizeFromLog2m(hllLog2m));
-            final String originColumnName = config.getString(getKeyFor(column, ORIGIN_COLUMN));
-            builder.setOriginColumnName(originColumnName);
-          } catch (RuntimeException e) {
-            LOGGER.error(
-                "Column: " + column + " is HLL derived column, but missing log2m, fieldSize or originColumnName.");
-            throw e;
-          }
-          break;
-        default:
-          throw new IllegalArgumentException("Column: " + column + " with derived metric Type: " + derivedMetricType
-              + " is not supported in building column metadata.");
-      }
-      builder.setDerivedMetricType(derivedMetricType);
     }
 
     // Set min/max value if available.
@@ -216,8 +181,6 @@ public class ColumnMetadata {
     private String columnName;
     private int cardinality;
     private int totalDocs;
-    private int totalRawDocs;
-    private int totalAggDocs;
     private DataType dataType;
     private int bitsPerElement;
     private int columnMaxLength;
@@ -234,9 +197,6 @@ public class ColumnMetadata {
     private String defaultNullValueString;
     private TimeUnit timeUnit;
     private char paddingCharacter;
-    private DerivedMetricType derivedMetricType;
-    private int fieldSize;
-    private String originColumnName;
     private Comparable minValue;
     private Comparable maxValue;
     private PartitionFunction partitionFunction;
@@ -258,16 +218,6 @@ public class ColumnMetadata {
 
     public Builder setTotalDocs(int totalDocs) {
       this.totalDocs = totalDocs;
-      return this;
-    }
-
-    public Builder setTotalRawDocs(int totalRawDocs) {
-      this.totalRawDocs = totalRawDocs;
-      return this;
-    }
-
-    public Builder setTotalAggDocs(int totalAggDocs) {
-      this.totalAggDocs = totalAggDocs;
       return this;
     }
 
@@ -351,21 +301,6 @@ public class ColumnMetadata {
       return this;
     }
 
-    public Builder setDerivedMetricType(DerivedMetricType derivedMetricType) {
-      this.derivedMetricType = derivedMetricType;
-      return this;
-    }
-
-    public Builder setFieldSize(int fieldSize) {
-      this.fieldSize = fieldSize;
-      return this;
-    }
-
-    public Builder setOriginColumnName(String originColumnName) {
-      this.originColumnName = originColumnName;
-      return this;
-    }
-
     public Builder setMinValue(Comparable minValue) {
       this.minValue = minValue;
       return this;
@@ -406,27 +341,24 @@ public class ColumnMetadata {
     }
 
     public ColumnMetadata build() {
-      return new ColumnMetadata(columnName, cardinality, totalDocs, totalRawDocs, totalAggDocs, dataType,
-          bitsPerElement, columnMaxLength, fieldType, isSorted, containsNulls, hasDictionary, hasInvertedIndex,
-          isSingleValue, maxNumberOfMultiValues, totalNumberOfEntries, isAutoGenerated, isVirtual,
-          defaultNullValueString, timeUnit, paddingCharacter, derivedMetricType, fieldSize, originColumnName, minValue,
-          maxValue, partitionFunction, numPartitions, _partitions, dateTimeFormat, dateTimeGranularity, TextIndexType.valueOf(textIndexType));
+      return new ColumnMetadata(columnName, cardinality, totalDocs, dataType, bitsPerElement, columnMaxLength,
+          fieldType, isSorted, containsNulls, hasDictionary, hasInvertedIndex, isSingleValue, maxNumberOfMultiValues,
+          totalNumberOfEntries, isAutoGenerated, isVirtual, defaultNullValueString, timeUnit, paddingCharacter,
+          minValue, maxValue, partitionFunction, numPartitions, _partitions, dateTimeFormat, dateTimeGranularity,
+          TextIndexType.valueOf(textIndexType));
     }
   }
 
-  private ColumnMetadata(String columnName, int cardinality, int totalDocs, int totalRawDocs, int totalAggDocs,
-      DataType dataType, int bitsPerElement, int columnMaxLength, FieldType fieldType, boolean isSorted,
-      boolean hasNulls, boolean hasDictionary, boolean hasInvertedIndex, boolean isSingleValue,
-      int maxNumberOfMultiValues, int totalNumberOfEntries, boolean isAutoGenerated, boolean isVirtual,
-      String defaultNullValueString, TimeUnit timeUnit, char paddingCharacter, DerivedMetricType derivedMetricType,
-      int fieldSize, String originColumnName, Comparable minValue, Comparable maxValue,
-      PartitionFunction partitionFunction, int numPartitions, Set<Integer> partitions, String dateTimeFormat,
-      String dateTimeGranularity, TextIndexType textIndexType) {
+  private ColumnMetadata(String columnName, int cardinality, int totalDocs, DataType dataType, int bitsPerElement,
+      int columnMaxLength, FieldType fieldType, boolean isSorted, boolean hasNulls, boolean hasDictionary,
+      boolean hasInvertedIndex, boolean isSingleValue, int maxNumberOfMultiValues, int totalNumberOfEntries,
+      boolean isAutoGenerated, boolean isVirtual, String defaultNullValueString, TimeUnit timeUnit,
+      char paddingCharacter, Comparable minValue, Comparable maxValue, PartitionFunction partitionFunction,
+      int numPartitions, Set<Integer> partitions, String dateTimeFormat, String dateTimeGranularity,
+      TextIndexType textIndexType) {
     this.columnName = columnName;
     this.cardinality = cardinality;
     this.totalDocs = totalDocs;
-    this.totalRawDocs = totalRawDocs;
-    this.totalAggDocs = totalAggDocs;
     this.dataType = dataType;
     this.bitsPerElement = bitsPerElement;
     this.columnMaxLength = columnMaxLength;
@@ -443,9 +375,6 @@ public class ColumnMetadata {
     this.defaultNullValueString = defaultNullValueString;
     this.timeUnit = timeUnit;
     this.paddingCharacter = paddingCharacter;
-    this.derivedMetricType = derivedMetricType;
-    this.fieldSize = fieldSize;
-    this.originColumnName = originColumnName;
     this.minValue = minValue;
     this.maxValue = maxValue;
     this.partitionFunction = partitionFunction;
@@ -460,11 +389,7 @@ public class ColumnMetadata {
         this.fieldSpec = new DimensionFieldSpec(columnName, dataType, isSingleValue);
         break;
       case METRIC:
-        if (derivedMetricType == null) {
-          this.fieldSpec = new MetricFieldSpec(columnName, dataType);
-        } else {
-          this.fieldSpec = new MetricFieldSpec(columnName, dataType, fieldSize, derivedMetricType);
-        }
+        this.fieldSpec = new MetricFieldSpec(columnName, dataType);
         break;
       case TIME:
         this.fieldSpec = new TimeFieldSpec(columnName, dataType, timeUnit);
@@ -493,14 +418,6 @@ public class ColumnMetadata {
 
   public int getTotalDocs() {
     return totalDocs;
-  }
-
-  public int getTotalRawDocs() {
-    return totalRawDocs;
-  }
-
-  public int getTotalAggDocs() {
-    return totalAggDocs;
   }
 
   public DataType getDataType() {
@@ -565,14 +482,6 @@ public class ColumnMetadata {
 
   public char getPaddingCharacter() {
     return paddingCharacter;
-  }
-
-  public DerivedMetricType getDerivedMetricType() {
-    return derivedMetricType;
-  }
-
-  public String getOriginColumnName() {
-    return originColumnName;
   }
 
   public FieldSpec getFieldSpec() {

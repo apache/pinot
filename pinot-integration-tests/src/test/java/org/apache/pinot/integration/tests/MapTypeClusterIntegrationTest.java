@@ -79,8 +79,8 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
         .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + AvroUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT).build();
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(Collections.singletonList(avroFile), 0, _segmentDir, _tarDir, getTableName(), false,
-            null, null, schema, executor);
+        .buildSegmentsFromAvro(Collections.singletonList(avroFile), 0, _segmentDir, _tarDir, getTableName(), null, null,
+            schema, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
     uploadSegments(getTableName(), _tarDir);

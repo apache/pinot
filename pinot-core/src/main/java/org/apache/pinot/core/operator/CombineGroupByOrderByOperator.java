@@ -35,7 +35,6 @@ import java.util.function.Function;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
@@ -46,6 +45,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -223,7 +223,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
       mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
       mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());
       mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
-      mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+      mergedBlock.setNumTotalDocs(executionStatistics.getNumTotalDocs());
 
       if (_indexedTable.size() >= _indexedTableCapacity) {
         mergedBlock.setNumGroupsLimitReached(true);
