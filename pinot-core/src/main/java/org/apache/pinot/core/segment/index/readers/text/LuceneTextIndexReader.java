@@ -30,9 +30,9 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -63,8 +63,7 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
   public LuceneTextIndexReader(String column, File segmentIndexDir) {
     _column = column;
     try {
-      File indexFile = new File(segmentIndexDir.getPath() + "/" + SegmentVersion.v3.name() + "/" + column
-          + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION);
+      File indexFile = getTextIndexFile(segmentIndexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
@@ -78,6 +77,28 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
     }
     StandardAnalyzer analyzer = new StandardAnalyzer();
     _queryParser = new QueryParser(column, analyzer);
+  }
+
+  /**
+   * CASE 1: If IndexLoadingConfig specifies a segment version to load and if it is different then
+   * the on-disk version of the segment, then {@link org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader}
+   * will take care of up-converting the on-disk segment to v3 before load. The converter
+   * already has support for converting v1 text index to v3. So the text index can be
+   * loaded from segmentIndexDir/v3/ since v3 sub-directory would have already been created
+   *
+   * CASE 2: However, if IndexLoadingConfig doesn't specify the segment version to load or if the specified
+   * version is same as the on-disk version of the segment, then ImmutableSegmentLoader will load
+   * whatever the version of segment is on disk.
+   * @param segmentIndexDir top-level segment index directory
+   * @return text index file
+   */
+  private File getTextIndexFile(File segmentIndexDir) {
+    // will return null if file does not exist
+    File file = SegmentDirectoryPaths.findTextIndexIndexFile(segmentIndexDir, _column);
+    if (file == null) {
+      throw new IllegalStateException("Failed to find text index file for column: " + _column);
+    }
+    return file;
   }
 
   @Override

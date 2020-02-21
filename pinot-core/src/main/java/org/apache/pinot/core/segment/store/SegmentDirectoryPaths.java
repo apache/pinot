@@ -24,6 +24,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 
 
 public class SegmentDirectoryPaths {
@@ -76,6 +77,18 @@ public class SegmentDirectoryPaths {
   @Nullable
   public static File findStarTreeFile(@Nonnull File indexDir) {
     return findFormatFile(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
+  }
+
+  /**
+   * Find text index file in top-level segment index directory
+   * @param indexDir top-level segment index directory
+   * @param column text column name
+   * @return text index directory (if exists in V3, V1 or V2 format), null if index file does not exit
+   */
+  @Nullable
+  public static File findTextIndexIndexFile(File indexDir, String column) {
+    String luceneIndexDirectory = column + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    return findFormatFile(indexDir, luceneIndexDirectory);
   }
 
   /**
