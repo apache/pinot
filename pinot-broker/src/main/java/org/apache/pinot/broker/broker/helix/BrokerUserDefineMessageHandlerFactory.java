@@ -29,6 +29,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Broker message handler factory for Helix user-define messages.
+ * <p>The following message sub-types are supported:
+ * <ul>
+ *   <li>Refresh segment message: Refresh the routing properties for a given segment</li>
+ * </ul>
+ */
 public class BrokerUserDefineMessageHandlerFactory implements MessageHandlerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerUserDefineMessageHandlerFactory.class);
 

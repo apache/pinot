@@ -24,8 +24,10 @@ import org.apache.helix.model.Message;
 
 
 /**
- * This (Helix) message is sent from the controller to brokers and servers when a request is received to refresh
- * an existing segment.
+ * This (Helix) message is sent from the controller to servers and brokers when a request is received to refresh
+ * an existing segment. When server gets this message, it will check the crc of the local segment and the segment ZK
+ * metadata and download the refreshed segment if necessary. When broker gets this message, it will update the routing
+ * properties (time boundary, partition info etc.) based on the refreshed segment ZK metadata.
  *
  * NOTE: Changing this class to include new fields is a change in the protocol, so the new fields must be made optional,
  * and coded in such a way that either controller, broker or server may be upgraded first.
