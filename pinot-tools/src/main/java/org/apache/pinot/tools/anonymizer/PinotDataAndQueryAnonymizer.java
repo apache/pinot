@@ -37,8 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileWriter;
@@ -48,6 +46,7 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByExpressionAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.PredicateParenthesisGroupAstNode;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -970,17 +969,10 @@ public class PinotDataAndQueryAnonymizer {
       StringBuilder filter = new StringBuilder();
       filter.append("WHERE ");
       PredicateListAstNode predicateListAstNode = (PredicateListAstNode)whereAstNode.getChildren().get(0);
-      int numChildren = predicateListAstNode.getChildren().size();
-      List<? extends AstNode> predicateList = predicateListAstNode.getChildren();
-      for (int i = 0; i < numChildren; i += 2) {
-        PredicateAstNode predicate = (PredicateAstNode) predicateList.get(i);
-        rewritePredicate(predicate, filter);
-        BooleanOperatorAstNode nextOperator;
-        if (i + 1 < numChildren) {
-          nextOperator = (BooleanOperatorAstNode) predicateList.get(i + 1);
-          rewriteBooleanOperator(nextOperator, filter);
-        }
-      }
+
+      // The predicate may be PredicateParenthesisGroupAstNode.
+      parsePredicate(predicateListAstNode, filter);
+
       return filter.toString();
     }
 
@@ -995,7 +987,10 @@ public class PinotDataAndQueryAnonymizer {
     private void rewritePredicate(PredicateAstNode predicateAstNode, StringBuilder filter) throws Exception {
       /// get column name participating in the predicate
       String columnName = predicateAstNode.getIdentifier();
-      String derivedColumn = getAnonymousColumnName(columnName);
+      String derivedColumn = null;
+      if (columnName != null) {
+        derivedColumn = getAnonymousColumnName(columnName);
+      }
       LiteralAstNode literal;
       if (predicateAstNode instanceof ComparisonPredicateAstNode) {
         // handle COMPARISON
@@ -1047,10 +1042,29 @@ public class PinotDataAndQueryAnonymizer {
         }
         // finish the IN predicate
         filter.append(")");
+      } else if (predicateAstNode instanceof PredicateParenthesisGroupAstNode) {
+        filter.append("(");
+        parsePredicate((PredicateListAstNode) predicateAstNode.getChildren().get(0), filter);
+        filter.append(")");
       } else {
         // TODO: handle parenthesised predicate
         // for now throw exception as opposed to generating incorrect query
         throw new UnsupportedOperationException("predicate ast node: " + predicateAstNode.getClass() + " not supported");
+      }
+    }
+
+    private void parsePredicate(PredicateListAstNode predicateListAstNode, StringBuilder filter)
+        throws Exception {
+      int numChildren = predicateListAstNode.getChildren().size();
+      List<? extends AstNode> predicateList = predicateListAstNode.getChildren();
+      for (int i = 0; i < numChildren; i += 2) {
+        PredicateAstNode predicate = (PredicateAstNode) predicateList.get(i);
+        rewritePredicate(predicate, filter);
+        BooleanOperatorAstNode nextOperator;
+        if (i + 1 < numChildren) {
+          nextOperator = (BooleanOperatorAstNode) predicateList.get(i + 1);
+          rewriteBooleanOperator(nextOperator, filter);
+        }
       }
     }
 
@@ -1162,12 +1176,21 @@ public class PinotDataAndQueryAnonymizer {
         if (child instanceof WhereAstNode) {
           WhereAstNode whereAstNode = (WhereAstNode)child;
           PredicateListAstNode predicateListAstNode = (PredicateListAstNode)whereAstNode.getChildren().get(0);
-          int numChildren = predicateListAstNode.getChildren().size();
-          List<? extends AstNode> predicateList = predicateListAstNode.getChildren();
-          for (int i = 0; i < numChildren; i += 2) {
-            PredicateAstNode predicate = (PredicateAstNode) predicateList.get(i);
-            filterColumns.add(predicate.getIdentifier());
-          }
+          // The predicate may be PredicateParenthesisGroupAstNode.
+          parsePredicate(predicateListAstNode, filterColumns);
+        }
+      }
+    }
+
+    private static void parsePredicate(PredicateListAstNode predicateListAstNode, Set<String> filterColumns) {
+      int numChildren = predicateListAstNode.getChildren().size();
+      List<? extends AstNode> predicateList = predicateListAstNode.getChildren();
+      for (int i = 0; i < numChildren; i += 2) {
+        PredicateAstNode predicate = (PredicateAstNode) predicateList.get(i);
+        if (predicate instanceof PredicateParenthesisGroupAstNode) {
+          parsePredicate((PredicateListAstNode) predicate.getChildren().get(0), filterColumns);
+        } else {
+          filterColumns.add(predicate.getIdentifier());
         }
       }
     }
