@@ -45,6 +45,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
   private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_EMAIL_SCHEME = "emailScheme";
+  private static final String PROP_JIRA_SCHEME = "jiraScheme";
+  private static final String PROP_ASSIGNEE = "assignee";
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";
@@ -104,6 +106,37 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     alertConfig.setVectorClocks(vectorClocks);
 
     return alertConfig;
+  }
+
+  private DetectionAlertConfigDTO createDetectionAlertConfigWithJira() {
+    DetectionAlertConfigDTO alertConfig = new DetectionAlertConfigDTO();
+
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
+    alertConfig.setProperties(properties);
+
+    Map<String, Object> alertSchemes = new HashMap<>();
+    Map<String, Object> jiraScheme = new HashMap<>();
+    jiraScheme.put(PROP_ASSIGNEE, "test");
+    alertSchemes.put(PROP_JIRA_SCHEME, jiraScheme);
+    alertConfig.setAlertSchemes(alertSchemes);
+
+    Map<Long, Long> vectorClocks = new HashMap<>();
+    vectorClocks.put(PROP_ID_VALUE.get(0), 0L);
+    alertConfig.setVectorClocks(vectorClocks);
+
+    return alertConfig;
+  }
+
+  @Test
+  public void testGetAlertFilterResultWithJira() throws Exception {
+    DetectionAlertConfigDTO alertConfig = createDetectionAlertConfigWithJira();
+    this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, alertConfig,2500L);
+
+    DetectionAlertFilterResult result = this.alertFilter.run();
+
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeJiraNotifications(this.alertConfig, "test");
+    Assert.assertEquals(result.getResult().get(notification), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
   }
 
   @Test

@@ -26,6 +26,8 @@ import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 
 import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionJiraAlerter.*;
+import static org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient.*;
 
 
 public class AlertFilterUtils {
@@ -47,6 +49,16 @@ public class AlertFilterUtils {
     Set<String> recipients = new HashSet<>(toRecipients);
     recipients.addAll(PROP_TO_VALUE);
     return makeEmailNotifications(config, recipients, PROP_CC_VALUE, PROP_BCC_VALUE);
+  }
+
+  static DetectionAlertFilterNotification makeJiraNotifications(DetectionAlertConfigDTO config, String assignee) {
+    Map<String, Object> alertProps = new HashMap<>();
+    Map<String, Object> jiraParams = new HashMap<>();
+    jiraParams.put(PROP_ASSIGNEE, assignee);
+    alertProps.put(PROP_JIRA_SCHEME, jiraParams);
+
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(config, alertProps, config.getReferenceLinks());
+    return new DetectionAlertFilterNotification(subsConfig);
   }
 
   static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config,
