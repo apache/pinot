@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.cube.summary;
 
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import org.apache.pinot.thirdeye.cube.data.cube.Cube;
 import org.apache.pinot.thirdeye.cube.cost.CostFunction;
 import org.apache.pinot.thirdeye.cube.data.cube.DimNameValueCostEntry;
@@ -42,6 +44,7 @@ public class SummaryResponse {
 
   static final String ALL = "(ALL)";
   static final String NOT_ALL = "(ALL)-";
+  static final String EMPTY = "";
   static final String NOT_AVAILABLE = "-na-";
 
   @JsonProperty("metricUrn")
@@ -203,12 +206,23 @@ public class SummaryResponse {
     nodes = SummaryResponseTree.sortResponseTree(nodes, targetLevelCount, costFunction);
     //   Build name tag for each row of responses
     Map<CubeNode, NameTag> nameTags = new HashMap<>();
-    Map<CubeNode, List<String>> otherDimensionValues = new HashMap<>();
+    Map<CubeNode, LinkedHashSet<String>> otherDimensionValues = new HashMap<>();
     for (CubeNode node : nodes) {
       NameTag tag = new NameTag(targetLevelCount);
       nameTags.put(node, tag);
       tag.copyNames(node.getDimensionValues());
-      otherDimensionValues.put(node, new ArrayList<String>());
+
+      // Put all children name to other dimension values, which will be shown on UI if this node is (ALL)-
+      // Later, each picked child will remove itself from this parent's other dimension values.
+      LinkedHashSet<String> childrenNames = new LinkedHashSet<>();
+      List<CubeNode> children = node.getChildren();
+      for (CubeNode child : children) {
+        String childName = child.getDimensionValues().get(node.getLevel()).trim();
+        if (!childName.isEmpty()) {
+          childrenNames.add(child.getDimensionValues().get(node.getLevel()));
+        }
+      }
+      otherDimensionValues.put(node, childrenNames);
     }
     //   pre-condition: parent node is processed before its children nodes
     for (CubeNode node : nodes) {
@@ -217,17 +231,16 @@ public class SummaryResponse {
       while ((parent = parent.getParent()) != null) {
         NameTag parentNameTag = nameTags.get(parent);
         if (parentNameTag != null) {
-          // Set tag from ALL to NOT_ALL String.
+          // Set parent's name tag from ALL to NOT_ALL String.
           int notAllLevel = node.getLevel()-levelDiff;
           parentNameTag.setNotAll(notAllLevel);
-          // For users' ease of understanding, we append what dimension values are excluded from NOT_ALL
-          StringBuilder sb = new StringBuilder();
-          String separator = "";
-          for (int i = notAllLevel; i < node.getDimensionValues().size(); ++i) {
-            sb.append(separator).append(node.getDimensionValues().get(i));
-            separator = ".";
+          // After that, set the names after NOT_ALL to empty, e.g., [home page, (ALL)-, ""]
+          for (int i = notAllLevel + 1; i < targetLevelCount; ++i) {
+            parentNameTag.setEmpty(i);
           }
-          otherDimensionValues.get(parent).add(sb.toString());
+          // Each picked child will remove itself from this parent's other dimension values.
+          // Thus, the (ALL)- node will only show the names of the children name that are NOT picked in the summary.
+          otherDimensionValues.get(parent).remove(node.getDimensionValues().get(parent.getLevel()));
           break;
         }
         ++levelDiff;
@@ -247,10 +260,17 @@ public class SummaryResponse {
       row.contributionToOverallChange =
           computeContributionToOverallChange(row.baselineValue, row.currentValue, baselineTotal, currentTotal);
       row.cost = node.getCost();
+      // Add other dimension values if this node is (ALL)-
       StringBuilder sb = new StringBuilder();
       String separator = "";
-      for (String s : otherDimensionValues.get(node)) {
-        sb.append(separator).append(s);
+      Iterator<String> iterator = otherDimensionValues.get(node).iterator();
+      int counter = 0;
+      while (iterator.hasNext()) {
+        if (++counter > 10) { // Get at most 10 children
+          sb.append(separator).append("and more...");
+          break;
+        }
+        sb.append(separator).append(iterator.next());
         separator = ", ";
       }
       row.otherDimensionValues = sb.toString();
@@ -303,21 +323,25 @@ public class SummaryResponse {
   private static class NameTag {
     private List<String> names;
 
-    public NameTag(int levelCount) {
+    NameTag(int levelCount) {
       names = new ArrayList<>(levelCount);
       for (int i = 0; i < levelCount; ++i) {
         names.add(ALL);
       }
     }
 
-    public void copyNames(DimensionValues dimensionValues) {
+    void copyNames(DimensionValues dimensionValues) {
       for (int i = 0; i < dimensionValues.size(); ++i) {
         names.set(i, dimensionValues.get(i));
       }
     }
 
-    public void setNotAll(int index) {
+    void setNotAll(int index) {
       names.set(index, NOT_ALL);
+    }
+
+    void setEmpty(int index) {
+      names.set(index, EMPTY);
     }
   }
 }
