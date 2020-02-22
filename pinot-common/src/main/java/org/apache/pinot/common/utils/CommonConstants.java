@@ -20,6 +20,8 @@ package org.apache.pinot.common.utils;
 
 import java.io.File;
 
+import org.apache.commons.lang.StringUtils;
+
 
 public class CommonConstants {
 
@@ -35,9 +37,13 @@ public class CommonConstants {
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
+    public static final String PREFIX_OF_KEY_COORDINATOR_INSTANCE = "KeyCoordinator_";
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
+    public static final String KEY_COORDINATOR_MESSAGE_RESOURCE_NAME = "keyCoordinatorMessageResource";
+
+    public static final int KEY_COORDINATOR_MESSAGE_RESOURCE_REPLICA_COUNT = 1;
 
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
     public static final String ENABLE_CASE_INSENSITIVE_PQL_KEY = "enable.case.insensitive.pql";
@@ -159,12 +165,17 @@ public class CommonConstants {
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
     public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
+    public static final String CONFIG_OF_BROKER_POLLING_SERVER_LWMS_INTERVAL_MS = "pinot.broker.query.polling.server.lwms.interval.ms";
+    public static final String CONFIG_OF_BROKER_POLLING_SERVER_LWMS_SERVER_PORT = "pinot.broker.query.polling.server.lwms.port";
+    public static final String CONFIG_OF_BROKER_LWM_REWRITE_ENABLE = "pinot.broker.query.lwm.rewrite";
+    public static final boolean CONFIG_OF_BROKER_LWM_REWRITE_ENABLE_DEFAULT = true;
     public static class Request {
       public static final String PQL = "pql";
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
       public static final String QUERY_OPTIONS = "queryOptions";
+      public static final String DISABLE_REWRITE = "disableRewrite";
 
       public static class QueryOptionKey {
         public static final String PRESERVE_TYPE = "preserveType";
@@ -290,6 +301,7 @@ public class CommonConstants {
   }
 
   public static class Minion {
+
     public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
@@ -306,6 +318,23 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
+  }
+
+  public static class Grigio {
+    // config for distributed grigio components
+    public static final String CONFIG_OF_METRICS_PREFIX_KEY = "metrics.prefix";
+    public static final String DEFAULT_METRICS_PREFIX = "pinot.grigio.";
+
+    // config for server related components
+    public static final String PINOT_UPSERT_SERVER_COMPONENT_PREFIX = "upsert.";
+  }
+
+  public static class Metric {
+    public static class Server {
+      public static final String CURRENT_NUMBER_OF_SEGMENTS = "currentNumberOfSegments";
+      public static final String CURRENT_NUMBER_OF_DOCUMENTS = "currentNumberOfDocuments";
+      public static final String NUMBER_OF_DELETED_SEGMENTS = "numberOfDeletedSegments";
+    }
   }
 
   public static class Segment {
@@ -378,4 +407,23 @@ public class CommonConstants {
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
   }
+
+  public enum UpdateSemantic {
+    APPEND,
+    UPSERT;
+
+    public static UpdateSemantic DEFAULT_SEMANTIC = APPEND;
+
+    public static UpdateSemantic getUpdateSemantic(String updateSemanticStr) {
+      if (StringUtils.isEmpty(updateSemanticStr)) {
+        return DEFAULT_SEMANTIC;
+      }
+      try {
+        return valueOf(updateSemanticStr.toUpperCase());
+      } catch (Exception ex) {
+        return DEFAULT_SEMANTIC;
+      }
+    }
+  }
+
 }

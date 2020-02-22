@@ -65,7 +65,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // Netty connection metrics
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
-  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true);
+  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+
+  // upsert related metrics
+  MESSAGE_PRODUCE_FAILED_COUNT("failedMessage", true);
 
   private final String meterName;
   private final String unit;

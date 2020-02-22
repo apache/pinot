@@ -132,6 +132,9 @@
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.42.Final</netty.version>
 
+    <!-- dependency for upsert component -->
+    <rocks-db.version>5.13.4</rocks-db.version>
+
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g</argLine>
 
@@ -705,6 +708,12 @@
         <groupId>org.webjars</groupId>
         <artifactId>swagger-ui</artifactId>
         <version>2.2.2</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.ws.rs</groupId>
+            <artifactId>jsr311-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.clearspring.analytics</groupId>
@@ -945,6 +954,18 @@
         <groupId>commons-logging</groupId>
         <artifactId>commons-logging</artifactId>
         <version>${commons-logging.version}</version>
+      </dependency>
+      <!-- upsert related config -->
+      <dependency>
+        <groupId>com.github.tomakehurst</groupId>
+        <artifactId>wiremock-jre8</artifactId>
+        <version>2.22.0</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.rocksdb</groupId>
+        <artifactId>rocksdbjni</artifactId>
+        <version>${rocks-db.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

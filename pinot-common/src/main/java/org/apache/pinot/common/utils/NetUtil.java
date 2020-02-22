@@ -18,13 +18,21 @@
  */
 package org.apache.pinot.common.utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Enumeration;
 
 
 public class NetUtil {
+  private static final Logger LOGGER = LoggerFactory.getLogger(NetUtil.class);
+
+  private static final String LOCALHOST_NAME = "localhost";
   private static final String DUMMY_OUT_IP = "74.125.224.0";
 
   /**
@@ -48,8 +56,27 @@ public class NetUtil {
    */
   public static String getHostnameOrAddress() {
     try {
-      return InetAddress.getLocalHost().getCanonicalHostName();
-    } catch (UnknownHostException ignored) {
+      String hostName = InetAddress.getLocalHost().getCanonicalHostName();
+      if (!hostName.equalsIgnoreCase(LOCALHOST_NAME)) {
+        return hostName;
+      } else {
+        Enumeration<NetworkInterface> interfaceEnumeration = NetworkInterface.getNetworkInterfaces();
+        while (interfaceEnumeration.hasMoreElements()) {
+          NetworkInterface networkInterface = interfaceEnumeration.nextElement();
+          if (networkInterface != null) {
+            Enumeration<InetAddress> networkAddressEnumeration = networkInterface.getInetAddresses();
+            while(networkAddressEnumeration.hasMoreElements()) {
+              InetAddress address = networkAddressEnumeration.nextElement();
+              if (address != null && !LOCALHOST_NAME.equalsIgnoreCase(address.getCanonicalHostName())) {
+                return address.getCanonicalHostName();
+              }
+            }
+          }
+        }
+        return LOCALHOST_NAME;
+      }
+    } catch (UnknownHostException | SocketException ignored) {
+      LOGGER.warn("failed to get host name", ignored);
       try {
         return getHostAddress();
       } catch (Exception e) {

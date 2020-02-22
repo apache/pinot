@@ -30,17 +30,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import javax.validation.constraints.Null;
+
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.common.utils.CommonConstants.UpdateSemantic;
 
 
 @SuppressWarnings({"Duplicates", "unused"})
 public class TableConfig extends BaseJsonConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
+  private static final String UPDATE_SEMANTIC_CONFIG_KEY = "updateSemantic";
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
   public static final String TENANT_CONFIG_KEY = "tenants";
   public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
@@ -75,6 +79,9 @@ public class TableConfig extends BaseJsonConfig {
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
 
+  @JsonPropertyDescription(value = "The update semantic of the table, either append or upsert, default as append")
+  private UpdateSemantic _updateSemantic;
+
   /**
    * NOTE: DO NOT use this constructor, use builder instead. This constructor is for deserializer only.
    */
@@ -90,6 +97,16 @@ public class TableConfig extends BaseJsonConfig {
       @Nullable QueryConfig queryConfig,
       @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @Nullable List<FieldConfig> fieldConfigList) {
+      this(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig, quotaConfig, taskConfig,
+              routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, UpdateSemantic.APPEND);
+  }
+
+  private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
+            TenantConfig tenantConfig, IndexingConfig indexingConfig, TableCustomConfig customConfig,
+            @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
+            @Null QueryConfig queryConfig,
+            @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
+            @Nullable List<FieldConfig> fieldConfigList, @Nullable UpdateSemantic updateSemantic) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -102,6 +119,7 @@ public class TableConfig extends BaseJsonConfig {
     _queryConfig = queryConfig;
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
     _fieldConfigList = fieldConfigList;
+    _updateSemantic = updateSemantic;
   }
 
   public static TableConfig fromJsonString(String jsonString)
@@ -156,8 +174,15 @@ public class TableConfig extends BaseJsonConfig {
         extractChildConfig(jsonConfig, FIELD_CONFIG_LIST_KEY, new TypeReference<List<FieldConfig>>() {
         });
 
+    // generate update schematic
+    UpdateSemantic updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
+    if (jsonConfig.has(UPDATE_SEMANTIC_CONFIG_KEY)) {
+      updateSemantic = UpdateSemantic.getUpdateSemantic(jsonConfig.get(UPDATE_SEMANTIC_CONFIG_KEY).asText());
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList);
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
+        updateSemantic);
   }
 
   /**
@@ -232,6 +257,11 @@ public class TableConfig extends BaseJsonConfig {
       jsonConfig.put(FIELD_CONFIG_LIST_KEY, JsonUtils.objectToJsonNode(_fieldConfigList));
     }
 
+    if (_updateSemantic != null) {
+      jsonConfig.put(UPDATE_SEMANTIC_CONFIG_KEY, _updateSemantic.toString());
+    } else {
+      jsonConfig.put(UPDATE_SEMANTIC_CONFIG_KEY, UpdateSemantic.APPEND.toString());
+    }
     return jsonConfig;
   }
 
@@ -315,8 +345,11 @@ public class TableConfig extends BaseJsonConfig {
       });
     }
 
+    UpdateSemantic updateSemantic = UpdateSemantic.getUpdateSemantic(simpleFields.get(UPDATE_SEMANTIC_CONFIG_KEY));
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList);
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
+        updateSemantic);
   }
 
   public ZNRecord toZNRecord()
@@ -354,6 +387,7 @@ public class TableConfig extends BaseJsonConfig {
     }
 
     ZNRecord znRecord = new ZNRecord(_tableName);
+    simpleFields.put(UPDATE_SEMANTIC_CONFIG_KEY, _updateSemantic.toString());
     znRecord.setSimpleFields(simpleFields);
     return znRecord;
   }
@@ -470,6 +504,18 @@ public class TableConfig extends BaseJsonConfig {
     return _fieldConfigList;
   }
 
+  public UpdateSemantic getUpdateSemantic() {
+    return _updateSemantic;
+  }
+
+  public void setUpdateSemantic(UpdateSemantic updateSemantic) {
+    _updateSemantic = updateSemantic;
+  }
+
+  public boolean isTableForUpsert() {
+    return _updateSemantic == UpdateSemantic.UPSERT;
+  }
+
   public static class Builder {
     private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
     private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
@@ -516,6 +562,8 @@ public class TableConfig extends BaseJsonConfig {
     private QueryConfig _queryConfig;
     private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
     private List<FieldConfig> _fieldConfigList;
+
+    private UpdateSemantic _updateSemantic;
 
     public Builder(TableType tableType) {
       _tableType = tableType;
@@ -683,6 +731,11 @@ public class TableConfig extends BaseJsonConfig {
       return this;
     }
 
+    public Builder setUpdateSemantic(UpdateSemantic updateSemantic) {
+      _updateSemantic = updateSemantic;
+      return this;
+    }
+
     public TableConfig build() {
       // Validation config
       SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -720,6 +773,10 @@ public class TableConfig extends BaseJsonConfig {
         _customConfig = new TableCustomConfig(null);
       }
 
+      if (_updateSemantic == null) {
+        _updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
+      }
+
       // eventually this validation will be generic but since we are initially
       // using FieldConfig only for text columns (and migrate to expand its usage
       // soon after), just validate the field config list from text index creation
@@ -727,7 +784,9 @@ public class TableConfig extends BaseJsonConfig {
       TextIndexConfigValidator.validate(_fieldConfigList, _noDictionaryColumns);
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
-          _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap, _fieldConfigList);
+          _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap, _fieldConfigList,
+          _updateSemantic);
+
     }
   }
 }

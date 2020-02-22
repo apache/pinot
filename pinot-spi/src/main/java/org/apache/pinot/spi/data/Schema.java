@@ -24,9 +24,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -39,8 +47,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -59,6 +65,20 @@ public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
   private String _schemaName;
+
+  // upsert related config
+  // primary key refers to the column name that is the primary key of this upsert table
+  private String _primaryKey;
+  // offset key refers to the column name that we are going to store the offset value to
+  private String _offsetKey;
+  // new config key to indicate if a table is for upsert. If this is define as upsert, it would be an upsert table
+  private String _updateSemantic;
+  private static final String UPSERT_TABLE_CONFIG_VALUE = "upsert";
+  @JsonIgnore
+  private DimensionFieldSpec _primaryKeyFieldSpec = null;
+  @JsonIgnore
+  private DimensionFieldSpec _offsetKeyFieldSpec = null;
+
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
@@ -66,6 +86,7 @@ public final class Schema {
 
   // Json ignored fields
   private transient final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
+  private transient final Map<String, FieldSpec> _physicalFieldSpecMap = new HashMap<>();
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
@@ -94,6 +115,68 @@ public final class Schema {
 
   public void setSchemaName(String schemaName) {
     _schemaName = schemaName;
+  }
+
+  public String getPrimaryKey() {
+    return _primaryKey;
+  }
+
+  public void setPrimaryKey(@Nonnull String primaryKey) {
+    _primaryKey = primaryKey;
+  }
+
+  public String getOffsetKey() {
+    return _offsetKey;
+  }
+
+  public void setOffsetKey(@Nonnull String offsetKey) {
+    _offsetKey = offsetKey;
+  }
+
+  public String getUpdateSemantic() {
+    return _updateSemantic;
+  }
+
+  public void setUpdateSemantic(@Nonnull String updateSemantic) {
+    _updateSemantic = updateSemantic;
+  }
+
+  @JsonIgnore
+  public boolean isTableForUpsert() {
+    return UPSERT_TABLE_CONFIG_VALUE.equalsIgnoreCase(_updateSemantic);
+  }
+
+  @JsonIgnore
+  public DimensionFieldSpec getPrimaryKeyFieldSpec() {
+    if (_primaryKeyFieldSpec == null) {
+      Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
+      Preconditions.checkState(StringUtils.isNotEmpty(_primaryKey), "primary key should not be empty");
+      for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
+        if (dimensionFieldSpec._name.equals(_primaryKey)) {
+          _primaryKeyFieldSpec = dimensionFieldSpec;
+        }
+      }
+    }
+    return _primaryKeyFieldSpec;
+  }
+
+  @JsonIgnore
+  public DimensionFieldSpec getOffsetKeyFieldSpec() {
+    if (_offsetKeyFieldSpec == null) {
+      Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
+      Preconditions.checkState(StringUtils.isNotEmpty(_offsetKey), "offset key should not be empty");
+      for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
+        if (dimensionFieldSpec._name.equals(_offsetKey)) {
+          _offsetKeyFieldSpec = dimensionFieldSpec;
+          Preconditions.checkState(_offsetKeyFieldSpec.isSingleValueField(), "offset key should be single value");
+          Preconditions.checkState(_offsetKeyFieldSpec.getDataType() == DataType.LONG, "offset key should be long type");
+        }
+      }
+    }
+    if (_offsetKeyFieldSpec == null) {
+      throw new RuntimeException("no dimension matches primary key name");
+    }
+    return _offsetKeyFieldSpec;
   }
 
   public List<DimensionFieldSpec> getDimensionFieldSpecs() {
@@ -191,6 +274,9 @@ public final class Schema {
     }
 
     _fieldSpecMap.put(columnName, fieldSpec);
+    if (!fieldSpec.isVirtualColumnField()) {
+      _physicalFieldSpecMap.put(columnName, fieldSpec);
+    }
   }
 
   @Deprecated
@@ -201,6 +287,9 @@ public final class Schema {
 
   public boolean removeField(String columnName) {
     FieldSpec existingFieldSpec = _fieldSpecMap.remove(columnName);
+    if (_physicalFieldSpecMap.containsKey(columnName)) {
+      _physicalFieldSpecMap.remove(columnName);
+    }
     if (existingFieldSpec != null) {
       FieldType fieldType = existingFieldSpec.getFieldType();
       switch (fieldType) {
@@ -259,6 +348,12 @@ public final class Schema {
   @JsonIgnore
   public Collection<FieldSpec> getAllFieldSpecs() {
     return _fieldSpecMap.values();
+  }
+
+  @JsonIgnore
+  @Nonnull
+  public Collection<FieldSpec> getAllPhysicalFieldSpecs() {
+    return _physicalFieldSpecMap.values();
   }
 
   public int size() {
@@ -328,6 +423,26 @@ public final class Schema {
   }
 
   /**
+    * method to be used when loading immutable realtime segment to get the hints for upsert schema metrics as
+   * they cannot be found with physical copy of data
+   */
+  @JsonIgnore
+  public void withSchemaHint(@Nullable Schema upsertSchema) {
+    if (upsertSchema == null || !upsertSchema.isTableForUpsert()) {
+      return;
+    } else {
+      this._updateSemantic = UPSERT_TABLE_CONFIG_VALUE;
+      this._primaryKey = upsertSchema._primaryKey;
+      this._offsetKey = upsertSchema._offsetKey;
+      for (FieldSpec fieldSpec: upsertSchema.getAllFieldSpecs()) {
+        if (fieldSpec.isVirtualColumnField()) {
+          _fieldSpecMap.putIfAbsent(fieldSpec._name, fieldSpec);
+        }
+      }
+    }
+  }
+
+  /**
    * Returns a json representation of the schema.
    */
   public ObjectNode toJsonObject() {
@@ -356,6 +471,11 @@ public final class Schema {
         jsonArray.add(dateTimeFieldSpec.toJsonObject());
       }
       jsonObject.set("dateTimeFieldSpecs", jsonArray);
+    }
+    jsonObject.put("updateSemantic", _updateSemantic);
+    if (UPSERT_TABLE_CONFIG_VALUE.equalsIgnoreCase(_updateSemantic)) {
+      jsonObject.put("primaryKey", _primaryKey);
+      jsonObject.put("offsetKey", _offsetKey);
     }
     return jsonObject;
   }
@@ -630,5 +750,51 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     return result;
+  }
+
+  public boolean isVirtualColumn(String columnName) {
+    return columnName.startsWith("$") || (getFieldSpecFor(columnName).getVirtualColumnProvider() != null
+        && !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
+  }
+
+
+  @JsonIgnore
+  public static byte[] getByteArrayFromField(Object value, DimensionFieldSpec fieldSpec) {
+    switch (fieldSpec.getDataType()) {
+      case INT:
+        return ByteBuffer.allocate(4).putInt((int)value).array();
+      case LONG:
+        return ByteBuffer.allocate(8).putLong((long)value).array();
+      case FLOAT:
+        return ByteBuffer.allocate(4).putFloat((float)value).array();
+      case DOUBLE:
+        return ByteBuffer.allocate(8).putDouble((double)value).array();
+      case STRING:
+        return ((String) value).getBytes(StandardCharsets.UTF_8);
+      case BYTES:
+        return (byte[]) value;
+      default:
+        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
+    }
+  }
+
+  @JsonIgnore
+  public static Object getValueFromBytes(byte[] bytes, DimensionFieldSpec fieldSpec) {
+    switch (fieldSpec.getDataType()) {
+      case INT:
+        return ByteBuffer.wrap(bytes).asIntBuffer().get();
+      case LONG:
+        return ByteBuffer.wrap(bytes).asLongBuffer().get();
+      case FLOAT:
+        return ByteBuffer.wrap(bytes).asFloatBuffer().get();
+      case DOUBLE:
+        return ByteBuffer.wrap(bytes).asDoubleBuffer().get();
+      case STRING:
+        return new String(bytes, StandardCharsets.UTF_8);
+      case BYTES:
+        return bytes;
+      default:
+        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
+    }
   }
 }
