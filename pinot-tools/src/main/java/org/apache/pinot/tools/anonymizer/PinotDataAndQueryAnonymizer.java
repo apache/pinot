@@ -30,7 +30,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -1025,7 +1024,11 @@ public class PinotDataAndQueryAnonymizer {
         // handle IN
         List<? extends AstNode> inChildren = predicateAstNode.getChildren();
         // append column name for IN and IN operator itself
-        filter.append(derivedColumn).append(" ").append("IN ").append("(");
+        if (((InPredicateAstNode) predicateAstNode).isNotInClause()) {
+          filter.append(derivedColumn).append(" NOT IN ").append("(");
+        } else {
+          filter.append(derivedColumn).append(" IN ").append("(");
+        }
         int numChildren = inChildren.size();
         int count  = 0;
         for (AstNode betweenChild: inChildren) {
