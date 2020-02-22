@@ -226,8 +226,7 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
     // column exists and does not have text index enabled
     Assert.assertNotNull(columnMetadata);
-    Assert.assertFalse(columnMetadata.hasTextIndex());
-    Assert.assertNull(columnMetadata.getTextIndexType());
+    Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
     checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, null, false);
 
     // Create a segment in V1, add a new column with text index enabled
@@ -236,8 +235,7 @@ public class SegmentPreProcessorTest {
     columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
     // column exists and does not have text index enabled
     Assert.assertNotNull(columnMetadata);
-    Assert.assertFalse(columnMetadata.hasTextIndex());
-    Assert.assertNull(columnMetadata.getTextIndexType());
+    Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
     checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, null, false);
   }
 
@@ -255,7 +253,7 @@ public class SegmentPreProcessorTest {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_DICT);
     Assert.assertNotNull(columnMetadata);
-    Assert.assertFalse(columnMetadata.hasTextIndex());
+    Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
 
     try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, _newColumnsSchemaWithText)) {
       processor.process();
@@ -282,7 +280,6 @@ public class SegmentPreProcessorTest {
       Assert.assertFalse(columnMetadata.isSorted());
       Assert.assertFalse(columnMetadata.hasNulls());
       Assert.assertFalse(columnMetadata.hasDictionary());
-      Assert.assertTrue(columnMetadata.hasTextIndex());
       Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.LUCENE);
       Assert.assertTrue(columnMetadata.isSingleValue());
       Assert.assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 0);

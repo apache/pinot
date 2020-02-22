@@ -58,7 +58,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.HAS_TEXT_INDEX;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TEXT_INDEX_TYPE;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.getKeyFor;
 
@@ -168,7 +167,6 @@ public class TextIndexHandler {
     }
     LOGGER.info("Created text index for column: {} in segment: {}", column, _segmentName);
     PropertiesConfiguration properties = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
-    properties.setProperty(getKeyFor(column, HAS_TEXT_INDEX), String.valueOf(true));
     properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), TextIndexType.LUCENE.name());
     properties.save();
   }

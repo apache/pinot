@@ -368,7 +368,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     SegmentColumnarIndexCreator
         .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, totalRawDocs,
             totalAggDocs, fieldSpec, false/*hasDictionary*/, dictionaryElementSize, false/*hasInvertedIndex*/,
-            null/*hllOriginColumn*/, true /* hasTextIndex */, TextIndexType.LUCENE);
+            null/*hllOriginColumn*/, TextIndexType.NONE);
   }
 
   /**
@@ -467,6 +467,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     SegmentColumnarIndexCreator
         .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, totalRawDocs,
             totalAggDocs, fieldSpec, true/*hasDictionary*/, dictionaryElementSize, true/*hasInvertedIndex*/,
-            null/*hllOriginColumn*/, false /* hasTextIndex */, null);
+            null/*hllOriginColumn*/, TextIndexType.NONE);
   }
 }

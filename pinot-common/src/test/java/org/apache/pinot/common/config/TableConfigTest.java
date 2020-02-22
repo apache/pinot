@@ -20,6 +20,7 @@ package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -334,21 +335,17 @@ public class TableConfigTest {
       Map<String, String> properties1 = new HashMap<>();
       properties1.put(FieldConfig.VAR_LENGTH_DICTIONARY_COLUMN_KEY, "true");
       FieldConfig fieldConfigSortedCol = new FieldConfig("sorted_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.SORTED, properties1);
-      TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(Lists.newArrayList(fieldConfigTextCol, fieldConfigInvCol, fieldConfigRawCol, fieldConfigSortedCol)).build();
+      List<String> noDict = new ArrayList<>();
+      noDict.add("text_col");
+      TableConfig tableConfig = tableConfigBuilder
+          .setFieldConfigList(Lists.newArrayList(fieldConfigTextCol, fieldConfigInvCol, fieldConfigRawCol, fieldConfigSortedCol))
+          .setNoDictionaryColumns(noDict)
+          .build();
 
       TableConfig toCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
-      List<FieldConfig> fieldConfigs = toCompare.getFieldConfigList();
-      Assert.assertNotNull(fieldConfigs);
-      Assert.assertEquals(4, fieldConfigs.size());
-
-      FieldConfig config = fieldConfigs.get(0);
-      checkFieldConfigList(config, properties, "text_col", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT);
-      config = fieldConfigs.get(1);
-      checkFieldConfigList(config, null, "inv_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED);
-      config = fieldConfigs.get(2);
-      checkFieldConfigList(config, null, "raw_index_col", FieldConfig.EncodingType.RAW, null);
-      config = fieldConfigs.get(3);
-      checkFieldConfigList(config, properties1, "sorted_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.SORTED);
+      compareConfigHavingFieldConfig(toCompare, properties, properties1);
+      toCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      compareConfigHavingFieldConfig(toCompare, properties, properties1);
 
       TableConfig tableConfigWithoutFieldConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("foo").build();
       toCompare = TableConfig.fromJsonConfig(tableConfigWithoutFieldConfig.toJsonConfig());
@@ -356,6 +353,22 @@ public class TableConfigTest {
       toCompare = TableConfig.fromZnRecord(tableConfigWithoutFieldConfig.toZNRecord());
       Assert.assertNull(toCompare.getFieldConfigList());
     }
+  }
+
+  private void compareConfigHavingFieldConfig(TableConfig toCompare, Map<String, String> properties,
+      Map<String, String> properties1) {
+    List<FieldConfig> fieldConfigs = toCompare.getFieldConfigList();
+    Assert.assertNotNull(fieldConfigs);
+    Assert.assertEquals(4, fieldConfigs.size());
+
+    FieldConfig config = fieldConfigs.get(0);
+    checkFieldConfigList(config, properties, "text_col", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT);
+    config = fieldConfigs.get(1);
+    checkFieldConfigList(config, null, "inv_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED);
+    config = fieldConfigs.get(2);
+    checkFieldConfigList(config, null, "raw_index_col", FieldConfig.EncodingType.RAW, null);
+    config = fieldConfigs.get(3);
+    checkFieldConfigList(config, properties1, "sorted_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.SORTED);
   }
 
   private void checkFieldConfigList(FieldConfig config, Map<String, String> expectedProperties,
