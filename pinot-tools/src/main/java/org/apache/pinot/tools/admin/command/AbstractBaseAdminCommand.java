@@ -25,11 +25,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.IOUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 
 
@@ -66,14 +65,26 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
 
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
+    return sendRequest("POST", urlString, payload);
+  }
+
+  public static String sendDeleteRequest(String urlString, String payload)
+      throws IOException {
+    return sendRequest("DELETE", urlString, payload);
+  }
+
+  public static String sendRequest(String requestMethod, String urlString, String payload)
+      throws IOException {
     final URL url = new URL(urlString);
-    final URLConnection conn = url.openConnection();
+    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
     conn.setDoOutput(true);
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-
-    writer.write(payload, 0, payload.length());
-    writer.flush();
+    conn.setRequestMethod(requestMethod);
+    if (payload != null) {
+      final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
+      writer.write(payload, 0, payload.length());
+      writer.flush();
+    }
 
     final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
     final StringBuilder sb = new StringBuilder();

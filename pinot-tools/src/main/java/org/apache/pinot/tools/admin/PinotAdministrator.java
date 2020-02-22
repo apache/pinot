@@ -31,6 +31,7 @@ import org.apache.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
+import org.apache.pinot.tools.admin.command.DeleteClusterConfigCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
 import org.apache.pinot.tools.admin.command.GetClusterConfigsCommand;
 import org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand;
@@ -93,6 +94,7 @@ public class PinotAdministrator {
       @SubCommand(name = "QuickStart", impl = QuickStartCommand.class),
       @SubCommand(name = "GetClusterConfigs", impl = GetClusterConfigsCommand.class),
       @SubCommand(name = "UpdateClusterConfig", impl = UpdateClusterConfigCommand.class),
+      @SubCommand(name = "DeleteClusterConfig", impl = DeleteClusterConfigCommand.class),
       @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
       @SubCommand(name = "LaunchDataIngestionJob", impl = LaunchDataIngestionJobCommand.class),
       @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),

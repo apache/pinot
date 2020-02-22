@@ -22,17 +22,21 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -94,6 +98,25 @@ public class PinotClusterConfigs {
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       String errStr = "Failed to update cluster config.";
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @DELETE
+  @Path("/cluster/configs/{configName}")
+  @ApiOperation(value = "Delete cluster configuration")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Server error deleting configuration")})
+  public SuccessResponse deleteClusterConfig(
+      @ApiParam(value = "Name of the config to delete", required = true) @PathParam("configName") String configName) {
+    try {
+      HelixAdmin admin = pinotHelixResourceManager.getHelixAdmin();
+      HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+          .forCluster(pinotHelixResourceManager.getHelixClusterName()).build();
+      admin.removeConfig(configScope, Arrays.asList(configName));
+      return new SuccessResponse("Deleted cluster config: " + configName);
+    } catch (Exception e) {
+      String errStr = "Failed to delete cluster config: " + configName;
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
