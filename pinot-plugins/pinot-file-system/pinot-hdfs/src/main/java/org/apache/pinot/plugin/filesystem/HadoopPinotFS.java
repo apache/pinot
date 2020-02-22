@@ -47,7 +47,7 @@ public class HadoopPinotFS extends PinotFS {
   private static final String KEYTAB = "hadoop.kerberos.keytab";
   private static final String HADOOP_CONF_PATH = "hadoop.conf.path";
 
-  private org.apache.hadoop.fs.FileSystem _hadoopFS = null;
+  protected org.apache.hadoop.fs.FileSystem _hadoopFS = null;
   private org.apache.hadoop.conf.Configuration _hadoopConf;
 
   public HadoopPinotFS() {

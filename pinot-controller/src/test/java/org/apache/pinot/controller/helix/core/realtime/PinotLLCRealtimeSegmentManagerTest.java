@@ -189,7 +189,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(committingSegment, PARTITION_OFFSET + NUM_DOCS, 0L);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
-    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor,
+        committingSegmentDescriptor.getSegmentLocation());
 
     // Verify instance states for committed segment and new consuming segment
     Map<String, String> committedSegmentInstanceStateMap = instanceStatesMap.get(committingSegment);
@@ -228,7 +229,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentDescriptor =
         new CommittingSegmentDescriptor(committingSegment, PARTITION_OFFSET + NUM_DOCS + NUM_DOCS, 0L);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
-    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor,
+        committingSegmentDescriptor.getSegmentLocation());
 
     // Verify instance states for committed segment and new consuming segment
     committedSegmentInstanceStateMap = instanceStatesMap.get(committingSegment);
@@ -244,7 +246,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Illegal segment commit - commit the segment again
     try {
-      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor,
+          committingSegmentDescriptor.getSegmentLocation());
       fail();
     } catch (IllegalStateException e) {
       // Expected
@@ -279,7 +282,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       CommittingSegmentDescriptor committingSegmentDescriptor =
           new CommittingSegmentDescriptor(segmentName, PARTITION_OFFSET + NUM_DOCS, 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
-      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor,
+          committingSegmentDescriptor.getSegmentLocation());
     }
     testSetUpNewPartitions(segmentManager, false);
 
@@ -435,7 +439,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       CommittingSegmentDescriptor committingSegmentDescriptor =
           new CommittingSegmentDescriptor(segmentName, PARTITION_OFFSET + NUM_DOCS, 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
-      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor,
+          committingSegmentDescriptor.getSegmentLocation());
     }
 
     // Remove the CONSUMING segment from the ideal state for partition 0 (step 3 failed)
@@ -477,7 +482,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       CommittingSegmentDescriptor committingSegmentDescriptor =
           new CommittingSegmentDescriptor(segmentName, PARTITION_OFFSET + NUM_DOCS, 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
-      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor,
+          committingSegmentDescriptor.getSegmentLocation());
     }
 
     // Remove the CONSUMING segment from the ideal state for partition 0 (step 3 failed)
@@ -657,13 +663,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
 
     try {
-      segmentManager1.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+      segmentManager1.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor,
+          committingSegmentDescriptor.getSegmentLocation());
       fail();
     } catch (IllegalStateException e) {
       // Expected
     }
     try {
-      segmentManager2.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+      segmentManager2.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor,
+          committingSegmentDescriptor.getSegmentLocation());
       fail();
     } catch (IllegalStateException e) {
       // Expected
@@ -746,7 +754,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Expected
     }
     try {
-      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, mock(CommittingSegmentDescriptor.class));
+      CommittingSegmentDescriptor mockDescriptor = mock(CommittingSegmentDescriptor.class);
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, mockDescriptor, mockDescriptor.getSegmentLocation());
       fail();
     } catch (IllegalStateException e) {
       // Expected
