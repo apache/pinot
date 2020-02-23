@@ -34,7 +34,7 @@ public class DefaultColumnHandlerFactory {
     if (SegmentVersion.valueOf(segmentMetadata.getVersion()) == SegmentVersion.v3) {
       return new V3DefaultColumnHandler(indexDir, schema, segmentMetadata, segmentWriter);
     } else {
-      return new V1DefaultColumnHandler(indexDir, schema, segmentMetadata);
+      return new V1DefaultColumnHandler(indexDir, schema, segmentMetadata, segmentWriter);
     }
   }
 }

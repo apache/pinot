@@ -18,16 +18,26 @@
  */
 package org.apache.pinot.common.config;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
 
 public class TextIndexConfigValidator {
-  public static void validate(List<FieldConfig> fieldConfigList) {
+  public static void validate(List<FieldConfig> fieldConfigList, List<String> noDictionaryColumns) {
     if (fieldConfigList != null) {
+      Set<String> noDict = new HashSet<>();
+      if (noDictionaryColumns != null) {
+        noDict.addAll(noDictionaryColumns);
+      }
       for (FieldConfig fieldConfig : fieldConfigList) {
+        String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW) {
+          // validate both places until we get rid of IndexingConfig way of specifying info and
+          // move completely to FieldConfig
+          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !noDict.contains(fieldConfig.getName())) {
             throw new UnsupportedOperationException(
-                "Dictionary encoded index is not supported for text columns currently. Only raw index is supported. Please use EncodingType as RAW in FieldConfig");
+                "Dictionary encoded index is not supported for text column: " + column + " currently. Only raw index is supported. Please use EncodingType as RAW in FieldConfig");
           }
         }
       }

@@ -95,7 +95,6 @@ public class TestTextSearchQueries extends BaseQueriesTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    Pql2Compiler.ENABLE_TEXT_MATCH = true;
     createPinotTableSchema();
     createTestData();
     _recordReader = new GenericRowRecordReader(_rows, _schema);

@@ -83,8 +83,6 @@ public class IndexLoadingConfig {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
 
-    extractTextIndexColumnsFromTableConfig(tableConfig);
-
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
     if (bloomFilterColumns != null) {
       _bloomFilterColumns.addAll(bloomFilterColumns);
@@ -94,6 +92,8 @@ public class IndexLoadingConfig {
     if (noDictionaryColumns != null) {
       _noDictionaryColumns.addAll(noDictionaryColumns);
     }
+
+    extractTextIndexColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
     if (noDictionaryConfig != null) {
@@ -134,7 +134,11 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
+        String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
+          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !_noDictionaryColumns.contains(fieldConfig.getName())) {
+            throw new UnsupportedOperationException("Text index is currently not supported on dictionary encoded column: " + column);
+          }
           _textIndexColumns.add(fieldConfig.getName());
         }
       }
