@@ -45,12 +45,14 @@ public class TestDataAndQueryAnonymizer {
   @Test
   public void testFilterColumnExtractor() throws Exception {
     Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor.extractColumnsUsedInFilter(getQueryDir(), ORIGINAL_QUERY_FILE_NAME);
-    Assert.assertEquals(5, filterColumns.size());
+    Assert.assertEquals(7, filterColumns.size());
     Assert.assertTrue(filterColumns.contains("C9"));
     Assert.assertTrue(filterColumns.contains("C10"));
     Assert.assertTrue(filterColumns.contains("C11"));
     Assert.assertTrue(filterColumns.contains("C2"));
     Assert.assertTrue(filterColumns.contains("C3"));
+    Assert.assertTrue(filterColumns.contains("C12"));
+    Assert.assertTrue(filterColumns.contains("C13"));
   }
 
   @Test
@@ -93,6 +95,8 @@ public class TestDataAndQueryAnonymizer {
     timeColumns.add("C3");
     timeColumns.add("C9");
     timeColumns.add("C10");
+    timeColumns.add("C12");
+    timeColumns.add("C13");
     PinotDataAndQueryAnonymizer.QueryGenerator queryGenerator = new PinotDataAndQueryAnonymizer.QueryGenerator(
         getQueryDir(), getQueryDir(), ORIGINAL_QUERY_FILE_NAME, "MyTable", filterColumns, timeColumns);
 
