@@ -46,9 +46,8 @@ import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.RoutingTable;
-import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
-import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.broker.routing.v2.RoutingManager;
+import org.apache.pinot.broker.routing.v2.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.AggregationFunctionType;
@@ -82,8 +81,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
 
   protected final Configuration _config;
-  protected final RoutingTable _routingTable;
-  protected final TimeBoundaryService _timeBoundaryService;
+  protected final RoutingManager _routingManager;
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
   protected final BrokerMetrics _brokerMetrics;
@@ -106,12 +104,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableQueryLimitOverride;
   private final TableCache _tableCache;
 
-  public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
-      TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public BaseBrokerRequestHandler(Configuration config, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _config = config;
-    _routingTable = routingTable;
-    _timeBoundaryService = timeBoundaryService;
+    _routingManager = routingManager;
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
     _brokerMetrics = brokerMetrics;
@@ -212,22 +209,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
       // Offline table
-      if (_routingTable.routingTableExists(tableName)) {
+      if (_routingManager.routingExists(tableName)) {
         offlineTableName = tableName;
       }
     } else if (tableType == CommonConstants.Helix.TableType.REALTIME) {
       // Realtime table
-      if (_routingTable.routingTableExists(tableName)) {
+      if (_routingManager.routingExists(tableName)) {
         realtimeTableName = tableName;
       }
     } else {
       // Hybrid table (check both OFFLINE and REALTIME)
       String offlineTableNameToCheck = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      if (_routingTable.routingTableExists(offlineTableNameToCheck)) {
+      if (_routingManager.routingExists(offlineTableNameToCheck)) {
         offlineTableName = offlineTableNameToCheck;
       }
       String realtimeTableNameToCheck = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      if (_routingTable.routingTableExists(realtimeTableNameToCheck)) {
+      if (_routingManager.routingExists(realtimeTableNameToCheck)) {
         realtimeTableName = realtimeTableNameToCheck;
       }
     }
@@ -290,16 +287,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Map<ServerInstance, List<String>> offlineRoutingTable = null;
     Map<ServerInstance, List<String>> realtimeRoutingTable = null;
     if (offlineBrokerRequest != null) {
-      offlineRoutingTable = _routingTable.getRoutingTable(new RoutingTableLookupRequest(offlineBrokerRequest));
-      if (offlineRoutingTable.isEmpty()) {
+      // NOTE: Routing table might be null if table is just removed
+      offlineRoutingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
+      if (offlineRoutingTable == null || offlineRoutingTable.isEmpty()) {
         LOGGER.debug("No OFFLINE server found for request {}: {}", requestId, query);
         offlineBrokerRequest = null;
         offlineRoutingTable = null;
       }
     }
     if (realtimeBrokerRequest != null) {
-      realtimeRoutingTable = _routingTable.getRoutingTable(new RoutingTableLookupRequest(realtimeBrokerRequest));
-      if (realtimeRoutingTable.isEmpty()) {
+      // NOTE: Routing table might be null if table is just removed
+      realtimeRoutingTable = _routingManager.getRoutingTable(realtimeBrokerRequest);
+      if (realtimeRoutingTable == null || realtimeRoutingTable.isEmpty()) {
         LOGGER.debug("No REALTIME server found for request {}: {}", requestId, query);
         realtimeBrokerRequest = null;
         realtimeRoutingTable = null;
@@ -389,7 +388,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       // Handle Selection & GroupBy for PinotQuery
-      if (brokerRequest.getPinotQuery()!= null) {
+      if (brokerRequest.getPinotQuery() != null) {
         if (brokerRequest.getPinotQuery().getLimit() > queryLimit) {
           brokerRequest.getPinotQuery().setLimit(queryLimit);
         }
@@ -675,9 +674,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <code>null</code> if the time boundary service does not have the information.
    */
   private String getTimeColumnName(String offlineTableName) {
-    TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo =
-        _timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName);
-    return (timeBoundaryInfo != null) ? timeBoundaryInfo.getTimeColumn() : null;
+    TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
+    return timeBoundaryInfo != null ? timeBoundaryInfo.getTimeColumn() : null;
   }
 
   /**
@@ -710,8 +708,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Helper method to attach time boundary to a broker request.
    */
   private void attachTimeBoundary(String rawTableName, BrokerRequest brokerRequest, boolean isOfflineRequest) {
-    TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo =
-        _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+    TimeBoundaryInfo timeBoundaryInfo =
+        _routingManager.getTimeBoundaryInfo(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
     if (timeBoundaryInfo == null) {
       LOGGER.warn("Failed to find time boundary info for hybrid table: {}", rawTableName);
       return;

@@ -32,9 +32,11 @@ import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.AfterTest;
@@ -60,7 +62,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     _helixManager = initHelixManager(helixClusterName);
     _testPropertyStore = _helixManager.getHelixPropertyStore();
 
-    _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager();
+    _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager(Mockito.mock(BrokerMetrics.class));
     _queryQuotaManager.init(_helixManager);
   }
 

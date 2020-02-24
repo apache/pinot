@@ -127,14 +127,14 @@ public class ValidationManagerTest extends ControllerTest {
 
     // Refresh the segment
     // NOTE: In order to send the refresh message, the segment need to be in the ExternalView
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
     TestUtils.waitForCondition(aVoid -> {
-      ExternalView externalView = _helixAdmin
-          .getResourceExternalView(getHelixClusterName(), TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME));
+      ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(), offlineTableName);
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
     _helixResourceManager
-        .refreshSegment(TEST_TABLE_NAME, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl", null);
+        .refreshSegment(offlineTableName, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl", null);
 
     offlineSegmentZKMetadata = _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time

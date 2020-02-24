@@ -19,20 +19,19 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Function;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -275,17 +274,15 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     dropOfflineTable(tableName);
     dropRealtimeTable(tableName);
 
-    // Routing table should not have any entries (length = 0) after deleting all tables
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          JsonNode routingTableSnapshot = getDebugInfo("debug/routingTable/" + tableName).get("routingTableSnapshot");
-          return routingTableSnapshot.size() == 0;
-        } catch (Exception e) {
-          return null;
-        }
+    // Routing should be removed after deleting all tables
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        getDebugInfo("debug/routingTable/" + tableName);
+        return false;
+      } catch (FileNotFoundException e) {
+        return true;
+      } catch (Exception e) {
+        return null;
       }
     }, 60_000L, "Routing table is not empty after dropping all tables");
 

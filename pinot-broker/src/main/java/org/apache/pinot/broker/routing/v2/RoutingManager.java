@@ -281,8 +281,11 @@ public class RoutingManager implements ClusterChangeHandler {
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+    // NOTE: External view might be null for new created tables. In such case, create an empty one.
     ExternalView externalView = getExternalView(tableNameWithType);
-    Preconditions.checkState(externalView != null, "Failed to find external view for table: {}", tableNameWithType);
+    if (externalView == null) {
+      externalView = new ExternalView(tableNameWithType);
+    }
     Set<String> onlineSegments = getOnlineSegments(tableNameWithType);
     Preconditions.checkState(onlineSegments != null, "Failed to find ideal state for table: {}", tableNameWithType);
     Set<String> enabledInstances = _enabledServerInstanceMap.keySet();
@@ -320,9 +323,11 @@ public class RoutingManager implements ClusterChangeHandler {
         TableConfig offlineTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
         Preconditions
             .checkState(offlineTableConfig != null, "Failed to find table config for table: {}", offlineTableName);
+        // NOTE: External view might be null for new created tables. In such case, create an empty one.
         ExternalView offlineTableExternalView = getExternalView(offlineTableName);
-        Preconditions.checkState(offlineTableExternalView != null, "Failed to find external view for table: {}",
-            offlineTableName);
+        if (offlineTableExternalView == null) {
+          offlineTableExternalView = new ExternalView(offlineTableName);
+        }
         Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableName);
         Preconditions.checkState(offlineTableOnlineSegments != null, "Failed to find ideal state for table: {}",
             offlineTableName);
@@ -390,14 +395,16 @@ public class RoutingManager implements ClusterChangeHandler {
 
   /**
    * Returns the routing table (map from server instance to list of segments hosted by the server) based on the broker
-   * request.
+   * request, or {@code null} if the routing does not exist.
    * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
    */
+  @Nullable
   public Map<ServerInstance, List<String>> getRoutingTable(BrokerRequest brokerRequest) {
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-    Preconditions.checkState(routingEntry != null, "Failed to find routing for table: %s", tableNameWithType);
-
+    if (routingEntry == null) {
+      return null;
+    }
     Map<String, String> segmentToInstanceMap = routingEntry.calculateSegmentToInstanceMap(brokerRequest);
     Map<ServerInstance, List<String>> routingTable = new HashMap<>();
     for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
@@ -413,13 +420,16 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   /**
-   * Returns the time boundary info for the given offline table.
+   * Returns the time boundary info for the given offline table, or {@code null} if the routing or time boundary does
+   * not exist.
    * <p>NOTE: Time boundary info is only available for the offline part of the hybrid table.
    */
   @Nullable
   public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
     RoutingEntry routingEntry = _routingEntryMap.get(offlineTableName);
-    Preconditions.checkState(routingEntry != null, "Failed to find routing for table: %s", offlineTableName);
+    if (routingEntry == null) {
+      return null;
+    }
     TimeBoundaryManager timeBoundaryManager = routingEntry.getTimeBoundaryManager();
     return timeBoundaryManager != null ? timeBoundaryManager.getTimeBoundaryInfo() : null;
   }

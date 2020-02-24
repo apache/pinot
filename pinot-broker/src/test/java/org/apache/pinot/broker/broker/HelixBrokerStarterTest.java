@@ -27,21 +27,20 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
-import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
-import org.apache.pinot.broker.routing.TimeBoundaryService;
-import org.apache.pinot.broker.routing.TimeBoundaryService.TimeBoundaryInfo;
+import org.apache.pinot.broker.routing.v2.RoutingManager;
+import org.apache.pinot.broker.routing.v2.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants.Broker;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
@@ -55,6 +54,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class HelixBrokerStarterTest extends ControllerTest {
+  private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
@@ -73,7 +73,6 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     Configuration brokerConf = new BaseConfiguration();
     brokerConf.addProperty(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-    brokerConf.addProperty(Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL, 100L);
     _brokerStarter = new HelixBrokerStarter(brokerConf, getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
     _brokerStarter.start();
 
@@ -134,12 +133,13 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertEquals(brokerResourceExternalView.getStateMap(OFFLINE_TABLE_NAME).size(), NUM_BROKERS);
     assertEquals(brokerResourceExternalView.getStateMap(REALTIME_TABLE_NAME).size(), NUM_BROKERS);
 
-    HelixExternalViewBasedRouting routing = _brokerStarter.getHelixExternalViewBasedRouting();
-    assertTrue(routing.routingTableExists(OFFLINE_TABLE_NAME));
-    assertTrue(routing.routingTableExists(REALTIME_TABLE_NAME));
+    RoutingManager routingManager = _brokerStarter.getRoutingManager();
+    assertTrue(routingManager.routingExists(OFFLINE_TABLE_NAME));
+    assertTrue(routingManager.routingExists(REALTIME_TABLE_NAME));
 
-    RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(OFFLINE_TABLE_NAME);
-    Map<ServerInstance, List<String>> routingTable = routing.getRoutingTable(routingTableLookupRequest);
+    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest("SELECT * FROM " + OFFLINE_TABLE_NAME);
+    Map<ServerInstance, List<String>> routingTable = routingManager.getRoutingTable(brokerRequest);
+    assertNotNull(routingTable);
     assertEquals(routingTable.size(), NUM_SERVERS);
     assertEquals(routingTable.values().iterator().next().size(), NUM_OFFLINE_SEGMENTS);
 
@@ -147,9 +147,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
     _helixResourceManager
         .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
 
-    TestUtils.waitForCondition(
-        aVoid -> routing.getRoutingTable(routingTableLookupRequest).values().iterator().next().size()
-            == NUM_OFFLINE_SEGMENTS + 1, 30_000L, "Failed to add the new segment into the routing table");
+    TestUtils.waitForCondition(aVoid -> routingManager.getRoutingTable(brokerRequest).values().iterator().next().size()
+        == NUM_OFFLINE_SEGMENTS + 1, 30_000L, "Failed to add the new segment into the routing table");
 
     // Add a new table with different broker tenant
     String newRawTableName = "newTable";
@@ -173,7 +172,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
       return newTableStateMap != null && newTableStateMap.size() == NUM_BROKERS;
     }, 30_000L, "Failed to find all brokers for the new table in the brokerResource ExternalView");
 
-    assertTrue(routing.routingTableExists(newOfflineTableName));
+    assertTrue(routingManager.routingExists(newOfflineTableName));
   }
 
   /**
@@ -181,12 +180,12 @@ public class HelixBrokerStarterTest extends ControllerTest {
    */
   @Test
   public void testTimeBoundaryUpdate() {
-    TimeBoundaryService timeBoundaryService = _brokerStarter.getHelixExternalViewBasedRouting().
-        getTimeBoundaryService();
+    RoutingManager routingManager = _brokerStarter.getRoutingManager();
 
     // Time boundary should be 1 day smaller than the end time
     int currentEndTime = 10;
-    TimeBoundaryInfo timeBoundaryInfo = timeBoundaryService.getTimeBoundaryInfoFor(OFFLINE_TABLE_NAME);
+    TimeBoundaryInfo timeBoundaryInfo = routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME);
+    assertNotNull(timeBoundaryInfo);
     assertEquals(timeBoundaryInfo.getTimeValue(), Integer.toString(currentEndTime - 1));
 
     // Refresh a segment with a new end time
@@ -198,7 +197,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
         SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_TABLE_NAME, segmentToRefresh, newEndTime),
         segmentZKMetadata, "downloadUrl", null);
 
-    TestUtils.waitForCondition(aVoid -> timeBoundaryService.getTimeBoundaryInfoFor(OFFLINE_TABLE_NAME).getTimeValue()
+    TestUtils.waitForCondition(aVoid -> routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME).getTimeValue()
         .equals(Integer.toString(newEndTime - 1)), 30_000L, "Failed to update the time boundary for refreshed segment");
   }
 
