@@ -131,19 +131,32 @@ public class RoutingManager implements ClusterChangeHandler {
     Stat[] stats = _zkDataAccessor.getStats(externalViewPaths, AccessOption.PERSISTENT);
     long fetchStatsEndTimeMs = System.currentTimeMillis();
 
-    int numRoutingEntriesToUpdate = 0;
+    List<String> tablesToUpdate = new ArrayList<>();
     for (int i = 0; i < numTables; i++) {
       Stat stat = stats[i];
       if (stat != null) {
         RoutingEntry routingEntry = routingEntries.get(i);
         if (stat.getVersion() != routingEntry.getLastUpdateExternalViewVersion()) {
-          numRoutingEntriesToUpdate++;
+          String tableNameWithType = routingEntry.getTableNameWithType();
+          tablesToUpdate.add(tableNameWithType);
           try {
-            updateRoutingEntryOnExternalViewChange(routingEntry);
+            ExternalView externalView = getExternalView(tableNameWithType);
+            if (externalView == null) {
+              LOGGER.warn("Failed to find external view for table: {}, skipping updating routing entry",
+                  tableNameWithType);
+              continue;
+            }
+            Set<String> onlineSegments = getOnlineSegments(tableNameWithType);
+            if (onlineSegments == null) {
+              LOGGER
+                  .warn("Failed to find ideal state for table: {}, skipping updating routing entry", tableNameWithType);
+              continue;
+            }
+            routingEntry.onExternalViewChange(externalView, onlineSegments);
           } catch (Exception e) {
             LOGGER
                 .error("Caught unexpected exception while updating routing entry on external view change for table: {}",
-                    routingEntry.getTableNameWithType(), e);
+                    tableNameWithType, e);
           }
         }
       }
@@ -151,24 +164,9 @@ public class RoutingManager implements ClusterChangeHandler {
     long updateRoutingEntriesEndTimeMs = System.currentTimeMillis();
 
     LOGGER.info(
-        "Processed external view change in {}ms (fetch {} external view stats: {}ms, update {} routing entries: {}ms)",
+        "Processed external view change in {}ms (fetch {} external view stats: {}ms, update routing entry for {} tables ({}): {}ms)",
         updateRoutingEntriesEndTimeMs - startTimeMs, numTables, fetchStatsEndTimeMs - startTimeMs,
-        numRoutingEntriesToUpdate, updateRoutingEntriesEndTimeMs - fetchStatsEndTimeMs);
-  }
-
-  private void updateRoutingEntryOnExternalViewChange(RoutingEntry routingEntry) {
-    String tableNameWithType = routingEntry.getTableNameWithType();
-    ExternalView externalView = getExternalView(tableNameWithType);
-    if (externalView == null) {
-      LOGGER.warn("Failed to find external view for table: {}, skipping updating routing entry", tableNameWithType);
-      return;
-    }
-    Set<String> onlineSegments = getOnlineSegments(tableNameWithType);
-    if (onlineSegments == null) {
-      LOGGER.warn("Failed to find ideal state for table: {}, skipping updating routing entry", tableNameWithType);
-      return;
-    }
-    routingEntry.onExternalViewChange(externalView, onlineSegments);
+        tablesToUpdate.size(), tablesToUpdate, updateRoutingEntriesEndTimeMs - fetchStatsEndTimeMs);
   }
 
   @Nullable
@@ -235,6 +233,16 @@ public class RoutingManager implements ClusterChangeHandler {
     changedInstances.addAll(newEnabledInstances);
     changedInstances.addAll(newDisabledInstances);
     long calculateChangedInstancesEndTimeMs = System.currentTimeMillis();
+
+    // Early terminate if there is no instance changed
+    if (changedInstances.isEmpty()) {
+      LOGGER.info(
+          "Processed instance config change in {}ms (fetch {} instance configs: {}ms, calculate changed instances: {}ms) without instance change",
+          calculateChangedInstancesEndTimeMs - startTimeMs, instanceConfigZNRecords.size(),
+          fetchInstanceConfigsEndTimeMs - startTimeMs,
+          calculateChangedInstancesEndTimeMs - fetchInstanceConfigsEndTimeMs);
+      return;
+    }
 
     // Update routing entry for all tables
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
