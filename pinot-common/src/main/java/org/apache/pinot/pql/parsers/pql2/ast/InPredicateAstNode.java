@@ -39,6 +39,10 @@ public class InPredicateAstNode extends PredicateAstNode {
     _isNotInClause = isNotInClause;
   }
 
+  public boolean isNotInClause() {
+    return _isNotInClause;
+  }
+
   public ArrayList<String> getValues() {
     ArrayList<String> values = new ArrayList<>();
     for (AstNode astNode : getChildren()) {
