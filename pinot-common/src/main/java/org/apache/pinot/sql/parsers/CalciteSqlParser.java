@@ -273,7 +273,7 @@ public class CalciteSqlParser {
         }
 
         if (selectSqlNode.getWhere() != null) {
-          pinotQuery.setFilterExpression(updateComparisonPredicate(toExpression(selectSqlNode.getWhere())));
+          pinotQuery.setFilterExpression(toExpression(selectSqlNode.getWhere()));
         }
         if (selectSqlNode.getGroup() != null) {
           pinotQuery.setGroupByList(convertSelectList(selectSqlNode.getGroup()));
@@ -283,10 +283,22 @@ public class CalciteSqlParser {
         throw new RuntimeException(
             "Unable to convert SqlNode: " + sqlNode + " to PinotQuery. Unknown node type: " + sqlNode.getKind());
     }
+    queryReWrite(pinotQuery);
+    return pinotQuery;
+  }
+
+  private static void queryReWrite(PinotQuery pinotQuery) {
+    // Update Predicate Comparison
+    if (pinotQuery.isSetFilterExpression()) {
+      Expression filterExpression = pinotQuery.getFilterExpression();
+      Expression updatedFilterExpression = updateComparisonPredicate(filterExpression);
+      pinotQuery.setFilterExpression(updatedFilterExpression);
+    }
+
+    // Update alias
     Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
     applyAlias(aliasMap, pinotQuery);
     validate(aliasMap, pinotQuery);
-    return pinotQuery;
   }
 
   // This method converts a predicate expression to the what Pinot could evaluate.
@@ -338,6 +350,17 @@ public class CalciteSqlParser {
     return expression;
   }
 
+  /**
+   * The purpose of this method is to convert expression "0 < columnA" to "columnA > 0".
+   * The conversion would be:
+   *  from ">" to "<",
+   *  from "<" to ">",
+   *  from ">=" to "<=",
+   *  from "<=" to ">=".
+   *
+   * @param operator
+   * @return opposite operator
+   */
   private static String getOppositeOperator(String operator) {
     switch (operator.toUpperCase()) {
       case "GREATER_THAN":
@@ -355,16 +378,6 @@ public class CalciteSqlParser {
   }
 
   private static Expression getLeftOperand(Function functionCall) {
-    Expression minusFunction = RequestUtils.getFunctionExpression(SqlKind.MINUS.toString());
-    List<Expression> updatedOperands = new ArrayList<>();
-    for (Expression operand : functionCall.getOperands()) {
-      updatedOperands.add(updateComparisonPredicate(operand));
-    }
-    minusFunction.getFunctionCall().setOperands(updatedOperands);
-    return minusFunction;
-  }
-
-  private static Expression getRightOperand(Function functionCall) {
     Expression minusFunction = RequestUtils.getFunctionExpression(SqlKind.MINUS.toString());
     List<Expression> updatedOperands = new ArrayList<>();
     for (Expression operand : functionCall.getOperands()) {

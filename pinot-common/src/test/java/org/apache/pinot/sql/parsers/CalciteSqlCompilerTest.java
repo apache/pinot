@@ -156,6 +156,37 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 0L);
 
 
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where foo1(bar1(a-b)) <= foo2(bar2(c+d))");
+    func = pinotQuery.getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), SqlKind.LESS_THAN_OR_EQUAL.name());
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "MINUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "foo1");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "foo2");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "bar1");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "bar2");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "MINUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "a");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "b");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "c");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "d");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 0L);
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where foo1(bar1(a-b)) - foo2(bar2(c+d)) <= 0");
+    func = pinotQuery.getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), SqlKind.LESS_THAN_OR_EQUAL.name());
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "MINUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "foo1");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "foo2");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "bar1");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "bar2");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "MINUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "a");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "b");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "c");
+    Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "d");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getLongValue(), 0L);
+
     pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where c >= 10");
     func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN_OR_EQUAL.name());
