@@ -283,10 +283,108 @@ public class CalciteSqlParser {
         throw new RuntimeException(
             "Unable to convert SqlNode: " + sqlNode + " to PinotQuery. Unknown node type: " + sqlNode.getKind());
     }
+    queryReWrite(pinotQuery);
+    return pinotQuery;
+  }
+
+  private static void queryReWrite(PinotQuery pinotQuery) {
+    // Update Predicate Comparison
+    if (pinotQuery.isSetFilterExpression()) {
+      Expression filterExpression = pinotQuery.getFilterExpression();
+      Expression updatedFilterExpression = updateComparisonPredicate(filterExpression);
+      pinotQuery.setFilterExpression(updatedFilterExpression);
+    }
+
+    // Update alias
     Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
     applyAlias(aliasMap, pinotQuery);
     validate(aliasMap, pinotQuery);
-    return pinotQuery;
+  }
+
+  // This method converts a predicate expression to the what Pinot could evaluate.
+  // For comparison expression, left operand could be any expression, but right operand only
+  // supports literal.
+  // E.g. 'WHERE a > b' will be updated to 'WHERE a - b > 0'
+  private static Expression updateComparisonPredicate(Expression expression) {
+    Function functionCall = expression.getFunctionCall();
+    if (functionCall != null) {
+      SqlKind sqlKind = SqlKind.OTHER_FUNCTION;
+      try {
+        sqlKind = SqlKind.valueOf(functionCall.getOperator().toUpperCase());
+      } catch (Exception e) {
+        // Do nothing
+      }
+      switch (sqlKind) {
+        case EQUALS:
+        case NOT_EQUALS:
+        case GREATER_THAN:
+        case GREATER_THAN_OR_EQUAL:
+        case LESS_THAN:
+        case LESS_THAN_OR_EQUAL:
+          // Handle predicate like 'WHERE 10=a'
+          if (functionCall.getOperands().get(0).getLiteral() != null) {
+            functionCall.setOperator(getOppositeOperator(functionCall.getOperator()));
+            List<Expression> oldOperands = functionCall.getOperands();
+            Expression tempExpr = oldOperands.get(0);
+            oldOperands.set(0, oldOperands.get(1));
+            oldOperands.set(1, tempExpr);
+          }
+          if (functionCall.getOperands().get(1).getLiteral() != null) {
+            return expression;
+          }
+          Expression comparisonFunction = RequestUtils.getFunctionExpression(functionCall.getOperator());
+          List<Expression> exprList = new ArrayList<>();
+          exprList.add(getLeftOperand(functionCall));
+          exprList.add(RequestUtils.getLiteralExpression(0));
+          comparisonFunction.getFunctionCall().setOperands(exprList);
+          return comparisonFunction;
+        default:
+          List<Expression> operands = functionCall.getOperands();
+          List<Expression> newOperands = new ArrayList<>();
+          for (int i = 0; i < operands.size(); i++) {
+            newOperands.add(updateComparisonPredicate(operands.get(i)));
+          }
+          functionCall.setOperands(newOperands);
+      }
+    }
+    return expression;
+  }
+
+  /**
+   * The purpose of this method is to convert expression "0 < columnA" to "columnA > 0".
+   * The conversion would be:
+   *  from ">" to "<",
+   *  from "<" to ">",
+   *  from ">=" to "<=",
+   *  from "<=" to ">=".
+   *
+   * @param operator
+   * @return opposite operator
+   */
+  private static String getOppositeOperator(String operator) {
+    switch (operator.toUpperCase()) {
+      case "GREATER_THAN":
+        return "LESS_THAN";
+      case "GREATER_THAN_OR_EQUAL":
+        return "LESS_THAN_OR_EQUAL";
+      case "LESS_THAN":
+        return "GREATER_THAN";
+      case "LESS_THAN_OR_EQUAL":
+        return "GREATER_THAN_OR_EQUAL";
+      default:
+        // Do nothing
+        return operator;
+    }
+  }
+
+  private static Expression getLeftOperand(Function functionCall) {
+    Expression minusFunction = RequestUtils.getFunctionExpression(SqlKind.MINUS.toString());
+    List<Expression> updatedOperands = new ArrayList<>();
+    for (Expression operand : functionCall.getOperands()) {
+      updatedOperands.add(updateComparisonPredicate(operand));
+    }
+    minusFunction.getFunctionCall().setOperands(updatedOperands);
+    return minusFunction;
   }
 
   private static void applyAlias(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery) {

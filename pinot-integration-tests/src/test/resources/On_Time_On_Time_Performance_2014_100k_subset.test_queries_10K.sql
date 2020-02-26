@@ -9998,3 +9998,8 @@
 {"sql":"SELECT COUNT(OriginCityName), AVG(SecurityDelay) FROM mytable WHERE DivAirportLandings BETWEEN 0 AND 9 OR OriginCityName <= 'Melbourne, FL' LIMIT 28"}
 {"sql":"SELECT WheelsOff, DistanceGroup, OriginAirportID, SUM(OriginAirportSeqID), MAX(LateAircraftDelay), MAX(Diverted) FROM mytable WHERE TaxiOut <> 45 GROUP BY WheelsOff, DistanceGroup, OriginAirportID  ORDER BY WheelsOff, DistanceGroup, OriginAirportID LIMIT 6","hsqls":["SELECT WheelsOff, DistanceGroup, OriginAirportID, SUM(OriginAirportSeqID), MAX(LateAircraftDelay), MAX(Diverted) FROM mytable WHERE TaxiOut <> 45 GROUP BY WheelsOff, DistanceGroup, OriginAirportID  ORDER BY WheelsOff, DistanceGroup, OriginAirportID LIMIT 6"]}
 {"sql":"SELECT DepDel15, OriginStateName, COUNT(*) FROM mytable WHERE DepTime BETWEEN 1407 AND 1857 GROUP BY DepDel15, OriginStateName  ORDER BY DepDel15, OriginStateName LIMIT 24","hsqls":["SELECT DepDel15, OriginStateName, COUNT(*) FROM mytable WHERE DepTime BETWEEN 1407 AND 1857 GROUP BY DepDel15, OriginStateName  ORDER BY DepDel15, OriginStateName LIMIT 24"]}
+{"sql":"SELECT COUNT(WeatherDelay) FROM mytable WHERE DestCityMarketID >= 33158 AND DestCityMarketID <= 30930 LIMIT 26"}
+{"sql":"SELECT COUNT(WeatherDelay) FROM mytable WHERE 33158 <= DestCityMarketID AND  30930>= DestCityMarketID LIMIT 26"}
+{"sql":"SELECT COUNT(WeatherDelay) FROM mytable WHERE 33158 -1 <= DestCityMarketID -1  AND  30930 + 1 >= DestCityMarketID + 1 LIMIT 26"}
+{"sql":"SELECT COUNT(WeatherDelay) FROM mytable WHERE  ArrDelay > CarrierDelay LIMIT 26"}
+{"sql":"SELECT COUNT(WeatherDelay) FROM mytable WHERE  ArrDelay - CarrierDelay > 0 LIMIT 26"}
