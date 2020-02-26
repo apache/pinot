@@ -40,7 +40,7 @@ public class RoutingConfig extends BaseJsonConfig {
   @JsonCreator
   public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
       @JsonProperty("routingTableBuilderOptions") @Nullable Map<String, String> routingTableBuilderOptions,
-      @JsonProperty("segmentPrunerType") @Nullable List<String> segmentPrunerTypes,
+      @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
       @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType) {
     _routingTableBuilderName = routingTableBuilderName;
     _routingTableBuilderOptions = routingTableBuilderOptions;
