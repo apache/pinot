@@ -229,6 +229,11 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   }
 
   @Override
+  public void destroy() {
+    // do nothing
+  }
+
+  @Override
   public void run() throws Exception {
     Preconditions.checkNotNull(result);
     if (result.getAllAnomalies().size() == 0) {

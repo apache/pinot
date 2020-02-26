@@ -54,6 +54,8 @@ public abstract class DetectionAlertScheme {
 
   public abstract void run() throws Exception;
 
+  public abstract void destroy() throws Exception;
+
   /**
    * Plug the appropriate template based on configuration.
    */

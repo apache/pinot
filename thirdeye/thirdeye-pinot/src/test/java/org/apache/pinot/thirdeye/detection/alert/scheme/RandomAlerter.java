@@ -15,4 +15,9 @@ public class RandomAlerter extends DetectionAlertScheme {
   public void run() {
 
   }
+
+  @Override
+  public void destroy() throws Exception {
+
+  }
 }

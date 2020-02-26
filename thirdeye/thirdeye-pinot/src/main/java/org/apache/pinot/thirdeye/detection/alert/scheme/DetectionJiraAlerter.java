@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.alert.scheme;
 
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -168,6 +169,11 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
         super.handleAlertFailure(result.getValue().size(), e);
       }
     }
+  }
+
+  @Override
+  public void destroy() {
+    this.jiraClient.close();
   }
 
   @Override

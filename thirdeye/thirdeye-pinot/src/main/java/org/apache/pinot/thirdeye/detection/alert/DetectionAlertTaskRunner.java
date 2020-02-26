@@ -112,6 +112,7 @@ public class DetectionAlertTaskRunner implements TaskRunner {
           detAlertTaskFactory.loadAlertSchemes(alertConfig, taskContext.getThirdEyeAnomalyConfiguration(), result);
       for (DetectionAlertScheme alertScheme : alertSchemes) {
         alertScheme.run();
+        alertScheme.destroy();
       }
 
       updateAlertConfigWatermarks(result, alertConfig);

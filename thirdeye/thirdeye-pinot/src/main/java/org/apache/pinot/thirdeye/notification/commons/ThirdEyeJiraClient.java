@@ -35,6 +35,7 @@ import com.atlassian.jira.rest.client.api.domain.input.TransitionInput;
 import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory;
 import com.google.common.base.Joiner;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -60,7 +61,6 @@ public class ThirdEyeJiraClient {
   private static final String JIRA_REOPEN_TRANSITION = "Reopen";
   public static final String PROP_ISSUE_TYPE = "issuetype";
   public static final String PROP_PROJECT = "project";
-  public static final String PROP_SUMMARY = "summary";
   public static final String PROP_ASSIGNEE = "assignee";
   public static final String PROP_MERGE_GAP = "mergeGap";
   public static final String PROP_LABELS = "labels";
@@ -248,5 +248,13 @@ public class ThirdEyeJiraClient {
     }
 
     return issueBuilder.build();
+  }
+
+  public void close() {
+    try {
+      restClient.close();
+    } catch (IOException e) {
+      LOG.warn("Failed to close jira rest client", e);
+    }
   }
 }
