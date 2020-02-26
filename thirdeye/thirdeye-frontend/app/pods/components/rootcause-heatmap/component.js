@@ -1,5 +1,5 @@
 import Component from '@ember/component';
-import { observer, get, getProperties, computed } from '@ember/object';
+import { get, getProperties, computed } from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
@@ -7,10 +7,7 @@ import {
   isInverse,
   isAdditive,
   filterPrefix,
-  toMetricLabel,
-  stripTail,
-  extractTail,
-  appendTail
+  toMetricLabel
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   humanizeChange,

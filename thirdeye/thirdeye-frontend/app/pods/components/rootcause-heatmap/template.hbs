@@ -13,7 +13,15 @@
     {{/unless}}
   </div>
   <div class="col-xs-4 pull-right">
-    <label class="te-label te-label--small" for="select-heatmap-mode">Color heatmap by: </label>
+    <label class="te-label te-label--small" for="select-heatmap-mode">
+      Color heatmap by:
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#bs-popover placement="bottom" title="Definition of change ratios"}}
+          {{cube-tooltip}}
+        {{/bs-popover}}
+      </span>
+    </label>
     {{#power-select
       triggerId="select-heatmap-mode"
       selected=selectedMode
