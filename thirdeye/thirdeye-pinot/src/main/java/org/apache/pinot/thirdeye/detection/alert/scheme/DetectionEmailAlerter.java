@@ -35,6 +35,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -218,8 +219,10 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
               new HashSet<>(ConfigUtils.getList(emailRecipients.get(PROP_CC))),
               new HashSet<>(ConfigUtils.getList(emailRecipients.get(PROP_BCC))));
           sendEmail(prepareEmailContent(subsConfig, emailClientConfigs, anomalyResultListOfGroup, recipients));
+          ThirdeyeMetricsUtil.emailAlertsSucesssCounter.inc();
         }
-      } catch (IllegalArgumentException e) {
+      } catch (Exception e) {
+        ThirdeyeMetricsUtil.emailAlertsFailedCounter.inc();
         super.handleAlertFailure(result.getValue().size(), e);
       }
     }

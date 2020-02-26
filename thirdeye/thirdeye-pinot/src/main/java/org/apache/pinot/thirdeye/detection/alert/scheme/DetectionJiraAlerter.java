@@ -29,6 +29,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -136,7 +137,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
         .getJiraEntity(notification.getDimensionFilters(), anomalyResultListOfGroup);
   }
 
-  private void createJiraTickets(DetectionAlertFilterResult results) {
+  private void createJiraTickets(DetectionAlertFilterResult results) throws Exception {
     LOG.info("Preparing a jira alert for subscription group id {}", this.subsConfig.getId());
     Preconditions.checkNotNull(results.getResult());
     for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result : results.getResult().entrySet()) {
@@ -152,13 +153,18 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
         if (!latestJiraIssue.isPresent()) {
           // No existing ticket found. Create a new jira ticket
           String issueKey = jiraClient.createIssue(jiraEntity);
+          ThirdeyeMetricsUtil.jiraAlertsSuccessCounter.inc();
+          ThirdeyeMetricsUtil.jiraAlertsNumTicketsCounter.inc();
           LOG.info("Jira created {}, anomalies reported {}", issueKey, result.getValue().size());
         } else {
           // Reopen recent existing ticket and add a comment
           updateJiraAlert(latestJiraIssue.get(), jiraEntity);
+          ThirdeyeMetricsUtil.jiraAlertsSuccessCounter.inc();
+          ThirdeyeMetricsUtil.jiraAlertsNumCommentsCounter.inc();
           LOG.info("Jira updated {}, anomalies reported = {}", latestJiraIssue.get().getKey(), result.getValue().size());
         }
-      } catch (IllegalArgumentException e) {
+      } catch (Exception e) {
+        ThirdeyeMetricsUtil.jiraAlertsFailedCounter.inc();
         super.handleAlertFailure(result.getValue().size(), e);
       }
     }
