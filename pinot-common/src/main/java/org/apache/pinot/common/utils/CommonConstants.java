@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import org.apache.commons.lang.StringUtils;
-
 import java.io.File;
 import org.apache.pinot.common.response.BrokerResponseFactory;
 
@@ -411,23 +409,4 @@ public class CommonConstants {
     public static final String RETRY_WAITIME_MS = "retry.wait.ms";
     public static final int RETRY_WAITIME_MS_DEFAULT = 100;
   }
-
-  public enum UpdateSemantic {
-    APPEND,
-    UPSERT;
-
-    public static UpdateSemantic DEFAULT_SEMANTIC = APPEND;
-
-    public static UpdateSemantic getUpdateSemantic(String updateSemanticStr) {
-      if (StringUtils.isEmpty(updateSemanticStr)) {
-        return DEFAULT_SEMANTIC;
-      }
-      try {
-        return valueOf(updateSemanticStr.toUpperCase());
-      } catch (Exception ex) {
-        return DEFAULT_SEMANTIC;
-      }
-    }
-  }
-
 }
