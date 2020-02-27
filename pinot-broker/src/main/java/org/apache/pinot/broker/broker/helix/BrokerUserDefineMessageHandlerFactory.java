@@ -23,7 +23,7 @@ import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
-import org.apache.pinot.broker.routing.v2.RoutingManager;
+import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
