@@ -15,9 +15,4 @@ public class AnotherRandomAlerter extends DetectionAlertScheme {
   public void run() {
 
   }
-
-  @Override
-  public void destroy() throws Exception {
-
-  }
 }
