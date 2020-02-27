@@ -203,19 +203,19 @@ public class DictionariesTest {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.INT);
     statsCollector.collect(1);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(2f);
+    statsCollector.collect(2);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(3L);
-    Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(4d);
+    statsCollector.collect(3);
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(4);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(2f);
+    statsCollector.collect(4);
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(2);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(40d);
+    statsCollector.collect(40);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(20d);
+    statsCollector.collect(20);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -227,21 +227,21 @@ public class DictionariesTest {
   @Test
   public void testFloatColumnPreIndexStatsCollector() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.FLOAT);
-    statsCollector.collect(1);
+    statsCollector.collect(1f);
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(2f);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(3L);
+    statsCollector.collect(3f);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(4d);
+    statsCollector.collect(4f);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(4);
+    statsCollector.collect(4f);
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(2f);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(40d);
+    statsCollector.collect(40f);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(20d);
+    statsCollector.collect(20f);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -253,21 +253,21 @@ public class DictionariesTest {
   @Test
   public void testLongColumnPreIndexStatsCollector() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.LONG);
-    statsCollector.collect(1);
+    statsCollector.collect(1L);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(2f);
+    statsCollector.collect(2L);
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(3L);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(4d);
+    statsCollector.collect(4L);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(4);
+    statsCollector.collect(4L);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(2f);
+    statsCollector.collect(2L);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(40d);
+    statsCollector.collect(40L);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(20d);
+    statsCollector.collect(20L);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -279,17 +279,17 @@ public class DictionariesTest {
   @Test
   public void testDoubleColumnPreIndexStatsCollector() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.DOUBLE);
-    statsCollector.collect(1);
+    statsCollector.collect(1d);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(2f);
+    statsCollector.collect(2d);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(3L);
+    statsCollector.collect(3d);
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(4d);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(4);
+    statsCollector.collect(4d);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(2f);
+    statsCollector.collect(2d);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.collect(40d);
     Assert.assertFalse(statsCollector.isSorted());

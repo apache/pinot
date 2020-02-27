@@ -24,18 +24,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.config.instance.InstanceConstraintConfig;
 import org.apache.pinot.common.config.instance.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.startree.hll.HllConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -145,13 +141,11 @@ public class TableConfigTest {
       assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       assertNull(tableConfigToCompare.getQuotaConfig());
       assertNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
-      assertNull(tableConfigToCompare.getValidationConfig().getHllConfig());
 
       tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       assertNull(tableConfigToCompare.getQuotaConfig());
       assertNull(tableConfig.getValidationConfig().getReplicaGroupStrategyConfig());
-      assertNull(tableConfigToCompare.getValidationConfig().getHllConfig());
     }
     {
       // With quota config
@@ -266,54 +260,6 @@ public class TableConfigTest {
       checkTableConfigWithCompletionConfig(tableConfig, tableConfigToCompare);
     }
     {
-      // With star tree config
-      StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
-      Set<String> dims = new HashSet<>();
-      dims.add("dims");
-      starTreeIndexSpec.setDimensionsSplitOrder(Collections.singletonList("dim"));
-      starTreeIndexSpec.setMaxLeafRecords(5);
-      starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(1);
-      starTreeIndexSpec.setSkipMaterializationForDimensions(dims);
-      starTreeIndexSpec.setSkipStarNodeCreationForDimensions(dims);
-
-      TableConfig tableConfig = tableConfigBuilder.build();
-      tableConfig.getIndexingConfig().setStarTreeIndexSpec(starTreeIndexSpec);
-
-      // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
-      checkTableConfigWithStarTreeConfig(tableConfig, tableConfigToCompare);
-
-      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
-      checkTableConfigWithStarTreeConfig(tableConfig, tableConfigToCompare);
-    }
-    {
-      // With HllConfig
-      HllConfig hllConfig = new HllConfig();
-      Set<String> columns = new HashSet<>();
-      columns.add("column");
-      columns.add("column2");
-
-      hllConfig.setColumnsToDeriveHllFields(columns);
-      hllConfig.setHllLog2m(9);
-      hllConfig.setHllDeriveColumnSuffix("suffix");
-
-      String hllConfigJson = hllConfig.toJsonString();
-      HllConfig newHllConfig = HllConfig.fromJsonString(hllConfigJson);
-      assertEquals(hllConfig.getColumnsToDeriveHllFields(), newHllConfig.getColumnsToDeriveHllFields());
-      assertEquals(hllConfig.getHllLog2m(), newHllConfig.getHllLog2m());
-      assertEquals(hllConfig.getHllDeriveColumnSuffix(), newHllConfig.getHllDeriveColumnSuffix());
-
-      TableConfig tableConfig = tableConfigBuilder.build();
-      tableConfig.getValidationConfig().setHllConfig(hllConfig);
-
-      // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
-      checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
-
-      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
-      checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
-    }
-    {
       // With instance assignment config
       InstanceAssignmentConfig instanceAssignmentConfig =
           new InstanceAssignmentConfig(new InstanceTagPoolConfig("tenant_OFFLINE", true, 3, null),
@@ -329,25 +275,29 @@ public class TableConfigTest {
     {
       Map<String, String> properties = new HashMap<>();
       properties.put(FieldConfig.TEXT_INDEX_REALTIME_READER_REFRESH_KEY, "100");
-      FieldConfig fieldConfigTextCol = new FieldConfig("text_col", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, properties);
-      FieldConfig fieldConfigInvCol = new FieldConfig("inv_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null);
+      FieldConfig fieldConfigTextCol =
+          new FieldConfig("text_col", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, properties);
+      FieldConfig fieldConfigInvCol =
+          new FieldConfig("inv_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null);
       FieldConfig fieldConfigRawCol = new FieldConfig("raw_index_col", FieldConfig.EncodingType.RAW, null, null);
       Map<String, String> properties1 = new HashMap<>();
       properties1.put(FieldConfig.VAR_LENGTH_DICTIONARY_COLUMN_KEY, "true");
-      FieldConfig fieldConfigSortedCol = new FieldConfig("sorted_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.SORTED, properties1);
+      FieldConfig fieldConfigSortedCol =
+          new FieldConfig("sorted_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.SORTED,
+              properties1);
       List<String> noDict = new ArrayList<>();
       noDict.add("text_col");
-      TableConfig tableConfig = tableConfigBuilder
-          .setFieldConfigList(Lists.newArrayList(fieldConfigTextCol, fieldConfigInvCol, fieldConfigRawCol, fieldConfigSortedCol))
-          .setNoDictionaryColumns(noDict)
-          .build();
+      TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(
+          Lists.newArrayList(fieldConfigTextCol, fieldConfigInvCol, fieldConfigRawCol, fieldConfigSortedCol))
+          .setNoDictionaryColumns(noDict).build();
 
       TableConfig toCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
       compareConfigHavingFieldConfig(toCompare, properties, properties1);
       toCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       compareConfigHavingFieldConfig(toCompare, properties, properties1);
 
-      TableConfig tableConfigWithoutFieldConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("foo").build();
+      TableConfig tableConfigWithoutFieldConfig =
+          new TableConfig.Builder(TableType.OFFLINE).setTableName("foo").build();
       toCompare = TableConfig.fromJsonConfig(tableConfigWithoutFieldConfig.toJsonConfig());
       Assert.assertNull(toCompare.getFieldConfigList());
       toCompare = TableConfig.fromZnRecord(tableConfigWithoutFieldConfig.toZNRecord());
@@ -364,15 +314,17 @@ public class TableConfigTest {
     FieldConfig config = fieldConfigs.get(0);
     checkFieldConfigList(config, properties, "text_col", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT);
     config = fieldConfigs.get(1);
-    checkFieldConfigList(config, null, "inv_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED);
+    checkFieldConfigList(config, null, "inv_index_col", FieldConfig.EncodingType.DICTIONARY,
+        FieldConfig.IndexType.INVERTED);
     config = fieldConfigs.get(2);
     checkFieldConfigList(config, null, "raw_index_col", FieldConfig.EncodingType.RAW, null);
     config = fieldConfigs.get(3);
-    checkFieldConfigList(config, properties1, "sorted_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.SORTED);
+    checkFieldConfigList(config, properties1, "sorted_index_col", FieldConfig.EncodingType.DICTIONARY,
+        FieldConfig.IndexType.SORTED);
   }
 
-  private void checkFieldConfigList(FieldConfig config, Map<String, String> expectedProperties,
-      String expectedColumn, FieldConfig.EncodingType expectedEncodingType, FieldConfig.IndexType expectedIndexType) {
+  private void checkFieldConfigList(FieldConfig config, Map<String, String> expectedProperties, String expectedColumn,
+      FieldConfig.EncodingType expectedEncodingType, FieldConfig.IndexType expectedIndexType) {
     Assert.assertEquals(expectedColumn, config.getName());
     Assert.assertEquals(expectedEncodingType, config.getEncodingType());
     Assert.assertEquals(expectedIndexType, config.getIndexType());
@@ -404,49 +356,6 @@ public class TableConfigTest {
     // Check that the configurations are correct.
     CompletionConfig completionConfig = tableConfigToCompare.getValidationConfig().getCompletionConfig();
     assertEquals(completionConfig.getCompletionMode(), "DEFAULT");
-  }
-
-  private void checkTableConfigWithStarTreeConfig(TableConfig tableConfig, TableConfig tableConfigToCompare)
-      throws Exception {
-    // Check that the segment assignment configuration does exist.
-    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-    assertNotNull(tableConfigToCompare.getIndexingConfig().getStarTreeIndexSpec());
-
-    // Check that the configurations are correct.
-    StarTreeIndexSpec starTreeIndexSpec = tableConfigToCompare.getIndexingConfig().getStarTreeIndexSpec();
-
-    Set<String> dims = new HashSet<>();
-    dims.add("dims");
-
-    assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
-    assertEquals(starTreeIndexSpec.getMaxLeafRecords(), 5);
-    assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
-    assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
-    assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
-
-    starTreeIndexSpec = StarTreeIndexSpec.fromJsonString(starTreeIndexSpec.toJsonString());
-    assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
-    assertEquals(starTreeIndexSpec.getMaxLeafRecords(), 5);
-    assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
-    assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
-    assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
-  }
-
-  private void checkTableConfigWithHllConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
-    // Check that the segment assignment configuration does exist.
-    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-    assertNotNull(tableConfigToCompare.getValidationConfig().getHllConfig());
-
-    // Check that the configurations are correct.
-    HllConfig hllConfig = tableConfigToCompare.getValidationConfig().getHllConfig();
-
-    Set<String> columns = new HashSet<>();
-    columns.add("column");
-    columns.add("column2");
-
-    assertEquals(hllConfig.getColumnsToDeriveHllFields(), columns);
-    assertEquals(hllConfig.getHllLog2m(), 9);
-    assertEquals(hllConfig.getHllDeriveColumnSuffix(), "suffix");
   }
 
   private void checkTableConfigWithInstanceAssignmentConfigMap(TableConfig tableConfig) {

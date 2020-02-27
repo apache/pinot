@@ -39,18 +39,18 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.config.TagOverrideConfig;
 import org.apache.pinot.common.config.TenantConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -193,7 +193,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, false, null, null, null, executor);
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, null, null, null, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
     uploadSegments(getTableName(), _tarDir);

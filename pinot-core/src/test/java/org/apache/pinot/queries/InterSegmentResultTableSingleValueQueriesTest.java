@@ -29,7 +29,7 @@ import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.startree.hll.HllUtil;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
@@ -89,12 +89,12 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     // empty results
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + " where column5='non-existent-value'", queryOptions);
+    brokerResponse =
+        getBrokerResponseForPqlQuery(query + GROUP_BY + " where column5='non-existent-value'", queryOptions);
     rows = new ArrayList<>();
     expectedResultsSize = 0;
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 0, 0, 0, 120000L, rows, expectedResultsSize,
-            dataSchema);
+        .testInterSegmentResultTable(brokerResponse, 0, 0, 0, 120000L, rows, expectedResultsSize, dataSchema);
   }
 
   @Test
@@ -434,8 +434,12 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
     Object[] row0 = brokerResponse.getResultTable().getRows().get(0);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[0].toString())).cardinality(), expectedRow0[0]);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[0].toString())).cardinality(),
+        expectedRow0[0]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
+        expectedRow0[1]);
 
     brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     expectedRow0 = new Object[]{1886L, 4492L};
@@ -443,8 +447,12 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
             dataSchema);
     row0 = brokerResponse.getResultTable().getRows().get(0);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[0].toString())).cardinality(), expectedRow0[0]);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[0].toString())).cardinality(),
+        expectedRow0[0]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
+        expectedRow0[1]);
 
     query = "SELECT DISTINCTCOUNTRAWHLL(column1) FROM testTable";
     brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
@@ -457,7 +465,9 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
     row0 = brokerResponse.getResultTable().getRows().get(0);
     Assert.assertEquals(row0[0], expectedRow0[0]);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
+        expectedRow0[1]);
 
     brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     expectedRow0 = new Object[]{"296467636", 1324L};
@@ -466,7 +476,9 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
     row0 = brokerResponse.getResultTable().getRows().get(0);
     Assert.assertEquals(row0[0], expectedRow0[0]);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
+        expectedRow0[1]);
   }
 
   @Test
@@ -941,10 +953,11 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
     Assert.assertEquals(resultTable.getRows().size(), 10);
-    List<Object[]> rows = Lists.newArrayList(new Object[]{142002934, 17891}, new Object[]{142002934, 17891},
-        new Object[]{142002934, 17891}, new Object[]{142002934, 17891}, new Object[]{33273941, 84046},
-        new Object[]{33273941, 84046}, new Object[]{33273941, 84046}, new Object[]{33273941, 84046},
-        new Object[]{1002250922, 177388}, new Object[]{1002250922, 177388});
+    List<Object[]> rows = Lists
+        .newArrayList(new Object[]{142002934, 17891}, new Object[]{142002934, 17891}, new Object[]{142002934, 17891},
+            new Object[]{142002934, 17891}, new Object[]{33273941, 84046}, new Object[]{33273941, 84046},
+            new Object[]{33273941, 84046}, new Object[]{33273941, 84046}, new Object[]{1002250922, 177388},
+            new Object[]{1002250922, 177388});
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), selectionResults.getColumns().toArray());
     for (int i = 0; i < 10; i++) {
       Assert.assertEquals(selectionResults.getRows().get(i), resultTable.getRows().get(i));

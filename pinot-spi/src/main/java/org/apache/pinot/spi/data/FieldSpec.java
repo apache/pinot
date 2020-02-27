@@ -339,9 +339,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
           return Float.BYTES;
         case DOUBLE:
           return Double.BYTES;
-        case BYTES:
-          // TODO: Metric size is only used for Star-tree generation, which is not supported yet.
-          return MetricFieldSpec.UNDEFINED_METRIC_SIZE;
         default:
           throw new IllegalStateException("Cannot get number of bytes for: " + this);
       }

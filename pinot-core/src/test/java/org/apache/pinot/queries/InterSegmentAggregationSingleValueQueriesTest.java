@@ -22,10 +22,10 @@ import java.io.Serializable;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.SelectionResults;
-import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import org.apache.pinot.core.startree.hll.HllUtil;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -213,8 +213,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   @Test
   public void testDistinctCountRawHLL() {
     String query = "SELECT DISTINCTCOUNTRAWHLL(column1), DISTINCTCOUNTRAWHLL(column3) FROM testTable";
-    Function<Serializable, String> cardinalityExtractor =
-        value -> String.valueOf(HllUtil.buildHllFromBytes(BytesUtils.toBytes((String) value)).cardinality());
+    Function<Serializable, String> cardinalityExtractor = value -> String
+        .valueOf(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String) value)).cardinality());
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     QueriesTestUtils

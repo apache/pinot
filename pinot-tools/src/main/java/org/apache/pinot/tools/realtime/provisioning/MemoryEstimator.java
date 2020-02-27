@@ -120,7 +120,7 @@ public class MemoryEstimator {
 
     RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(_segmentMetadata.getName());
     RealtimeSegmentZKMetadata segmentZKMetadata =
-        getRealtimeSegmentZKMetadata(_segmentMetadata, _segmentMetadata.getTotalRawDocs());
+        getRealtimeSegmentZKMetadata(_segmentMetadata, _segmentMetadata.getTotalDocs());
 
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -330,7 +330,7 @@ public class MemoryEstimator {
     realtimeSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     realtimeSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
     realtimeSegmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
-    realtimeSegmentZKMetadata.setTotalRawDocs(totalDocs);
+    realtimeSegmentZKMetadata.setTotalDocs(totalDocs);
     realtimeSegmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
     return realtimeSegmentZKMetadata;
   }

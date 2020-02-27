@@ -42,11 +42,11 @@ public class QueriesTestUtils {
 
   public static void testInnerSegmentExecutionStatistics(ExecutionStatistics executionStatistics,
       long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
-      long expectedNumTotalRawDocs) {
+      long expectedNumTotalDocs) {
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), expectedNumDocsScanned);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), expectedNumEntriesScannedInFilter);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), expectedNumTotalRawDocs);
+    Assert.assertEquals(executionStatistics.getNumTotalDocs(), expectedNumTotalDocs);
   }
 
   public static void testInnerSegmentAggregationResult(List<Object> aggregationResult, long expectedCountResult,
@@ -88,14 +88,8 @@ public class QueriesTestUtils {
   public static void testInterSegmentAggregationResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
       String[] expectedAggregationResults) {
-    testInterSegmentAggregationResult(
-        brokerResponse,
-        expectedNumDocsScanned,
-        expectedNumEntriesScannedInFilter,
-        expectedNumEntriesScannedPostFilter,
-        expectedNumTotalDocs,
-        Serializable::toString,
-        expectedAggregationResults);
+    testInterSegmentAggregationResult(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
+        expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, Serializable::toString, expectedAggregationResults);
   }
 
   public static void testInterSegmentAggregationResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
@@ -117,7 +111,8 @@ public class QueriesTestUtils {
         Assert.assertEquals(responseMapper.apply(value), expectedAggregationResult);
       } else {
         // Group-by.
-        Assert.assertEquals(responseMapper.apply(aggregationResult.getGroupByResult().get(0).getValue()), expectedAggregationResult);
+        Assert.assertEquals(responseMapper.apply(aggregationResult.getGroupByResult().get(0).getValue()),
+            expectedAggregationResult);
       }
     }
   }
@@ -175,5 +170,4 @@ public class QueriesTestUtils {
       }
     }
   }
-
 }

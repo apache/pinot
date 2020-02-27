@@ -306,7 +306,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     long startTime = System.currentTimeMillis();
     LOGGER.info("Starting building star-tree with config: {}", _builderConfig);
 
-    int numSegmentRecords = _segment.getSegmentMetadata().getTotalRawDocs();
+    int numSegmentRecords = _segment.getSegmentMetadata().getTotalDocs();
     Iterator<Record> recordIterator = sortAndAggregateSegmentRecords(numSegmentRecords);
     while (recordIterator.hasNext()) {
       appendToStarTree(recordIterator.next());

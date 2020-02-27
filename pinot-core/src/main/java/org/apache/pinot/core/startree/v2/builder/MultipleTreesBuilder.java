@@ -79,9 +79,6 @@ public class MultipleTreesBuilder {
     _metadataProperties =
         new PropertiesConfiguration(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     Preconditions
-        .checkState(!_metadataProperties.getBoolean(V1Constants.MetadataKeys.StarTree.STAR_TREE_ENABLED, false),
-            "Star-tree already exists");
-    Preconditions
         .checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree v2 already exists");
     _buildMode = buildMode;
   }

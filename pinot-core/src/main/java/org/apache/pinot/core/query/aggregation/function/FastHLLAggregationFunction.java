@@ -19,27 +19,28 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.google.common.base.Preconditions;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.startree.hll.HllUtil;
-import org.apache.pinot.startree.hll.HllConstants;
 
 
+/**
+ * Use {@link DistinctCountHLLAggregationFunction} on byte[] for serialized HyperLogLog.
+ */
+@Deprecated
 public class FastHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
-  private int _log2m = HllConstants.DEFAULT_LOG2M;
+  public static final int DEFAULT_LOG2M = 8;
+  private static final int BYTE_TO_CHAR_OFFSET = 129;
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.FASTHLL;
-  }
-
-  public void setLog2m(int log2m) {
-    _log2m = log2m;
   }
 
   @Override
@@ -59,45 +60,64 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    String[] valueArray = blockValSets[0].getStringValuesSV();
-    HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
+    String[] values = blockValSets[0].getStringValuesSV();
     try {
-      for (int i = 0; i < length; i++) {
-        hyperLogLog.addAll(HllUtil.convertStringToHll(valueArray[i]));
+      HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
+      if (hyperLogLog != null) {
+        for (int i = 0; i < length; i++) {
+          hyperLogLog.addAll(convertStringToHLL(values[i]));
+        }
+      } else {
+        hyperLogLog = convertStringToHLL(values[0]);
+        aggregationResultHolder.setValue(hyperLogLog);
+        for (int i = 1; i < length; i++) {
+          hyperLogLog.addAll(convertStringToHLL(values[i]));
+        }
       }
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
+      throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
     }
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet... blockValSets) {
-    String[] valueArray = blockValSets[0].getStringValuesSV();
+    String[] values = blockValSets[0].getStringValuesSV();
     try {
       for (int i = 0; i < length; i++) {
-        HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
-        hyperLogLog.addAll(HllUtil.convertStringToHll(valueArray[i]));
+        HyperLogLog value = convertStringToHLL(values[i]);
+        int groupKey = groupKeyArray[i];
+        HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+        if (hyperLogLog != null) {
+          hyperLogLog.addAll(value);
+        } else {
+          groupByResultHolder.setValueForKey(groupKey, value);
+        }
       }
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
+      throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet... blockValSets) {
-    String[] valueArray = blockValSets[0].getStringValuesSV();
+    String[] values = blockValSets[0].getStringValuesSV();
     try {
       for (int i = 0; i < length; i++) {
-        HyperLogLog value = HllUtil.convertStringToHll(valueArray[i]);
+        HyperLogLog value = convertStringToHLL(values[i]);
         for (int groupKey : groupKeysArray[i]) {
-          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
-          hyperLogLog.addAll(value);
+          HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+          if (hyperLogLog != null) {
+            hyperLogLog.addAll(value);
+          } else {
+            // Create a new HyperLogLog for the group
+            groupByResultHolder.setValueForKey(groupKey, convertStringToHLL(values[i]));
+          }
         }
       }
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
+      throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
     }
   }
 
@@ -105,7 +125,7 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   public HyperLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
-      return new HyperLogLog(_log2m);
+      return new HyperLogLog(DEFAULT_LOG2M);
     } else {
       return hyperLogLog;
     }
@@ -115,7 +135,7 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   public HyperLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
-      return new HyperLogLog(_log2m);
+      return new HyperLogLog(DEFAULT_LOG2M);
     } else {
       return hyperLogLog;
     }
@@ -123,6 +143,16 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public HyperLogLog merge(HyperLogLog intermediateResult1, HyperLogLog intermediateResult2) {
+    // Can happen when aggregating serialized HyperLogLog with non-default log2m
+    if (intermediateResult1.sizeof() != intermediateResult2.sizeof()) {
+      if (intermediateResult1.cardinality() == 0) {
+        return intermediateResult2;
+      } else {
+        Preconditions
+            .checkState(intermediateResult2.cardinality() == 0, "Cannot merge HyperLogLogs of different sizes");
+        return intermediateResult1;
+      }
+    }
     try {
       intermediateResult1.addAll(intermediateResult2);
     } catch (Exception e) {
@@ -151,34 +181,13 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
     return intermediateResult.cardinality();
   }
 
-  /**
-   * Returns the HyperLogLog from the result holder or creates a new one if it does not exist.
-   *
-   * @param aggregationResultHolder Result holder
-   * @return HyperLogLog from the result holder
-   */
-  private HyperLogLog getHyperLogLog(AggregationResultHolder aggregationResultHolder) {
-    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
-    if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(_log2m);
-      aggregationResultHolder.setValue(hyperLogLog);
+  private static HyperLogLog convertStringToHLL(String value) {
+    char[] chars = value.toCharArray();
+    int length = chars.length;
+    byte[] bytes = new byte[length];
+    for (int i = 0; i < length; i++) {
+      bytes[i] = (byte) (chars[i] - BYTE_TO_CHAR_OFFSET);
     }
-    return hyperLogLog;
-  }
-
-  /**
-   * Returns the HyperLogLog for the given group key. If one does not exist, creates a new one and returns that.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the HyperLogLog
-   * @return HyperLogLog for the group key
-   */
-  private HyperLogLog getHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
-    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-    if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(_log2m);
-      groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
-    }
-    return hyperLogLog;
+    return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytes);
   }
 }

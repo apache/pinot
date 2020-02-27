@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.segment.StarTreeMetadata;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
@@ -94,11 +92,6 @@ public class BackfillDateTimeColumn {
     config.setTableName(_rawTableName);
     config.setSegmentName(segmentName);
     config.setSchema(wrapperReader.getSchema());
-
-    StarTreeMetadata starTreeMetadata = originalSegmentMetadata.getStarTreeMetadata();
-    if (starTreeMetadata != null) {
-      config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
-    }
 
     LOGGER.info("Creating segment for {} with config {}", segmentName, config.toString());
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

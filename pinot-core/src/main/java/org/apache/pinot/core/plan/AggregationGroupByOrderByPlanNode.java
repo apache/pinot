@@ -29,7 +29,6 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -99,15 +98,15 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
 
   @Override
   public AggregationGroupByOrderByOperator run() {
-    int numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOrderByOperator(_functionContexts, _groupBy, _maxInitialResultHolderCapacity,
-          _numGroupsLimit, _transformPlanNode.run(), numTotalRawDocs, false);
+          _numGroupsLimit, _transformPlanNode.run(), numTotalDocs, false);
     } else {
       // Use star-tree
       return new AggregationGroupByOrderByOperator(_functionContexts, _groupBy, _maxInitialResultHolderCapacity,
-          _numGroupsLimit, _starTreeTransformPlanNode.run(), numTotalRawDocs, true);
+          _numGroupsLimit, _starTreeTransformPlanNode.run(), numTotalDocs, true);
     }
   }
 

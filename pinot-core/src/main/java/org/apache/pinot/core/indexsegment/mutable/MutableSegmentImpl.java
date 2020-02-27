@@ -137,12 +137,6 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       @Override
-      public int getTotalRawDocs() {
-        // In realtime total docs and total raw docs are the same currently.
-        return _numDocsIndexed;
-      }
-
-      @Override
       public long getLastIndexedTimestamp() {
         return _lastIndexedTimeMs;
       }
@@ -242,8 +236,11 @@ public class MutableSegmentImpl implements MutableSegment {
         // TODO: Use the stats to get estimated average length
         // Use a smaller capacity as opposed to segment flush size
         int initialCapacity = Math.min(_capacity, NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
-        String allocationContext = buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-        indexReaderWriter = new VarByteSingleColumnSingleValueReaderWriter(_memoryManager, allocationContext, initialCapacity, NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
+        String allocationContext =
+            buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+        indexReaderWriter =
+            new VarByteSingleColumnSingleValueReaderWriter(_memoryManager, allocationContext, initialCapacity,
+                NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
       } else {
         // two possible cases can lead here:
         // (1) dictionary encoded forward index
@@ -251,16 +248,17 @@ public class MutableSegmentImpl implements MutableSegment {
         if (fieldSpec.isSingleValueField()) {
           // SV column -- both dictionary encoded and raw index are supported on SV
           // columns for both fixed and variable width types
-          String allocationContext =
-              buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-          indexReaderWriter = new FixedByteSingleColumnSingleValueReaderWriter(_capacity, forwardIndexColumnSize, _memoryManager,
-              allocationContext);
+          String allocationContext = buildAllocationContext(_segmentName, column,
+              V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+          indexReaderWriter =
+              new FixedByteSingleColumnSingleValueReaderWriter(_capacity, forwardIndexColumnSize, _memoryManager,
+                  allocationContext);
         } else {
           // MV column -- only dictionary encoded index is supported on MV columns
           // for both fixed and variable width types
           // TODO: Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
-          String allocationContext =
-              buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+          String allocationContext = buildAllocationContext(_segmentName, column,
+              V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
           indexReaderWriter =
               new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgNumMultiValues, _capacity,
                   forwardIndexColumnSize, _memoryManager, allocationContext);
@@ -278,10 +276,11 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       if (textIndexColumns.contains(column)) {
-        RealtimeLuceneTextIndexReader realtimeLuceneIndexReader = new RealtimeLuceneTextIndexReader(column, new File(config.getConsumerDir()), _segmentName);
+        RealtimeLuceneTextIndexReader realtimeLuceneIndexReader =
+            new RealtimeLuceneTextIndexReader(column, new File(config.getConsumerDir()), _segmentName);
         _invertedIndexMap.put(column, realtimeLuceneIndexReader);
         if (_realtimeLuceneReaders == null) {
-          _realtimeLuceneReaders= new RealtimeLuceneReaders(_segmentName);
+          _realtimeLuceneReaders = new RealtimeLuceneReaders(_segmentName);
         }
         _realtimeLuceneReaders.addReader(realtimeLuceneIndexReader);
       }
@@ -458,9 +457,9 @@ public class MutableSegmentImpl implements MutableSegment {
       InvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
       if (invertedIndex != null) {
         if (invertedIndex instanceof RealtimeLuceneTextIndexReader) {
-          ((RealtimeLuceneTextIndexReader)invertedIndex).addDoc(row.getValue(column), docId);
+          ((RealtimeLuceneTextIndexReader) invertedIndex).addDoc(row.getValue(column), docId);
         } else {
-          RealtimeInvertedIndexReader realtimeInvertedIndexReader = (RealtimeInvertedIndexReader)invertedIndex;
+          RealtimeInvertedIndexReader realtimeInvertedIndexReader = (RealtimeInvertedIndexReader) invertedIndex;
           if (fieldSpec.isSingleValueField()) {
             realtimeInvertedIndexReader.add(((Integer) dictIdMap.get(column)), docId);
           } else {
@@ -470,7 +469,6 @@ public class MutableSegmentImpl implements MutableSegment {
             }
           }
         }
-
       }
     }
   }
@@ -641,7 +639,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     for (InvertedIndexReader index : _invertedIndexMap.values()) {
       if (index instanceof RealtimeInvertedIndexReader) {
-        ((RealtimeInvertedIndexReader)index).close();
+        ((RealtimeInvertedIndexReader) index).close();
       }
     }
 
@@ -700,7 +698,7 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     IntArrays.quickSort(dictIds, (dictId1, dictId2) -> dictionary.compare(dictId1, dictId2));
-    RealtimeInvertedIndexReader invertedIndex = (RealtimeInvertedIndexReader)_invertedIndexMap.get(column);
+    RealtimeInvertedIndexReader invertedIndex = (RealtimeInvertedIndexReader) _invertedIndexMap.get(column);
     int[] docIds = new int[_numDocsIndexed];
     int docIdIndex = 0;
     for (int dictId : dictIds) {

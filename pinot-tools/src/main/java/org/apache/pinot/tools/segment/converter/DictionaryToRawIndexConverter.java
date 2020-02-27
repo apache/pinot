@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -41,6 +40,7 @@ import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -262,7 +262,7 @@ public class DictionaryToRawIndexConverter {
    */
   private static void printUsage() {
     System.out.println("Usage: DictionaryTORawIndexConverter");
-    for (Field field : ColumnarToStarTreeConverter.class.getDeclaredFields()) {
+    for (Field field : DictionaryToRawIndexConverter.class.getDeclaredFields()) {
 
       if (field.isAnnotationPresent(Option.class)) {
         Option option = field.getAnnotation(Option.class);

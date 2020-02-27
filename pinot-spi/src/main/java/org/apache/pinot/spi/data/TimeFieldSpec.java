@@ -121,7 +121,6 @@ public final class TimeFieldSpec extends FieldSpec {
   }
 
   @JsonIgnore
-
   @Override
   public FieldType getFieldType() {
     return FieldType.TIME;

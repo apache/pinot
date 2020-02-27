@@ -235,20 +235,18 @@ public class ClusterIntegrationTestUtils {
 
   /**
    * Builds segments from the given Avro files. Each segment will be built using a separate thread.
-   *
-   * @param avroFiles List of Avro files
+   *  @param avroFiles List of Avro files
    * @param baseSegmentIndex Base segment index number
    * @param segmentDir Output directory for the un-tarred segments
    * @param tarDir Output directory for the tarred segments
    * @param tableName Table name
-   * @param createStarTreeIndex Whether to create Star-tree index
    * @param starTreeV2BuilderConfigs List of star-tree V2 builder configs
    * @param rawIndexColumns Columns to create raw index with
    * @param pinotSchema Pinot schema
    * @param executor Executor
    */
   public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
-      String tableName, boolean createStarTreeIndex, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
+      String tableName, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
       @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.spi.data.Schema pinotSchema,
       Executor executor) {
     int numSegments = avroFiles.size();
@@ -264,13 +262,8 @@ public class ClusterIntegrationTestUtils {
           // Test segment with space and special character in the file name
           segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
 
-          // Cannot build star-tree V1 and V2 at same time
           if (starTreeV2BuilderConfigs != null) {
             segmentGeneratorConfig.setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
-          } else {
-            if (createStarTreeIndex) {
-              segmentGeneratorConfig.enableStarTreeIndex(null);
-            }
           }
 
           if (rawIndexColumns != null) {
@@ -308,8 +301,7 @@ public class ClusterIntegrationTestUtils {
    */
   public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
       String tableName, Executor executor) {
-    buildSegmentsFromAvro(avroFiles, baseSegmentIndex, segmentDir, tarDir, tableName, false, null, null, null,
-        executor);
+    buildSegmentsFromAvro(avroFiles, baseSegmentIndex, segmentDir, tarDir, tableName, null, null, null, executor);
   }
 
   /**

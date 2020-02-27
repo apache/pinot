@@ -189,7 +189,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
     mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
     mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
-    mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+    mergedBlock.setNumTotalDocs(executionStatistics.getNumTotalDocs());
     mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());
     mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
 

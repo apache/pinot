@@ -26,6 +26,7 @@ import java.net.SocketException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
@@ -70,7 +71,6 @@ public class ClusterStarter {
   private String _segmentDirName;
 
   private boolean _startZookeeper;
-  private boolean _enableStarTreeIndex;
 
   private static final long TIMEOUT_IN_MILLISECONDS = 200 * 1000;
 
@@ -98,8 +98,6 @@ public class ClusterStarter {
     _timeColumnName = config.getTimeColumnName();
     _timeUnit = config.getTimeUnit();
     _tableConfigFile = config.getTableConfigFile();
-
-    _enableStarTreeIndex = false;
   }
 
   public ClusterStarter setControllerPort(String controllerPort) {
@@ -139,11 +137,6 @@ public class ClusterStarter {
 
   public ClusterStarter setSegmentDirName(String segmentDirName) {
     _segmentDirName = segmentDirName;
-    return this;
-  }
-
-  public ClusterStarter setEnableStarTree(boolean value) {
-    _enableStarTreeIndex = value;
     return this;
   }
 
@@ -192,8 +185,8 @@ public class ClusterStarter {
       throws Exception {
     if (_tableConfigFile != null) {
       AddTableCommand addTableCommand =
-          new AddTableCommand().setControllerPort(_controllerPort)
-              .setSchemaFile(_schemaFileName).setTableConfigFile(_tableConfigFile).setExecute(true);
+          new AddTableCommand().setControllerPort(_controllerPort).setSchemaFile(_schemaFileName)
+              .setTableConfigFile(_tableConfigFile).setExecute(true);
       addTableCommand.execute();
       return;
     }
@@ -225,8 +218,7 @@ public class ClusterStarter {
     if (_inputDataDir != null) {
       CreateSegmentCommand segmentCreator =
           new CreateSegmentCommand().setDataDir(_inputDataDir).setSchemaFile(_schemaFileName).setTableName(_tableName)
-              .setSegmentName(_segmentName).setOutDir(_segmentDirName).setOverwrite(true)
-              .setEnableStarTreeIndex(_enableStarTreeIndex);
+              .setSegmentName(_segmentName).setOutDir(_segmentDirName).setOverwrite(true);
 
       segmentCreator.execute();
     }
@@ -265,7 +257,7 @@ public class ClusterStarter {
     InputStream input = conn.getInputStream();
     long endTime = System.currentTimeMillis();
 
-    BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));
+    BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
     StringBuilder sb = new StringBuilder();
     String line;
     while ((line = reader.readLine()) != null) {

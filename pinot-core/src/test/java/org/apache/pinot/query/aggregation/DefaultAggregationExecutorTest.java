@@ -27,14 +27,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -44,13 +40,16 @@ import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.plan.AggregationFunctionInitializer;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -134,20 +133,17 @@ public class DefaultAggregationExecutorTest {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
       expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
     }
-    int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
-    MatchAllFilterOperator matchAllFilterOperator = new MatchAllFilterOperator(totalRawDocs);
+    int totalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    MatchAllFilterOperator matchAllFilterOperator = new MatchAllFilterOperator(totalDocs);
     DocIdSetOperator docIdSetOperator = new DocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
     TransformOperator transformOperator = new TransformOperator(projectionOperator, expressionTrees);
     TransformBlock transformBlock = transformOperator.nextBlock();
     int numAggFuncs = _aggregationInfoList.size();
     AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFuncs];
-    AggregationFunctionInitializer aggFuncInitializer =
-        new AggregationFunctionInitializer(_indexSegment.getSegmentMetadata());
     for (int i = 0; i < numAggFuncs; i++) {
       AggregationInfo aggregationInfo = _aggregationInfoList.get(i);
       aggrFuncContextArray[i] = AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo);
-      aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
     }
     AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggrFuncContextArray);
     aggregationExecutor.aggregate(transformBlock);

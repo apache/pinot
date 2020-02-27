@@ -20,22 +20,14 @@ package org.apache.pinot.core.startree.v2.store;
 
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.segment.StarTreeMetadata;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.startree.OffHeapStarTree;
 import org.apache.pinot.core.startree.StarTree;
@@ -118,57 +110,5 @@ public class StarTreeLoaderUtils {
     }
 
     return starTrees;
-  }
-
-  public static List<StarTreeV2> convertFromStarTreeV1(PinotDataBuffer dataBuffer, SegmentMetadataImpl segmentMetadata,
-      Map<String, ColumnIndexContainer> indexContainerMap) {
-    // Load star-tree index
-    StarTree starTree = new OffHeapStarTree(dataBuffer);
-
-    // Generate star-tree V2 metadata from star-tree V1 metadata and schema
-    StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
-    Schema schema = segmentMetadata.getSchema();
-    // Add all dimensions that are not skipped for materialization into dimensions split order
-    ArrayList<String> dimensionsSplitOrder = new ArrayList<>(schema.getDimensionNames());
-    dimensionsSplitOrder.removeAll(starTreeMetadata.getSkipMaterializationForDimensions());
-    // Add all metrics to function-column pairs
-    Set<AggregationFunctionColumnPair> functionColumnPairs = new HashSet<>();
-    for (MetricFieldSpec metricFieldSpec : schema.getMetricFieldSpecs()) {
-      String column = metricFieldSpec.getName();
-      if (metricFieldSpec.isDerivedMetric()) {
-        assert metricFieldSpec.getDerivedMetricType() == MetricFieldSpec.DerivedMetricType.HLL;
-        functionColumnPairs.add(new AggregationFunctionColumnPair(AggregationFunctionType.FASTHLL, column));
-      } else {
-        functionColumnPairs.add(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, column));
-      }
-    }
-    // Create the star-tree V2 metadata
-    StarTreeV2Metadata starTreeV2Metadata =
-        new StarTreeV2Metadata(segmentMetadata.getTotalDocs(), dimensionsSplitOrder, functionColumnPairs,
-            starTreeMetadata.getMaxLeafRecords(),
-            new HashSet<>(starTreeMetadata.getSkipStarNodeCreationForDimensions()));
-
-    return Collections.singletonList(new StarTreeV2() {
-      @Override
-      public StarTree getStarTree() {
-        return starTree;
-      }
-
-      @Override
-      public StarTreeV2Metadata getMetadata() {
-        return starTreeV2Metadata;
-      }
-
-      @Override
-      public DataSource getDataSource(String columnName) {
-        String column;
-        if (columnName.contains(AggregationFunctionColumnPair.DELIMITER)) {
-          column = AggregationFunctionColumnPair.fromColumnName(columnName).getColumn();
-        } else {
-          column = columnName;
-        }
-        return new ColumnDataSource(indexContainerMap.get(column), segmentMetadata.getColumnMetadataFor(column));
-      }
-    });
   }
 }

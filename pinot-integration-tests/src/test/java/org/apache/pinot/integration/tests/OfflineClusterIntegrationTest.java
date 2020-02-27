@@ -106,8 +106,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Create segments from Avro data
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), false, null, getRawIndexColumns(),
-            null, executor);
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), null, getRawIndexColumns(), null,
+            executor);
 
     // Load data into H2
     setUpH2Connection(avroFiles, executor);
@@ -828,7 +828,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         .add("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch);
     queries.add("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + 16138);
     queries.add("SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable");
-    queries.add("SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+    queries.add(
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
 
     for (String query : queries) {
       query = query.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch");

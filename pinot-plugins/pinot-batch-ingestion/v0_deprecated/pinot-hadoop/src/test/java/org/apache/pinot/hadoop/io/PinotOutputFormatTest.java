@@ -32,10 +32,10 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -84,25 +84,14 @@ public class PinotOutputFormatTest {
   }
 
   @Test
-  public void verifyStarIndex()
-      throws Exception {
-    runPinotOutputFormatTest(true, "star");
-  }
-
-  @Test
   public void verifyRawIndex()
       throws Exception {
-    runPinotOutputFormatTest(false, "raw");
+    runPinotOutputFormatTest("raw");
   }
 
-  private void runPinotOutputFormatTest(boolean isStarTree, String indexType)
+  private void runPinotOutputFormatTest(String indexType)
       throws Exception {
     init(indexType);
-    if (isStarTree) {
-      PinotOutputFormat.setEnableStarTreeIndex(job, true);
-    } else {
-      PinotOutputFormat.setEnableStarTreeIndex(job, false);
-    }
     Map<Integer, Emp> inputMap = addTestData();
     validate(inputMap);
   }

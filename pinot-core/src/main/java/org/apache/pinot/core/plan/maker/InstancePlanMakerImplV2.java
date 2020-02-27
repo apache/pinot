@@ -47,6 +47,7 @@ import org.apache.pinot.core.util.QueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
  */
@@ -130,7 +131,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       indexSegments.add(segmentDataManager.getSegment());
     }
-    BrokerRequestPreProcessor.preProcess(indexSegments, brokerRequest);
 
     List<PlanNode> planNodes = new ArrayList<>();
     for (IndexSegment indexSegment : indexSegments) {
@@ -184,10 +184,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @return True if query can be served using dictionary, false otherwise.
    */
   public static boolean isFitForDictionaryBasedPlan(BrokerRequest brokerRequest, IndexSegment indexSegment) {
-    // Skipping dictionary in case of star tree. Results from dictionary won't be correct
-    // because of aggregated values in metrics, and ALL value in dimension
-    if ((brokerRequest.getFilterQuery() != null) || brokerRequest.isSetGroupBy() || indexSegment.getSegmentMetadata()
-        .hasStarTree()) {
+    if ((brokerRequest.getFilterQuery() != null) || brokerRequest.isSetGroupBy()) {
       return false;
     }
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();

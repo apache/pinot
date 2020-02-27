@@ -59,7 +59,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, TransformExpressionTree expression, Predicate predicate) {
-    _numDocs = segment.getSegmentMetadata().getTotalRawDocs();
+    _numDocs = segment.getSegmentMetadata().getTotalDocs();
     _expression = expression;
 
     _dataSourceMap = new HashMap<>();

@@ -21,12 +21,8 @@ package org.apache.pinot.common.config;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -93,49 +89,5 @@ public class IndexingConfigTest {
       assertEquals(actualPartitionConfig.getFunctionName(column), expectedPartitionConfig.getFunctionName(column));
       assertEquals(actualPartitionConfig.getNumPartitions(column), expectedPartitionConfig.getNumPartitions(column));
     }
-  }
-
-  /**
-   * Unit test to check get and set of star tree index spec on IndexingConfig.
-   * <ul>
-   *   <li> Creates a StarTreeIndexSpec and sets it into the IndexingConfig. </li>
-   *   <li> Indexing config is first serialized into a string, and then read back from string. </li>
-   *   <li> Test to ensure star tree index spec values are correct after serialization and de-serialization. </li>
-   * </ul>
-   */
-  @Test
-  public void testStarTreeSpec()
-      throws IOException {
-    Random random = new Random(System.nanoTime());
-    StarTreeIndexSpec expectedStarTreeSpec = new StarTreeIndexSpec();
-
-    List<String> expectedDimensionSplitOrder = Arrays.asList("col1", "col2", "col3");
-    expectedStarTreeSpec.setDimensionsSplitOrder(expectedDimensionSplitOrder);
-
-    int expectedMaxLeafRecords = random.nextInt();
-    expectedStarTreeSpec.setMaxLeafRecords(expectedMaxLeafRecords);
-
-    int expectedSkipMaterializationThreshold = random.nextInt();
-    expectedStarTreeSpec.setSkipMaterializationCardinalityThreshold(expectedSkipMaterializationThreshold);
-
-    Set<String> expectedSkipMaterializationDimensions = new HashSet<>(Arrays.asList("col4", "col5"));
-    expectedStarTreeSpec.setSkipMaterializationForDimensions(expectedSkipMaterializationDimensions);
-
-    Set<String> expectedSkipStarNodeCreationForDimension = new HashSet<>(Arrays.asList("col6", "col7"));
-    expectedStarTreeSpec.setSkipStarNodeCreationForDimensions(expectedSkipStarNodeCreationForDimension);
-
-    IndexingConfig expectedIndexingConfig = new IndexingConfig();
-    expectedIndexingConfig.setStarTreeIndexSpec(expectedStarTreeSpec);
-
-    IndexingConfig actualIndexingConfig =
-        JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
-    StarTreeIndexSpec actualStarTreeSpec = actualIndexingConfig.getStarTreeIndexSpec();
-
-    assertEquals(actualStarTreeSpec.getDimensionsSplitOrder(), expectedDimensionSplitOrder);
-    assertEquals(actualStarTreeSpec.getMaxLeafRecords(), expectedMaxLeafRecords);
-
-    assertEquals(actualStarTreeSpec.getSkipMaterializationCardinalityThreshold(), expectedSkipMaterializationThreshold);
-    assertEquals(actualStarTreeSpec.getSkipMaterializationForDimensions(), expectedSkipMaterializationDimensions);
-    assertEquals(actualStarTreeSpec.getSkipStarNodeCreationForDimensions(), expectedSkipStarNodeCreationForDimension);
   }
 }

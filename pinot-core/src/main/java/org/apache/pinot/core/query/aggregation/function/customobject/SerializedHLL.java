@@ -19,34 +19,24 @@
 package org.apache.pinot.core.query.aggregation.function.customobject;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import javax.annotation.Nonnull;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.core.startree.hll.HllUtil;
 
 
 public class SerializedHLL implements Comparable<SerializedHLL> {
+  private final HyperLogLog _hyperLogLog;
 
-  private final HyperLogLog hll;
-
-  public static SerializedHLL of(@Nonnull HyperLogLog serializedHLL) {
-    return new SerializedHLL(serializedHLL);
+  public SerializedHLL(HyperLogLog hyperLogLog) {
+    _hyperLogLog = hyperLogLog;
   }
 
   @Override
-  public int compareTo(@Nonnull SerializedHLL other) {
-    return this.getCardinality().compareTo(other.getCardinality());
+  public int compareTo(SerializedHLL other) {
+    return Long.compare(_hyperLogLog.cardinality(), other._hyperLogLog.cardinality());
   }
 
   @Override
   public String toString() {
-    return BytesUtils.toHexString(HllUtil.toBytes(hll));
-  }
-
-  private Long getCardinality() {
-    return hll.cardinality();
-  }
-
-  private SerializedHLL(HyperLogLog hll) {
-    this.hll = hll;
+    return BytesUtils.toHexString(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(_hyperLogLog));
   }
 }

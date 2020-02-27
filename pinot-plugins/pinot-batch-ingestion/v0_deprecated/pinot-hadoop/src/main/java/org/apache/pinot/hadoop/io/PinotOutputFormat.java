@@ -18,11 +18,7 @@
  */
 package org.apache.pinot.hadoop.io;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashSet;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
@@ -30,18 +26,15 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.startree.hll.HllConfig;
-import org.apache.pinot.startree.hll.HllConstants;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 
 
 /**
  * Generic Pinot Output Format implementation.
- * @param <K>
- * @param <V>
+ *
+ * TODO: Support star-tree creation
  */
 public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
 
@@ -61,21 +54,6 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
 
   // config file for the record reader
   public static final String READER_CONFIG = "pinot.reader.config.file";
-
-  // boolean flag to enable Star Tree Index.
-  public static final String ENABLE_STAR_TREE_INDEX = "pinot.enable.star.tree.index";
-
-  // Config file for star tree index.
-  public static final String STAR_TREE_INDEX_SPEC = "pinot.star.tree.index.spec.file";
-
-  // HLL size (log scale), default is 9.
-  public static final String HLL_SIZE = "pinot.hll.size";
-
-  // HLL columns
-  public static final String HLL_COLUMNS = "pinot.hll.columns";
-
-  // Suffix for the derived HLL columns
-  public static final String HLL_SUFFIX = "pinot.hll.suffix";
 
   public static final String PINOT_RECORD_SERIALIZATION_CLASS = "pinot.record.serialization.class";
 
@@ -135,46 +113,6 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     return context.getConfiguration().get(PinotOutputFormat.READER_CONFIG);
   }
 
-  public static void setEnableStarTreeIndex(Job job, boolean flag) {
-    job.getConfiguration().setBoolean(PinotOutputFormat.ENABLE_STAR_TREE_INDEX, flag);
-  }
-
-  public static boolean getEnableStarTreeIndex(JobContext context) {
-    return context.getConfiguration().getBoolean(PinotOutputFormat.ENABLE_STAR_TREE_INDEX, false);
-  }
-
-  public static void setStarTreeIndexSpec(Job job, String starTreeIndexSpec) {
-    job.getConfiguration().set(PinotOutputFormat.STAR_TREE_INDEX_SPEC, starTreeIndexSpec);
-  }
-
-  public static String getStarTreeIndexSpec(JobContext context) {
-    return context.getConfiguration().get(PinotOutputFormat.STAR_TREE_INDEX_SPEC);
-  }
-
-  public static void getHllSize(Job job, int size) {
-    job.getConfiguration().setInt(PinotOutputFormat.HLL_SIZE, size);
-  }
-
-  public static int getHllSize(JobContext context) {
-    return context.getConfiguration().getInt(PinotOutputFormat.HLL_SIZE, 9);
-  }
-
-  public static void setHllColumns(Job job, String columns) {
-    job.getConfiguration().set(PinotOutputFormat.HLL_COLUMNS, columns);
-  }
-
-  public static String getHllColumns(JobContext context) {
-    return context.getConfiguration().get(PinotOutputFormat.HLL_COLUMNS);
-  }
-
-  public static void getHllSuffix(Job job, String suffix) {
-    job.getConfiguration().set(PinotOutputFormat.HLL_SUFFIX, suffix);
-  }
-
-  public static String getHllSuffix(JobContext context) {
-    return context.getConfiguration().get(PinotOutputFormat.HLL_SUFFIX, HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
-  }
-
   public static void setDataWriteSupportClass(Job job, Class<? extends PinotRecordSerialization> pinotSerialization) {
     job.getConfiguration().set(PinotOutputFormat.PINOT_RECORD_SERIALIZATION_CLASS, pinotSerialization.getName());
   }
@@ -193,7 +131,7 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
 
   @Override
   public RecordWriter<K, V> getRecordWriter(TaskAttemptContext context)
-      throws IOException, InterruptedException {
+      throws IOException {
     configure(context.getConfiguration());
     final PinotRecordSerialization dataWriteSupport = getDataWriteSupport(context);
     initSegmentConfig(context);
@@ -227,32 +165,5 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
     _segmentConfig.setSchema(Schema.fromString(PinotOutputFormat.getSchema(context)));
     _segmentConfig.setReaderConfigFile(PinotOutputFormat.getReaderConfig(context));
-    initStarTreeIndex(context);
-    initHllConfig(context);
-  }
-
-  private void initHllConfig(JobContext context) {
-    String _hllColumns = PinotOutputFormat.getHllColumns(context);
-    if (_hllColumns != null) {
-      String[] hllColumns = StringUtils.split(StringUtils.deleteWhitespace(_hllColumns), ',');
-      if (hllColumns.length != 0) {
-        HllConfig hllConfig = new HllConfig(PinotOutputFormat.getHllSize(context));
-        hllConfig.setColumnsToDeriveHllFields(new HashSet<>(Arrays.asList(hllColumns)));
-        hllConfig.setHllDeriveColumnSuffix(PinotOutputFormat.getHllSuffix(context));
-        _segmentConfig.setHllConfig(hllConfig);
-      }
-    }
-  }
-
-  private void initStarTreeIndex(JobContext context)
-      throws IOException {
-    String _starTreeIndexSpecFile = PinotOutputFormat.getStarTreeIndexSpec(context);
-    if (_starTreeIndexSpecFile != null) {
-      StarTreeIndexSpec starTreeIndexSpec = StarTreeIndexSpec.fromFile(new File(_starTreeIndexSpecFile));
-      // Specifying star-tree index file enables star tree generation, even if _enableStarTreeIndex is not specified.
-      _segmentConfig.enableStarTreeIndex(starTreeIndexSpec);
-    } else if (PinotOutputFormat.getEnableStarTreeIndex(context)) {
-      _segmentConfig.enableStarTreeIndex(null);
-    }
   }
 }

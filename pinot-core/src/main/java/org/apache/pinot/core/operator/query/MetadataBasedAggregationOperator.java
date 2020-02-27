@@ -63,18 +63,18 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   protected IntermediateResultsBlock getNextBlock() {
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
-    long totalRawDocs = _segmentMetadata.getTotalRawDocs();
+    long numTotalDocs = _segmentMetadata.getTotalDocs();
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
       AggregationFunctionType functionType = aggregationFunctionContext.getAggregationFunction().getType();
       Preconditions.checkState(functionType == AggregationFunctionType.COUNT,
           "Metadata based aggregation operator does not support function type: " + functionType);
-      aggregationResults.add(totalRawDocs);
+      aggregationResults.add(numTotalDocs);
     }
 
-    // Create execution statistics. Set numDocsScanned to totalRawDocs for backward compatibility.
+    // Create execution statistics. Set numDocsScanned to numTotalDocs for backward compatibility.
     _executionStatistics =
-        new ExecutionStatistics(totalRawDocs, 0/*numEntriesScannedInFilter*/, 0/*numEntriesScannedPostFilter*/,
-            totalRawDocs);
+        new ExecutionStatistics(numTotalDocs, 0/*numEntriesScannedInFilter*/, 0/*numEntriesScannedPostFilter*/,
+            numTotalDocs);
 
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctionContexts, aggregationResults, false);

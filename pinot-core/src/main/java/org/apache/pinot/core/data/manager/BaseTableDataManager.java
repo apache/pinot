@@ -112,7 +112,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentName = immutableSegment.getSegmentName();
     _logger.info("Adding immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
-        immutableSegment.getSegmentMetadata().getTotalRawDocs());
+        immutableSegment.getSegmentMetadata().getTotalDocs());
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
@@ -202,7 +202,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, -1L);
     _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_SEGMENT_COUNT, 1L);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
-        -segmentDataManager.getSegment().getSegmentMetadata().getTotalRawDocs());
+        -segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs());
     segmentDataManager.destroy();
     _logger.info("Closed segment: {} of table: {}", segmentName, _tableNameWithType);
   }

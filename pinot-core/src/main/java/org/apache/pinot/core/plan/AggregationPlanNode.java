@@ -84,13 +84,13 @@ public class AggregationPlanNode implements PlanNode {
 
   @Override
   public AggregationOperator run() {
-    int numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     if (_transformPlanNode != null) {
       // Do not use star-tree
-      return new AggregationOperator(_functionContexts, _transformPlanNode.run(), numTotalRawDocs, false);
+      return new AggregationOperator(_functionContexts, _transformPlanNode.run(), numTotalDocs, false);
     } else {
       // Use star-tree
-      return new AggregationOperator(_functionContexts, _starTreeTransformPlanNode.run(), numTotalRawDocs, true);
+      return new AggregationOperator(_functionContexts, _starTreeTransformPlanNode.run(), numTotalDocs, true);
     }
   }
 

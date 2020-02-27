@@ -49,20 +49,20 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final Map<String, Dictionary> _dictionaryMap;
-  private final long _totalRawDocs;
+  private final long _numTotalDocs;
   private ExecutionStatistics _executionStatistics;
 
   /**
    * Constructor for the class.
    * @param aggregationFunctionContexts Aggregation function contexts.
-   * @param totalRawDocs total raw docs from segmet metadata
+   * @param numTotalDocs total raw docs from segmet metadata
    * @param dictionaryMap Map of column to its dictionary.
    */
-  public DictionaryBasedAggregationOperator(AggregationFunctionContext[] aggregationFunctionContexts, long totalRawDocs,
+  public DictionaryBasedAggregationOperator(AggregationFunctionContext[] aggregationFunctionContexts, long numTotalDocs,
       Map<String, Dictionary> dictionaryMap) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _dictionaryMap = dictionaryMap;
-    _totalRawDocs = totalRawDocs;
+    _numTotalDocs = numTotalDocs;
   }
 
   @Override
@@ -96,10 +96,10 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
       aggregationResults.add(function.extractAggregationResult(resultHolder));
     }
 
-    // Create execution statistics. Set numDocsScanned to totalRawDocs for backward compatibility.
+    // Create execution statistics. Set numDocsScanned to numTotalDocs for backward compatibility.
     _executionStatistics =
-        new ExecutionStatistics(_totalRawDocs, 0/* numEntriesScannedInFilter */, 0/* numEntriesScannedPostFilter */,
-            _totalRawDocs);
+        new ExecutionStatistics(_numTotalDocs, 0/* numEntriesScannedInFilter */, 0/* numEntriesScannedPostFilter */,
+            _numTotalDocs);
 
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctionContexts, aggregationResults, false);

@@ -31,8 +31,5 @@ public interface SegmentPreIndexStatsCollector extends SegmentPreIndexStatsConta
   void collectRow(GenericRow row)
       throws Exception;
 
-  void collectRow(GenericRow row, boolean isAggregated)
-      throws Exception;
-
   void logStats();
 }

@@ -27,7 +27,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.startree.hll.HllUtil;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -392,7 +392,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "distinctcounthllmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"674022574",4715L});
+    rows.add(new Object[]{"674022574", 4715L});
     expectedResultsSize = 10;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
@@ -427,7 +427,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 400000L, 400000L, rows, expectedResultsSize,
             dataSchema);
     Object[] row0 = brokerResponse.getResultTable().getRows().get(0);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[0].toString())).cardinality(), expectedRow0[0]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[0].toString())).cardinality(),
+        expectedRow0[0]);
 
     brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     expectedRow0 = new Object[]{1296L};
@@ -435,7 +437,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentResultTable(brokerResponse, 62480L, 1089104L, 62480L, 400000L, rows, expectedResultsSize,
             dataSchema);
     row0 = brokerResponse.getResultTable().getRows().get(0);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[0].toString())).cardinality(), expectedRow0[0]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[0].toString())).cardinality(),
+        expectedRow0[0]);
 
     brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column8", "distinctcountrawhllmv(column6)"},
@@ -447,7 +451,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
             dataSchema);
     row0 = brokerResponse.getResultTable().getRows().get(0);
     Assert.assertEquals(row0[0], expectedRow0[0]);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
+        expectedRow0[1]);
 
     brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column7", "distinctcountrawhllmv(column6)"},
@@ -458,7 +464,9 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
             dataSchema);
     row0 = brokerResponse.getResultTable().getRows().get(0);
     Assert.assertEquals(row0[0], expectedRow0[0]);
-    Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
+    Assert.assertEquals(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
+        expectedRow0[1]);
   }
 
   @Test

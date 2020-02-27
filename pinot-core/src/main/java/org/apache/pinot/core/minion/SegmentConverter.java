@@ -24,9 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.minion.segment.DefaultRecordPartitioner;
 import org.apache.pinot.core.minion.segment.MapperRecordReader;
@@ -35,6 +33,7 @@ import org.apache.pinot.core.minion.segment.RecordPartitioner;
 import org.apache.pinot.core.minion.segment.RecordTransformer;
 import org.apache.pinot.core.minion.segment.ReducerRecordReader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.data.readers.RecordReader;
 
 
 /**
@@ -117,12 +116,10 @@ public class SegmentConverter {
       // Sorting on sorted column and creating indices
       if (_indexingConfig != null) {
         List<String> sortedColumn = _indexingConfig.getSortedColumn();
-        StarTreeIndexSpec starTreeIndexSpec = _indexingConfig.getStarTreeIndexSpec();
         List<String> invertedIndexColumns = _indexingConfig.getInvertedIndexColumns();
 
         // Check if the table config has any index configured
-        if ((sortedColumn != null && !sortedColumn.isEmpty()) || starTreeIndexSpec != null
-            || invertedIndexColumns != null) {
+        if ((sortedColumn != null && !sortedColumn.isEmpty()) || invertedIndexColumns != null) {
           String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
           try (
               PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(outputSegment, null, sortedColumn)) {
@@ -152,9 +149,6 @@ public class SegmentConverter {
     segmentGeneratorConfig.setSkipTimeValueCheck(_skipTimeValueCheck);
     if (indexingConfig != null) {
       segmentGeneratorConfig.setInvertedIndexCreationColumns(indexingConfig.getInvertedIndexColumns());
-      if (indexingConfig.getStarTreeIndexSpec() != null) {
-        segmentGeneratorConfig.enableStarTreeIndex(indexingConfig.getStarTreeIndexSpec());
-      }
     }
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, recordReader);

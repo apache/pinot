@@ -134,14 +134,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
             groupId = segmentGroupIdName;
           }
           // Discard all segments with different groupids as they are replicas
-          if (groupId.equals(segmentGroupIdName) && realtimeSegmentZKMetadata.getTotalRawDocs() >= 0) {
-            numTotalDocs += realtimeSegmentZKMetadata.getTotalRawDocs();
+          if (groupId.equals(segmentGroupIdName) && realtimeSegmentZKMetadata.getTotalDocs() >= 0) {
+            numTotalDocs += realtimeSegmentZKMetadata.getTotalDocs();
           }
         }
       } else {
         // Low level segments
         if (!countHLCSegments) {
-          numTotalDocs += realtimeSegmentZKMetadata.getTotalRawDocs();
+          numTotalDocs += realtimeSegmentZKMetadata.getTotalDocs();
         }
       }
     }

@@ -20,12 +20,12 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,12 +36,10 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   private final StatsCollectorConfig _statsCollectorConfig;
   private Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap;
 
-  private int rawDocCount;
-  private int aggregatedDocCount;
   private int totalDocCount;
 
   public SegmentPreIndexStatsCollectorImpl(StatsCollectorConfig statsCollectorConfig) {
-    this._statsCollectorConfig = statsCollectorConfig;
+    _statsCollectorConfig = statsCollectorConfig;
   }
 
   @Override
@@ -97,18 +95,13 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void collectRow(GenericRow row) {
-    collectRow(row, false);
-  }
-
-  @Override
-  public void collectRow(GenericRow row, boolean isAggregated) {
     for (Map.Entry<String, Object> columnNameAndValue : row.getFieldToValueMap().entrySet()) {
       final String columnName = columnNameAndValue.getKey();
       final Object value = columnNameAndValue.getValue();
 
       if (columnStatsCollectorMap.containsKey(columnName)) {
         try {
-          columnStatsCollectorMap.get(columnName).collect(value, isAggregated);
+          columnStatsCollectorMap.get(columnName).collect(value);
         } catch (Exception e) {
           LOGGER.error("Exception while collecting stats for column:{} in row:{}", columnName, row);
           throw e;
@@ -117,21 +110,6 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
     }
 
     ++totalDocCount;
-    if (!isAggregated) {
-      ++rawDocCount;
-    } else {
-      ++aggregatedDocCount;
-    }
-  }
-
-  @Override
-  public int getRawDocCount() {
-    return rawDocCount;
-  }
-
-  @Override
-  public int getAggregatedDocCount() {
-    return aggregatedDocCount;
   }
 
   @Override

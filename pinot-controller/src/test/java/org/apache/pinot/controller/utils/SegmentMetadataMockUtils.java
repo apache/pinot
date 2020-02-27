@@ -42,7 +42,6 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getTableName()).thenReturn(tableName);
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(numTotalDocs);
-    Mockito.when(segmentMetadata.getTotalRawDocs()).thenReturn(numTotalDocs);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(crc);
     Mockito.when(segmentMetadata.getPushTime()).thenReturn(Long.MIN_VALUE);
     Mockito.when(segmentMetadata.getRefreshTime()).thenReturn(Long.MIN_VALUE);
@@ -67,7 +66,7 @@ public class SegmentMetadataMockUtils {
     RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = Mockito.mock(RealtimeSegmentZKMetadata.class);
     Mockito.when(realtimeSegmentZKMetadata.getTableName()).thenReturn(tableName);
     Mockito.when(realtimeSegmentZKMetadata.getSegmentName()).thenReturn(segmentName);
-    Mockito.when(realtimeSegmentZKMetadata.getTotalRawDocs()).thenReturn(numTotalDocs);
+    Mockito.when(realtimeSegmentZKMetadata.getTotalDocs()).thenReturn(numTotalDocs);
     return realtimeSegmentZKMetadata;
   }
 
@@ -92,7 +91,6 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getTableName()).thenReturn(tableName);
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(0);
-    Mockito.when(segmentMetadata.getTotalRawDocs()).thenReturn(0);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
     Mockito.when(segmentMetadata.getPushTime()).thenReturn(Long.MIN_VALUE);
     Mockito.when(segmentMetadata.getRefreshTime()).thenReturn(Long.MIN_VALUE);

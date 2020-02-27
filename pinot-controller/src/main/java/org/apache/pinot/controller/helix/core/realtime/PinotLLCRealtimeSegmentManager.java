@@ -490,7 +490,7 @@ public class PinotLLCRealtimeSegmentManager {
     committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
     committingSegmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
     committingSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
-    committingSegmentZKMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
+    committingSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
 
     persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
     return committingSegmentZKMetadata;

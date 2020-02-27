@@ -165,11 +165,11 @@ public class FlushThresholdUpdaterTest {
   }
 
   private LLCRealtimeSegmentZKMetadata getCommittingSegmentZKMetadata(long creationTime,
-      int sizeThresholdToFlushSegment, int totalRawDocs) {
+      int sizeThresholdToFlushSegment, int totalDocs) {
     LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
     committingSegmentZKMetadata.setCreationTime(creationTime);
     committingSegmentZKMetadata.setSizeThresholdToFlushSegment(sizeThresholdToFlushSegment);
-    committingSegmentZKMetadata.setTotalRawDocs(totalRawDocs);
+    committingSegmentZKMetadata.setTotalDocs(totalDocs);
     return committingSegmentZKMetadata;
   }
 

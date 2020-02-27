@@ -98,15 +98,15 @@ public class AggregationGroupByPlanNode implements PlanNode {
 
   @Override
   public AggregationGroupByOperator run() {
-    int numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     if (_transformPlanNode != null) {
       // Do not use star-tree
       return new AggregationGroupByOperator(_functionContexts, _groupBy, _maxInitialResultHolderCapacity,
-          _numGroupsLimit, _transformPlanNode.run(), numTotalRawDocs, false);
+          _numGroupsLimit, _transformPlanNode.run(), numTotalDocs, false);
     } else {
       // Use star-tree
       return new AggregationGroupByOperator(_functionContexts, _groupBy, _maxInitialResultHolderCapacity,
-          _numGroupsLimit, _starTreeTransformPlanNode.run(), numTotalRawDocs, true);
+          _numGroupsLimit, _starTreeTransformPlanNode.run(), numTotalDocs, true);
     }
   }
 

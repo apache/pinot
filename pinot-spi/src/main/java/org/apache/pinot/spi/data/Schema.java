@@ -424,13 +424,6 @@ public final class Schema {
             case DOUBLE:
             case BYTES:
               break;
-            case STRING:
-              MetricFieldSpec metricFieldSpec = (MetricFieldSpec) fieldSpec;
-              if (!metricFieldSpec.isDerivedMetric()) {
-                ctxLogger.info("Unsupported data type: STRING in non-derived METRIC field: {}", fieldName);
-                return false;
-              }
-              break;
             default:
               ctxLogger.info("Unsupported data type: {} in METRIC field: {}", dataType, fieldName);
               return false;
@@ -484,18 +477,6 @@ public final class Schema {
 
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addMetric(String name, DataType dataType, int fieldSize,
-        MetricFieldSpec.DerivedMetricType derivedMetricType) {
-      _schema.addField(new MetricFieldSpec(name, dataType, fieldSize, derivedMetricType));
-      return this;
-    }
-
-    public SchemaBuilder addMetric(String name, DataType dataType, int fieldSize,
-        MetricFieldSpec.DerivedMetricType derivedMetricType, Object defaultNullValue) {
-      _schema.addField(new MetricFieldSpec(name, dataType, fieldSize, derivedMetricType, defaultNullValue));
       return this;
     }
 

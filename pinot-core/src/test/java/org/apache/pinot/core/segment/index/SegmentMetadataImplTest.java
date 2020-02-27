@@ -95,10 +95,8 @@ public class SegmentMetadataImplTest {
       ColumnMetadata columnMeta = metadata.getColumnMetadataFor(jsonColumnMeta.get("columnName").asText());
       assertNotNull(columnMeta);
       assertEquals(jsonColumnMeta.get("cardinality").asInt(), columnMeta.getCardinality());
-      assertEquals(jsonColumnMeta.get("totalRawDocs").asInt(), columnMeta.getTotalRawDocs());
       assertEquals(jsonColumnMeta.get("bitsPerElement").asInt(), columnMeta.getBitsPerElement());
       assertEquals(jsonColumnMeta.get("sorted").asBoolean(), columnMeta.isSorted());
-      assertEquals(jsonColumnMeta.get("totalAggDocs").asInt(), columnMeta.getTotalAggDocs());
       assertEquals(jsonColumnMeta.get("containsNulls").asBoolean(), columnMeta.hasNulls());
       assertEquals(jsonColumnMeta.get("hasDictionary").asBoolean(), columnMeta.hasDictionary());
     }

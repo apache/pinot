@@ -25,7 +25,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
@@ -60,7 +59,7 @@ public class IntermediateResultsBlock implements Block {
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
-  private long _numTotalRawDocs;
+  private long _numTotalDocs;
   private long _numSegmentsProcessed;
   private long _numSegmentsMatched;
   private boolean _numGroupsLimitReached;
@@ -70,8 +69,7 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for selection result.
    */
-  public IntermediateResultsBlock(@Nonnull DataSchema dataSchema,
-      @Nonnull Collection<Serializable[]> selectionResult) {
+  public IntermediateResultsBlock(DataSchema dataSchema, Collection<Serializable[]> selectionResult) {
     _dataSchema = dataSchema;
     _selectionResult = selectionResult;
   }
@@ -82,8 +80,8 @@ public class IntermediateResultsBlock implements Block {
    * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
    */
   @SuppressWarnings("unchecked")
-  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull List aggregationResult, boolean isGroupBy) {
+  public IntermediateResultsBlock(AggregationFunctionContext[] aggregationFunctionContexts, List aggregationResult,
+      boolean isGroupBy) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     if (isGroupBy) {
       _combinedAggregationGroupByResult = aggregationResult;
@@ -95,7 +93,7 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
    */
-  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+  public IntermediateResultsBlock(AggregationFunctionContext[] aggregationFunctionContexts,
       @Nullable AggregationGroupByResult aggregationGroupByResults) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _aggregationGroupByResult = aggregationGroupByResults;
@@ -104,15 +102,14 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
-  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+  public IntermediateResultsBlock(AggregationFunctionContext[] aggregationFunctionContexts,
       @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
   }
 
-
-  public IntermediateResultsBlock(@Nonnull Table table) {
+  public IntermediateResultsBlock(Table table) {
     _table = table;
     _dataSchema = table.getDataSchema();
   }
@@ -120,7 +117,7 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for exception block.
    */
-  public IntermediateResultsBlock(@Nonnull ProcessingException processingException, @Nonnull Exception e) {
+  public IntermediateResultsBlock(ProcessingException processingException, Exception e) {
     _processingExceptions = new ArrayList<>();
     _processingExceptions.add(QueryException.getException(processingException, e));
   }
@@ -128,7 +125,7 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for exception block.
    */
-  public IntermediateResultsBlock(@Nonnull Exception e) {
+  public IntermediateResultsBlock(Exception e) {
     this(QueryException.QUERY_EXECUTION_ERROR, e);
   }
 
@@ -182,7 +179,7 @@ public class IntermediateResultsBlock implements Block {
     _processingExceptions = processingExceptions;
   }
 
-  public void addToProcessingExceptions(@Nonnull ProcessingException processingException) {
+  public void addToProcessingExceptions(ProcessingException processingException) {
     if (_processingExceptions == null) {
       _processingExceptions = new ArrayList<>();
     }
@@ -217,15 +214,14 @@ public class IntermediateResultsBlock implements Block {
     _numSegmentsMatched = numSegmentsMatched;
   }
 
-  public void setNumTotalRawDocs(long numTotalRawDocs) {
-    _numTotalRawDocs = numTotalRawDocs;
+  public void setNumTotalDocs(long numTotalDocs) {
+    _numTotalDocs = numTotalDocs;
   }
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
-  @Nonnull
   public DataTable getDataTable()
       throws Exception {
 
@@ -253,8 +249,8 @@ public class IntermediateResultsBlock implements Block {
     throw new UnsupportedOperationException("No data inside IntermediateResultsBlock.");
   }
 
-  @Nonnull
-  private DataTable getResultDataTable() throws IOException {
+  private DataTable getResultDataTable()
+      throws IOException {
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
 
@@ -304,14 +300,11 @@ public class IntermediateResultsBlock implements Block {
     }
   }
 
-  @Nonnull
   private DataTable getSelectionResultDataTable()
       throws Exception {
-    return attachMetadataToDataTable(
-        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
   }
 
-  @Nonnull
   private DataTable getAggregationResultDataTable()
       throws Exception {
     // Extract each aggregation column name and type from aggregation function context.
@@ -349,12 +342,10 @@ public class IntermediateResultsBlock implements Block {
     return attachMetadataToDataTable(dataTable);
   }
 
-  @Nonnull
   private DataTable getAggregationGroupByResultDataTable()
       throws Exception {
     String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
-    ColumnDataType[] columnDataTypes =
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT};
+    ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT};
 
     // Build the data table.
     DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
@@ -384,7 +375,7 @@ public class IntermediateResultsBlock implements Block {
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
 
-    dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalRawDocs));
+    dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalDocs));
     if (_numGroupsLimitReached) {
       dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");
     }

@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,25 +38,21 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.config.FieldConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.StarTreeIndexConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.data.readers.RecordReaderFactory;
-import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,11 +96,8 @@ public class SegmentGeneratorConfig {
   private Schema _schema = null;
   private String _readerConfigFile = null;
   private RecordReaderConfig _readerConfig = null;
-  private boolean _enableStarTreeIndex = false;
-  private StarTreeIndexSpec _starTreeIndexSpec = null;
   private List<StarTreeV2BuilderConfig> _starTreeV2BuilderConfigs = null;
   private String _creatorVersion = null;
-  private HllConfig _hllConfig = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
   private int _sequenceId = -1;
@@ -152,11 +144,8 @@ public class SegmentGeneratorConfig {
     _schema = config._schema;
     _readerConfigFile = config._readerConfigFile;
     _readerConfig = config._readerConfig;
-    _enableStarTreeIndex = config._enableStarTreeIndex;
-    _starTreeIndexSpec = config._starTreeIndexSpec;
     _starTreeV2BuilderConfigs = config._starTreeV2BuilderConfigs;
     _creatorVersion = config._creatorVersion;
-    _hllConfig = config._hllConfig;
     _segmentNameGenerator = config._segmentNameGenerator;
     _segmentPartitionConfig = config._segmentPartitionConfig;
     _sequenceId = config._sequenceId;
@@ -200,12 +189,6 @@ public class SegmentGeneratorConfig {
     }
     _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
 
-    // Star-tree V1 config
-    StarTreeIndexSpec starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
-    if (starTreeIndexSpec != null) {
-      enableStarTreeIndex(starTreeIndexSpec);
-    }
-
     // Star-tree V2 configs
     List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
     if (starTreeIndexConfigs != null && !starTreeIndexConfigs.isEmpty()) {
@@ -221,9 +204,6 @@ public class SegmentGeneratorConfig {
     }
 
     extractTextIndexColumnsFromTableConfig(tableConfig);
-
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    _hllConfig = validationConfig.getHllConfig();
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
   }
@@ -577,47 +557,12 @@ public class SegmentGeneratorConfig {
     _readerConfig = readerConfig;
   }
 
-  public boolean isEnableStarTreeIndex() {
-    return _enableStarTreeIndex;
-  }
-
-  public void setEnableStarTreeIndex(boolean enableStarTreeIndex) {
-    _enableStarTreeIndex = enableStarTreeIndex;
-  }
-
-  public StarTreeIndexSpec getStarTreeIndexSpec() {
-    return _starTreeIndexSpec;
-  }
-
-  public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
-    _starTreeIndexSpec = starTreeIndexSpec;
-  }
-
-  /**
-   * Enable star tree generation with the given indexing spec.
-   * <p>NOTE: DO NOT remove the setter and getter for these two fields, they are required for ser/de.
-   *
-   * @param starTreeIndexSpec Optional indexing spec for star tree
-   */
-  public void enableStarTreeIndex(@Nullable StarTreeIndexSpec starTreeIndexSpec) {
-    setEnableStarTreeIndex(true);
-    setStarTreeIndexSpec(starTreeIndexSpec);
-  }
-
   public List<StarTreeV2BuilderConfig> getStarTreeV2BuilderConfigs() {
     return _starTreeV2BuilderConfigs;
   }
 
   public void setStarTreeV2BuilderConfigs(List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs) {
     _starTreeV2BuilderConfigs = starTreeV2BuilderConfigs;
-  }
-
-  public HllConfig getHllConfig() {
-    return _hllConfig;
-  }
-
-  public void setHllConfig(HllConfig hllConfig) {
-    _hllConfig = hllConfig;
   }
 
   public SegmentNameGenerator getSegmentNameGenerator() {
@@ -664,7 +609,7 @@ public class SegmentGeneratorConfig {
     return getQualifyingFields(FieldType.METRIC, true);
   }
 
-   @JsonIgnore
+  @JsonIgnore
   public String getDimensions() {
     return getQualifyingFields(FieldType.DIMENSION, true);
   }

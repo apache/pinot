@@ -25,10 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -43,6 +39,9 @@ import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterTest;
@@ -53,24 +52,19 @@ import org.testng.annotations.Test;
 
 
 public class MetadataAndDictionaryAggregationPlanMakerTest {
-
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_201711219_20171120";
-  private static final String SEGMENT_NAME_STARTREE = "testTableStarTree_201711219_20171120";
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PlanNodeFactoryTest");
-  private static final File INDEX_DIR_STARTREE =
-      new File(FileUtils.getTempDirectory(), "StarTreeSegmentPlanNodeFactoryTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "MetadataAndDictionaryAggregationPlanMakerTest");
 
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private static final InstancePlanMakerImplV2 PLAN_MAKER = new InstancePlanMakerImplV2();
   private IndexSegment _indexSegment = null;
-  private IndexSegment _starTreeIndexSegment = null;
 
   @BeforeTest
   public void buildSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
-    FileUtils.deleteQuietly(INDEX_DIR_STARTREE);
 
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
@@ -107,104 +101,62 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig);
     driver.build();
-
-    // Star Tree segment
-    // Build the segment schema.
-    schema = new Schema.SchemaBuilder().setSchemaName("testTableStarTree").addMetric("column1", FieldSpec.DataType.INT)
-        .addMetric("column3", FieldSpec.DataType.INT).addSingleValueDimension("column5", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("column6", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column7", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column9", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
-        .addMetric("column18", FieldSpec.DataType.INT).addTime("daysSinceEpoch", 1, TimeUnit.DAYS, DataType.INT)
-        .build();
-
-    // Create the segment generator config.
-    segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setInputFilePath(filePath);
-    segmentGeneratorConfig.setTableName("testTableStarTree");
-    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME_STARTREE);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR_STARTREE.getAbsolutePath());
-    segmentGeneratorConfig.enableStarTreeIndex(new StarTreeIndexSpec());
-    // The segment generation code in SegmentColumnarIndexCreator will throw
-    // exception if start and end time in time column are not in acceptable
-    // range. For this test, we first need to fix the input avro data
-    // to have the time column values in allowed range. Until then, the check
-    // is explicitly disabled
-    segmentGeneratorConfig.setSkipTimeValueCheck(true);
-
-    // Build the index segment.
-    driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig);
-    driver.build();
   }
 
   @BeforeClass
   public void loadSegment()
       throws Exception {
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
-    _starTreeIndexSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR_STARTREE, SEGMENT_NAME_STARTREE), ReadMode.heap);
   }
 
   @AfterClass
   public void destroySegment() {
     _indexSegment.destroy();
-    _starTreeIndexSegment.destroy();
   }
 
   @AfterTest
   public void deleteSegment() {
     FileUtils.deleteQuietly(INDEX_DIR);
-    FileUtils.deleteQuietly(INDEX_DIR_STARTREE);
   }
 
   @Test(dataProvider = "testPlanNodeMakerDataProvider")
-  public void testInstancePlanMakerForMetadataAndDictionaryPlan(String query, Class<? extends PlanNode> planNodeClass,
-      Class<? extends PlanNode> starTreePlanNodeClass) {
-
+  public void testInstancePlanMakerForMetadataAndDictionaryPlan(String query, Class<? extends PlanNode> planNodeClass) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
     PlanNode plan = PLAN_MAKER.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     Assert.assertTrue(planNodeClass.isInstance(plan));
-
-    plan = PLAN_MAKER.makeInnerSegmentPlan(_starTreeIndexSegment, brokerRequest);
-    Assert.assertTrue(starTreePlanNodeClass.isInstance(plan));
   }
 
   @DataProvider(name = "testPlanNodeMakerDataProvider")
   public Object[][] provideTestPlanNodeMakerData() {
-
     List<Object[]> entries = new ArrayList<>();
     entries.add(new Object[]{"select * from testTable", /*selection query*/
-        SelectionPlanNode.class, SelectionPlanNode.class});
+        SelectionPlanNode.class});
     entries.add(new Object[]{"select column1,column5 from testTable", /*selection query*/
-        SelectionPlanNode.class, SelectionPlanNode.class});
+        SelectionPlanNode.class});
     entries.add(new Object[]{"select * from testTable where daysSinceEpoch > 100", /*selection query with filters*/
-        SelectionPlanNode.class, SelectionPlanNode.class});
+        SelectionPlanNode.class});
     entries.add(new Object[]{"select count(*) from testTable", /*count(*) from metadata*/
-        MetadataBasedAggregationPlanNode.class, MetadataBasedAggregationPlanNode.class});
+        MetadataBasedAggregationPlanNode.class});
     entries
         .add(new Object[]{"select max(daysSinceEpoch),min(daysSinceEpoch) from testTable", /*min max from dictionary*/
-            DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class /* in case of star tree, we don't go to metadata/dictionary */});
+            DictionaryBasedAggregationPlanNode.class});
     entries.add(new Object[]{"select minmaxrange(daysSinceEpoch) from testTable", /*min max from dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class /* in case of star tree, we don't go to metadata/dictionary */});
+        DictionaryBasedAggregationPlanNode.class});
     entries.add(new Object[]{"select max(column17),min(column17) from testTable", /* minmax from dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class /* in case of star tree, we don't go to dictionary */});
+        DictionaryBasedAggregationPlanNode.class});
     entries.add(new Object[]{"select minmaxrange(column17) from testTable", /*no minmax metadata, go to dictionary*/
-        DictionaryBasedAggregationPlanNode.class, AggregationPlanNode.class /* in case of star tree, we don't go to dictionary */});
+        DictionaryBasedAggregationPlanNode.class});
     entries.add(new Object[]{"select sum(column1) from testTable", /*aggregation query*/
-        AggregationPlanNode.class, AggregationPlanNode.class});
+        AggregationPlanNode.class});
     entries.add(
         new Object[]{"select sum(column1) from testTable group by daysSinceEpoch", /*aggregation with group by query*/
-            AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class});
-
+            AggregationGroupByPlanNode.class});
     entries.add(
         new Object[]{"select count(*),min(column17) from testTable", /*multiple aggregations query, one from metadata, one from dictionary*/
-            AggregationPlanNode.class, AggregationPlanNode.class});
+            AggregationPlanNode.class});
     entries.add(
         new Object[]{"select count(*),min(daysSinceEpoch) from testTable group by daysSinceEpoch", /*multiple aggregations with group by*/
-            AggregationGroupByPlanNode.class, AggregationGroupByPlanNode.class});
+            AggregationGroupByPlanNode.class});
 
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -239,25 +191,6 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     entries.add(
         new Object[]{"select max(column5) from testTable where daysSinceEpoch > 100", _indexSegment, false, false});
     entries.add(new Object[]{"select column1 from testTable", _indexSegment, false, false});
-
-    entries.add(new Object[]{"select * from testTableStarTree", _starTreeIndexSegment, false, false});
-    entries.add(
-        new Object[]{"select count(*) from testTableStarTree", _starTreeIndexSegment, true, false /* count* from metadata, even if star tree present */});
-    entries.add(
-        new Object[]{"select min(daysSinceEpoch) from testTableStarTree", _starTreeIndexSegment, false, false /* skip in case of star tree */});
-    entries.add(
-        new Object[]{"select max(daysSinceEpoch),minmaxrange(daysSinceEpoch) from testTableStarTree", _starTreeIndexSegment, false, false});
-    entries.add(
-        new Object[]{"select count(*),max(daysSinceEpoch) from testTableStarTree", _starTreeIndexSegment, false, false});
-    entries.add(new Object[]{"select sum(column1) from testTableStarTree", _starTreeIndexSegment, false, false});
-    entries.add(
-        new Object[]{"select count(*) from testTableStarTree group by daysSinceEpoch", _starTreeIndexSegment, false, false});
-    entries.add(
-        new Object[]{"select count(*) from testTableStarTree where daysSinceEpoch > 1", _starTreeIndexSegment, false, false});
-    entries.add(
-        new Object[]{"select max(column5) from testTableStarTree where daysSinceEpoch > 100", _starTreeIndexSegment, false, false});
-    entries.add(new Object[]{"select column1 from testTableStarTree", _starTreeIndexSegment, false, false});
-
     return entries.toArray(new Object[entries.size()][]);
   }
 }

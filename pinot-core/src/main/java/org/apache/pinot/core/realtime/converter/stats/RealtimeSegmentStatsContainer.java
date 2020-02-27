@@ -57,23 +57,12 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
   }
 
   @Override
-  public ColumnStatistics getColumnProfileFor(String column)
-      throws Exception {
+  public ColumnStatistics getColumnProfileFor(String column) {
     return _columnStatisticsMap.get(column);
   }
 
   @Override
-  public int getRawDocCount() {
-    return _realtimeSegment.getNumDocsIndexed();
-  }
-
-  @Override
-  public int getAggregatedDocCount() {
-    return 0;
-  }
-
-  @Override
   public int getTotalDocCount() {
-    return getRawDocCount();
+    return _realtimeSegment.getNumDocsIndexed();
   }
 }

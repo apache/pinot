@@ -107,6 +107,6 @@ public class DistinctCountRawHLLAggregationFunction implements AggregationFuncti
 
   @Override
   public SerializedHLL extractFinalResult(HyperLogLog intermediateResult) {
-    return SerializedHLL.of(intermediateResult);
+    return new SerializedHLL(intermediateResult);
   }
 }

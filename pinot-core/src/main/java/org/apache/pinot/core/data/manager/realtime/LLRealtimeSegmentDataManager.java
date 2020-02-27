@@ -40,7 +40,6 @@ import org.apache.pinot.common.config.CompletionConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -251,7 +250,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final List<String> _textIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final List<String> _varLengthDictionaryColumns;
-  private final StarTreeIndexSpec _starTreeIndexSpec;
   private final String _sortedColumn;
   private Logger segmentLogger;
   private final String _tableStreamName;
@@ -711,7 +709,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
               _tableNameWithType, _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _textIndexColumns, _noDictionaryColumns, _varLengthDictionaryColumns,
-              _starTreeIndexSpec, _nullHandlingEnabled);
+              _nullHandlingEnabled);
       segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1112,9 +1110,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
 
-    // Read the star tree config
-    _starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
-
     // Read the max number of rows
     int segmentMaxRowCount = _partitionLevelStreamConfig.getFlushThresholdRows();
     if (0 < segmentZKMetadata.getSizeThresholdToFlushSegment()) {
@@ -1138,8 +1133,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata)
-            .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
+            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir);

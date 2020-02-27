@@ -20,9 +20,6 @@ package org.apache.pinot.core.segment.creator;
 
 public class SegmentIndexCreationInfo {
   private int totalDocs;
-  private int totalRawDocs;
-  private int totalAggDocs;
-  boolean starTreeEnabled;
 
   public int getTotalDocs() {
     return totalDocs;
@@ -30,29 +27,5 @@ public class SegmentIndexCreationInfo {
 
   public void setTotalDocs(int totalDocs) {
     this.totalDocs = totalDocs;
-  }
-
-  public int getTotalRawDocs() {
-    return totalRawDocs;
-  }
-
-  public void setTotalRawDocs(int totalRawDocs) {
-    this.totalRawDocs = totalRawDocs;
-  }
-
-  public int getTotalAggDocs() {
-    return totalAggDocs;
-  }
-
-  public void setTotalAggDocs(int totalAggDocs) {
-    this.totalAggDocs = totalAggDocs;
-  }
-
-  public boolean isStarTreeEnabled() {
-    return starTreeEnabled;
-  }
-
-  public void setStarTreeEnabled(boolean starTreeEnabled) {
-    this.starTreeEnabled = starTreeEnabled;
   }
 }
