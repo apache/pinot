@@ -14,7 +14,7 @@ server:
     - type: http
       port: 1868
 alert: false
-autoload: false
+autoload: true
 classifier: false
 holidayEventsLoader: false
 monitor: false

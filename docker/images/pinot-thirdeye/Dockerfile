@@ -51,12 +51,11 @@ RUN git clone ${PINOT_GIT_URL} ${TE_BUILD_DIR} \
     && cd ${TE_BUILD_DIR}/thirdeye  \
     && git checkout ${PINOT_BRANCH} \
     && mvn clean install -X -DskipTests || exit 1 \
-    && mkdir -p ${TE_HOME}/config \
+    && mkdir -p ${TE_HOME}/config/default \
     && mkdir -p ${TE_HOME}/bin \
-    && cp -rp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config/* ${TE_HOME}/config/. \
+    && cp -rp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config/* ${TE_HOME}/config/default/. \
     && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-1.0-SNAPSHOT.jar ${TE_HOME}/bin/. \
     && rm -rf ${TE_BUILD_DIR}
-
 
 FROM openjdk:8-jdk-slim
 
@@ -66,7 +65,7 @@ ENV TE_HOME=/opt/thirdeye
 
 COPY --from=thirdeye_build_env ${TE_HOME} ${TE_HOME}
 COPY bin ${TE_HOME}/bin
-COPY examples ${TE_HOME}/examples
+COPY config ${TE_HOME}/config
 
 VOLUME ["${TE_HOME}/config"]
 EXPOSE 1426 1427

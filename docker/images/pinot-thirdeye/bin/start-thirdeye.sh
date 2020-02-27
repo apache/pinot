@@ -20,30 +20,18 @@
 
 if [[ "$#" -gt 0 ]]
 then
-  TYPE=$1
-  if [[ "${TYPE^^}" == "DASHBOARD" ]]
-  then
-    APP_CLASS_NAME="org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication"
-  else
-    if [[ "${TYPE^^}" == "BACKEND" ]]
-    then
-      APP_CLASS_NAME="org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication"
-    else
-      echo "Unknow type: $1"
-      exit 1
-    fi
-  fi
+  CONFIG_DIR=./config/$1
 else
-  echo "Need at least one parameter."
-  exit 1
+  CONFIG_DIR="./config/default"
 fi
 
-if [[ "$#" -gt 1 ]]
-then
-  CONFIG_DIR=$2
-else
-  CONFIG_DIR="./config"
-fi
+echo "Running thirdeye backend with config: ${CONFIG_DIR}"
+java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication ${CONFIG_DIR} &
 
-echo "Trying to run thirdeye with class ${APP_CLASS_NAME} and Config dir: ${CONFIG_DIR}"
-java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" ${APP_CLASS_NAME} ${CONFIG_DIR}
+sleep 30
+kill %1
+
+echo "Running thirdeye frontend with config: ${CONFIG_DIR}"
+java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication ${CONFIG_DIR} &
+
+wait

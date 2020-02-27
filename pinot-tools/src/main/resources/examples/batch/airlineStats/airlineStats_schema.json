@@ -1,18 +1,11 @@
 {
-  "metricFieldSpecs": [
-  ],
-  "dimensionFieldSpecs": [
-    {
-      "dataType": "INT",
-      "name": "ActualElapsedTime"
-    },
+  "metricFieldSpecs": [{
+    "dataType": "INT",
+    "name": "ActualElapsedTime"
+  },
     {
       "dataType": "INT",
       "name": "AirTime"
-    },
-    {
-      "dataType": "INT",
-      "name": "AirlineID"
     },
     {
       "dataType": "INT",
@@ -31,10 +24,6 @@
       "name": "ArrTime"
     },
     {
-      "dataType": "STRING",
-      "name": "ArrTimeBlk"
-    },
-    {
       "dataType": "INT",
       "name": "ArrivalDelayGroups"
     },
@@ -51,28 +40,8 @@
       "name": "CRSElapsedTime"
     },
     {
-      "dataType": "STRING",
-      "name": "CancellationCode"
-    },
-    {
-      "dataType": "INT",
-      "name": "Cancelled"
-    },
-    {
-      "dataType": "STRING",
-      "name": "Carrier"
-    },
-    {
       "dataType": "INT",
       "name": "CarrierDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "DayOfWeek"
-    },
-    {
-      "dataType": "INT",
-      "name": "DayofMonth"
     },
     {
       "dataType": "INT",
@@ -91,12 +60,93 @@
       "name": "DepTime"
     },
     {
-      "dataType": "STRING",
-      "name": "DepTimeBlk"
+      "dataType": "INT",
+      "name": "DepartureDelayGroups"
     },
     {
       "dataType": "INT",
-      "name": "DepartureDelayGroups"
+      "name": "Distance"
+    },
+    {
+      "dataType": "INT",
+      "name": "DivActualElapsedTime"
+    },
+    {
+      "dataType": "INT",
+      "name": "DivArrDelay"
+    },
+    {
+      "dataType": "INT",
+      "name": "DivDistance"
+    },
+    {
+      "dataType": "INT",
+      "name": "FirstDepTime"
+    },
+    {
+      "dataType": "INT",
+      "name": "Flights"
+    },
+    {
+      "dataType": "INT",
+      "name": "LateAircraftDelay"
+    },
+    {
+      "dataType": "INT",
+      "name": "LongestAddGTime"
+    },
+    {
+      "dataType": "INT",
+      "name": "NASDelay"
+    },
+    {
+      "dataType": "INT",
+      "name": "SecurityDelay"
+    },
+    {
+      "dataType": "INT",
+      "name": "TaxiIn"
+    },
+    {
+      "dataType": "INT",
+      "name": "TaxiOut"
+    },
+    {
+      "dataType": "INT",
+      "name": "WheelsOn"
+    },
+    {
+      "dataType": "INT",
+      "name": "WheelsOff"
+    },
+    {
+      "dataType": "INT",
+      "name": "WeatherDelay"
+    },
+    {
+      "dataType": "INT",
+      "name": "TotalAddGTime"
+    }
+  ],
+  "dimensionFieldSpecs": [{
+    "dataType": "STRING",
+    "name": "CancellationCode"
+  },
+    {
+      "dataType": "INT",
+      "name": "Cancelled"
+    },
+    {
+      "dataType": "STRING",
+      "name": "Carrier"
+    },
+    {
+      "dataType": "INT",
+      "name": "DayOfWeek"
+    },
+    {
+      "dataType": "INT",
+      "name": "DayofMonth"
     },
     {
       "dataType": "STRING",
@@ -133,110 +183,6 @@
     {
       "dataType": "INT",
       "name": "DestWac"
-    },
-    {
-      "dataType": "INT",
-      "name": "Distance"
-    },
-    {
-      "dataType": "INT",
-      "name": "DistanceGroup"
-    },
-    {
-      "dataType": "INT",
-      "name": "DivActualElapsedTime"
-    },
-    {
-      "dataType": "INT",
-      "name": "DivAirportIDs",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivAirportLandings"
-    },
-    {
-      "dataType": "INT",
-      "name": "DivAirportSeqIDs",
-      "singleValueField": false
-    },
-    {
-      "dataType": "STRING",
-      "name": "DivAirports",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivArrDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "DivDistance"
-    },
-    {
-      "dataType": "INT",
-      "name": "DivLongestGTimes",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivReachedDest"
-    },
-    {
-      "dataType": "STRING",
-      "name": "DivTailNums",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivTotalGTimes",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivWheelsOffs",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivWheelsOns",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "Diverted"
-    },
-    {
-      "dataType": "INT",
-      "name": "FirstDepTime"
-    },
-    {
-      "dataType": "STRING",
-      "name": "FlightDate"
-    },
-    {
-      "dataType": "INT",
-      "name": "FlightNum"
-    },
-    {
-      "dataType": "INT",
-      "name": "Flights"
-    },
-    {
-      "dataType": "INT",
-      "name": "LateAircraftDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "LongestAddGTime"
-    },
-    {
-      "dataType": "INT",
-      "name": "Month"
-    },
-    {
-      "dataType": "INT",
-      "name": "NASDelay"
     },
     {
       "dataType": "STRING",
@@ -284,44 +230,96 @@
       "singleValueField": false
     },
     {
-      "dataType": "INT",
-      "name": "SecurityDelay"
-    },
-    {
       "dataType": "STRING",
       "name": "TailNum"
-    },
-    {
-      "dataType": "INT",
-      "name": "TaxiIn"
-    },
-    {
-      "dataType": "INT",
-      "name": "TaxiOut"
     },
     {
       "dataType": "INT",
       "name": "Year"
     },
     {
-      "dataType": "INT",
-      "name": "WheelsOn"
-    },
-    {
-      "dataType": "INT",
-      "name": "WheelsOff"
-    },
-    {
-      "dataType": "INT",
-      "name": "WeatherDelay"
-    },
-    {
       "dataType": "STRING",
       "name": "UniqueCarrier"
     },
     {
+      "dataType": "STRING",
+      "name": "FlightDate"
+    },
+    {
       "dataType": "INT",
-      "name": "TotalAddGTime"
+      "name": "DivAirportIDs",
+      "singleValueField": false
+    },
+    {
+      "dataType": "INT",
+      "name": "DivAirportLandings"
+    },
+    {
+      "dataType": "STRING",
+      "name": "DepTimeBlk"
+    },
+    {
+      "dataType": "INT",
+      "name": "DivAirportSeqIDs",
+      "singleValueField": false
+    },
+    {
+      "dataType": "STRING",
+      "name": "DivAirports",
+      "singleValueField": false
+    },
+    {
+      "dataType": "INT",
+      "name": "DivReachedDest"
+    },
+    {
+      "dataType": "STRING",
+      "name": "DivTailNums",
+      "singleValueField": false
+    },
+    {
+      "dataType": "INT",
+      "name": "Diverted"
+    },
+    {
+      "dataType": "INT",
+      "name": "FlightNum"
+    },
+    {
+      "dataType": "INT",
+      "name": "Month"
+    },
+    {
+      "dataType": "INT",
+      "name": "DistanceGroup"
+    },
+    {
+      "dataType": "INT",
+      "name": "AirlineID"
+    },
+    {
+      "dataType": "INT",
+      "name": "DivLongestGTimes",
+      "singleValueField": false
+    },
+    {
+      "dataType": "INT",
+      "name": "DivTotalGTimes",
+      "singleValueField": false
+    },
+    {
+      "dataType": "INT",
+      "name": "DivWheelsOffs",
+      "singleValueField": false
+    },
+    {
+      "dataType": "STRING",
+      "name": "ArrTimeBlk"
+    },
+    {
+      "dataType": "INT",
+      "name": "DivWheelsOns",
+      "singleValueField": false
     }
   ],
   "timeFieldSpec": {
