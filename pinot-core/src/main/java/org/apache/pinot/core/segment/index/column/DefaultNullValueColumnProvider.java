@@ -22,12 +22,12 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.core.io.reader.impl.ConstantMultiValueInvertedIndex;
 import org.apache.pinot.core.io.reader.impl.ConstantSingleValueInvertedIndex;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.readers.ConstantValueDoubleDictionary;
+import org.apache.pinot.core.segment.index.readers.ConstantValueFloatDictionary;
+import org.apache.pinot.core.segment.index.readers.ConstantValueIntDictionary;
+import org.apache.pinot.core.segment.index.readers.ConstantValueLongDictionary;
+import org.apache.pinot.core.segment.index.readers.ConstantValueStringDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.segment.index.readers.SingleDoubleDictionary;
-import org.apache.pinot.core.segment.index.readers.SingleFloatDictionary;
-import org.apache.pinot.core.segment.index.readers.SingleIntDictionary;
-import org.apache.pinot.core.segment.index.readers.SingleLongDictionary;
-import org.apache.pinot.core.segment.index.readers.SingleStringDictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -58,15 +58,15 @@ public class DefaultNullValueColumnProvider extends BaseColumnProvider {
     FieldSpec fieldSpec = context.getFieldSpec();
     DataType dataType = fieldSpec.getDataType().getStoredType();
     if (dataType.equals(DataType.STRING)) {
-      _dictionary = new SingleStringDictionary((String) fieldSpec.getDefaultNullValue());
+      _dictionary = new ConstantValueStringDictionary((String) fieldSpec.getDefaultNullValue());
     } else if (dataType.equals(FieldSpec.DataType.FLOAT)) {
-      _dictionary = new SingleFloatDictionary((float) fieldSpec.getDefaultNullValue());
+      _dictionary = new ConstantValueFloatDictionary((float) fieldSpec.getDefaultNullValue());
     } else if (dataType.equals(DataType.DOUBLE)) {
-      _dictionary = new SingleDoubleDictionary((double) fieldSpec.getDefaultNullValue());
+      _dictionary = new ConstantValueDoubleDictionary((double) fieldSpec.getDefaultNullValue());
     } else if (dataType.equals(DataType.INT)) {
-      _dictionary = new SingleIntDictionary((int) fieldSpec.getDefaultNullValue());
+      _dictionary = new ConstantValueIntDictionary((int) fieldSpec.getDefaultNullValue());
     } else if (dataType.equals(DataType.LONG)) {
-      _dictionary = new SingleLongDictionary((long) fieldSpec.getDefaultNullValue());
+      _dictionary = new ConstantValueLongDictionary((long) fieldSpec.getDefaultNullValue());
     } else {
       throw new IllegalStateException(
           "Caught exception building dictionary. Unsupported data type: " + dataType.toString());
@@ -74,7 +74,7 @@ public class DefaultNullValueColumnProvider extends BaseColumnProvider {
     return _dictionary;
   }
 
-  public void updateInvertedIndex(String str, ColumnContext columnContext) {
+  public void updateInvertedIndex(ColumnContext columnContext) {
     Preconditions.checkState(
         _columnIndexContainer.getInvertedIndex() instanceof ConstantSingleValueInvertedIndex || _columnIndexContainer
             .getInvertedIndex() instanceof ConstantMultiValueInvertedIndex, "column index should have constant value");

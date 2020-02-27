@@ -26,6 +26,7 @@ import org.apache.pinot.core.segment.index.column.DefaultNullValueColumnProvider
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.plugin.PluginManager;
 
 
 /**
@@ -38,12 +39,13 @@ public class ColumnProviderFactory {
       // Use the preset virtualColumnProvider if available
       if (virtualColumnProvider != null && !virtualColumnProvider
           .equals(DefaultNullValueColumnProvider.class.getName())) {
-        return (ColumnProvider) Class.forName(virtualColumnProvider).newInstance();
+        return PluginManager.get().createInstance(virtualColumnProvider);
       }
       // Create the columnProvider that returns default null values based on the columnContext
-      return DefaultNullValueColumnProvider.class.getDeclaredConstructor(ColumnContext.class)
-          .newInstance(columnContext);
-    } catch (ReflectiveOperationException e) {
+      return PluginManager.get()
+          .createInstance(DefaultNullValueColumnProvider.class.getName(), new Class[]{ColumnContext.class},
+              new ColumnContext[]{columnContext});
+    } catch (Exception e) {
       throw new IllegalStateException("Caught exception while creating instance of: " + virtualColumnProvider, e);
     }
   }

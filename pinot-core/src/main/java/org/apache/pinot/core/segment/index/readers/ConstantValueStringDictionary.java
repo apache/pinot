@@ -19,13 +19,13 @@
 package org.apache.pinot.core.segment.index.readers;
 
 /**
- * Dictionary for single-value string
+ * Dictionary for constant-value string
  */
 
-public class SingleStringDictionary extends BaseImmutableDictionary {
+public class ConstantValueStringDictionary extends BaseImmutableDictionary {
   final String _value;
 
-  public SingleStringDictionary(String value) {
+  public ConstantValueStringDictionary(String value) {
     super(1);
     _value = value;
   }

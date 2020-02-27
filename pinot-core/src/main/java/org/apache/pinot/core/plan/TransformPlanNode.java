@@ -83,11 +83,7 @@ public class TransformPlanNode implements PlanNode {
       // Extract selection expressions
       List<String> selectionColumns = selection.getSelectionColumns();
       if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
-        for (String column : indexSegment.getColumnNames()) {
-          if (column.charAt(0) == '$') {
-            // For "select *" queries, ignore columns that start with "$"
-            continue;
-          }
+        for (String column : indexSegment.getPhysicalColumnNames()) {
           _projectionColumns.add(column);
           _expressions.add(new TransformExpressionTree(new IdentifierAstNode(column)));
         }

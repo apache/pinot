@@ -38,6 +38,8 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
  */
 public class DocIdVirtualColumnProvider extends BaseColumnProvider {
 
+  ColumnMetadata _columnMetadata;
+
   @Override
   public DataFileReader buildReader(ColumnContext context) {
     return new DocIdSingleValueReader();
@@ -53,8 +55,13 @@ public class DocIdVirtualColumnProvider extends BaseColumnProvider {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
     columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setHasDictionary(true).setHasInvertedIndex(true)
         .setSingleValue(true).setIsSorted(true);
+    _columnMetadata = columnMetadataBuilder.build();
+    return _columnMetadata;
+  }
 
-    return columnMetadataBuilder.build();
+  @Override
+  public ColumnMetadata getColumnMetadata() {
+    return _columnMetadata;
   }
 
   @Override

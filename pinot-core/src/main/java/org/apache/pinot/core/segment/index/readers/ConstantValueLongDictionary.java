@@ -19,13 +19,13 @@
 package org.apache.pinot.core.segment.index.readers;
 
 /**
- * Dictionary for single-value int
+ * Dictionary for constant-value long
  */
 
-public class SingleIntDictionary extends BaseImmutableDictionary {
-  final Integer _value;
+public class ConstantValueLongDictionary extends BaseImmutableDictionary {
+  final Long _value;
 
-  public SingleIntDictionary(Integer value) {
+  public ConstantValueLongDictionary(Long value) {
     super(1);
     _value = value;
   }
@@ -36,7 +36,7 @@ public class SingleIntDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public Integer get(int dictId) {
+  public Long get(int dictId) {
     return _value;
   }
 
@@ -62,6 +62,6 @@ public class SingleIntDictionary extends BaseImmutableDictionary {
 
   @Override
   public String getStringValue(int dictId) {
-    return Integer.toString(_value);
+    return Long.toString(_value);
   }
 }

@@ -38,4 +38,8 @@ public interface ColumnProvider {
   InvertedIndexReader buildInvertedIndex(ColumnContext context);
 
   ColumnIndexContainer buildColumnIndexContainer(ColumnContext context);
+
+  ColumnIndexContainer getColumnIndexContainer();
+
+  ColumnMetadata getColumnMetadata();
 }

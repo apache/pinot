@@ -45,6 +45,7 @@ import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -207,9 +208,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
       LOGGER.info("Try reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
       SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
-      MutableSegmentImpl mutableSegment = (MutableSegmentImpl) (_tableDataManagerMap.get(tableNameWithType)
-          .acquireSegment(segmentMetadataImpl.getName()).getSegment());
-      mutableSegment.addExtraColumns(schema);
+      SegmentDataManager segmentDataManager = _tableDataManagerMap.get(tableNameWithType)
+          .acquireSegment(segmentMetadataImpl.getName());
+      try {
+        MutableSegmentImpl mutableSegment = (MutableSegmentImpl) (segmentDataManager.getSegment());
+        mutableSegment.addExtraColumns(schema);
+      }
+      finally {
+        _tableDataManagerMap.get(tableNameWithType).releaseSegment(segmentDataManager);
+      }
       return;
     }
     Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);

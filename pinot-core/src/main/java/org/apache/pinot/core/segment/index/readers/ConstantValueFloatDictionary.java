@@ -19,25 +19,24 @@
 package org.apache.pinot.core.segment.index.readers;
 
 /**
- * Dictionary for single-value double
+ * Dictionary for constant-value float
  */
 
-public class SingleDoubleDictionary extends BaseImmutableDictionary {
-  final Double _value;
+public class ConstantValueFloatDictionary extends BaseImmutableDictionary {
+  final Float _value;
 
-  public SingleDoubleDictionary(Double value) {
+  public ConstantValueFloatDictionary(Float value) {
     super(1);
     _value = value;
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-
     return 0;
   }
 
   @Override
-  public Double get(int dictId) {
+  public Float get(int dictId) {
     return _value;
   }
 
@@ -53,16 +52,16 @@ public class SingleDoubleDictionary extends BaseImmutableDictionary {
 
   @Override
   public float getFloatValue(int dictId) {
-    return _value.floatValue();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
     return _value;
   }
 
   @Override
+  public double getDoubleValue(int dictId) {
+    return _value.doubleValue();
+  }
+
+  @Override
   public String getStringValue(int dictId) {
-    return Double.toString(_value);
+    return Float.toString(_value);
   }
 }

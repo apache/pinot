@@ -31,7 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public abstract class BaseColumnProvider implements ColumnProvider {
 
-  org.apache.pinot.core.segment.index.column.ColumnIndexContainer _columnIndexContainer;
+  ColumnIndexContainer _columnIndexContainer;
   InvertedIndexReader _invertedIndexReader;
 
   public DataFileReader buildReader(ColumnContext context) {
@@ -46,7 +46,8 @@ public abstract class BaseColumnProvider implements ColumnProvider {
     FieldSpec fieldSpec = context.getFieldSpec();
     return new ColumnMetadata.Builder().setVirtual(true).setColumnName(fieldSpec.getName())
         .setFieldType(fieldSpec.getFieldType()).setDataType(fieldSpec.getDataType())
-        .setTotalDocs(context.getTotalDocCount()).setSingleValue(fieldSpec.isSingleValueField());
+        .setTotalDocs(context.getTotalDocCount()).setSingleValue(fieldSpec.isSingleValueField())
+        .setDefaultNullValueString(context.getFieldSpec().getDefaultNullValueString());
   }
 
   public InvertedIndexReader buildInvertedIndex(ColumnContext context) {

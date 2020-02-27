@@ -52,17 +52,16 @@ import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefr
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.core.realtime.impl.nullvalue.RealtimeNullValueVectorReaderWriter;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnContext;
 import org.apache.pinot.core.segment.index.column.ColumnProvider;
 import org.apache.pinot.core.segment.index.column.DefaultNullValueColumnProvider;
-import org.apache.pinot.core.segment.virtualcolumn.ColumnProviderFactory;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
-import org.apache.pinot.core.segment.index.loader.defaultcolumn.BaseDefaultColumnHandler;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.segment.virtualcolumn.ColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
@@ -562,8 +561,8 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       physicalColumnNames.add(fieldSpec.getName());
     }
-
-    return physicalColumnNames;
+    // We should include newly added columns in the physical columns
+    return Sets.union(physicalColumnNames, _newlyAddedColumnsFieldMap.keySet());
   }
 
   @Override
@@ -572,20 +571,18 @@ public class MutableSegmentImpl implements MutableSegment {
     if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
       // Column is either added during ingestion, or was initiated with a virtual column provider
       if (fieldSpec == null) {
-        // If the column was added during ingestion, we will construct the virtual column provider based on its fieldSpec
+        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to provide default null values
         fieldSpec = _newlyAddedColumnsFieldMap.get(columnName);
         Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + columnName + " should not be null");
       }
       ColumnContext columnContext = new ColumnContext(fieldSpec, _numDocsIndexed);
-      ColumnProvider columnProvider = _newlyAddedColumnsProviderMap.getOrDefault(columnName, ColumnProviderFactory.buildProvider(columnContext));
+      ColumnProvider columnProvider =
+          _newlyAddedColumnsProviderMap.getOrDefault(columnName, ColumnProviderFactory.buildProvider(columnContext));
       if (columnProvider instanceof DefaultNullValueColumnProvider) {
         _logger.debug("Updating number of rows for {}", columnName);
         // We just need to update _numDocsIndexed, and return default values
-        ((DefaultNullValueColumnProvider) columnProvider)
-            .updateInvertedIndex(columnName, columnContext);
-        return new ColumnDataSource(
-            ((DefaultNullValueColumnProvider) columnProvider).getColumnIndexContainer(),
-            ((DefaultNullValueColumnProvider) columnProvider).getColumnMetadata());
+        ((DefaultNullValueColumnProvider) columnProvider).updateInvertedIndex(columnContext);
+        return new ColumnDataSource(columnProvider.getColumnIndexContainer(), columnProvider.getColumnMetadata());
       } else {
         return new ColumnDataSource(columnProvider.buildColumnIndexContainer(columnContext),
             columnProvider.buildMetadata(columnContext));
