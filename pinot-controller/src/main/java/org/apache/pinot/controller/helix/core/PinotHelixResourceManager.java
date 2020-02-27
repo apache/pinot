@@ -1711,7 +1711,6 @@ public class PinotHelixResourceManager {
     // Send refresh message to brokers
     recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
     recipientCriteria.setPartition(offlineTableName);
-    messagingService.send(recipientCriteria, refreshMessage, null, -1);
     numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
     if (numMessagesSent > 0) {
       LOGGER.info("Sent {} refresh messages to brokers for segment: {} of table: {}", numMessagesSent, segmentName,
