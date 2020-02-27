@@ -74,6 +74,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
 
   public static final String PROP_JIRA_SCHEME = "jiraScheme";
   public static final int JIRA_DESCRIPTION_MAX_LENGTH = 100000;
+  public static final int JIRA_ONE_LINE_COMMENT_LENGTH = 250;
 
   public DetectionJiraAlerter(DetectionAlertConfigDTO subsConfig, ThirdEyeAnomalyConfiguration thirdeyeConfig,
       DetectionAlertFilterResult result, ThirdEyeJiraClient jiraClient) {
@@ -112,10 +113,16 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
       sb.append("*<Truncating details due to jira limit! Please use the below link to view all the anomalies.>*");
       sb.append(System.getProperty("line.separator"));
 
-      String desc = jiraEntity.getDescription().replaceAll("listed below", "");
-
       // Print only the first line with the redirection link to ThirdEye
-      sb.append(desc, 0, desc.indexOf("\n"));
+      String desc = jiraEntity.getDescription();
+      int newLineIndex = desc.indexOf("\n");
+      if (newLineIndex < 0 || newLineIndex > JIRA_ONE_LINE_COMMENT_LENGTH) {
+        sb.append(desc, 0, JIRA_ONE_LINE_COMMENT_LENGTH);
+        sb.append("...");
+      } else {
+        sb.append(desc, 0, newLineIndex);
+      }
+
       jiraClient.addComment(issue, sb.toString());
     }
   }
