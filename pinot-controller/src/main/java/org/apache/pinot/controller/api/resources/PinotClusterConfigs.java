@@ -94,11 +94,9 @@ public class PinotClusterConfigs {
       }
       return new SuccessResponse("Updated cluster config.");
     } catch (IOException e) {
-      String errStr = "Error converting request to cluster config.";
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
+      throw new ControllerApplicationException(LOGGER, "Error converting request to cluster config.", Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
-      String errStr = "Failed to update cluster config.";
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, "Failed to update cluster config.", Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
