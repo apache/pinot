@@ -30,7 +30,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import org.apache.pinot.broker.routing.v2.RoutingManager;
+import org.apache.pinot.broker.routing.RoutingManager;
 
 
 @Api(tags = "Routing")
