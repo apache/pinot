@@ -195,14 +195,6 @@ public class HelixBrokerStarter {
     _brokerRequestHandler =
         new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
             _brokerMetrics, _propertyStore);
-//    _brokerServerBuilder = new BrokerServerBuilder(_brokerConf, _helixExternalViewBasedRouting,
-//        _helixExternalViewBasedRouting.getTimeBoundaryService(), _helixExternalViewBasedQueryQuotaManager,
-//        _propertyStore);
-//    BrokerRequestHandler brokerRequestHandler = _brokerServerBuilder.getBrokerRequestHandler();
-//    BrokerMetrics brokerMetrics = _brokerServerBuilder.getBrokerMetrics();
-//    _helixExternalViewBasedRouting.setBrokerMetrics(brokerMetrics);
-//    _helixExternalViewBasedQueryQuotaManager.setBrokerMetrics(brokerMetrics);
-//    _brokerServerBuilder.start();
 
     int brokerQueryPort = _brokerConf.getInt(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT);
     LOGGER.info("Starting broker admin application on port: {}", brokerQueryPort);
@@ -247,7 +239,7 @@ public class HelixBrokerStarter {
     // Register user-define message handler factory
     _participantHelixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-            new BrokerUserDefineMessageHandlerFactory(_routingManager));
+            new BrokerUserDefineMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
     addInstanceTagIfNeeded();
     _brokerMetrics

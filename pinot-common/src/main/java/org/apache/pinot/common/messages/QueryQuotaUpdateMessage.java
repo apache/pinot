@@ -21,6 +21,7 @@ package org.apache.pinot.common.messages;
 import com.google.common.base.Preconditions;
 import java.util.UUID;
 import org.apache.helix.model.Message;
+import org.apache.pinot.common.utils.CommonConstants;
 
 
 // A message intended for a pinot Broker to ask it to update its rate limiter of a table.
@@ -29,6 +30,7 @@ public class QueryQuotaUpdateMessage extends Message {
 
   public QueryQuotaUpdateMessage(String tableNameWithType) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
+    setResourceName(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     setPartitionName(tableNameWithType);
     setMsgSubType(UPDATE_QUERY_QUOTA_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive

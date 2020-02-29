@@ -23,7 +23,9 @@ import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
+import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.common.messages.QueryQuotaUpdateMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +42,12 @@ public class BrokerUserDefineMessageHandlerFactory implements MessageHandlerFact
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerUserDefineMessageHandlerFactory.class);
 
   private final RoutingManager _routingManager;
+  private final HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
 
-  public BrokerUserDefineMessageHandlerFactory(RoutingManager routingManager) {
+  public BrokerUserDefineMessageHandlerFactory(RoutingManager routingManager,
+      HelixExternalViewBasedQueryQuotaManager queryQuotaManager) {
     _routingManager = routingManager;
+    _queryQuotaManager = queryQuotaManager;
   }
 
   @Override
@@ -51,6 +56,8 @@ public class BrokerUserDefineMessageHandlerFactory implements MessageHandlerFact
     switch (msgSubType) {
       case SegmentRefreshMessage.REFRESH_SEGMENT_MSG_SUB_TYPE:
         return new RefreshSegmentMessageHandler(new SegmentRefreshMessage(message), context);
+      case QueryQuotaUpdateMessage.UPDATE_QUERY_QUOTA_MSG_SUB_TYPE:
+        return new QueryQuotaUpdateMessageHandler(new QueryQuotaUpdateMessage(message), context);
       default:
         throw new UnsupportedOperationException("Unsupported user defined message sub type: " + msgSubType);
     }
@@ -87,6 +94,30 @@ public class BrokerUserDefineMessageHandlerFactory implements MessageHandlerFact
     public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
       LOGGER.error("Caught exception while refreshing segment: {} of table: {} (code: {}, type: {})", _segmentName,
           _tableNameWithType, errorCode, errorType, e);
+    }
+  }
+
+  private class QueryQuotaUpdateMessageHandler extends MessageHandler {
+    private final String _tableNameWithType;
+
+    public QueryQuotaUpdateMessageHandler(QueryQuotaUpdateMessage queryQuotaUpdateMessage,
+        NotificationContext context) {
+      super(queryQuotaUpdateMessage, context);
+      _tableNameWithType = queryQuotaUpdateMessage.getPartitionName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _queryQuotaManager.initOrUpdateTableQueryQuota(_tableNameWithType);
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
+      LOGGER.error("Caught exception while updating query quota of table: {} (code: {}, type: {})", _tableNameWithType,
+          errorCode, errorType, e);
     }
   }
 }

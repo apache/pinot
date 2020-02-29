@@ -31,7 +31,6 @@ import org.apache.helix.model.Message;
  */
 public class SegmentReloadMessage extends Message {
   public static final String RELOAD_SEGMENT_MSG_SUB_TYPE = "RELOAD_SEGMENT";
-  public static final String UPDATE_QUERY_QUOTA_MSG_SUB_TYPE = "UPDATE_QUERY_QUOTA";
 
   public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable String segmentName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
