@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -35,6 +36,7 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
+import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
@@ -129,10 +131,10 @@ public class HybridQuickstart {
     startKafka();
     printStatus(Color.YELLOW, "***** Starting Zookeeper, 2 servers, 2 brokers and 1 controller *****");
     runner.startAll();
-    printStatus(Color.YELLOW, "***** Creating a server tenant with name 'airline' *****");
-    runner.createServerTenantWith(1, 1, "airline");
-    printStatus(Color.YELLOW, "***** Creating a broker tenant with name 'airline_broker' *****");
-    runner.createBrokerTenantWith(2, "airline_broker");
+    printStatus(Color.YELLOW, "***** Creating a server tenant with name 'DefaultTenant' *****");
+    runner.createServerTenantWith(1, 1, TagNameUtils.DEFAULT_TENANT_NAME);
+    printStatus(Color.YELLOW, "***** Creating a broker tenant with name 'DefaultTenant' *****");
+    runner.createBrokerTenantWith(2, TagNameUtils.DEFAULT_TENANT_NAME);
     printStatus(Color.YELLOW, "***** Adding airlineStats offline and realtime table *****");
     runner.addTable();
     printStatus(Color.YELLOW, "***** Launch data ingestion job to build index segments for airlineStats and push to controller *****");
@@ -155,7 +157,38 @@ public class HybridQuickstart {
     printStatus(Color.YELLOW, "*****    7. Built and pushed an offline segment *****");
     printStatus(Color.YELLOW,
         "*****    8. Started publishing a Kafka stream for the realtime instance to start consuming *****");
-    printStatus(Color.YELLOW, "***** go to http://localhost:9000/query to run a few queries *****");
+
+    String q1 = "select count(*) from airlineStats limit 10";
+    printStatus(Color.YELLOW, "Total number of documents in the table");
+    printStatus(Color.CYAN, "Query : " + q1);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q2 = "select sum(Cancelled) from airlineStats group by AirlineID limit 5";
+    printStatus(Color.YELLOW, "Top 5 airlines in cancellation ");
+    printStatus(Color.CYAN, "Query : " + q2);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q3 = "select sum(Flights) from airlineStats where Year > 2010 group by AirlineID, Year limit 5";
+    printStatus(Color.YELLOW, "Top 5 airlines in number of flights after 2010");
+    printStatus(Color.CYAN, "Query : " + q3);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q4 = "select max(Flights) from airlineStats group by OriginCityName limit 5";
+    printStatus(Color.YELLOW, "Top 5 cities for number of flights");
+    printStatus(Color.CYAN, "Query : " + q4);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q5 = "select AirlineID, OriginCityName, DestCityName, Year from airlineStats order by Year limit 5";
+    printStatus(Color.YELLOW, "Print AirlineID, OriginCityName, DestCityName, Year for 5 records ordered by Year");
+    printStatus(Color.CYAN, "Query : " + q5);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    printStatus(Color.GREEN, "You can always go to http://localhost:9000/query to play around in the query console");
 
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override

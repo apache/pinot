@@ -38,10 +38,7 @@ data:
         "replication": "1",
         "replicasPerPartition": "1"
       },
-      "tenants": {
-        "broker": "airline_broker",
-        "server": "airline"
-      },
+      "tenants": {},
       "tableIndexConfig": {
         "loadMode": "MMAP",
         "streamConfigs": {
@@ -78,10 +75,7 @@ data:
         "replication": "1",
         "replicasPerPartition": "1"
       },
-      "tenants": {
-        "broker": "airline_broker",
-        "server": "airline"
-      },
+      "tenants": {},
       "tableIndexConfig": {
         "loadMode": "MMAP",
         "streamConfigs": {
