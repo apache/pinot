@@ -935,6 +935,7 @@ export default Component.extend({
       let anomalyEdgeTimestamps = [];
       for (let i = 0; i < series.Current.timestamps.length; ++i) {
         const anomalyValue = useValue ? series.Current.values[i] : 1.0;
+        const anomalyValueMinusOne = useValue ? series.Current.values[i-1] : 1.0;
         if (!inAnomalyRange) {
           currentAnomaly = filteredAnomalies.find(anomaly => {
             return anomaly.startTime === series.Current.timestamps[i];
@@ -959,7 +960,7 @@ export default Component.extend({
             anomalyEdgeValues.push(anomalyValue);
             anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
           } else if (i > 0) {
-            anomalyEdgeValues.push(series.Current.values[i-1]);
+            anomalyEdgeValues.push(anomalyValueMinusOne);
             anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
             valuesCurrent.push(null);
           }
@@ -1130,7 +1131,7 @@ export default Component.extend({
    * @param anomalies - an array of anomaly objects
    * @param metricUrn - the metricUrn currently selected for time series chart
    * @param showRules - whether we are showing detection rules and bounds in time series chart
-   * @param selectedRule - which detection rule selected for time series chart 
+   * @param selectedRule - which detection rule selected for time series chart
    * @return {Array}
    */
   _filterAnomalies(anomalies, metricUrn, showRules, selectedRule) {
