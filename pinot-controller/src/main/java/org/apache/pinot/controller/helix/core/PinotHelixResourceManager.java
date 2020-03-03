@@ -57,14 +57,12 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
-import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.Instance;
-import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableCustomConfig;
@@ -1727,11 +1725,6 @@ public class PinotHelixResourceManager {
   }
 
   private void sendUpdateQueryQuotaMessage(TableConfig tableConfig) {
-    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
-    if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null) {
-      return;
-    }
-    final int timeoutMs = -1; // Infinite timeout on the recipient.
     String tableNameWithType = tableConfig.getTableName();
     QueryQuotaUpdateMessage refreshMessage = new QueryQuotaUpdateMessage(tableNameWithType);
 
@@ -1740,17 +1733,16 @@ public class PinotHelixResourceManager {
     // message to participants. Note that brokers are also participants.
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
-    recipientCriteria.setSessionSpecific(true);
     recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    recipientCriteria.setDataSource(Criteria.DataSource.EXTERNALVIEW);
-    // The brokerResource field in the EXTERNALVIEW stores the offline table name in the Partition subfield.
+    recipientCriteria.setSessionSpecific(true);
+    // The brokerResource field in the EXTERNALVIEW stores the table name in the Partition subfield.
     recipientCriteria.setPartition(tableNameWithType);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     LOGGER.info("Sending query quota update message for table {}:{} to recipients {}",
         tableNameWithType, refreshMessage, recipientCriteria);
     // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
-    int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, timeoutMs);
+    int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
     if (nMsgsSent > 0) {
       // TODO Would be nice if we can get the name of the instances to which messages were sent.
       LOGGER.info("Sent {} query quota update msgs for table {}", nMsgsSent, tableNameWithType);

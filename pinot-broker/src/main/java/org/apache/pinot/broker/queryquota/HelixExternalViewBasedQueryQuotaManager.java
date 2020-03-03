@@ -123,8 +123,14 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       }
     }
 
-    // Create rate limiter
-    createRateLimiter(tableNameWithType, brokerResource, tableConfig.getQuotaConfig());
+    // Create rate limiter if query quota config is specified.
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    if (quotaConfig == null || Strings.isNullOrEmpty(quotaConfig.getMaxQueriesPerSecond())) {
+      LOGGER.info("No qps config specified for table: {}", tableNameWithType);
+      removeRateLimiter(tableNameWithType);
+    } else {
+      createRateLimiter(tableNameWithType, brokerResource, quotaConfig);
+    }
   }
 
   /**
