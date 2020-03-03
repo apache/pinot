@@ -8,10 +8,7 @@
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "replication": "1"
   },
-  "tenants": {
-    "broker": "airline_broker",
-    "server": "airline"
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP"
   },
