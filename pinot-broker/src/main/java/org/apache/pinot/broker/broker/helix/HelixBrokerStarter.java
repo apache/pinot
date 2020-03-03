@@ -239,7 +239,7 @@ public class HelixBrokerStarter {
     // Register user-define message handler factory
     _participantHelixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-            new BrokerUserDefineMessageHandlerFactory(_routingManager));
+            new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
     _participantHelixManager.connect();
     addInstanceTagIfNeeded();
     _brokerMetrics

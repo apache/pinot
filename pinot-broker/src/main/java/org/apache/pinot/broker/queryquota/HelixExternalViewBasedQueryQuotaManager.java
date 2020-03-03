@@ -84,6 +84,14 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     processQueryQuotaChange(brokerResourceEV);
   }
 
+  public void initOrUpdateTableQueryQuota(String tableNameWithType) {
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    ExternalView brokerResourceEV = HelixHelper
+        .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    initTableQueryQuota(tableConfig, brokerResourceEV);
+  }
+
   /**
    * Initialize dynamic rate limiter with table query quota.
    * @param tableConfig table config.
@@ -133,6 +141,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    */
   private void removeRateLimiter(String tableNameWithType) {
     _rateLimiterMap.remove(tableNameWithType);
+  }
+
+  public boolean containsRateLimiterForTable(String tableNameWithType) {
+    return _rateLimiterMap.containsKey(tableNameWithType);
   }
 
   /**
