@@ -20,18 +20,25 @@
 
 if [[ "$#" -gt 0 ]]
 then
-  CONFIG_DIR=./config/$1
+  CONFIG_DIR="./config/$1"
 else
   CONFIG_DIR="./config/default"
 fi
 
-echo "Running thirdeye backend with config: ${CONFIG_DIR}"
-java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication ${CONFIG_DIR} &
+echo "Starting H2 database server"
+java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.h2.tools.Server -tcp -baseDir "${CONFIG_DIR}/.." &
+sleep 1
 
-sleep 30
-kill %1
+echo "Creating ThirdEye database schema"
+java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.h2.tools.RunScript -user "sa" -password "sa" -url "jdbc:h2:tcp:localhost/h2db" -script "zip:./bin/thirdeye-pinot-1.0-SNAPSHOT.jar!/schema/create-schema.sql"
 
-echo "Running thirdeye frontend with config: ${CONFIG_DIR}"
-java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication ${CONFIG_DIR} &
+echo "Running thirdeye backend config: ${CONFIG_DIR}"
+[ -f "${CONFIG_DIR}/data-sources/data-sources-config-backend.yml" ] && cp "${CONFIG_DIR}/data-sources/data-sources-config-backend.yml" "${CONFIG_DIR}/data-sources/data-sources-config.yml"
+java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "${CONFIG_DIR}" &
+sleep 5
+
+echo "Running thirdeye frontend config: ${CONFIG_DIR}"
+[ -f "${CONFIG_DIR}/data-sources/data-sources-config-frontend.yml" ] && cp "${CONFIG_DIR}/data-sources/data-sources-config-frontend.yml" "${CONFIG_DIR}/data-sources/data-sources-config.yml"
+java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication "${CONFIG_DIR}" &
 
 wait

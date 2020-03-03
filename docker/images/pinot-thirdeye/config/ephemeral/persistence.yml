@@ -1,5 +1,5 @@
 databaseConfiguration:
-  url: jdbc:h2:./config/h2db
+  url: jdbc:h2:tcp://localhost/h2db
   user: sa
   password: sa
   driver: org.h2.Driver

@@ -16,7 +16,7 @@ rootCause:
     - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.DimensionEntityFormatter
     - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.ServiceEntityFormatter
     - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.DefaultEventEntityFormatter
-dashboardHost: "http://thirdeye-dashboard:1426"
+dashboardHost: "http://localhost:1426"
 failureFromAddress: thirdeye@localhost
 failureToAddress: user@localhost
 alerterConfiguration:

@@ -17,13 +17,13 @@ alert: false
 autoload: true
 classifier: false
 holidayEventsLoader: false
-monitor: false
+monitor: true
 pinotProxy: false
-scheduler: false
-worker: false
-detectionPipeline: false
-detectionAlert: false
-dashboardHost: "http://thirdeye-dashboard:1426"
+scheduler: true
+worker: true
+detectionPipeline: true
+detectionAlert: true
+dashboardHost: "http://localhost:1426"
 id: 0
 alerterConfiguration:
   smtpConfiguration:
