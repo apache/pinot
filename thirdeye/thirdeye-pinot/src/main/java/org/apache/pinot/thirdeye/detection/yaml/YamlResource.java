@@ -927,6 +927,21 @@ public class YamlResource {
   }
 
   /**
+   * Handles parse errors individually when formatting configs.
+   *
+   * @param config The detection configuration to be enhanced by DetectionConfigFormatter::format.
+   * @return enhanced configuration or null if the parse failed, logs failure for debugging.
+   */
+  private Map<String, Object> formatConfigOrNull(DetectionConfigDTO config) {
+    try {
+      return this.detectionConfigFormatter.format(config);
+    } catch (Exception e){
+      LOG.warn("Error parsing config id: {}", config.getId());
+    }
+    return null;
+  }
+
+  /**
    * Query all detection yaml configurations and optionally filter, then format as JSON and enhance with
    * detection config id, isActive, and createdBy information
    *
@@ -940,13 +955,15 @@ public class YamlResource {
       yamls = this.detectionConfigDAO
           .findAll()
           .parallelStream()
-          .map(this.detectionConfigFormatter::format)
+          .map(config -> formatConfigOrNull(config))
+          .filter(c -> c!= null)
           .collect(Collectors.toList());
     } else {
       yamls = this.detectionConfigDAO
           .findAll()
           .parallelStream()
-          .map(this.detectionConfigFormatter::format)
+          .map(config -> formatConfigOrNull(config))
+          .filter(c -> c!= null)
           .filter(y -> filterConfigsBy(y, dataset, metric))
           .collect(Collectors.toList());
     }
