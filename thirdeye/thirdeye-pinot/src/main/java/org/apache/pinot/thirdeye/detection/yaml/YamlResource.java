@@ -569,7 +569,7 @@ public class YamlResource {
     Preconditions.checkNotNull(subscriptionGroupName, "Missing property " + PROP_SUBS_GROUP_NAME
         + " in the subscription config.");
 
-    // Check if detection already exists
+    // Check if subscription already exists
     Collection<DetectionAlertConfigDTO> subscriptionConfigs = this.subscriptionConfigDAO
         .findByPredicate(Predicate.EQ("name", subscriptionGroupName));
     if (subscriptionConfigs != null && !subscriptionConfigs.isEmpty()) {
