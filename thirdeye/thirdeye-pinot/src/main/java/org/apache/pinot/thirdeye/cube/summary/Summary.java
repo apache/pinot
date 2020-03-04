@@ -303,7 +303,7 @@ public class Summary {
    * Returns null if no ancestor exists in the target set.
    */
   private static CubeNode findAncestor(CubeNode node, CubeNode ceiling, Set<CubeNode> targets) {
-    while ((node = node.getParent()) != ceiling) {
+    while (node != null && (node = node.getParent()) != ceiling) {
       if (targets.contains(node)) {
         return node;
       }
