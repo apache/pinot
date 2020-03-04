@@ -28,19 +28,31 @@ public class PreparedStatement {
   private final Connection _connection;
   private final String _statement;
   private final String[] _parameters;
+  private final String _queryFormat;
 
-  PreparedStatement(Connection connection, String statement) {
+  @Deprecated
+  PreparedStatement(Connection connection, String query) {
     _connection = connection;
-    _statement = statement;
+    _statement = query;
+    _parameters = new String[getQuestionMarkCount(query)];
+    _queryFormat = "pql";
+  }
 
+  PreparedStatement(Connection connection, Request request) {
+    _connection = connection;
+    _statement = request.getQuery();
+    _parameters = new String[getQuestionMarkCount(request.getQuery())];
+    _queryFormat = request.getQueryFormat();
+  }
+
+  private int getQuestionMarkCount(String query) {
     int questionMarkCount = 0;
-    int index = statement.indexOf('?');
+    int index = query.indexOf('?');
     while (index != -1) {
       questionMarkCount++;
-      index = statement.indexOf('?', index + 1);
+      index = query.indexOf('?', index + 1);
     }
-
-    _parameters = new String[questionMarkCount];
+    return questionMarkCount;
   }
 
   private String fillStatementWithParameters() {
@@ -57,7 +69,7 @@ public class PreparedStatement {
    * @return The query results
    */
   public ResultSetGroup execute() {
-    return _connection.execute(fillStatementWithParameters());
+    return _connection.execute(new Request(_queryFormat, fillStatementWithParameters()));
   }
 
   /**
@@ -66,7 +78,7 @@ public class PreparedStatement {
    * @return The query results
    */
   public Future<ResultSetGroup> executeAsync() {
-    return _connection.executeAsync(fillStatementWithParameters());
+    return _connection.executeAsync(new Request(_queryFormat, fillStatementWithParameters()));
   }
 
   /**

@@ -37,7 +37,7 @@ public class PreparedStatementTest {
   public void testPreparedStatementEscaping() {
     // Create a prepared statement that has to quote a string appropriately
     Connection connection = ConnectionFactory.fromHostList("dummy");
-    PreparedStatement preparedStatement = connection.prepareStatement("SELECT foo FROM bar WHERE baz = ?");
+    PreparedStatement preparedStatement = connection.prepareStatement(new Request("sql", "SELECT foo FROM bar WHERE baz = ?"));
     preparedStatement.setString(0, "'hello'");
     preparedStatement.execute();
 
