@@ -133,7 +133,7 @@ public class YamlResource {
   private static final long ONBOARDING_REPLAY_LOOKBACK = TimeUnit.DAYS.toMillis(30);
 
   private final DetectionConfigManager detectionConfigDAO;
-  private final DetectionAlertConfigManager detectionAlertConfigDAO;
+  private final DetectionAlertConfigManager subscriptionConfigDAO;
   private final DetectionConfigValidator detectionValidator;
   private final SubscriptionConfigValidator subscriptionValidator;
   private final DataProvider provider;
@@ -152,7 +152,7 @@ public class YamlResource {
 
   public YamlResource(DetectionPreviewConfiguration previewConfig) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
-    this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
+    this.subscriptionConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -185,9 +185,8 @@ public class YamlResource {
   /*
    * Helper method to build the detection config from a yaml.
    */
-  private DetectionConfigDTO buildDetectionConfigFromYaml(long tuningStartTime, long tuningEndTime, String yamlConfig,
-      DetectionConfigDTO existingConfig) {
-
+  private DetectionConfigDTO buildDetectionConfigFromYaml(long tuningStartTime, long tuningEndTime,
+      @NotNull String yamlConfig, DetectionConfigDTO existingConfig) {
     // Configure the tuning window
     if (tuningStartTime == 0L && tuningEndTime == 0L) {
       // default tuning window 28 days
@@ -278,12 +277,12 @@ public class YamlResource {
     // Detection
     long detectionConfigId;
     try {
+      validatePayload(payload);
       yamls = OBJECT_MAPPER.readValue(payload, Map.class);
+      String detectionYaml = yamls.get(PROP_DETECTION);
+      Preconditions.checkArgument(StringUtils.isNotBlank(detectionYaml), "detection yaml is missing");
 
-      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
-      Preconditions.checkArgument(yamls.containsKey(PROP_DETECTION), "Detection pipeline yaml is missing");
-
-      detectionConfigId = createDetectionPipeline(yamls.get(PROP_DETECTION), startTime, endTime);
+      detectionConfigId = createDetectionConfig(detectionYaml, startTime, endTime);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
@@ -293,9 +292,9 @@ public class YamlResource {
     // Notification
     long detectionAlertConfigId;
     try {
-      Preconditions.checkArgument(yamls.containsKey(PROP_SUBSCRIPTION), "Subscription group yaml is missing.");
-
       String subscriptionYaml = yamls.get(PROP_SUBSCRIPTION);
+      Preconditions.checkArgument(StringUtils.isNotBlank(subscriptionYaml), "subscription yaml is missing");
+
       Map<String, Object> subscriptionYamlConfig;
       try {
         subscriptionYamlConfig = ConfigUtils.getMap(this.yaml.load(subscriptionYaml));
@@ -305,12 +304,12 @@ public class YamlResource {
 
       // Check if existing or new subscription group
       String groupName = MapUtils.getString(subscriptionYamlConfig, PROP_SUBS_GROUP_NAME);
-      List<DetectionAlertConfigDTO> alertConfigDTOS = detectionAlertConfigDAO.findByPredicate(Predicate.EQ("name", groupName));
+      List<DetectionAlertConfigDTO> alertConfigDTOS = subscriptionConfigDAO.findByPredicate(Predicate.EQ("name", groupName));
       if (!alertConfigDTOS.isEmpty()) {
         detectionAlertConfigId = alertConfigDTOS.get(0).getId();
         updateSubscriptionGroup(user, detectionAlertConfigId, subscriptionYaml);
       } else {
-        detectionAlertConfigId = createSubscriptionGroup(subscriptionYaml);
+        detectionAlertConfigId = createSubscriptionConfig(subscriptionYaml);
       }
     } catch (IllegalArgumentException e) {
       this.detectionConfigDAO.deleteById(detectionConfigId);
@@ -333,14 +332,12 @@ public class YamlResource {
     ).build();
   }
 
-  long createDetectionPipeline(String yamlDetectionConfig) {
-    return createDetectionPipeline(yamlDetectionConfig, 0, 0);
+  long createDetectionConfig(@NotNull String yamlDetectionConfig) {
+    return createDetectionConfig(yamlDetectionConfig, 0, 0);
   }
 
-  long createDetectionPipeline(String payload, long startTime, long endTime)
+  long createDetectionConfig(@NotNull String payload, long startTime, long endTime)
       throws IllegalArgumentException {
-    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
-
     DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, null);
 
     // Check for duplicates
@@ -376,7 +373,8 @@ public class YamlResource {
     Map<String, String> responseMessage = new HashMap<>();
     long detectionConfigId;
     try {
-      detectionConfigId = createDetectionPipeline(payload, startTime, endTime);
+      validatePayload(payload);
+      detectionConfigId = createDetectionConfig(payload, startTime, endTime);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
@@ -389,18 +387,18 @@ public class YamlResource {
     return Response.ok().entity(responseMessage).build();
   }
 
-  private void updateDetectionPipeline(ThirdEyePrincipal user, long detectionID, String yamlDetectionConfig) {
-    updateDetectionPipeline(user, detectionID, yamlDetectionConfig, 0, 0);
+  private void updateDetectionConfig(ThirdEyePrincipal user, long detectionID, @NotNull String payload) {
+    updateDetectionConfig(user, detectionID, payload, 0, 0);
   }
 
-  private void updateDetectionPipeline(ThirdEyePrincipal user, long detectionID, String payload, long startTime, long endTime)
+  private void updateDetectionConfig(ThirdEyePrincipal user, long detectionID, @NotNull String payload, long startTime,
+      long endTime)
       throws IllegalArgumentException {
     DetectionConfigDTO existingDetectionConfig = this.detectionConfigDAO.findById(detectionID);
-    DetectionConfigDTO detectionConfig;
     Preconditions.checkNotNull(existingDetectionConfig, "Cannot find detection pipeline " + detectionID);
-    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
 
     authorizeUser(user, detectionID, PROP_DETECTION);
+    DetectionConfigDTO detectionConfig;
     try {
       detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, existingDetectionConfig);
 
@@ -451,7 +449,7 @@ public class YamlResource {
         DetectionConfigDTO detectionConfig = this.detectionConfigDAO.findById(id);
         validateConfigOwner(user, detectionConfig.getOwners());
       } else if (authEntity.equals(PROP_SUBSCRIPTION)) {
-        DetectionAlertConfigDTO subscriptionConfig = this.detectionAlertConfigDAO.findById(id);
+        DetectionAlertConfigDTO subscriptionConfig = this.subscriptionConfigDAO.findById(id);
         validateConfigOwner(user, subscriptionConfig.getOwners());
       }
 
@@ -481,7 +479,8 @@ public class YamlResource {
       @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) {
     Map<String, String> responseMessage = new HashMap<>();
     try {
-      updateDetectionPipeline(user, id, payload, startTime, endTime);
+      validatePayload(payload);
+      updateDetectionConfig(user, id, payload, startTime, endTime);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_DETECTION, YamlOperations.UPDATING.name(), payload, e);
     } catch (NotAuthorizedException e) {
@@ -496,14 +495,14 @@ public class YamlResource {
     return Response.ok().entity(responseMessage).build();
   }
 
-  private DetectionConfigDTO fetchExistingDetection(String payload) {
+  private DetectionConfigDTO fetchExistingDetection(@NotNull String payload) {
     DetectionConfigDTO existingDetectionConfig = null;
 
     // Extract the detectionName from payload
     Map<String, Object> detectionConfigMap = new HashMap<>();
     detectionConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(payload)));
     String detectionName = MapUtils.getString(detectionConfigMap, PROP_DETECTION_NAME);
-    Preconditions.checkNotNull(detectionName, "Missing property detectionName in the detection config.");
+    Preconditions.checkNotNull(detectionName, PROP_DETECTION_NAME + " cannot be left empty");
 
     // Check if detection already existing
     Collection<DetectionConfigDTO> detectionConfigs = this.detectionConfigDAO
@@ -515,15 +514,14 @@ public class YamlResource {
     return existingDetectionConfig;
   }
 
-  long createOrUpdateDetectionPipeline(ThirdEyePrincipal user, String payload) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+  long createOrUpdateDetectionConfig(ThirdEyePrincipal user, @NotNull String payload) {
     long detectionId;
     DetectionConfigDTO existingDetection = fetchExistingDetection(payload);
     if (existingDetection != null) {
       detectionId = existingDetection.getId();
-      updateDetectionPipeline(user, detectionId, payload);
+      updateDetectionConfig(user, detectionId, payload);
     } else {
-      detectionId = createDetectionPipeline(payload);
+      detectionId = createDetectionConfig(payload);
     }
 
     return detectionId;
@@ -539,14 +537,15 @@ public class YamlResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   @PermitAll
-  @ApiOperation("Create a new detection pipeline or update existing if one already exists")
-  public Response createOrUpdateDetectionPipelineApi(
+  @ApiOperation("Create a new detection config or update existing if one already exists")
+  public Response createOrUpdateDetectionConfigApi(
       @Auth ThirdEyePrincipal user,
       @ApiParam("yaml config") String payload) {
     Map<String, String> responseMessage = new HashMap<>();
     long detectionConfigId;
     try {
-      detectionConfigId = createOrUpdateDetectionPipeline(user, payload);
+      validatePayload(payload);
+      detectionConfigId = createOrUpdateDetectionConfig(user, payload);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     } catch (NotAuthorizedException e) {
@@ -555,20 +554,85 @@ public class YamlResource {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     }
 
-    LOG.info("Detection Pipeline created/updated with id " + detectionConfigId + " using payload " + payload);
+    LOG.info("Detection Config created/updated with id " + detectionConfigId + " using payload " + payload);
     responseMessage.put("message", "The alert was created/updated successfully.");
     responseMessage.put("more-info", "Record saved/updated with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
   }
 
-  public long createSubscriptionGroup(String yamlConfig) throws IllegalArgumentException {
-    Preconditions.checkArgument(StringUtils.isNotBlank(yamlConfig),
-        "The Yaml Payload in the request is empty.");
+  private DetectionAlertConfigDTO fetchExistingSubscriptionGroup(@NotNull String payload) {
+    DetectionAlertConfigDTO existingSubscriptionConfig = null;
 
-    DetectionAlertConfigDTO alertConfig = new SubscriptionConfigTranslator(detectionConfigDAO, yamlConfig).translate();
+    // Extract the subscription group name from payload
+    Map<String, Object> subscriptionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
+    String subscriptionGroupName = MapUtils.getString(subscriptionConfigMap, PROP_SUBS_GROUP_NAME);
+    Preconditions.checkNotNull(subscriptionGroupName, "Missing property " + PROP_SUBS_GROUP_NAME
+        + " in the subscription config.");
+
+    // Check if detection already exists
+    Collection<DetectionAlertConfigDTO> subscriptionConfigs = this.subscriptionConfigDAO
+        .findByPredicate(Predicate.EQ("name", subscriptionGroupName));
+    if (subscriptionConfigs != null && !subscriptionConfigs.isEmpty()) {
+      existingSubscriptionConfig = subscriptionConfigs.iterator().next();
+    }
+
+    return existingSubscriptionConfig;
+  }
+
+  /**
+   * Update an existing subscription config or create a new one otherwise.
+   */
+  long createOrUpdateSubscriptionConfig(ThirdEyePrincipal user, @NotNull String payload) {
+    long subscriptionId;
+    DetectionAlertConfigDTO existingSubscriptionGroup = fetchExistingSubscriptionGroup(payload);
+    if (existingSubscriptionGroup != null) {
+      subscriptionId = existingSubscriptionGroup.getId();
+      updateSubscriptionGroup(user, subscriptionId, payload);
+    } else {
+      subscriptionId = createSubscriptionConfig(payload);
+    }
+
+    return subscriptionId;
+  }
+
+  /**
+   Set up a subscription pipeline using a YAML config - create new or update existing
+   @param payload YAML config string
+   @return a message contains the saved subscription config id
+   */
+  @POST
+  @Path("/subscription/create-or-update")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @PermitAll
+  @ApiOperation("Create a new subscription config or update existing if one already exists")
+  public Response createOrUpdateSubscriptionConfigApi(
+      @Auth ThirdEyePrincipal user,
+      @ApiParam("yaml config") String payload) {
+    Map<String, String> responseMessage = new HashMap<>();
+    long subscriptionConfigId;
+    try {
+      validatePayload(payload);
+      subscriptionConfigId = createOrUpdateSubscriptionConfig(user, payload);
+    } catch (IllegalArgumentException e) {
+      return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
+    } catch (NotAuthorizedException e) {
+      return processBadAuthorizationResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
+    } catch (Exception e) {
+      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
+    }
+
+    LOG.info("Subscription config created/updated with id " + subscriptionConfigId + " using payload " + payload);
+    responseMessage.put("message", "The subscription group was created/updated successfully.");
+    responseMessage.put("more-info", "Record saved/updated with id " + subscriptionConfigId);
+    return Response.ok().entity(responseMessage).build();
+  }
+
+  public long createSubscriptionConfig(@NotNull String payload) throws IllegalArgumentException {
+    DetectionAlertConfigDTO alertConfig = new SubscriptionConfigTranslator(detectionConfigDAO, payload).translate();
 
     // Check for duplicates
-    List<DetectionAlertConfigDTO> alertConfigDTOS = detectionAlertConfigDAO
+    List<DetectionAlertConfigDTO> alertConfigDTOS = subscriptionConfigDAO
         .findByPredicate(Predicate.EQ("name", alertConfig.getName()));
     Preconditions.checkArgument(alertConfigDTOS.isEmpty(),
         "Subscription group name is already taken. Please use a different name.");
@@ -577,7 +641,7 @@ public class YamlResource {
     subscriptionValidator.validateConfig(alertConfig);
 
     // Save the detection alert config
-    Long id = this.detectionAlertConfigDAO.save(alertConfig);
+    Long id = this.subscriptionConfigDAO.save(alertConfig);
     Preconditions.checkNotNull(id, "Error while saving the subscription group");
 
     return alertConfig.getId();
@@ -589,12 +653,13 @@ public class YamlResource {
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation("Create a subscription group using a YAML config")
   @SuppressWarnings("unchecked")
-  public Response createSubscriptionGroupApi(
+  public Response createSubscriptionConfigApi(
       @ApiParam("payload") String payload) {
     Map<String, String> responseMessage = new HashMap<>();
     long detectionAlertConfigId;
     try {
-      detectionAlertConfigId = createSubscriptionGroup(payload);
+      validatePayload(payload);
+      detectionAlertConfigId = createSubscriptionConfig(payload);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
@@ -631,15 +696,14 @@ public class YamlResource {
     return oldAlertConfig;
   }
 
-  void updateSubscriptionGroup(ThirdEyePrincipal user, long oldAlertConfigID, String yamlConfig) {
-    DetectionAlertConfigDTO oldAlertConfig = this.detectionAlertConfigDAO.findById(oldAlertConfigID);
+  void updateSubscriptionGroup(ThirdEyePrincipal user, long oldAlertConfigID, @NotNull String payload) {
+    DetectionAlertConfigDTO oldAlertConfig = this.subscriptionConfigDAO.findById(oldAlertConfigID);
     if (oldAlertConfig == null) {
       throw new RuntimeException("Cannot find subscription group " + oldAlertConfigID);
     }
-    Preconditions.checkArgument(StringUtils.isNotBlank(yamlConfig), "The Yaml Payload in the request is empty.");
 
     authorizeUser(user, oldAlertConfigID, PROP_SUBSCRIPTION);
-    DetectionAlertConfigDTO newAlertConfig = new SubscriptionConfigTranslator(detectionConfigDAO, yamlConfig).translate();
+    DetectionAlertConfigDTO newAlertConfig = new SubscriptionConfigTranslator(detectionConfigDAO, payload).translate();
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);
 
     // Update watermarks to reflect changes to detectionName list in subscription config
@@ -663,7 +727,7 @@ public class YamlResource {
     subscriptionValidator.validateUpdatedConfig(updatedAlertConfig, oldAlertConfig);
 
     // Save the updated subscription config
-    int detectionAlertConfigId = this.detectionAlertConfigDAO.update(updatedAlertConfig);
+    int detectionAlertConfigId = this.subscriptionConfigDAO.update(updatedAlertConfig);
     if (detectionAlertConfigId <= 0) {
       throw new RuntimeException("Failed to update the detection alert config.");
     }
@@ -681,6 +745,7 @@ public class YamlResource {
       @ApiParam("the detection alert config id to edit") @PathParam("id") long id) {
     Map<String, String> responseMessage = new HashMap<>();
     try {
+      validatePayload(payload);
       updateSubscriptionGroup(user, id, payload);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_SUBSCRIPTION, YamlOperations.UPDATING.name(), payload, e);
@@ -707,7 +772,7 @@ public class YamlResource {
       @QueryParam("tuningStart") long tuningStart,
       @QueryParam("tuningEnd") long tuningEnd,
       @ApiParam("jsonPayload") String payload) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+    validatePayload(payload);
     return runPreview(start, end, tuningStart, tuningEnd, payload, null);
   }
 
@@ -723,14 +788,14 @@ public class YamlResource {
       @QueryParam("tuningStart") long tuningStart,
       @QueryParam("tuningEnd") long tuningEnd,
       @ApiParam("jsonPayload") String payload) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+    validatePayload(payload);
     DetectionConfigDTO existingConfig = this.detectionConfigDAO.findById(id);
     Preconditions.checkNotNull(existingConfig, "can not find existing detection config " + id);
     return runPreview(start, end, tuningStart, tuningEnd, payload, existingConfig);
   }
 
   private Response runPreview(long start, long end,
-      long tuningStart, long tuningEnd, String payload, DetectionConfigDTO existingConfig) {
+      long tuningStart, long tuningEnd, @NotNull String payload, DetectionConfigDTO existingConfig) {
     long ts = System.currentTimeMillis();
     Map<String, String> responseMessage = new HashMap<>();
     DetectionPipelineResult result;
@@ -795,8 +860,7 @@ public class YamlResource {
       @ApiParam("jsonPayload") @NotNull String payload,
       @QueryParam("ruleName") String ruleName) {
     try {
-      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
-
+      validatePayload(payload);
       DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, payload, null);
       Preconditions.checkNotNull(detectionConfig);
       detectionConfig.setId(Long.MAX_VALUE);
@@ -953,6 +1017,9 @@ public class YamlResource {
     return yamls;
   }
 
+  private static void validatePayload(String payload) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+  }
 
   /**
    * List all yaml configurations as JSON enhanced with detection config id, isActive and createBy information.
