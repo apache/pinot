@@ -74,6 +74,7 @@ import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.messages.QueryQuotaUpdateMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -1342,6 +1343,9 @@ public class PinotHelixResourceManager {
       default:
         throw new InvalidTableConfigException("Unsupported table type: " + tableType);
     }
+
+    // Send update query quota message if quota is specified
+    sendUpdateQueryQuotaMessage(tableConfig);
   }
 
   public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs)
@@ -1717,6 +1721,35 @@ public class PinotHelixResourceManager {
           offlineTableName);
     } else {
       LOGGER.warn("No refresh message sent to brokers for segment: {} of table: {}", segmentName, offlineTableName);
+    }
+  }
+
+  private void sendUpdateQueryQuotaMessage(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    QueryQuotaUpdateMessage refreshMessage = new QueryQuotaUpdateMessage(tableNameWithType);
+
+    Criteria recipientCriteria = new Criteria();
+    // Currently Helix does not support send message to a Spectator. So we walk around the problem by sending the
+    // message to participants. Note that brokers are also participants.
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    // The brokerResource field in the EXTERNALVIEW stores the table name in the Partition subfield.
+    recipientCriteria.setPartition(tableNameWithType);
+
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    LOGGER.info("Sending query quota update message for table {}:{} to recipients {}",
+        tableNameWithType, refreshMessage, recipientCriteria);
+    // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
+    int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
+    if (nMsgsSent > 0) {
+      // TODO Would be nice if we can get the name of the instances to which messages were sent.
+      LOGGER.info("Sent {} query quota update msgs for table {}", nMsgsSent, tableNameWithType);
+    } else {
+      // May be the case when none of the brokers are up yet. That is OK, because when they come up they will get
+      // the latest query quota info from table config.
+      LOGGER.warn("Unable to send query quota update message for table {}, nMsgs={}", tableNameWithType, nMsgsSent);
     }
   }
 
