@@ -1,0 +1,113 @@
+[
+  {
+    "column": "hoursSinceEpoch",
+    "template": {
+      "type": "SEQUENCE", "start": 420768, "stepsize": 1, "repetitions": 18
+    }
+  },
+  {
+    "column": "country",
+    "template": {
+      "type": "STRING", "values": [ "us", "cn", "in" ], "repetitions": 6
+    }
+  },
+  {
+    "column": "platform",
+    "template": {
+      "type": "STRING", "values": [ "desktop", "mobile" ], "repetitions": 3
+    }
+  },
+  {
+    "column": "browser",
+    "template": {
+      "type": "STRING", "values": [ "chrome", "safari", "firefox" ]
+    }
+  },
+  {
+    "column": "views",
+    "template": {
+      "type": "MIXTURE",
+      "defaults": {
+        "type": "SEASONAL", "wavelength": 24, "scalingFactors": [ 0.4, 0.9, 1.0, 1.0, 1.0, 0.8, 0.4 ]
+      },
+      "generatorBins": [
+        [ { "mean": 50, "sigma": 4.0, "amplitude": 40 } ],
+        [ { "mean": 25, "sigma": 2.5, "amplitude": 15 } ],
+        [ { "mean": 10, "sigma": 1.0, "amplitude":  5 } ],
+        [ { "mean": 90, "sigma": 6.0, "amplitude": 80 }, { "type": "SPIKE", "arrivalMean": 5, "arrivalSigma": 1, "magnitudeMean": 5, "magnitudeSigma": 1, "smoothing": 0.7 } ],
+        [ { "mean": 45, "sigma": 3.0, "amplitude": 35 } ],
+        [ { "mean": 20, "sigma": 1.5, "amplitude": 15 } ],
+        [ { "mean": 10, "sigma": 0.5, "amplitude":  8 } ],
+        [ { "mean": 25, "sigma": 2.5, "amplitude": 15 } ],
+        [ { "mean": 10, "sigma": 1.0, "amplitude":  5 } ],
+        [ { "mean": 20, "sigma": 1.0, "amplitude": 18 }, { "type": "SPIKE", "arrivalMean": 5, "arrivalSigma": 1, "magnitudeMean": 0.5, "magnitudeSigma": 0.5, "smoothing": 0.5 } ],
+        [ { "mean": 45, "sigma": 3.0, "amplitude": 35 } ],
+        [ { "mean": 20, "sigma": 1.5, "amplitude": 15 } ],
+        [ { "mean": 50, "sigma": 4.0, "amplitude": 40 } ],
+        [ { "mean": 10, "sigma": 1.0, "amplitude":  8 } ],
+        [ { "mean": 10, "sigma": 1.0, "amplitude":  5 } ],
+        [ { "mean": 90, "sigma": 6.0, "amplitude": 80 }, { "type": "SPIKE", "arrivalMean": 5, "arrivalSigma": 1, "magnitudeMean": 4, "magnitudeSigma": 1, "smoothing": 0.5 } ],
+        [ { "mean": 45, "sigma": 3.0, "amplitude": 35 } ],
+        [ { "mean": 10, "sigma": 0.5, "amplitude":  9 } ]
+      ]
+    }
+  },
+  {
+    "column": "clicks",
+    "template": {
+      "type": "MIXTURE",
+      "defaults": {
+        "type": "SEASONAL", "wavelength": 24, "scalingFactors": [ 0.5, 0.9, 1.0, 1.0, 1.0, 0.9, 0.5 ]
+      },
+      "generatorBins": [
+        [ { "mean": 12, "sigma": 1.0, "amplitude": 10 } ],
+        [ { "mean":  6, "sigma": 0.5, "amplitude":  5 } ],
+        [ { "mean":  2, "sigma": 0.3, "amplitude":  2 } ],
+        [ { "mean": 20, "sigma": 2.0, "amplitude": 18 }, { "type": "SPIKE", "arrivalMean": 4, "arrivalSigma": 1, "magnitudeMean": 2, "magnitudeSigma": 1, "smoothing": 0.5 } ],
+        [ { "mean":  9, "sigma": 1.0, "amplitude":  7 } ],
+        [ { "mean":  4, "sigma": 0.5, "amplitude":  3 } ],
+        [ { "mean":  3, "sigma": 0.5, "amplitude":  2 } ],
+        [ { "mean":  6, "sigma": 0.5, "amplitude":  5 } ],
+        [ { "mean":  2, "sigma": 0.3, "amplitude":  2 } ],
+        [ { "mean":  5, "sigma": 0.5, "amplitude":  4 }, { "type": "SPIKE", "arrivalMean": 5, "arrivalSigma": 1, "magnitudeMean": 0.5, "magnitudeSigma": 0.5, "smoothing": 0.3 } ],
+        [ { "mean":  9, "sigma": 1.0, "amplitude":  7 } ],
+        [ { "mean":  4, "sigma": 0.5, "amplitude":  3 } ],
+        [ { "mean": 12, "sigma": 1.0, "amplitude": 10 } ],
+        [ { "mean":  6, "sigma": 0.5, "amplitude":  5 } ],
+        [ { "mean":  2, "sigma": 0.3, "amplitude":  2 } ],
+        [ { "mean": 20, "sigma": 2.0, "amplitude": 18 }, { "type": "SPIKE", "arrivalMean": 5, "arrivalSigma": 1, "magnitudeMean": 3, "magnitudeSigma": 1, "smoothing": 0.3 } ],
+        [ { "mean":  9, "sigma": 1.0, "amplitude":  7 } ],
+        [ { "mean":  4, "sigma": 0.5, "amplitude":  3 } ]
+      ]
+    }
+  },
+  {
+    "column": "errors",
+    "template": {
+      "type": "MIXTURE",
+      "defaults": {
+        "type": "SPIKE", "arrivalMean": 4, "arrivalSigma": 1, "magnitudeMean": 2, "magnitudeSigma": 1, "smoothing": 0.3
+      },
+      "generatorBins": [
+        [ { "arrivalMean": 4, "magnitudeMean": 2.0 } ],
+        [ { "arrivalMean": 3, "magnitudeMean": 1.0 } ],
+        [ { "arrivalMean": 5, "magnitudeMean": 0.2 } ],
+        [ { "arrivalMean": 4, "magnitudeMean": 2.5 } ],
+        [ { "arrivalMean": 3, "magnitudeMean": 0.8 } ],
+        [ { "arrivalMean": 5, "magnitudeMean": 0.1 } ],
+        [ { "arrivalMean": 1, "magnitudeMean": 0.5 } ],
+        [ { "arrivalMean": 3, "magnitudeMean": 1.0 } ],
+        [ { "arrivalMean": 5, "magnitudeMean": 0.2 } ],
+        [ { "arrivalMean": 1, "magnitudeMean": 0.5 } ],
+        [ { "arrivalMean": 3, "magnitudeMean": 0.8 } ],
+        [ { "arrivalMean": 5, "magnitudeMean": 0.1 } ],
+        [ { "arrivalMean": 4, "magnitudeMean": 2.0 } ],
+        [ { "arrivalMean": 3, "magnitudeMean": 1.0 } ],
+        [ { "arrivalMean": 5, "magnitudeMean": 0.2 } ],
+        [ { "arrivalMean": 4, "magnitudeMean": 2.5 } ],
+        [ { "arrivalMean": 3, "magnitudeMean": 0.8 } ],
+        [ { "arrivalMean": 5, "magnitudeMean": 0.1 } ]
+      ]
+    }
+  }
+]

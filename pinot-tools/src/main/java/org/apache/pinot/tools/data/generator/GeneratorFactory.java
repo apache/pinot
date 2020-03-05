@@ -20,22 +20,14 @@ package org.apache.pinot.tools.data.generator;
 
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
+import java.util.Map;
+
 
 /**
  * Sep 13, 2014
  */
 
 public class GeneratorFactory {
-
-  public static Class getGeneratorFor(DataType type) {
-
-    if (type == DataType.STRING) {
-      return StringGenerator.class;
-    }
-
-    return NumberGenerator.class;
-  }
-
   public static Generator getGeneratorFor(DataType type, int cardinality) {
     if (type == DataType.STRING) {
       return new StringGenerator(cardinality);
@@ -45,28 +37,34 @@ public class GeneratorFactory {
   }
 
   public static Generator getGeneratorFor(DataType dataType, int start, int end) {
-    Generator generator;
-
     switch (dataType) {
       case INT:
-        generator = new RangeIntGenerator(start, end);
-        break;
-
+        return new RangeIntGenerator(start, end);
       case LONG:
-        generator = new RangeLongGenerator(start, end);
-        break;
-
+        return new RangeLongGenerator(start, end);
       case FLOAT:
-        generator = new RangeFloatGenerator(start, end);
-        break;
-
+        return new RangeFloatGenerator(start, end);
       case DOUBLE:
-        generator = new RangeDoubleGenerator(start, end);
-        break;
-
+        return new RangeDoubleGenerator(start, end);
       default:
-        throw new RuntimeException("Invalid datatype");
+        throw new RuntimeException(String.format("Invalid datatype '%s'", dataType));
     }
-    return generator;
+  }
+
+  public static Generator getGeneratorFor(TemplateType templateType, Map<String, Object> templateConfig) {
+    switch (templateType) {
+      case SEASONAL:
+        return new TemplateSeasonalGenerator(templateConfig);
+      case SPIKE:
+        return new TemplateSpikeGenerator(templateConfig);
+      case SEQUENCE:
+        return new TemplateSequenceGenerator(templateConfig);
+      case STRING:
+        return new TemplateStringGenerator(templateConfig);
+      case MIXTURE:
+        return new TemplateMixtureGenerator(templateConfig);
+      default:
+        throw new RuntimeException(String.format("Invalid template '%s'", templateType));
+    }
   }
 }
