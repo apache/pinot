@@ -290,7 +290,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
       private MutableRoaringBitmap evaluate(MutableRoaringBitmap answer) {
         BaseFilterOperator filterOperator = new BitmapWrappedFilterOperator(answer);
-        DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+        DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL, false);
         ProjectionOperator projectionOperator =
             new ProjectionOperator(_expressionFilterOperator._dataSourceMap, docIdSetOperator);
         TransformOperator operator =
