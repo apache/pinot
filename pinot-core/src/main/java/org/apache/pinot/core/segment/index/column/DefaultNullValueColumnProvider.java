@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
-import com.google.common.base.Preconditions;
-import org.apache.pinot.core.io.reader.impl.ConstantMultiValueInvertedIndex;
-import org.apache.pinot.core.io.reader.impl.ConstantSingleValueInvertedIndex;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.ConstantValueDoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueFloatDictionary;
@@ -38,7 +35,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class DefaultNullValueColumnProvider extends BaseColumnProvider {
 
   Dictionary _dictionary;
-  ColumnMetadata _columnMetadata;
 
   public DefaultNullValueColumnProvider(ColumnContext columnContext) {
     buildDictionary(columnContext);
@@ -50,8 +46,7 @@ public class DefaultNullValueColumnProvider extends BaseColumnProvider {
   public ColumnMetadata buildMetadata(ColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
     columnMetadataBuilder.setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true);
-    _columnMetadata = columnMetadataBuilder.build();
-    return _columnMetadata;
+    return columnMetadataBuilder.build();
   }
 
   public Dictionary buildDictionary(ColumnContext context) {
@@ -72,22 +67,5 @@ public class DefaultNullValueColumnProvider extends BaseColumnProvider {
           "Caught exception building dictionary. Unsupported data type: " + dataType.toString());
     }
     return _dictionary;
-  }
-
-  public void updateInvertedIndex(ColumnContext columnContext) {
-    Preconditions.checkState(
-        _columnIndexContainer.getInvertedIndex() instanceof ConstantSingleValueInvertedIndex || _columnIndexContainer
-            .getInvertedIndex() instanceof ConstantMultiValueInvertedIndex, "column index should have constant value");
-    if (_columnIndexContainer.getInvertedIndex() instanceof ConstantSingleValueInvertedIndex) {
-      ((ConstantSingleValueInvertedIndex) _columnIndexContainer.getInvertedIndex())
-          .setLength(columnContext.getTotalDocCount());
-    } else {
-      ((ConstantMultiValueInvertedIndex) _columnIndexContainer.getInvertedIndex())
-          .setLength(columnContext.getTotalDocCount());
-    }
-  }
-
-  public ColumnMetadata getColumnMetadata() {
-    return _columnMetadata;
   }
 }

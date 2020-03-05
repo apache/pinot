@@ -65,8 +65,4 @@ public abstract class BaseColumnProvider implements ColumnProvider {
         new BaseColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
     return _columnIndexContainer;
   }
-
-  public ColumnIndexContainer getColumnIndexContainer() {
-    return _columnIndexContainer;
-  }
 }

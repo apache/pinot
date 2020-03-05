@@ -56,7 +56,6 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnContext;
 import org.apache.pinot.core.segment.index.column.ColumnProvider;
-import org.apache.pinot.core.segment.index.column.DefaultNullValueColumnProvider;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
@@ -130,7 +129,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private RealtimeLuceneReaders _realtimeLuceneReaders;
   // If the table schema is changed before the consuming segment is committed, newly added columns would appear in _newlyAddedColumnsFieldMap.
   private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
-  private final Map<String, ColumnProvider> _newlyAddedColumnsProviderMap = new ConcurrentHashMap<>();
+  private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -330,9 +329,13 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   public void addExtraColumns(Schema newSchema) {
-    for (String columnName : newSchema.getPhysicalColumnNames()) {
-      if (!_schema.getPhysicalColumnNames().contains(columnName)) {
-        _newlyAddedColumnsFieldMap.put(columnName, newSchema.getFieldSpecFor(columnName));
+    for (String columnName : newSchema.getColumnNames()) {
+      if (!_schema.getColumnNames().contains(columnName)) {
+        FieldSpec fieldSpec = newSchema.getFieldSpecFor(columnName);
+        _newlyAddedColumnsFieldMap.put(columnName, fieldSpec);
+        if (!fieldSpec.isVirtualColumn()) {
+          _newlyAddedPhysicalColumnsFieldMap.put(columnName, fieldSpec);
+        }
       }
     }
     _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
@@ -562,7 +565,7 @@ public class MutableSegmentImpl implements MutableSegment {
       physicalColumnNames.add(fieldSpec.getName());
     }
     // We should include newly added columns in the physical columns
-    return Sets.union(physicalColumnNames, _newlyAddedColumnsFieldMap.keySet());
+    return Sets.union(physicalColumnNames, _newlyAddedPhysicalColumnsFieldMap.keySet());
   }
 
   @Override
@@ -571,22 +574,14 @@ public class MutableSegmentImpl implements MutableSegment {
     if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
       // Column is either added during ingestion, or was initiated with a virtual column provider
       if (fieldSpec == null) {
-        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to provide default null values
+        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to provide values
         fieldSpec = _newlyAddedColumnsFieldMap.get(columnName);
         Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + columnName + " should not be null");
       }
       ColumnContext columnContext = new ColumnContext(fieldSpec, _numDocsIndexed);
-      ColumnProvider columnProvider =
-          _newlyAddedColumnsProviderMap.getOrDefault(columnName, ColumnProviderFactory.buildProvider(columnContext));
-      if (columnProvider instanceof DefaultNullValueColumnProvider) {
-        _logger.debug("Updating number of rows for {}", columnName);
-        // We just need to update _numDocsIndexed, and return default values
-        ((DefaultNullValueColumnProvider) columnProvider).updateInvertedIndex(columnContext);
-        return new ColumnDataSource(columnProvider.getColumnIndexContainer(), columnProvider.getColumnMetadata());
-      } else {
-        return new ColumnDataSource(columnProvider.buildColumnIndexContainer(columnContext),
-            columnProvider.buildMetadata(columnContext));
-      }
+      ColumnProvider columnProvider = ColumnProviderFactory.buildProvider(columnContext);
+      return new ColumnDataSource(columnProvider.buildColumnIndexContainer(columnContext),
+          columnProvider.buildMetadata(columnContext));
     } else {
       return new ColumnDataSource(fieldSpec, _numDocsIndexed, _maxNumValuesMap.get(columnName),
           _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),

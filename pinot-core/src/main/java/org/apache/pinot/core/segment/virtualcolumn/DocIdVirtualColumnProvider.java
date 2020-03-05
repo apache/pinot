@@ -60,11 +60,6 @@ public class DocIdVirtualColumnProvider extends BaseColumnProvider {
   }
 
   @Override
-  public ColumnMetadata getColumnMetadata() {
-    return _columnMetadata;
-  }
-
-  @Override
   public InvertedIndexReader buildInvertedIndex(ColumnContext context) {
     return new DocIdInvertedIndex();
   }

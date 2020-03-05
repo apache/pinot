@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
-import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.ConstantValueDoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueFloatDictionary;
@@ -173,18 +172,5 @@ public class DefaultNullValueColumnProviderTest {
     dictionary = new DefaultNullValueColumnProvider(columnContext).buildDictionary(columnContext);
     Assert.assertEquals(ConstantValueFloatDictionary.class, dictionary.getClass());
     Assert.assertEquals(Float.NEGATIVE_INFINITY, dictionary.getFloatValue(0));
-  }
-
-  @Test
-  public void testUpdateInvertedIndex() {
-    ColumnContext columnContext = new ColumnContext(svStringFieldSpec, 1);
-    DefaultNullValueColumnProvider columnProvider = new DefaultNullValueColumnProvider(columnContext);
-    Assert.assertEquals(columnProvider.getColumnIndexContainer().getInvertedIndex().getDocIds(0),
-        new Pairs.IntPair(0, 1));
-
-    columnContext = new ColumnContext(svStringFieldSpec, 10);
-    columnProvider.updateInvertedIndex(columnContext);
-    Assert.assertEquals(columnProvider.getColumnIndexContainer().getInvertedIndex().getDocIds(0),
-        new Pairs.IntPair(0, 10));
   }
 }
