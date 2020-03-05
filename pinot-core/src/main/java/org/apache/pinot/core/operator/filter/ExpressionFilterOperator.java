@@ -196,7 +196,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       int _endDocId;
       //used only in next() and advance methods
       int _currentBlockStartDocId = -1;
-      int _currentBlockEndDocId = 0;
+      int _currentBlockEndDocId = -1;
       private int _currentDocId = -1;
       IntIterator _intIterator = null;
 
@@ -219,7 +219,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
         }
         while (_currentDocId < _endDocId) {
           if (_intIterator == null) {
-            _currentBlockStartDocId = _currentBlockEndDocId;
+            _currentBlockStartDocId = _currentBlockEndDocId + 1;
             _currentBlockEndDocId = _currentBlockStartDocId + DocIdSetPlanNode.MAX_DOC_PER_CALL;
             _currentBlockEndDocId = Math.min(_currentBlockEndDocId, _endDocId);
             MutableRoaringBitmap bitmapRange = new MutableRoaringBitmap();
