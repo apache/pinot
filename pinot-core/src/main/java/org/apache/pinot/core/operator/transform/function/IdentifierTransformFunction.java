@@ -33,15 +33,15 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  */
 public class IdentifierTransformFunction implements TransformFunction {
   private final String _columnName;
-  private final DataSource _dataSource;
+  private final Dictionary _dictionary;
   private final TransformResultMetadata _resultMetadata;
 
   public IdentifierTransformFunction(String columnName, DataSource dataSource) {
     _columnName = columnName;
-    _dataSource = dataSource;
+    _dictionary = dataSource.getDictionary();
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     _resultMetadata = new TransformResultMetadata(dataSourceMetadata.getDataType(), dataSourceMetadata.isSingleValue(),
-        dataSourceMetadata.hasDictionary());
+        _dictionary != null);
   }
 
   @Override
@@ -61,7 +61,7 @@ public class IdentifierTransformFunction implements TransformFunction {
 
   @Override
   public Dictionary getDictionary() {
-    return _dataSource.getDictionary();
+    return _dictionary;
   }
 
   @Override

@@ -23,11 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
+import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -88,8 +89,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public ColumnDataSource getDataSource(String column) {
-    return new ColumnDataSource(_indexContainerMap.get(column), _segmentMetadata.getColumnMetadataFor(column));
+  public DataSource getDataSource(String column) {
+    return new ImmutableDataSource(_segmentMetadata.getColumnMetadataFor(column), _indexContainerMap.get(column));
   }
 
   @Override

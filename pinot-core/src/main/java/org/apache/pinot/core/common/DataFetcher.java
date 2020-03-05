@@ -34,12 +34,8 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  */
 public class DataFetcher {
   // Thread local (reusable) buffer for single-valued column dictionary Ids
-  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS = new ThreadLocal<int[]>() {
-    @Override
-    protected int[] initialValue() {
-      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-  };
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
+      ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
 
   private final Map<String, Dictionary> _dictionaryMap;
   // For single-valued column
@@ -59,7 +55,7 @@ public class DataFetcher {
     _singleValueSetMap = new HashMap<>(numColumns);
     _blockMultiValIteratorMap = new HashMap<>(numColumns);
 
-    int maxNumMultiValues = 0;
+    int maxNumValuesPerMVEntry = 0;
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
       String column = entry.getKey();
       DataSource dataSource = entry.getValue();
@@ -70,11 +66,11 @@ public class DataFetcher {
         _singleValueSetMap.put(column, (SingleValueSet) blockValueSet);
       } else {
         _blockMultiValIteratorMap.put(column, (BlockMultiValIterator) blockValueSet.iterator());
-        maxNumMultiValues = Math.max(maxNumMultiValues, dataSourceMetadata.getMaxNumMultiValues());
+        maxNumValuesPerMVEntry = Math.max(maxNumValuesPerMVEntry, dataSourceMetadata.getMaxNumValuesPerMVEntry());
       }
     }
 
-    _reusableMVDictIds = new int[maxNumMultiValues];
+    _reusableMVDictIds = new int[maxNumValuesPerMVEntry];
   }
 
   /**
