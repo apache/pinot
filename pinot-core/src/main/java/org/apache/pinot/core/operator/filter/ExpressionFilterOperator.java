@@ -151,7 +151,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
         throw new UnsupportedOperationException("Filter on expressions that return multi-values is not yet supported");
       }
       _blockDocIdIterator.setStartDocId(0);
-      _blockDocIdIterator.setEndDocId(_expressionFilterOperator._numDocs - 1);
+      _blockDocIdIterator.setEndDocId(_expressionFilterOperator._numDocs);
     }
 
     @Override
@@ -223,8 +223,9 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
             _currentBlockEndDocId = _currentBlockStartDocId + DocIdSetPlanNode.MAX_DOC_PER_CALL;
             _currentBlockEndDocId = Math.min(_currentBlockEndDocId, _endDocId);
             MutableRoaringBitmap bitmapRange = new MutableRoaringBitmap();
-            bitmapRange.add(_currentBlockStartDocId, _currentBlockEndDocId + 1);
+            bitmapRange.add(_currentBlockStartDocId, _currentBlockEndDocId);
             MutableRoaringBitmap matchedBitmap = evaluate(bitmapRange);
+
             _intIterator = matchedBitmap.getIntIterator();
             _numDocsScanned += (_currentBlockEndDocId - _currentBlockStartDocId);
           }
@@ -290,7 +291,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
       private MutableRoaringBitmap evaluate(MutableRoaringBitmap answer) {
         BaseFilterOperator filterOperator = new BitmapWrappedFilterOperator(answer);
-        DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+        DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL, false);
         ProjectionOperator projectionOperator =
             new ProjectionOperator(_expressionFilterOperator._dataSourceMap, docIdSetOperator);
         TransformOperator operator =
