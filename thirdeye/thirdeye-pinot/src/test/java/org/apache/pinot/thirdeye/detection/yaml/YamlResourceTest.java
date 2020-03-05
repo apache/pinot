@@ -1,5 +1,7 @@
 package org.apache.pinot.thirdeye.detection.yaml;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.dashboard.DetectionPreviewConfiguration;
@@ -67,6 +69,36 @@ public class YamlResourceTest {
   }
 
   @Test
+  public void testValidateCreateAlertYaml() throws IOException {
+    // No validation error should be thrown for valid yaml payload
+    String detectionPayload = IOUtils.toString(this.getClass().getResourceAsStream("detection/detection-config-2.yaml"));
+    String subscriptionPayload = IOUtils.toString(this.getClass().getResourceAsStream("alertconfig/alert-config-5.yaml"));
+    Map<String, String> config = new HashMap<>();
+    config.put("detection", detectionPayload);
+    config.put("subscription", subscriptionPayload);
+    try {
+      this.yamlResource.validateCreateAlertYaml(config);
+    } catch (Exception e) {
+      Assert.fail("No exception should be thrown for valid payload");
+      return;
+    }
+
+    // Throw error if the subscription group is not subscribed to the detection
+    detectionPayload = IOUtils.toString(this.getClass().getResourceAsStream("detection/detection-config-2.yaml"));
+    subscriptionPayload = IOUtils.toString(this.getClass().getResourceAsStream("alertconfig/alert-config-2.yaml"));
+    config.put("detection", detectionPayload);
+    config.put("subscription", subscriptionPayload);
+    try {
+      this.yamlResource.validateCreateAlertYaml(config);
+    } catch (IllegalArgumentException e) {
+      Assert.assertEquals(e.getMessage(), "You have not subscribed to the alert. Please copy-paste the"
+          + " detectionName under the subscribedDetections field in your subscription group.");
+      return;
+    }
+    Assert.fail("Since the subscription group has not subscribed to the alert, an error should have been thrown.");
+  }
+
+  @Test
   public void testCreateOrUpdateDetectionConfig() throws IOException {
     String blankYaml = "";
     try {
@@ -95,7 +127,7 @@ public class YamlResourceTest {
       long id = this.yamlResource.createOrUpdateDetectionConfig(user, validYaml);
       DetectionConfigDTO detection = daoRegistry.getDetectionConfigManager().findById(id);
       Assert.assertNotNull(detection);
-      Assert.assertEquals(detection.getName(), "testPipeline");
+      Assert.assertEquals(detection.getName(), "test_detection_1");
     } catch (Exception e) {
       Assert.fail("Exception should not be thrown for valid yaml. Message: " + e + " Cause: " + e.getCause(), e);
     }
@@ -106,7 +138,7 @@ public class YamlResourceTest {
       long id = this.yamlResource.createOrUpdateDetectionConfig(user, updatedYaml);
       DetectionConfigDTO detection = daoRegistry.getDetectionConfigManager().findById(id);
       Assert.assertNotNull(detection);
-      Assert.assertEquals(detection.getName(), "testPipeline");
+      Assert.assertEquals(detection.getName(), "test_detection_2");
       Assert.assertEquals(detection.getDescription(), "My modified pipeline");
     } catch (Exception e) {
       Assert.fail("Exception should not be thrown if detection already exists. Message: " + e + " Cause: " + e.getCause());
@@ -157,7 +189,8 @@ public class YamlResourceTest {
       Assert.assertEquals(e.getMessage(), "Could not parse as map: application:test:application");
     }
 
-    String noSubscriptGroupYaml = "application: test_application";
+    // Error should be thrown if subscriptionGroupName is not defined
+    String noSubscriptGroupYaml = "application: test_application\nsubscribedDetections:\n- test_detection_1\n";
     try {
       this.yamlResource.createSubscriptionConfig(noSubscriptGroupYaml);
       Assert.fail("Exception not thrown on empty yaml");
@@ -251,7 +284,8 @@ public class YamlResourceTest {
       Assert.assertEquals(e.getMessage(), "Could not parse as map: application:test:application");
     }
 
-    String noSubscriptGroupYaml = "application: test_app";
+    // Error should be thrown if no subscriptionGroupName is specified
+    String noSubscriptGroupYaml = "application: test_app\nsubscribedDetections:\n- test_detection_1";
     try {
       this.yamlResource.updateSubscriptionGroup(user, oldId, noSubscriptGroupYaml);
       Assert.fail("Exception not thrown on empty yaml");

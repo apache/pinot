@@ -14,13 +14,13 @@ subscribedDetections:
 # or for advanced critical use-cases setup Iris alert by referring to the documentation
 alertSchemes:
   - type: EMAIL
-recipients:
-  to:
-    - "me@company.com"          # Specify alert recipient email address here
-    - "me@company.com"
-  cc:
-    - "cc_email@company.com"
-fromAddress: email@domain.com
+    params:
+      recipients:
+        to:
+          - "me@company.com"          # Specify alert recipient email address here
+          - "me@company.com"
+        cc:
+          - "cc_email@company.com"
 
 # The below links will appear in the email alerts. This will help alert recipients to quickly refer and act on.
 referenceLinks:

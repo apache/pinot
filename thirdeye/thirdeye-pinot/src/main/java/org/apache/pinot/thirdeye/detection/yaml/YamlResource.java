@@ -26,6 +26,7 @@ import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -261,6 +262,23 @@ public class YamlResource {
     return Response.status(Response.Status.UNAUTHORIZED).entity(responseMessage).build();
   }
 
+  /**
+   * Perform some basic validations on the create alert payload
+   */
+  public void validateCreateAlertYaml(Map<String, String> config) throws IOException {
+    Preconditions.checkArgument(config.containsKey(PROP_DETECTION), "Detection pipeline yaml is missing");
+    Preconditions.checkArgument(config.containsKey(PROP_SUBSCRIPTION), "Subscription group yaml is missing.");
+
+    // check if subscription group has subscribed to the detection
+    Map<String, Object> detectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(config.get(PROP_DETECTION))));
+    String detectionName = MapUtils.getString(detectionConfigMap, PROP_DETECTION_NAME);
+    Map<String, Object> subscriptionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(config.get(PROP_SUBSCRIPTION))));
+    List<String> detectionNames = ConfigUtils.getList(subscriptionConfigMap.get(PROP_DETECTION_NAMES));
+    Preconditions.checkArgument(detectionNames.contains(detectionName),
+        "You have not subscribed to the alert. Please copy-paste the detectionName under the "
+            + PROP_DETECTION_NAMES + " field in your subscription group.");
+  }
+
   @POST
   @Path("/create-alert")
   @Produces(MediaType.APPLICATION_JSON)
@@ -272,9 +290,19 @@ public class YamlResource {
       @ApiParam(value =  "a json contains both subscription and detection yaml as string")  String payload,
       @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long startTime,
       @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) throws Exception {
+    // validate the payload
     Map<String, String> yamls;
+    try {
+      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+      yamls = OBJECT_MAPPER.readValue(payload, Map.class);
+      validateCreateAlertYaml(yamls);
+    } catch (IllegalArgumentException e) {
+      return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
+    } catch (Exception e) {
+      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
+    }
 
-    // Detection
+    // Parse and save the detection config
     long detectionConfigId;
     try {
       validatePayload(payload);
@@ -289,7 +317,7 @@ public class YamlResource {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     }
 
-    // Notification
+    // Parse and save the subscription config
     long detectionAlertConfigId;
     try {
       String subscriptionYaml = yamls.get(PROP_SUBSCRIPTION);

@@ -13,19 +13,16 @@ dimensionRecipients:
   - "ios-thirdeye@thirdeye.com"
 dimension: app_name
 
-fromAddress: thirdeye-dev@linkedin.com
-
-recipients:
- to:
-  - "thirdeye@thirdeye.com"
- cc:
-  - "thirdeye-developers@thirdeye.com"
-
 alertSchemes:
 - type: EMAIL
   params:
     template: ENTITY_GROUPBY_REPORT
     subject: METRICS
+    recipients:
+      to:
+        - "thirdeye@thirdeye.com"
+      cc:
+        - "thirdeye-developers@thirdeye.com"
 - type: IRIS
   params:
     plan: thirdye_test_plan

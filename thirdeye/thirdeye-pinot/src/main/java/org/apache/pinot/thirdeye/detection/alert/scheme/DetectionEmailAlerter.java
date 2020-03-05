@@ -63,7 +63,7 @@ import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.S
 public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionEmailAlerter.class);
 
-  private static final String PROP_RECIPIENTS = "recipients";
+  public static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";

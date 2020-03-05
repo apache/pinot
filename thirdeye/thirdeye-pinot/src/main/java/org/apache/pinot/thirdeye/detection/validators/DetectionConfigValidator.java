@@ -21,8 +21,6 @@ package org.apache.pinot.thirdeye.detection.validators;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +36,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.quartz.CronExpression;
 
 import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
 
 
 public class DetectionConfigValidator implements ConfigValidator<DetectionConfigDTO> {
@@ -58,6 +57,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   private static final String PROP_DETECTION_NAME = "detectionName";
   private static final String PROP_MAX_DURATION = "maxDuration";
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_CRON = "cron";
 
   private static final String LEGACY_METRIC_ALERT = "COMPOSITE";
   private static final String METRIC_ALERT = "METRIC_ALERT";
@@ -129,12 +129,11 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
         "Missing property ( " + PROP_NAME + " ) in one of the sub-alerts under " + parentAlertName);
     String alertName = MapUtils.getString(detectionYaml, PROP_NAME);
 
-    Preconditions.checkArgument(detectionYaml.containsKey(PROP_TYPE),
-        "Missing property ( " + PROP_TYPE + " ) in sub-alert " + alertName);
     String alertType = MapUtils.getString(detectionYaml, PROP_TYPE);
-
-    Preconditions.checkArgument(SUPPORTED_ALERT_TYPES.contains(alertType),
-        "Unsupported type (" + alertType + ") in sub-alert " + alertName);
+    if (alertType != null) {
+      Preconditions.checkArgument(SUPPORTED_ALERT_TYPES.contains(alertType),
+          "Unsupported type (" + alertType + ") in sub-alert " + alertName);
+    }
   }
 
   private void validateMetricAlertConfig(Map<String, Object> detectionYaml, String parentAlertName)
@@ -227,33 +226,31 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   }
 
   /**
-   * Validate the the detection yaml configuration.
+   * Make sure the config adheres to detection config syntax
    *
    * @param detectionYaml the detection yaml configuration to be validated
    */
   @Override
   public void validateYaml(Map<String, Object> detectionYaml) throws IllegalArgumentException {
-    // Validate detectionName
-    Preconditions.checkArgument(detectionYaml.containsKey(PROP_DETECTION_NAME), "Property missing: " + PROP_DETECTION_NAME);
-    String alertName = MapUtils.getString(detectionYaml, PROP_DETECTION_NAME);
+    // detectionName is a required field
+    Preconditions.checkArgument(detectionYaml.containsKey(PROP_DETECTION_NAME),
+        "Property missing: " + PROP_DETECTION_NAME);
 
     // Hack to support 'detectionName' attribute at root level and 'name' attribute elsewhere
     // We consistently use 'name' as a convention to define the sub-alerts. However, at the root
     // level, as a convention, we will use 'detectionName' which defines the name of the complete alert.
+    String alertName = MapUtils.getString(detectionYaml, PROP_DETECTION_NAME);
     detectionYaml.put(PROP_NAME, alertName);
 
-    // By default if 'type' is not specified, we assume it as a METRIC_ALERT
-    if (!detectionYaml.containsKey(PROP_TYPE)) {
-      detectionYaml.put(PROP_TYPE, METRIC_ALERT);
-    }
-
     // Validate config depending on the type (METRIC_ALERT OR COMPOSITE_ALERT)
-    if (detectionYaml.get(PROP_TYPE).equals(COMPOSITE_ALERT)) {
-      validateCompositeAlertConfig(detectionYaml, alertName);
-    } else {
-      // The legacy type 'COMPOSITE' will be treated as a metric alert along with the new convention METRIC_ALERT.
-      // This is applicable only at the root level to maintain backward compatibility.
+    if (detectionYaml.get(PROP_TYPE) == null || detectionYaml.get(PROP_TYPE).equals(METRIC_ALERT)) {
+      // By default, we treat every alert as a METRIC_ALERT unless explicitly specified.
+      // Even the legacy type termed 'COMPOSITE' will be treated as a metric alert along
+      // with the new convention METRIC_ALERT. This is applicable only at the root level
+      // to maintain backward compatibility.
       validateMetricAlertConfig(detectionYaml, alertName);
+    } else {
+      validateCompositeAlertConfig(detectionYaml, alertName);
     }
   }
 
