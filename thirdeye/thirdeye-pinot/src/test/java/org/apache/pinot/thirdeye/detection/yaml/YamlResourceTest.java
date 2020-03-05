@@ -72,7 +72,7 @@ public class YamlResourceTest {
   public void testValidateCreateAlertYaml() throws IOException {
     // No validation error should be thrown for valid yaml payload
     String detectionPayload = IOUtils.toString(this.getClass().getResourceAsStream("detection/detection-config-2.yaml"));
-    String subscriptionPayload = IOUtils.toString(this.getClass().getResourceAsStream("alertconfig/alert-config-5.yaml"));
+    String subscriptionPayload = IOUtils.toString(this.getClass().getResourceAsStream("subscription/subscription-config-5.yaml"));
     Map<String, String> config = new HashMap<>();
     config.put("detection", detectionPayload);
     config.put("subscription", subscriptionPayload);
@@ -85,7 +85,7 @@ public class YamlResourceTest {
 
     // Throw error if the subscription group is not subscribed to the detection
     detectionPayload = IOUtils.toString(this.getClass().getResourceAsStream("detection/detection-config-2.yaml"));
-    subscriptionPayload = IOUtils.toString(this.getClass().getResourceAsStream("alertconfig/alert-config-2.yaml"));
+    subscriptionPayload = IOUtils.toString(this.getClass().getResourceAsStream("subscription/subscription-config-2.yaml"));
     config.put("detection", detectionPayload);
     config.put("subscription", subscriptionPayload);
     try {
@@ -178,7 +178,8 @@ public class YamlResourceTest {
       this.yamlResource.createSubscriptionConfig(blankYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Subscription group name field cannot be left empty.");
+      Assert.assertEquals(e.getMessage(), "A subscription group should subscribe to at least one alert."
+          + " If you wish to unsubscribe, set active to false in the subscription config.");
     }
 
     String inValidYaml = "application:test:application";
@@ -273,7 +274,8 @@ public class YamlResourceTest {
       this.yamlResource.updateSubscriptionGroup(user, oldId, blankYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Subscription group name field cannot be left empty.");
+      Assert.assertEquals(e.getMessage(), "A subscription group should subscribe to at least one alert."
+          + " If you wish to unsubscribe, set active to false in the subscription config.");
     }
 
     String inValidYaml = "application:test:application";
