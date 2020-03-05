@@ -129,7 +129,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private RealtimeLuceneReaders _realtimeLuceneReaders;
   // If the table schema is changed before the consuming segment is committed, newly added columns would appear in _newlyAddedColumnsFieldMap.
-  private volatile Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
+  private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
   private final Map<String, ColumnProvider> _newlyAddedColumnsProviderMap = new ConcurrentHashMap<>();
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
