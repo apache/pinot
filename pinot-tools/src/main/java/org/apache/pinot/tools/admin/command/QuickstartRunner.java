@@ -35,6 +35,7 @@ import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.QuickstartTableRequest;
+import org.apache.pinot.tools.utils.JarUtils;
 import org.yaml.snakeyaml.Yaml;
 
 
@@ -178,7 +179,14 @@ public class QuickstartRunner {
           String inputDirURI = spec.getInputDirURI();
           if (!new File(inputDirURI).exists()) {
             URL resolvedInputDirURI = QuickstartRunner.class.getClassLoader().getResource(inputDirURI);
-            spec.setInputDirURI(resolvedInputDirURI.toURI().toString());
+            if (resolvedInputDirURI.getProtocol().equals("jar")) {
+              String[] splits = resolvedInputDirURI.getFile().split("!");
+              String inputDir = new File(_tempDir, "inputData").toString();
+              JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir);
+              spec.setInputDirURI(inputDir);
+            } else {
+              spec.setInputDirURI(resolvedInputDirURI.toString());
+            }
           }
           IngestionJobLauncher.runIngestionJob(spec);
         }
