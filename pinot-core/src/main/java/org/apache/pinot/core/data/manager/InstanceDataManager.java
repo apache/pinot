@@ -44,8 +44,7 @@ public interface InstanceDataManager {
    * Initializes the data manager.
    * <p>Should be called only once and before calling any other method.
    */
-  void init(Configuration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      HelixAdmin helixAdmin, String clusterName)
+  void init(Configuration config, HelixManager helixManager, ServerMetrics serverMetrics)
       throws ConfigurationException;
 
   /**

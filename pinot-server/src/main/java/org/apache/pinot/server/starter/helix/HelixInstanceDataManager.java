@@ -71,12 +71,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixManager _helixManager;
   private ServerMetrics _serverMetrics;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private HelixAdmin _helixAdmin;
-  private String _clusterName;
 
   @Override
-  public synchronized void init(Configuration config, HelixManager helixManager, ServerMetrics serverMetrics
-      , HelixAdmin helixAdmin, String clusterName)
+  public synchronized void init(Configuration config, HelixManager helixManager, ServerMetrics serverMetrics)
       throws ConfigurationException {
     LOGGER.info("Initializing Helix instance data manager");
 
@@ -85,8 +82,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _serverMetrics = serverMetrics;
-    _helixAdmin = helixAdmin;
-    _clusterName = clusterName;
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     if (!instanceDataDir.exists()) {
@@ -145,7 +140,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableNameWithType);
     tableDataManagerConfig.overrideConfigs(tableConfig);
     TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore, _serverMetrics , _helixAdmin, _clusterName);
+        .getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore, _serverMetrics);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;

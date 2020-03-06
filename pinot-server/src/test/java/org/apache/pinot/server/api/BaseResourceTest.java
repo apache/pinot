@@ -135,7 +135,7 @@ public abstract class BaseResourceTest {
     when(tableDataManagerConfig.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
-            mock(ServerMetrics.class), mock(HelixAdmin.class), "testCluster");
+            mock(ServerMetrics.class));
     tableDataManager.start();
     _tableDataManagerMap.put(tableName, tableDataManager);
   }

@@ -141,7 +141,8 @@ public class HelixServerStarter {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager, _helixAdmin, _helixClusterName);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverConf, instanceDataManager);
+    SegmentFetcherAndLoader fetcherAndLoader =
+        new SegmentFetcherAndLoader(_serverConf, instanceDataManager, _helixAdmin, _helixClusterName);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
     _helixManager.getStateMachineEngine()

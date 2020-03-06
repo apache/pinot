@@ -42,7 +42,7 @@ public interface TableDataManager {
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
   void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixAdmin admin, String clusterName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics);
 
   /**
    * Starts the table data manager. Should be called only once after table data manager gets initialized but before

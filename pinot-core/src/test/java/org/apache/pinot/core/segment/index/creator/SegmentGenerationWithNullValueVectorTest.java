@@ -140,7 +140,7 @@ public class SegmentGenerationWithNullValueVectorTest {
     @SuppressWarnings("unchecked")
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
-            mock(ServerMetrics.class), mock(HelixAdmin.class), "clusterName");
+            mock(ServerMetrics.class));
     tableDataManager.start();
     tableDataManager.addSegment(_segment);
     _instanceDataManager = mock(InstanceDataManager.class);

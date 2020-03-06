@@ -55,7 +55,7 @@ public class ServerInstance {
 
   private boolean _started = false;
 
-  public ServerInstance(ServerConf serverConf, HelixManager helixManager, HelixAdmin helixAdmin, String helixClusterName)
+  public ServerInstance(ServerConf serverConf, HelixManager helixManager)
       throws Exception {
     LOGGER.info("Initializing server instance");
 
@@ -70,8 +70,7 @@ public class ServerInstance {
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
     _instanceDataManager = (InstanceDataManager) Class.forName(instanceDataManagerClassName).newInstance();
-    _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
-        helixAdmin, helixClusterName);
+    _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics);
 
     String queryExecutorClassName = serverConf.getQueryExecutorClassName();
     LOGGER.info("Initializing query executor of class: {}", queryExecutorClassName);

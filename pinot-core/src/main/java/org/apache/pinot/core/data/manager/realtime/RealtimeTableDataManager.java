@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FilenameFilter;
@@ -35,13 +34,11 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -49,7 +46,6 @@ import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -67,6 +63,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 
 @ThreadSafe
 public class RealtimeTableDataManager extends BaseTableDataManager {
+  public static final String PEER_2_PEER_PROTOCOL = "server://";
   private final ExecutorService _segmentAsyncExecutorService =
       Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
@@ -290,12 +287,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     FileUtils.deleteQuietly(segmentFolder);
     try {
       boolean downloadResult = downloadFromURI(uri, tempFile);
+      // If segment download from segment store fails, tried to download from peer server (only if the server
+      // is configured with PeerServerSegmentFetcher.
       if (!downloadResult) {
-         String peerServerUri = getPeerServerURI(segmentName);
-         if (peerServerUri == null || !downloadFromURI(peerServerUri, tempFile)) {
-           _logger.warn("Download segment {} from {} failed.", segmentName, peerServerUri);
-           return;
-         }
+         SegmentFetcherFactory.fetchSegmentToLocal(new URI(StringUtil.join("/", PEER_2_PEER_PROTOCOL, segmentName)),
+             tempFile);
       }
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
       _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
@@ -311,48 +307,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  // Return the address of an ONLINE server hosting a segment.
-  public String getPeerServerURI(String segmentName) {
-    ExternalView externalViewForResource = HelixHelper.getExternalViewForResource(_helixAdmin, _clusterName, _tableNameWithType);
-    if (externalViewForResource == null ) {
-      _logger.warn("External View not found for segment {}", segmentName);
-      return null;
-    }
-    // Find out the ONLINE server serving the segment.
-    for(String segment : externalViewForResource.getPartitionSet()) {
-      if (!segmentName.equals(segment)) {
-        continue;
-      }
-
-      Map<String, String> instanceToStateMap = externalViewForResource.getStateMap(segmentName);
-      for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
-        if ("ONLINE".equals(instanceState.getValue())) {
-          _logger.info("Found ONLINE server {} for segment {}.", instanceState.getKey(), segmentName);
-          String instanceId = instanceState.getKey();
-
-          String namePortStr = instanceId.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
-          String hostName = namePortStr.split("_")[0];
-
-          Map<String, String> instanceConfig =
-              HelixHelper.getInstanceConfigsMapFor(instanceId, _clusterName, _helixAdmin);
-          int port;
-          try {
-            port = Integer.parseInt(instanceConfig.get(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
-          } catch (Exception e) {
-            port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
-          }
-
-          return StringUtil.join("/", "http://" + hostName + ":" + port,
-              "segments", _tableNameWithType, segmentName);
-        }
-      }
-    }
-    return null;
-  }
 
   private boolean downloadFromURI(String uri, File tempFile) {
     try {
-      SegmentFetcherFactory.getSegmentFetcher(new URI(uri).getScheme()).fetchSegmentToLocal(new URI(uri), tempFile);
+      SegmentFetcherFactory.fetchSegmentToLocal(new URI(uri), tempFile);
       _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
     } catch (Exception e) {
       _logger.warn("Download segment from {} failed: {}", uri, e.getMessage());
