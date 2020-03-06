@@ -67,7 +67,13 @@ public class InstanceSelectorTest {
     // Should be backward-compatible with legacy config
     when(routingConfig.getInstanceSelectorType()).thenReturn(null);
     when(tableConfig.getTableType()).thenReturn(CommonConstants.Helix.TableType.OFFLINE);
-    when(routingConfig.getRoutingTableBuilderName()).thenReturn(InstanceSelectorFactory.LEGACY_REPLICA_GROUP_ROUTING);
+    when(routingConfig.getRoutingTableBuilderName())
+        .thenReturn(InstanceSelectorFactory.LEGACY_REPLICA_GROUP_OFFLINE_ROUTING);
+    assertTrue(InstanceSelectorFactory
+        .getInstanceSelector(tableConfig, brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    when(tableConfig.getTableType()).thenReturn(CommonConstants.Helix.TableType.REALTIME);
+    when(routingConfig.getRoutingTableBuilderName())
+        .thenReturn(InstanceSelectorFactory.LEGACY_REPLICA_GROUP_REALTIME_ROUTING);
     assertTrue(InstanceSelectorFactory
         .getInstanceSelector(tableConfig, brokerMetrics) instanceof ReplicaGroupInstanceSelector);
   }

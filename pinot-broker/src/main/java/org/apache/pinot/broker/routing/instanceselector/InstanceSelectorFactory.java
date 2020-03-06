@@ -32,15 +32,18 @@ public class InstanceSelectorFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceSelectorFactory.class);
 
-  public static final String LEGACY_REPLICA_GROUP_ROUTING = "PartitionAwareOffline";
+  public static final String LEGACY_REPLICA_GROUP_OFFLINE_ROUTING = "PartitionAwareOffline";
+  public static final String LEGACY_REPLICA_GROUP_REALTIME_ROUTING = "PartitionAwareRealtime";
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig, BrokerMetrics brokerMetrics) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null && (
         RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(routingConfig.getInstanceSelectorType())
-            || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_ROUTING
-            .equalsIgnoreCase(routingConfig.getRoutingTableBuilderName())))) {
+            || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING
+            .equalsIgnoreCase(routingConfig.getRoutingTableBuilderName())) || (
+            tableConfig.getTableType() == TableType.REALTIME && LEGACY_REPLICA_GROUP_REALTIME_ROUTING
+                .equalsIgnoreCase(routingConfig.getRoutingTableBuilderName())))) {
       LOGGER.info("Using ReplicaGroupInstanceSelector for table: {}", tableNameWithType);
       return new ReplicaGroupInstanceSelector(tableNameWithType, brokerMetrics);
     }
