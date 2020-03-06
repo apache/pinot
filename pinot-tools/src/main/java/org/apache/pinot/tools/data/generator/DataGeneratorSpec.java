@@ -37,6 +37,7 @@ public class DataGeneratorSpec {
   private final List<String> columns;
   private final Map<String, Integer> cardinalityMap;
   private final Map<String, IntRange> rangeMap;
+  private final Map<String, Map<String, Object>> patternMap;
 
   private final Map<String, DataType> dataTypesMap;
   private final Map<String, FieldType> fieldTypesMap;
@@ -47,17 +48,19 @@ public class DataGeneratorSpec {
   private final boolean overrideOutDir;
 
   public DataGeneratorSpec() {
-    this(new ArrayList<String>(), new HashMap<String, Integer>(), new HashMap<String, IntRange>(),
-        new HashMap<String, DataType>(), new HashMap<String, FieldType>(), new HashMap<String, TimeUnit>(),
+    this(new ArrayList<String>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
+        new HashMap<>(), new HashMap<>(), new HashMap<>(),
         FileFormat.AVRO, "/tmp/dataGen", true);
   }
 
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
-      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
+      Map<String, Map<String, Object>> patternMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
       FileFormat format, String outputDir, boolean override) {
     this.columns = columns;
     this.cardinalityMap = cardinalityMap;
     this.rangeMap = rangeMap;
+    this.patternMap = patternMap;
+
     outputFileFormat = format;
     this.outputDir = outputDir;
     overrideOutDir = override;
@@ -95,6 +98,10 @@ public class DataGeneratorSpec {
     return rangeMap;
   }
 
+  public Map<String, Map<String, Object>> getPatternMap() {
+    return patternMap;
+  }
+
   public FileFormat getOutputFileFormat() {
     return outputFileFormat;
   }
@@ -109,8 +116,10 @@ public class DataGeneratorSpec {
     for (final String column : columns) {
       if (cardinalityMap.get(column) != null) {
         builder.append(column + " : " + cardinalityMap.get(column) + " : " + dataTypesMap.get(column));
-      } else {
+      } else if (rangeMap.get(column) != null) {
         builder.append(column + " : " + rangeMap.get(column) + " : " + dataTypesMap.get(column));
+      } else {
+        builder.append(column + " : " + patternMap.get(column));
       }
     }
     builder.append("output file format : " + outputFileFormat);

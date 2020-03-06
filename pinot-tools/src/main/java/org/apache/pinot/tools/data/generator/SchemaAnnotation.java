@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import java.util.Map;
+
 public class SchemaAnnotation {
   String _column;
   boolean _range;
@@ -25,6 +27,7 @@ public class SchemaAnnotation {
   private int _cardinality;
   private int _rangeStart;
   private int _rangeEnd;
+  private Map<String, Object> _pattern;
 
   public SchemaAnnotation() {
   }
@@ -38,6 +41,11 @@ public class SchemaAnnotation {
     _column = column;
     _rangeStart = rangeStart;
     _rangeEnd = rangeEnd;
+  }
+
+  public SchemaAnnotation(String column, Map<String, Object> pattern) {
+    _column = column;
+    _pattern = pattern;
   }
 
   public String getColumn() {
@@ -78,5 +86,13 @@ public class SchemaAnnotation {
 
   public void setRangeEnd(int rangeEnd) {
     _rangeEnd = rangeEnd;
+  }
+
+  public Map<String, Object> getPattern() {
+    return _pattern;
+  }
+
+  public void setPattern(Map<String, Object> pattern) {
+    _pattern = pattern;
   }
 }

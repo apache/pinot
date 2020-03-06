@@ -1,0 +1,17 @@
+{
+  "tableName": "complexWebsite",
+  "segmentsConfig" : {
+    "replication" : "1",
+    "schemaName" : "complexWebsite"
+  },
+  "tableIndexConfig" : {
+    "invertedIndexColumns" : [],
+    "loadMode"  : "HEAP"
+  },
+  "tenants" : {
+    "broker":"DefaultTenant",
+    "server":"DefaultTenant"
+  },
+  "tableType":"OFFLINE",
+  "metadata": {}
+}
