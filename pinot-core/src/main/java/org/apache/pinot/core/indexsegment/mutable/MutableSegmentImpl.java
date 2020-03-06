@@ -208,7 +208,7 @@ public class MutableSegmentImpl implements MutableSegment {
         // each forward index entry will contain a 4 byte dictionary ID
         forwardIndexColumnSize = FieldSpec.DataType.INT.size();
         int dictionaryColumnSize;
-        if (dataType == FieldSpec.DataType.STRING) {
+        if (!isFixedWidthColumn) {
           dictionaryColumnSize = _statsHistory.getEstimatedAvgColSize(column);
         } else {
           dictionaryColumnSize = dataType.size();
