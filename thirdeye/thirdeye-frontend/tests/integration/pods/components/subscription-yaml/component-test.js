@@ -44,7 +44,7 @@ module('Integration | Component | subscription-yaml', function(hooks) {
 
   test(`displays default subscription group yaml in create mode`, async function(assert) {
 
-    const defaultText = '# Below is a sample subscription group template. You may refer the documentation and update accordingly.';
+    const defaultText = "# subscriptionGroupName: 'give_a_unique_name_to_this_group'";
     await render(hbs`
       {{subscription-yaml
         isEditMode=false
