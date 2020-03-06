@@ -18,11 +18,11 @@
     under the License.
 
 -->
-# Generating and Loading Template Data
+# Generating and Loading Synthetic Data
 
 Mock data has many use-cases from testing over benchmarking to portable application demos. The generator configs
 in this directory produce neat synthetic time series data of an imaginary website. You can generate gigabytes of mock
-data with these templates if you so desire.
+data with these patterns if you so desire.
 
 **simpleWebsite** generates non-dimensional data with views, clicks, and error count metrics
 
@@ -31,8 +31,8 @@ data with these templates if you so desire.
 The command line examples below are meant to be executed from the **pinot repository root**.
 (This was tested with pinot-quickstart in batch mode. Requires DefaultTenant and broker) 
 
-## Generate data via template
-This first step generates the raw data from a given template file. By default, we generate the data as CSV, and you can
+## Generate data via pattern
+This first step generates the raw data from a given generator file. By default, we generate the data as CSV, and you can
 have a look manually with your favorite spreadsheet tool.
 
 (may require **rm -rf ./myTestData** to clear out existing mock data)
