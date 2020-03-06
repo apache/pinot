@@ -288,9 +288,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     yamlConfigMap.put(PROP_NAME, alertName);
 
     // By default if 'type' is not specified, we assume it as a METRIC_ALERT
-    if (!yamlConfigMap.containsKey(PROP_TYPE)) {
-      yamlConfigMap.put(PROP_TYPE, METRIC_ALERT);
-    }
+    yamlConfigMap.putIfAbsent(PROP_TYPE, METRIC_ALERT);
 
     // Translate config depending on the type (METRIC_ALERT OR COMPOSITE_ALERT)
     Map<String, Object> properties;
