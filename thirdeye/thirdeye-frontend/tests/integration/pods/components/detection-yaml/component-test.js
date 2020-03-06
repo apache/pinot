@@ -42,7 +42,7 @@ module('Integration | Component | detection-yaml', function(hooks) {
 
   test(`displays default yaml file of alert configuration in create mode`, async function(assert) {
 
-    const defaultText = '# Below is a sample template. You may refer the documentation for more examples and update the fields accordingly.';
+    const defaultText = '# Give a unique name to this alert and describe it';
     await render(hbs`
       {{detection-yaml
         isEditMode=false
