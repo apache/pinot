@@ -32,10 +32,15 @@ sleep 1
 echo "Creating ThirdEye database schema"
 java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.h2.tools.RunScript -user "sa" -password "sa" -url "jdbc:h2:tcp:localhost/h2db" -script "zip:./bin/thirdeye-pinot-1.0-SNAPSHOT.jar!/schema/create-schema.sql"
 
+if [ -f "${CONFIG_DIR}/bootstrap.sql" ]; then
+  echo "Running database bootstrap script ${CONFIG_DIR}/bootstrap.sql"
+  java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.h2.tools.RunScript -user "sa" -password "sa" -url "jdbc:h2:tcp:localhost/h2db" -script "${CONFIG_DIR}/bootstrap.sql"
+fi
+
 echo "Running thirdeye backend config: ${CONFIG_DIR}"
 [ -f "${CONFIG_DIR}/data-sources/data-sources-config-backend.yml" ] && cp "${CONFIG_DIR}/data-sources/data-sources-config-backend.yml" "${CONFIG_DIR}/data-sources/data-sources-config.yml"
 java -cp "./bin/thirdeye-pinot-1.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "${CONFIG_DIR}" &
-sleep 5
+sleep 10
 
 echo "Running thirdeye frontend config: ${CONFIG_DIR}"
 [ -f "${CONFIG_DIR}/data-sources/data-sources-config-frontend.yml" ] && cp "${CONFIG_DIR}/data-sources/data-sources-config-frontend.yml" "${CONFIG_DIR}/data-sources/data-sources-config.yml"
