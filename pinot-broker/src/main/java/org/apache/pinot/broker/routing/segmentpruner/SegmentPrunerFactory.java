@@ -63,8 +63,8 @@ public class SegmentPrunerFactory {
         // Handle legacy configs for backward-compatibility
         TableType tableType = tableConfig.getTableType();
         String routingTableBuilderName = routingConfig.getRoutingTableBuilderName();
-        if (tableType == TableType.OFFLINE && LEGACY_PARTITION_AWARE_OFFLINE_ROUTING
-            .equalsIgnoreCase(routingTableBuilderName) || (tableType == TableType.REALTIME
+        if ((tableType == TableType.OFFLINE && LEGACY_PARTITION_AWARE_OFFLINE_ROUTING
+            .equalsIgnoreCase(routingTableBuilderName)) || (tableType == TableType.REALTIME
             && LEGACY_PARTITION_AWARE_REALTIME_ROUTING.equalsIgnoreCase(routingTableBuilderName))) {
           PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
           if (partitionSegmentPruner != null) {
