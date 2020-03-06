@@ -18,6 +18,16 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.spi.data.*;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -25,20 +35,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.math.IntRange;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.readers.FileFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -75,11 +71,11 @@ public class DataGenerator {
     for (final String column : genSpec.getColumns()) {
       DataType dataType = genSpec.getDataTypesMap().get(column);
 
-      if (genSpec.getTemplateMap().containsKey(column)) {
+      if (genSpec.getPatternMap().containsKey(column)) {
         generators.put(column,
                 GeneratorFactory.getGeneratorFor(
-                        TemplateType.valueOf(genSpec.getTemplateMap().get(column).get("type").toString()),
-                        genSpec.getTemplateMap().get(column)));
+                        PatternType.valueOf(genSpec.getPatternMap().get(column).get("type").toString()),
+                        genSpec.getPatternMap().get(column)));
 
       } else if (genSpec.getCardinalityMap().containsKey(column)) {
         generators.put(column, GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column)));

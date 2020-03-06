@@ -22,7 +22,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * TemplateMixtureGenerator enables combination of multiple Generators in alternating and additive patterns, including
+ * PatternMixtureGenerator enables combination of multiple Generators in alternating and additive patterns, including
  * nested mixture models. This is typically used to generate similar (but not exact copies of) time series for different
  * dimension values of series or to simulate anomalous behavior in a otherwise regular time series.
  *
@@ -42,18 +42,18 @@ import java.util.stream.Collectors;
  *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
  * </ul>
  */
-public class TemplateMixtureGenerator implements Generator {
+public class PatternMixtureGenerator implements Generator {
     private final List<List<Generator>> generatorBins;
 
     private long step = -1;
 
-    public TemplateMixtureGenerator(Map<String, Object> templateConfig) {
+    public PatternMixtureGenerator(Map<String, Object> templateConfig) {
         this(toGeneratorBins(
                 (List<List<Map<String, Object>>>) templateConfig.get("generatorBins"),
                 (Map<String, Object>) templateConfig.get("defaults")));
     }
 
-    public TemplateMixtureGenerator(List<List<Generator>> generatorBins) {
+    public PatternMixtureGenerator(List<List<Generator>> generatorBins) {
         this.generatorBins = generatorBins;
     }
 
@@ -74,7 +74,7 @@ public class TemplateMixtureGenerator implements Generator {
     }
 
     private static Generator toGenerator(Map<String, Object> templateConfig) {
-        TemplateType type = TemplateType.valueOf(templateConfig.get("type").toString());
+        PatternType type = PatternType.valueOf(templateConfig.get("type").toString());
         return GeneratorFactory.getGeneratorFor(type, templateConfig);
     }
 
@@ -92,18 +92,5 @@ public class TemplateMixtureGenerator implements Generator {
             output += (Long) gen.next();
         }
         return output;
-    }
-
-    public static void main(String[] args) {
-        TemplateMixtureGenerator generator = new TemplateMixtureGenerator(
-                Arrays.asList(
-                        Arrays.asList(new TemplateSeasonalGenerator(100, 1, 0, 24, 50, new double[] { 1 })),
-                        Arrays.asList(new TemplateSequenceGenerator(-10, 1, 2))
-                )
-        );
-
-        for (int i = 0; i < 1000; i++) {
-            System.out.println(generator.next());
-        }
     }
 }

@@ -18,7 +18,13 @@
  */
 package org.apache.pinot.tools.data.generator;
 
-public enum TemplateType {
+/**
+ * PatternType describes the types of time series models available for generation. Each type maps to a dedicated
+ * generator class in GeneratorFactory.
+ *
+ * @see GeneratorFactory
+ */
+public enum PatternType {
     SEASONAL,
     SPIKE,
     SEQUENCE,

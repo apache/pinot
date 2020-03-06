@@ -27,7 +27,7 @@ public class SchemaAnnotation {
   private int _cardinality;
   private int _rangeStart;
   private int _rangeEnd;
-  private Map<String, Object> _template;
+  private Map<String, Object> _pattern;
 
   public SchemaAnnotation() {
   }
@@ -43,9 +43,9 @@ public class SchemaAnnotation {
     _rangeEnd = rangeEnd;
   }
 
-  public SchemaAnnotation(String column, Map<String, Object> template) {
+  public SchemaAnnotation(String column, Map<String, Object> pattern) {
     _column = column;
-    _template = template;
+    _pattern = pattern;
   }
 
   public String getColumn() {
@@ -88,11 +88,11 @@ public class SchemaAnnotation {
     _rangeEnd = rangeEnd;
   }
 
-  public Map<String, Object> getTemplate() {
-    return _template;
+  public Map<String, Object> getPattern() {
+    return _pattern;
   }
 
-  public void setTemplate(Map<String, Object> template) {
-    _template = template;
+  public void setPattern(Map<String, Object> pattern) {
+    _pattern = pattern;
   }
 }

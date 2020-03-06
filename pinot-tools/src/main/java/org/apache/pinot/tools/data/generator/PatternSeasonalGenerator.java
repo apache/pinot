@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import org.apache.commons.configuration.PropertyConverter;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
 import java.util.Arrays;
@@ -25,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * TemplateSeasonalGenerator generates sinus wave patterns with a linear trend, gaussian noise, and cyclically repeating
+ * PatternSeasonalGenerator generates sinus wave patterns with a linear trend, gaussian noise, and cyclically repeating
  * scaling factors. These patterns are typical for di-urnal usage patterns such as clicks and impressions of a website.
  *
  * Generator example:
@@ -45,30 +46,33 @@ import java.util.Map;
  *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
  * </ul>
  */
-public class TemplateSeasonalGenerator implements Generator {
+public class PatternSeasonalGenerator implements Generator {
     private final double trend;
     private final double wavelength;
     private final double amplitude;
     private final double[] scalingFactors;
+    private final double offset;
 
     private final NormalDistribution generator;
 
     private long step = -1;
 
-    public TemplateSeasonalGenerator(Map<String, Object> templateConfig) {
-        this(toDouble(templateConfig.get("mean"), 0),
-                toDouble(templateConfig.get("sigma"), 0),
-                toDouble(templateConfig.get("trend"), 0),
-                toDouble(templateConfig.get("wavelength"), 0),
-                toDouble(templateConfig.get("amplitude"), 0),
+    public PatternSeasonalGenerator(Map<String, Object> templateConfig) {
+        this(PropertyConverter.toDouble(templateConfig.getOrDefault("mean", 0)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("sigma", 0)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("trend", 0)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("wavelength", 0)),
+                PropertyConverter. toDouble(templateConfig.getOrDefault("amplitude", 0)),
+                PropertyConverter. toDouble(templateConfig.getOrDefault("offset", 0)),
                 toDoubleArray(templateConfig.get("scalingFactors"), 1));
     }
 
-    public TemplateSeasonalGenerator(double mean, double sigma, double trend, double wavelength, double amplitude,
-                                     double[] scalingFactors) {
+    public PatternSeasonalGenerator(double mean, double sigma, double trend, double wavelength, double amplitude,
+                                    double offset, double[] scalingFactors) {
         this.trend = trend;
         this.wavelength = wavelength;
         this.amplitude = amplitude;
+        this.offset = offset;
         this.scalingFactors = scalingFactors;
 
         this.generator = new NormalDistribution(mean, sigma);
@@ -84,7 +88,7 @@ public class TemplateSeasonalGenerator implements Generator {
         step++;
         return (long) Math.max((generator.sample()
                 + (trend * step)
-                + (wavelength == 0d ? 0 : Math.sin(step / wavelength * 2 * Math.PI) * amplitude))
+                + (wavelength == 0d ? 0 : Math.sin((step / wavelength + offset) * 2 * Math.PI) * amplitude))
                 * makeScalingFactor(step), 0);
     }
 
@@ -96,13 +100,6 @@ public class TemplateSeasonalGenerator implements Generator {
         double shift = offset - Math.floor(offset);
 
         return (1 - shift) * scalingFactors[i] + shift * scalingFactors[j];
-    }
-
-    private static double toDouble(Object obj, double defaultValue) {
-        if (obj == null) {
-            return defaultValue;
-        }
-        return Double.valueOf(obj.toString());
     }
 
     private static double[] toDoubleArray(Object obj, double defaultValue) {
@@ -118,12 +115,5 @@ public class TemplateSeasonalGenerator implements Generator {
             values[i] = userValues.get(i);
         }
         return values;
-    }
-
-    public static void main(String[] args) {
-        TemplateSeasonalGenerator gen = new TemplateSeasonalGenerator(80, 5, 0.02, 24, 40, new double[] { 0.5, 0.9, 1, 1, 1, 0.8, 0.6 });
-        for (int i = 0; i < 336; i++) {
-            System.out.println(gen.next());
-        }
     }
 }

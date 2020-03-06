@@ -37,7 +37,7 @@ public class DataGeneratorSpec {
   private final List<String> columns;
   private final Map<String, Integer> cardinalityMap;
   private final Map<String, IntRange> rangeMap;
-  private final Map<String, Map<String, Object>> templateMap;
+  private final Map<String, Map<String, Object>> patternMap;
 
   private final Map<String, DataType> dataTypesMap;
   private final Map<String, FieldType> fieldTypesMap;
@@ -54,12 +54,12 @@ public class DataGeneratorSpec {
   }
 
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
-      Map<String, Map<String, Object>> templateMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
+      Map<String, Map<String, Object>> patternMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
       FileFormat format, String outputDir, boolean override) {
     this.columns = columns;
     this.cardinalityMap = cardinalityMap;
     this.rangeMap = rangeMap;
-    this.templateMap = templateMap;
+    this.patternMap = patternMap;
 
     outputFileFormat = format;
     this.outputDir = outputDir;
@@ -98,8 +98,8 @@ public class DataGeneratorSpec {
     return rangeMap;
   }
 
-  public Map<String, Map<String, Object>> getTemplateMap() {
-    return templateMap;
+  public Map<String, Map<String, Object>> getPatternMap() {
+    return patternMap;
   }
 
   public FileFormat getOutputFileFormat() {
@@ -119,7 +119,7 @@ public class DataGeneratorSpec {
       } else if (rangeMap.get(column) != null) {
         builder.append(column + " : " + rangeMap.get(column) + " : " + dataTypesMap.get(column));
       } else {
-        builder.append(column + " : " + templateMap.get(column));
+        builder.append(column + " : " + patternMap.get(column));
       }
     }
     builder.append("output file format : " + outputFileFormat);

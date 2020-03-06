@@ -18,19 +18,21 @@
  */
 package org.apache.pinot.tools.data.generator;
 
-import java.util.List;
+import org.apache.commons.configuration.PropertyConverter;
+
 import java.util.Map;
 
 /**
- * TemplateStringGenerator produces series of strings by cycling through a predefined list of values, optionally with
- * a number of repetitions per value.
+ * PatternSequenceGenerator produces a series of sequentially increasing (decreasing) numbers, optionally with a fixed
+ * number of repetitions per values. This pattern is typical for monotonically increasing series such as timestamps.
  *
  * Generator example:
  * <pre>
- *     values = [ "hello", "world" ]
+ *     start = -10
+ *     stepsize = 3
  *     repetitions = 2
  *
- *     returns [ "hello", "hello", "world", "world", "hello", ... ]
+ *     returns [ -10, -10, -7, -7, -4, -4, -1, -1, 2, 2, ... ]
  * </pre>
  *
  * Configuration examples:
@@ -39,18 +41,22 @@ import java.util.Map;
  *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
  * </ul>
  */
-public class TemplateStringGenerator implements Generator {
-    private final String[] values;
+public class PatternSequenceGenerator implements Generator {
+    private final long start;
+    private final long stepsize;
     private final long repetitions;
 
-    private long step;
+    private long step = -1;
 
-    public TemplateStringGenerator(Map<String, Object> templateConfig) {
-        this(((List<String>) templateConfig.get("values")).toArray(new String[0]), toLong(templateConfig.get("repetitions"), 1));
+    public PatternSequenceGenerator(Map<String, Object> templateConfig) {
+        this(PropertyConverter.toLong(templateConfig.getOrDefault("start", 0)),
+                PropertyConverter.toLong(templateConfig.getOrDefault("stepsize", 1)),
+                PropertyConverter.toLong(templateConfig.getOrDefault("repetitions", 1)));
     }
 
-    public TemplateStringGenerator(String[] values, long repetitions) {
-        this.values = values;
+    public PatternSequenceGenerator(long start, long stepsize, long repetitions) {
+        this.start = start;
+        this.stepsize = stepsize;
         this.repetitions = repetitions;
     }
 
@@ -61,20 +67,7 @@ public class TemplateStringGenerator implements Generator {
 
     @Override
     public Object next() {
-        return values[(int) (step++ / repetitions) % values.length];
-    }
-
-    private static long toLong(Object obj, long defaultValue) {
-        if (obj == null) {
-            return defaultValue;
-        }
-        return Long.valueOf(obj.toString());
-    }
-
-    public static void main(String[] args) {
-        Generator gen = new TemplateStringGenerator(new String[] { "hello", "world", "!" }, 3);
-        for (int i = 0; i < 100; i++) {
-            System.out.println(gen.next());
-        }
+        step++;
+        return start + (step / repetitions) * stepsize;
     }
 }

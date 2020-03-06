@@ -1,7 +1,7 @@
 [
   {
     "column": "hoursSinceEpoch",
-    "template": {
+    "pattern": {
       "type": "SEQUENCE",
       "start": 420768,
       "stepsize": 1
@@ -9,7 +9,7 @@
   },
   {
     "column": "views",
-    "template": {
+    "pattern": {
       "type": "SEASONAL",
       "mean": 80,
       "sigma": 1.5,
@@ -21,7 +21,7 @@
   },
   {
     "column": "clicks",
-    "template": {
+    "pattern": {
       "type": "SEASONAL",
       "mean": 20,
       "sigma": 1,
@@ -33,7 +33,7 @@
   },
   {
     "column": "errors",
-    "template": {
+    "pattern": {
       "type": "SPIKE",
       "baseline": 0,
       "arrivalMean": 2,

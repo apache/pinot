@@ -130,12 +130,12 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
     final HashMap<String, Integer> cardinality = new HashMap<>();
     final HashMap<String, IntRange> range = new HashMap<>();
-    final HashMap<String, Map<String, Object>> template = new HashMap<>();
+    final HashMap<String, Map<String, Object>> pattern = new HashMap<>();
 
-    buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range, template);
+    buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range, pattern);
 
     final DataGeneratorSpec spec =
-        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality, range, template);
+        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality, range, pattern);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
@@ -152,7 +152,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   }
 
   private void buildCardinalityRangeMaps(String file, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range, Map<String, Map<String, Object>> template)
+      HashMap<String, IntRange> range, Map<String, Map<String, Object>> pattern)
       throws IOException {
     if (file == null) {
       return; // Nothing to do here.
@@ -165,8 +165,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
       if (sa.isRange()) {
         range.put(column, new IntRange(sa.getRangeStart(), sa.getRangeEnd()));
-      } else if (sa.getTemplate() != null) {
-        template.put(column, sa.getTemplate());
+      } else if (sa.getPattern() != null) {
+        pattern.put(column, sa.getPattern());
       } else {
         cardinality.put(column, sa.getCardinality());
       }
@@ -175,7 +175,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
       HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes, HashMap<String, TimeUnit> timeUnits,
-      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range, HashMap<String, Map<String, Object>> template) {
+      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range, HashMap<String, Map<String, Object>> pattern) {
     for (final FieldSpec fs : schema.getAllFieldSpecs()) {
       String col = fs.getName();
 
@@ -209,7 +209,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       }
     }
 
-    return new DataGeneratorSpec(columns, cardinality, range, template, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO,
+    return new DataGeneratorSpec(columns, cardinality, range, pattern, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO,
         _outDir, _overwrite);
   }
 

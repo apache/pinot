@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import org.apache.commons.configuration.PropertyConverter;
 import org.apache.commons.math3.distribution.LogNormalDistribution;
 
 import java.util.Map;
 
 /**
- * TemplateSpikeGenerator produces a series of log-normal spikes with log-normal arrival times, with optional smoothing.
+ * PatternSpikeGenerator produces a series of log-normal spikes with log-normal arrival times, with optional smoothing.
  * This pattern is typical for rare even spikes, such as error counts. The generated values are sampled non-deterministically.
  *
  * Generator example:
@@ -41,7 +42,7 @@ import java.util.Map;
  *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
  * </ul>
  */
-public class TemplateSpikeGenerator implements Generator {
+public class PatternSpikeGenerator implements Generator {
     private final double baseline;
     private final double smoothing;
 
@@ -53,16 +54,16 @@ public class TemplateSpikeGenerator implements Generator {
     private long nextArrival;
     private double lastValue;
 
-    public TemplateSpikeGenerator(Map<String, Object> templateConfig) {
-        this(toDouble(templateConfig.get("baseline"), 0),
-                toDouble(templateConfig.get("arrivalMean"), 2),
-                toDouble(templateConfig.get("arrivalSigma"), 1),
-                toDouble(templateConfig.get("magnitudeMean"), 2),
-                toDouble(templateConfig.get("magnitudeSigma"), 1),
-                toDouble(templateConfig.get("smoothing"), 0));
+    public PatternSpikeGenerator(Map<String, Object> templateConfig) {
+        this(PropertyConverter.toDouble(templateConfig.getOrDefault("baseline", 0)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("arrivalMean", 2)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("arrivalSigma", 1)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("magnitudeMean", 2)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("magnitudeSigma", 1)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("smoothing", 0)));
     }
 
-    public TemplateSpikeGenerator(double baseline, double arrivalMean, double arrivalSigma, double magnitudeMean, double magnitudeSigma, double smoothing) {
+    public PatternSpikeGenerator(double baseline, double arrivalMean, double arrivalSigma, double magnitudeMean, double magnitudeSigma, double smoothing) {
         this.baseline = baseline;
         this.smoothing = smoothing;
 
@@ -90,19 +91,5 @@ public class TemplateSpikeGenerator implements Generator {
         nextArrival += (long) arrivalGenerator.sample();
         lastValue = baseline + this.magnitudeGenerator.sample();
         return (long) lastValue;
-    }
-
-    private static double toDouble(Object obj, double defaultValue) {
-        if (obj == null) {
-            return defaultValue;
-        }
-        return Double.valueOf(obj.toString());
-    }
-
-    public static void main(String[] args) {
-        TemplateSpikeGenerator gen = new TemplateSpikeGenerator(15, 2, 1, 3, 1, 0.25);
-        for (int i = 0; i < 100; i++) {
-            System.out.println(gen.next());
-        }
     }
 }

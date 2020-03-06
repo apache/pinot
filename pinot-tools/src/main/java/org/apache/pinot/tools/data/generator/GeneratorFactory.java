@@ -51,20 +51,20 @@ public class GeneratorFactory {
     }
   }
 
-  public static Generator getGeneratorFor(TemplateType templateType, Map<String, Object> templateConfig) {
-    switch (templateType) {
+  public static Generator getGeneratorFor(PatternType patternType, Map<String, Object> templateConfig) {
+    switch (patternType) {
       case SEASONAL:
-        return new TemplateSeasonalGenerator(templateConfig);
+        return new PatternSeasonalGenerator(templateConfig);
       case SPIKE:
-        return new TemplateSpikeGenerator(templateConfig);
+        return new PatternSpikeGenerator(templateConfig);
       case SEQUENCE:
-        return new TemplateSequenceGenerator(templateConfig);
+        return new PatternSequenceGenerator(templateConfig);
       case STRING:
-        return new TemplateStringGenerator(templateConfig);
+        return new PatternStringGenerator(templateConfig);
       case MIXTURE:
-        return new TemplateMixtureGenerator(templateConfig);
+        return new PatternMixtureGenerator(templateConfig);
       default:
-        throw new RuntimeException(String.format("Invalid template '%s'", templateType));
+        throw new RuntimeException(String.format("Invalid template '%s'", patternType));
     }
   }
 }
