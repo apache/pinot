@@ -74,7 +74,52 @@ if [ "${COUNT_STAR_RES_3}" -le "${COUNT_STAR_RES_2}" ] || [ "${COUNT_STAR_RES_2}
   echo 'Hybrid Quickstart: Not getting incremental counts for 3 consecutive count star queries with 15 seconds interval.'
   exit 1
 fi
-# kill $PID
-# sleep 30
+kill $PID
+sleep 30
+
+cd bin
+# Test quick-start-batch
+./quick-start-batch.sh &
+PID=$!
+sleep 60
+COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
+if [ "${COUNT_STAR_RES}" -ne 97889 ]; then
+  echo 'Batch Quickstart: Incorrect result for count star query.'
+  exit 1
+fi
+kill $PID
+sleep 30
+
+# Test quick-start-streaming
+./quick-start-streaming.sh &
+PID=$!
+sleep 60
+COUNT_STAR_RES_1=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
+sleep 15
+COUNT_STAR_RES_2=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
+sleep 15
+COUNT_STAR_RES_3=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
+if [ "${COUNT_STAR_RES_3}" -le "${COUNT_STAR_RES_2}" ] || [ "${COUNT_STAR_RES_2}" -le "${COUNT_STAR_RES_1}" ]; then
+  echo 'Streaming Quickstart: Not getting incremental counts for 3 consecutive count star queries with 15 seconds interval.'
+  exit 1
+fi
+kill $PID
+sleep 30
+
+# Test quick-start-hybrid
+./quick-start-hybrid.sh &
+PID=$!
+sleep 60
+COUNT_STAR_RES_1=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
+sleep 15
+COUNT_STAR_RES_2=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
+sleep 15
+COUNT_STAR_RES_3=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
+if [ "${COUNT_STAR_RES_3}" -le "${COUNT_STAR_RES_2}" ] || [ "${COUNT_STAR_RES_2}" -le "${COUNT_STAR_RES_1}" ]; then
+  echo 'Hybrid Quickstart: Not getting incremental counts for 3 consecutive count star queries with 15 seconds interval.'
+  exit 1
+fi
+kill $PID
+sleep 30
 
 exit 0

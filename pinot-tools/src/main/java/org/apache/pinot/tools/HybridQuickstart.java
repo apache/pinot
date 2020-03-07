@@ -157,6 +157,9 @@ public class HybridQuickstart {
     printStatus(Color.YELLOW, "*****    7. Built and pushed an offline segment *****");
     printStatus(Color.YELLOW,
         "*****    8. Started publishing a Kafka stream for the realtime instance to start consuming *****");
+    printStatus(Color.YELLOW,
+        "*****    9. Sleep 5 Seconds to wait for all components brought up *****");
+    Thread.sleep(5000);
 
     String q1 = "select count(*) from airlineStats limit 10";
     printStatus(Color.YELLOW, "Total number of documents in the table");
