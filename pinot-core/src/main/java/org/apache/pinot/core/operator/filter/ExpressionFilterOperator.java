@@ -161,7 +161,8 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
     @Override
     public int getMaxDocId() {
-      return _blockDocIdIterator._endDocId;
+      // NOTE: Return value should be inclusive
+      return _blockDocIdIterator._endDocId - 1;
     }
 
     @Override
@@ -171,7 +172,8 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
     @Override
     public void setEndDocId(int endDocId) {
-      _blockDocIdIterator.setEndDocId(endDocId);
+      // NOTE: The passed in argument is inclusive
+      _blockDocIdIterator.setEndDocId(endDocId + 1);
     }
 
     @Override
@@ -193,6 +195,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       private ExpressionFilterOperator _expressionFilterOperator;
       int _numDocsScanned = 0;
       int _startDocId;
+      // Exclusive
       int _endDocId;
       //used only in next() and advance methods
       int _currentBlockStartDocId = -1;
@@ -217,11 +220,17 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
         if (_currentDocId == Constants.EOF) {
           return Constants.EOF;
         }
-        while (_currentDocId < _endDocId) {
-          if (_intIterator == null) {
+        while (true) {
+          if (_intIterator != null && _intIterator.hasNext()) {
+            _currentDocId = _intIterator.next();
+            return _currentDocId;
+          } else {
+            if (_currentBlockEndDocId == _endDocId) {
+              _currentDocId = Constants.EOF;
+              return _currentDocId;
+            }
             _currentBlockStartDocId = _currentBlockEndDocId;
-            _currentBlockEndDocId = _currentBlockStartDocId + DocIdSetPlanNode.MAX_DOC_PER_CALL;
-            _currentBlockEndDocId = Math.min(_currentBlockEndDocId, _endDocId);
+            _currentBlockEndDocId = Math.min(_currentBlockStartDocId + DocIdSetPlanNode.MAX_DOC_PER_CALL, _endDocId);
             MutableRoaringBitmap bitmapRange = new MutableRoaringBitmap();
             bitmapRange.add(_currentBlockStartDocId, _currentBlockEndDocId);
             MutableRoaringBitmap matchedBitmap = evaluate(bitmapRange);
@@ -229,32 +238,19 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
             _intIterator = matchedBitmap.getIntIterator();
             _numDocsScanned += (_currentBlockEndDocId - _currentBlockStartDocId);
           }
-          if (_intIterator.hasNext()) {
-            return (_currentDocId = _intIterator.next());
-          } else {
-            _currentDocId = _currentBlockEndDocId;
-            _intIterator = null;
-          }
         }
-        _currentDocId = Constants.EOF;
-        return _currentDocId;
       }
 
       @Override
       public int advance(int targetDocId) {
-        if (_currentDocId == Constants.EOF) {
+        if (_currentDocId == Constants.EOF || _currentDocId >= targetDocId) {
           return _currentDocId;
         }
-        if (targetDocId < _startDocId) {
-          targetDocId = _startDocId;
-        } else if (targetDocId > _endDocId) {
+        if (targetDocId >= _endDocId) {
           _currentDocId = Constants.EOF;
           return _currentDocId;
         }
         if (targetDocId >= _currentBlockStartDocId && targetDocId < _currentBlockEndDocId) {
-          if (_currentDocId == targetDocId) {
-            return _currentDocId;
-          }
           while (_intIterator.hasNext()) {
             _currentDocId = _intIterator.next();
             if (_currentDocId >= targetDocId) {
@@ -271,7 +267,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
       @Override
       public int currentDocId() {
-        return 0;
+        return _currentDocId;
       }
 
       @Override
@@ -284,14 +280,13 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
       @Override
       public MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer) {
-        MutableRoaringBitmap bitmap = evaluate(answer);
-        answer.and(bitmap);
-        return answer;
+        return evaluate(answer);
       }
 
       private MutableRoaringBitmap evaluate(MutableRoaringBitmap answer) {
         BaseFilterOperator filterOperator = new BitmapWrappedFilterOperator(answer);
-        DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL, false);
+        DocIdSetOperator docIdSetOperator =
+            new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL, false);
         ProjectionOperator projectionOperator =
             new ProjectionOperator(_expressionFilterOperator._dataSourceMap, docIdSetOperator);
         TransformOperator operator =
