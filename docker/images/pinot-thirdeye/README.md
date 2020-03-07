@@ -78,7 +78,7 @@ The entry point of docker image is `start-thirdeye.sh` script.
 docker network create -d bridge pinot-demo
 ```
 
-* Start Pinot Hybrid Quickstart
+* Start Pinot Batch Quickstart
 
 ```SHELL
 docker run \
@@ -86,29 +86,17 @@ docker run \
     --name pinot-quickstart \
     -p 9000:9000 \
     -d apachepinot/pinot:latest QuickStart \
-    -type hybrid
+    -type batch
 ```
 
-* Start ThirdEye backend
+* Start ThirdEye companion
 
 ```SHELL
 docker run \
     --network=pinot-demo \
     --name  thirdeye-backend \
-    --restart always \
     -p 1426:1426 \
     -p 1427:1427 \
-    -d apachepinot/thirdeye:latest backend ./examples/pinot-quickstart/config
+    -d apachepinot/thirdeye:latest pinot-quickstart
 ```
 
-* Start ThirdEye dashboard
-
-```SHELL
-docker run \
-    --network=pinot-demo \
-    --name  thirdeye-dashboard \
-    --restart always \
-    -p 1426:1426 \
-    -p 1427:1427 \
-    -d apachepinot/thirdeye:latest dashboard ./examples/pinot-quickstart/config
-```
