@@ -40,13 +40,13 @@
 
   </Appenders>
   <Loggers>
-    <AsyncRoot level="info" additivity="false">
+    <Root level="info" additivity="false">
       <AppenderRef ref="console"/>
-    </AsyncRoot>
-    <AsyncLogger name="org.apache.pinot" level="info" additivity="false"/>
-    <AsyncLogger name="org.apache.pinot.tools" level="info" additivity="false">
+    </Root>
+    <Logger name="org.apache.pinot" level="info" additivity="false"/>
+    <Logger name="org.apache.pinot.tools" level="info" additivity="false">
       <AppenderRef ref="console"/>
-    </AsyncLogger>
+    </Logger>
 
     <!-- Direct controller package log to the controller log file -->
     <AsyncLogger name="org.apache.pinot.controller" level="info" additivity="false">

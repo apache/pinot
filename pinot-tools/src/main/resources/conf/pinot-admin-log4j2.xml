@@ -39,15 +39,15 @@
     </RandomAccessFile>
   </Appenders>
   <Loggers>
-    <AsyncRoot level="info" additivity="false">
+    <Root level="info" additivity="false">
       <AppenderRef ref="console"/>
-    </AsyncRoot>
-    <AsyncLogger name="org.apache.pinot.controller.ControllerStarter" level="info" additivity="false">
+    </Root>
+    <Logger name="org.apache.pinot.controller.ControllerStarter" level="info" additivity="false">
       <AppenderRef ref="console"/>
-    </AsyncLogger>
-    <AsyncLogger name="org.apache.pinot.tools.admin" level="info" additivity="false">
+    </Logger>
+    <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
       <AppenderRef ref="console"/>
-    </AsyncLogger>
+    </Logger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
     <AsyncLogger name="org.apache.pinot.spi.plugin" level="error" additivity="false">
       <AppenderRef ref="console"/>
