@@ -28,6 +28,9 @@ import java.util.jar.JarFile;
 
 
 public class JarUtils {
+  private static final String JAR_PREFIX = "jar:";
+  private static final String FILE_PREFIX = "file:";
+
   private JarUtils() {
   } // non-instantiable
 
@@ -36,11 +39,11 @@ public class JarUtils {
    */
   public static void copyResourcesToDirectory(String fromJarFilePath, String jarDir, String destDir)
       throws IOException {
-    if (fromJarFilePath.startsWith("jar:")) {
-      fromJarFilePath = fromJarFilePath.substring(4);
+    if (fromJarFilePath.startsWith(JAR_PREFIX)) {
+      fromJarFilePath = fromJarFilePath.substring(JAR_PREFIX.length());
     }
-    if (fromJarFilePath.startsWith("file:")) {
-      fromJarFilePath = fromJarFilePath.substring(5);
+    if (fromJarFilePath.startsWith(FILE_PREFIX)) {
+      fromJarFilePath = fromJarFilePath.substring(FILE_PREFIX.length());
     }
     JarFile fromJar = new JarFile(fromJarFilePath);
     for (Enumeration<JarEntry> entries = fromJar.entries(); entries.hasMoreElements(); ) {
