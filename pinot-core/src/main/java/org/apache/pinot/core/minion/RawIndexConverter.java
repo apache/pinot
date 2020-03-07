@@ -165,10 +165,10 @@ public class RawIndexConverter {
 
     // In bits
     int lengthOfEachEntry;
-    if (dataType.equals(FieldSpec.DataType.STRING)) {
-      lengthOfEachEntry = columnMetadata.getColumnMaxLength() * Byte.SIZE;
-    } else {
+    if (dataType.isFixedWidth()) {
       lengthOfEachEntry = dataType.size() * Byte.SIZE;
+    } else {
+      lengthOfEachEntry = columnMetadata.getColumnMaxLength() * Byte.SIZE;
     }
     long dictionaryBasedIndexSize =
         (long) numTotalDocs * columnMetadata.getBitsPerElement() + (long) cardinality * lengthOfEachEntry;
