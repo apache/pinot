@@ -32,8 +32,8 @@
  *     ("some-server:1234", "some-other-server:1234", ...);}</pre>
  *
  * Queries can be sent directly to the Pinot cluster using the
- * {@link org.apache.pinot.client.Connection#execute(java.lang.String)} and
- * {@link org.apache.pinot.client.Connection#executeAsync(java.lang.String)} methods of
+ * {@link org.apache.pinot.client.Connection#execute(org.apache.pinot.client.Request)} and
+ * {@link org.apache.pinot.client.Connection#executeAsync(org.apache.pinot.client.Request)} methods of
  * {@link org.apache.pinot.client.Connection}.
  *
  * <pre>{@code ResultSetGroup resultSetGroup = connection.execute("select * from foo...");

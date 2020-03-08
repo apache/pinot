@@ -49,29 +49,45 @@ public class Connection {
   }
 
   /**
-   * Creates a prepared statement, to escape query parameters.
+   * Creates a prepared statement, to escape a PQL query parameters.
    *
-   * @param statement The statement for which to create a prepared statement.
+   * Deprecated as we will soon be removing support for pql endpoint
+   *
+   * @param query The PQL query for which to create a prepared statement.
    * @return A prepared statement for this connection.
    */
-  public PreparedStatement prepareStatement(String statement) {
-    return new PreparedStatement(this, statement);
+  @Deprecated
+  public PreparedStatement prepareStatement(String query) {
+    return new PreparedStatement(this, query);
   }
 
   /**
-   * Executes a PQL statement.
-   * @param statement The statement to execute
+   * Creates a prepared statement, to escape query parameters.
+   *
+   * @param request The request for which to create a prepared statement.
+   * @return A prepared statement for this connection.
+   */
+  public PreparedStatement prepareStatement(Request request) {
+    return new PreparedStatement(this, request);
+  }
+
+  /**
+   * Executes a PQL query.
+   *
+   * Deprecated as we will soon be removing support for pql endpoint
+   * @param query The query to execute
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public ResultSetGroup execute(String statement)
+  @Deprecated
+  public ResultSetGroup execute(String query)
       throws PinotClientException {
-    return execute(null, new Request("pql", statement));
+    return execute(null, new Request("pql", query));
   }
 
   /**
    * Executes a Pinot Request.
-   * @param request The statement to execute
+   * @param request The request to execute
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
@@ -81,21 +97,23 @@ public class Connection {
   }
 
   /**
-   * Executes a PQL statement.
+   * Executes a PQL query.
    *
-   * @param statement The statement to execute
+   * Deprecated as we will soon be removing support for pql endpoint
+   * @param query The query to execute
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public ResultSetGroup execute(String tableName, String statement)
+  @Deprecated
+  public ResultSetGroup execute(String tableName, String query)
       throws PinotClientException {
-    return execute(tableName, new Request("pql", statement));
+    return execute(tableName, new Request("pql", query));
   }
 
   /**
    * Executes a Pinot Request.
    *
-   * @param request The statement to execute
+   * @param request The request to execute
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
@@ -114,21 +132,24 @@ public class Connection {
   }
 
   /**
-   * Executes a PQL statement asynchronously.
+   * Executes a PQL query asynchronously.
    *
-   * @param statement The statement to execute
+   * Deprecated as we will soon be removing support for pql endpoint
+   *
+   * @param query The query to execute
    * @return A future containing the result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public Future<ResultSetGroup> executeAsync(String statement)
+  @Deprecated
+  public Future<ResultSetGroup> executeAsync(String query)
       throws PinotClientException {
-    return executeAsync(new Request("pql", statement));
+    return executeAsync(new Request("pql", query));
   }
 
   /**
    * Executes a Pinot Request asynchronously.
    *
-   * @param request The statement to execute
+   * @param request The request to execute
    * @return A future containing the result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
@@ -140,7 +161,7 @@ public class Connection {
           "Could not find broker to query for statement: " + (request.getQuery() == null ? "null"
               : request.getQuery()));
     }
-    final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(brokerHostPort, request.getQuery());
+    final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(brokerHostPort, request);
     return new ResultSetGroupFuture(responseFuture);
   }
 
