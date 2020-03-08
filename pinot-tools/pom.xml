@@ -152,9 +152,7 @@
               <name>pinot-admin</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
-                <maxMemorySize>4G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-admin-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -166,7 +164,6 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>20G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -178,7 +175,6 @@
                 <initialMemorySize>10G</initialMemorySize>
                 <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -190,7 +186,6 @@
                 <initialMemorySize>10G</initialMemorySize>
                 <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -268,7 +263,6 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=6g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>

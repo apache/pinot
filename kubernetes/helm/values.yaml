@@ -143,7 +143,7 @@ server:
     storageClass: ""
     #storageClass: "ssd"
 
-  jvmOpts: "-Xms4G -Xmx4G -XX:MaxDirectMemorySize=10g"
+  jvmOpts: "-Xms4G -Xmx4G"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
