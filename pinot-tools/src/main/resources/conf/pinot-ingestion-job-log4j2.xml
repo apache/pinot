@@ -34,13 +34,13 @@
 
   </Appenders>
   <Loggers>
-    <AsyncRoot level="error" additivity="false">
+    <Root level="error" additivity="false">
       <AppenderRef ref="console"/>
-    </AsyncRoot>
-    <AsyncLogger name="org.apache.pinot" level="info" additivity="false">
+    </Root>
+    <Logger name="org.apache.pinot" level="info" additivity="false">
       <AppenderRef ref="console"/>
       <AppenderRef ref="ingestionJobLog"/>
-    </AsyncLogger>
+    </Logger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
   </Loggers>
 </Configuration>
