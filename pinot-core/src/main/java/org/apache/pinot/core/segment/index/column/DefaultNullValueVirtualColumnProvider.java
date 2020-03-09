@@ -25,6 +25,7 @@ import org.apache.pinot.core.segment.index.readers.ConstantValueIntDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueLongDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueStringDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -32,25 +33,25 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * Provide the default null value.
  */
-public class DefaultNullValueColumnProvider extends BaseColumnProvider {
+public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProvider {
 
   Dictionary _dictionary;
 
-  public DefaultNullValueColumnProvider(ColumnContext columnContext) {
-    buildDictionary(columnContext);
-    buildMetadata(columnContext);
-    buildColumnIndexContainer(columnContext);
+  public DefaultNullValueVirtualColumnProvider(VirtualColumnContext virtualColumnContext) {
+    buildDictionary(virtualColumnContext);
+    buildMetadata(virtualColumnContext);
+    buildColumnIndexContainer(virtualColumnContext);
   }
 
   @Override
-  public ColumnMetadata buildMetadata(ColumnContext context) {
+  public ColumnMetadata buildMetadata(VirtualColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
     columnMetadataBuilder.setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true)
         .setIsSorted(context.getFieldSpec().isSingleValueField() ? true : false);
     return columnMetadataBuilder.build();
   }
 
-  public Dictionary buildDictionary(ColumnContext context) {
+  public Dictionary buildDictionary(VirtualColumnContext context) {
     FieldSpec fieldSpec = context.getFieldSpec();
     DataType dataType = fieldSpec.getDataType().getStoredType();
     if (dataType.equals(DataType.STRING)) {

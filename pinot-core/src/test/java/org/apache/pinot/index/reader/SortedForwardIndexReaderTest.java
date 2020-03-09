@@ -63,8 +63,7 @@ public class SortedForwardIndexReaderTest {
     }
     writer.close();
 
-    try (SortedIndexReader reader = new SortedIndexReaderImpl(
-        PinotDataBuffer.loadBigEndianFile(file), cardinality)) {
+    try (SortedIndexReader reader = new SortedIndexReaderImpl(PinotDataBuffer.loadBigEndianFile(file), cardinality)) {
       // without using context
       long start, end;
       start = System.currentTimeMillis();

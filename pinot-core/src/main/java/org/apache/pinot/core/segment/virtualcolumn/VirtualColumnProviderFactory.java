@@ -20,9 +20,7 @@ package org.apache.pinot.core.segment.virtualcolumn;
 
 import org.apache.pinot.common.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.common.utils.NetUtil;
-import org.apache.pinot.core.segment.index.column.ColumnContext;
-import org.apache.pinot.core.segment.index.column.ColumnProvider;
-import org.apache.pinot.core.segment.index.column.DefaultNullValueColumnProvider;
+import org.apache.pinot.core.segment.index.column.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -30,21 +28,21 @@ import org.apache.pinot.spi.plugin.PluginManager;
 
 
 /**
- * Factory for column providers.
+ * Factory for virtual column providers.
  */
 public class VirtualColumnProviderFactory {
-  public static ColumnProvider buildProvider(ColumnContext columnContext) {
-    String virtualColumnProvider = columnContext.getFieldSpec().getVirtualColumnProvider();
+  public static VirtualColumnProvider buildProvider(VirtualColumnContext virtualColumnContext) {
+    String virtualColumnProvider = virtualColumnContext.getFieldSpec().getVirtualColumnProvider();
     try {
       // Use the preset virtualColumnProvider if available
       if (virtualColumnProvider != null && !virtualColumnProvider
-          .equals(DefaultNullValueColumnProvider.class.getName())) {
+          .equals(DefaultNullValueVirtualColumnProvider.class.getName())) {
         return PluginManager.get().createInstance(virtualColumnProvider);
       }
-      // Create the columnProvider that returns default null values based on the columnContext
+      // Create the columnProvider that returns default null values based on the virtualColumnContext
       return PluginManager.get()
-          .createInstance(DefaultNullValueColumnProvider.class.getName(), new Class[]{ColumnContext.class},
-              new ColumnContext[]{columnContext});
+          .createInstance(DefaultNullValueVirtualColumnProvider.class.getName(), new Class[]{VirtualColumnContext.class},
+              new VirtualColumnContext[]{virtualColumnContext});
     } catch (Exception e) {
       throw new IllegalStateException("Caught exception while creating instance of: " + virtualColumnProvider, e);
     }
@@ -58,12 +56,12 @@ public class VirtualColumnProviderFactory {
 
     if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueColumnProvider.class, NetUtil.getHostnameOrAddress()));
+          DefaultNullValueVirtualColumnProvider.class, NetUtil.getHostnameOrAddress()));
     }
 
     if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueColumnProvider.class, segmentName));
+          DefaultNullValueVirtualColumnProvider.class, segmentName));
     }
   }
 }

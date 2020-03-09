@@ -16,26 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.column;
+package org.apache.pinot.core.segment.virtualcolumn;
 
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 /**
- * Column provider interface, which is used to instantiate the various components (dictionary, reader, etc) that
+ * Virtual column provider interface, which is used to instantiate the various components (dictionary, reader, etc) that
  * comprise a proper column.
  */
-public interface ColumnProvider {
-  DataFileReader buildReader(ColumnContext context);
+public interface VirtualColumnProvider {
+  DataFileReader buildReader(VirtualColumnContext context);
 
-  Dictionary buildDictionary(ColumnContext context);
+  Dictionary buildDictionary(VirtualColumnContext context);
 
-  ColumnMetadata buildMetadata(ColumnContext context);
+  ColumnMetadata buildMetadata(VirtualColumnContext context);
 
-  InvertedIndexReader buildInvertedIndex(ColumnContext context);
+  InvertedIndexReader buildInvertedIndex(VirtualColumnContext context);
 
-  ColumnIndexContainer buildColumnIndexContainer(ColumnContext context);
+  ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context);
 }

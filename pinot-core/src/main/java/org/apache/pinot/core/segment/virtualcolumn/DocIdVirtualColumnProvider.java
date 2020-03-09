@@ -26,8 +26,7 @@ import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.column.BaseColumnProvider;
-import org.apache.pinot.core.segment.index.column.ColumnContext;
+import org.apache.pinot.core.segment.index.column.BaseVirtualColumnProvider;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.DocIdDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
@@ -36,31 +35,28 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 /**
  * Virtual column provider that returns the current document id.
  */
-public class DocIdVirtualColumnProvider extends BaseColumnProvider {
-
-  ColumnMetadata _columnMetadata;
+public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
 
   @Override
-  public DataFileReader buildReader(ColumnContext context) {
+  public DataFileReader buildReader(VirtualColumnContext context) {
     return new DocIdSingleValueReader();
   }
 
   @Override
-  public Dictionary buildDictionary(ColumnContext context) {
+  public Dictionary buildDictionary(VirtualColumnContext context) {
     return new DocIdDictionary(context.getTotalDocCount());
   }
 
   @Override
-  public ColumnMetadata buildMetadata(ColumnContext context) {
+  public ColumnMetadata buildMetadata(VirtualColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
     columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setHasDictionary(true).setHasInvertedIndex(true)
         .setSingleValue(true).setIsSorted(true);
-    _columnMetadata = columnMetadataBuilder.build();
-    return _columnMetadata;
+    return columnMetadataBuilder.build();
   }
 
   @Override
-  public InvertedIndexReader buildInvertedIndex(ColumnContext context) {
+  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
     return new DocIdInvertedIndex();
   }
 

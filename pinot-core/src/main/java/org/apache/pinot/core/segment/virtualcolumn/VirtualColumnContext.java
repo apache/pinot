@@ -16,32 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl;
+package org.apache.pinot.core.segment.virtualcolumn;
 
-import java.io.IOException;
-import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Interface for sorted index multi-value readers.
+ * Miscellaneous context information about the column.
+ * It will be used to build various components (dictionary, reader, etc) in the virtual column provider.
  */
-public interface SortedIndexMultiValueReader<T extends ReaderContext> extends SingleColumnMultiValueReader<T>, InvertedIndexReader<Pairs.IntPair> {
-  @Override
-  int getIntArray(int row, int[] intArray);
+public class VirtualColumnContext {
+  private FieldSpec _fieldSpec;
+  private int _totalDocCount;
 
-  @Override
-  int getIntArray(int row, int[] intArray, T context);
+  public VirtualColumnContext(FieldSpec fieldSpec, int totalDocCount) {
+    _fieldSpec = fieldSpec;
+    _totalDocCount = totalDocCount;
+  }
 
-  @Override
-  T createContext();
+  public FieldSpec getFieldSpec() {
+    return _fieldSpec;
+  }
 
-  @Override
-  Pairs.IntPair getDocIds(int dictId);
-
-  @Override
-  void close()
-      throws IOException;
+  public int getTotalDocCount() {
+    return _totalDocCount;
+  }
 }

@@ -19,6 +19,9 @@
 package org.apache.pinot.core.segment.index.data.source;
 
 import com.google.common.base.Preconditions;
+import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
+import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.common.DataSource;
@@ -30,15 +33,12 @@ import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.MultiValueBlock;
 import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
-import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 public final class ColumnDataSource extends DataSource {
@@ -96,8 +96,7 @@ public final class ColumnDataSource extends DataSource {
       // Raw index
       // inverted index creation is supported for text index enabled columns
       // these columns are not dictionary encoded.
-      Preconditions.checkState(invertedIndex == null || invertedIndex instanceof LuceneTextIndexReader
-          || invertedIndex instanceof RealtimeLuceneTextIndexReader);
+      Preconditions.checkState(invertedIndex == null || invertedIndex instanceof LuceneTextIndexReader || invertedIndex instanceof RealtimeLuceneTextIndexReader);
     }
 
     _operatorName = "ColumnDataSource [" + columnName + "]";

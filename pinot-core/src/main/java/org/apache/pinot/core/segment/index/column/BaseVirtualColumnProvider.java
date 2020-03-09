@@ -23,18 +23,21 @@ import org.apache.pinot.core.io.reader.impl.ConstantMultiValueInvertedIndex;
 import org.apache.pinot.core.io.reader.impl.ConstantSingleValueInvertedIndex;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnIndexContainer;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
  * Shared implementation code between column providers.
  */
-public abstract class BaseColumnProvider implements ColumnProvider {
+public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
 
   ColumnIndexContainer _columnIndexContainer;
   InvertedIndexReader _invertedIndexReader;
 
-  public DataFileReader buildReader(ColumnContext context) {
+  public DataFileReader buildReader(VirtualColumnContext context) {
     if (context.getFieldSpec().isSingleValueField()) {
       return new ConstantSingleValueInvertedIndex(0);
     } else {
@@ -42,7 +45,7 @@ public abstract class BaseColumnProvider implements ColumnProvider {
     }
   }
 
-  protected ColumnMetadata.Builder getColumnMetadataBuilder(ColumnContext context) {
+  protected ColumnMetadata.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
     FieldSpec fieldSpec = context.getFieldSpec();
     return new ColumnMetadata.Builder().setVirtual(true).setColumnName(fieldSpec.getName())
         .setFieldType(fieldSpec.getFieldType()).setDataType(fieldSpec.getDataType())
@@ -50,7 +53,7 @@ public abstract class BaseColumnProvider implements ColumnProvider {
         .setDefaultNullValueString(context.getFieldSpec().getDefaultNullValueString());
   }
 
-  public InvertedIndexReader buildInvertedIndex(ColumnContext context) {
+  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
     if (context.getFieldSpec().isSingleValueField()) {
       _invertedIndexReader = new ConstantSingleValueInvertedIndex(context.getTotalDocCount());
     } else {
@@ -60,9 +63,9 @@ public abstract class BaseColumnProvider implements ColumnProvider {
   }
 
   @Override
-  public ColumnIndexContainer buildColumnIndexContainer(ColumnContext context) {
+  public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
     _columnIndexContainer =
-        new BaseColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
+        new VirtualColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
     return _columnIndexContainer;
   }
 }

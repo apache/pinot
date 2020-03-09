@@ -54,12 +54,12 @@ import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndex
 import org.apache.pinot.core.realtime.impl.nullvalue.RealtimeNullValueVectorReaderWriter;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.index.column.ColumnContext;
-import org.apache.pinot.core.segment.index.column.ColumnProvider;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.util.FixedIntArray;
@@ -578,10 +578,10 @@ public class MutableSegmentImpl implements MutableSegment {
         fieldSpec = _newlyAddedColumnsFieldMap.get(columnName);
         Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + columnName + " should not be null");
       }
-      ColumnContext columnContext = new ColumnContext(fieldSpec, _numDocsIndexed);
-      ColumnProvider columnProvider = VirtualColumnProviderFactory.buildProvider(columnContext);
-      return new ColumnDataSource(columnProvider.buildColumnIndexContainer(columnContext),
-          columnProvider.buildMetadata(columnContext));
+      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
+      VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
+      return new ColumnDataSource(virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext),
+          virtualColumnProvider.buildMetadata(virtualColumnContext));
     } else {
       return new ColumnDataSource(fieldSpec, _numDocsIndexed, _maxNumValuesMap.get(columnName),
           _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),
