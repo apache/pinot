@@ -1232,6 +1232,9 @@
             <!-- Top level directories -->
             <exclude>thirdeye/**</exclude>
 
+            <!-- Docker image configs -->
+            <exclude>docker/images/pinot-thirdeye/**</exclude>
+
             <!-- Note: this will exclude all single character directories under the root directory.
             We use this to exclude the temporary files generated during build -->
             <exclude>?/**</exclude>
@@ -1337,6 +1340,7 @@
 
             <!-- Third eye (not part of the distribution) -->
             <exclude>thirdeye/**</exclude>
+            <exclude>docker/images/pinot-thirdeye/**</exclude>
           </excludes>
         </configuration>
       </plugin>
