@@ -21,18 +21,17 @@ package org.apache.pinot.core.io.reader.impl.v1;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public class SortedIndexSingleValueReaderImpl extends BaseSingleColumnSingleValueReader<SortedIndexSingleValueReaderImpl.Context> implements SortedIndexSingleValueReader<SortedIndexSingleValueReaderImpl.Context> {
+public class SortedIndexReaderImpl extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
   private final FixedByteValueReaderWriter _reader;
   private final int _cardinality;
 
-  public SortedIndexSingleValueReaderImpl(PinotDataBuffer dataBuffer, int cardinality) {
+  public SortedIndexReaderImpl(PinotDataBuffer dataBuffer, int cardinality) {
     // 2 values per dictionary id
     Preconditions.checkState(dataBuffer.size() == 2 * cardinality * Integer.BYTES);
     _reader = new FixedByteValueReaderWriter(dataBuffer);

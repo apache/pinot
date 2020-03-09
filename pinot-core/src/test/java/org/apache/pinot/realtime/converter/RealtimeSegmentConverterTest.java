@@ -20,7 +20,7 @@ package org.apache.pinot.realtime.converter;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
-import org.apache.pinot.core.segment.virtualcolumn.ColumnProviderFactory;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -42,7 +42,7 @@ public class RealtimeSegmentConverterTest {
             TimeUnit.DAYS);
     schema.addField(tfs);
     String segmentName = "segment1";
-    ColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
     Assert.assertEquals(schema.getColumnNames().size(), 5);
     Assert.assertEquals(schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType(), TimeUnit.MILLISECONDS);
 

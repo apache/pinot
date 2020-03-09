@@ -21,8 +21,8 @@ package org.apache.pinot.index.reader;
 import java.io.File;
 import java.util.Random;
 import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReaderImpl;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
@@ -63,7 +63,7 @@ public class SortedForwardIndexReaderTest {
     }
     writer.close();
 
-    try (SortedIndexSingleValueReader reader = new SortedIndexSingleValueReaderImpl(
+    try (SortedIndexReader reader = new SortedIndexReaderImpl(
         PinotDataBuffer.loadBigEndianFile(file), cardinality)) {
       // without using context
       long start, end;

@@ -37,7 +37,7 @@ import org.apache.pinot.core.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.segment.index.column.ColumnProvider;
-import org.apache.pinot.core.segment.virtualcolumn.ColumnProviderFactory;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -117,14 +117,14 @@ public class ImmutableSegmentLoader {
     }
 
     // Ensure that the schema has the virtual columns added
-    ColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
 
     // Instantiate virtual columns
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (fieldSpec.isVirtualColumn()) {
         String columnName = fieldSpec.getName();
         ColumnContext context = new ColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
-        ColumnProvider provider = ColumnProviderFactory.buildProvider(context);
+        ColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
         indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
         segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
       }

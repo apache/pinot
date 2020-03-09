@@ -60,7 +60,7 @@ import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.apache.pinot.core.segment.virtualcolumn.ColumnProviderFactory;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
@@ -579,7 +579,7 @@ public class MutableSegmentImpl implements MutableSegment {
         Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + columnName + " should not be null");
       }
       ColumnContext columnContext = new ColumnContext(fieldSpec, _numDocsIndexed);
-      ColumnProvider columnProvider = ColumnProviderFactory.buildProvider(columnContext);
+      ColumnProvider columnProvider = VirtualColumnProviderFactory.buildProvider(columnContext);
       return new ColumnDataSource(columnProvider.buildColumnIndexContainer(columnContext),
           columnProvider.buildMetadata(columnContext));
     } else {

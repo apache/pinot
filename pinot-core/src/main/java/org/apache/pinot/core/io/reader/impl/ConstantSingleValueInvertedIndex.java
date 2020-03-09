@@ -22,14 +22,14 @@ import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReaderImpl;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 
 
 /**
  * Reader for the single-value column with the constant value
  */
-public class ConstantSingleValueInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexSingleValueReaderImpl.Context> implements SortedIndexSingleValueReader<SortedIndexSingleValueReaderImpl.Context> {
+public class ConstantSingleValueInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
 
   private int _length;
 
@@ -59,7 +59,7 @@ public class ConstantSingleValueInvertedIndex extends BaseSingleColumnSingleValu
   }
 
   @Override
-  public int getInt(int rowId, SortedIndexSingleValueReaderImpl.Context context) {
+  public int getInt(int rowId, SortedIndexReaderImpl.Context context) {
     return 0;
   }
 
@@ -69,7 +69,7 @@ public class ConstantSingleValueInvertedIndex extends BaseSingleColumnSingleValu
   }
 
   @Override
-  public SortedIndexSingleValueReaderImpl.Context createContext() {
+  public SortedIndexReaderImpl.Context createContext() {
     return null;
   }
 

@@ -32,7 +32,7 @@ import org.apache.pinot.spi.plugin.PluginManager;
 /**
  * Factory for column providers.
  */
-public class ColumnProviderFactory {
+public class VirtualColumnProviderFactory {
   public static ColumnProvider buildProvider(ColumnContext columnContext) {
     String virtualColumnProvider = columnContext.getFieldSpec().getVirtualColumnProvider();
     try {

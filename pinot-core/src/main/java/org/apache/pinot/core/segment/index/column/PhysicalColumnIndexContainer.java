@@ -25,8 +25,8 @@ import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReaderImpl;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -103,10 +103,10 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         // Single-value
         if (metadata.isSorted()) {
           // Sorted
-          SortedIndexSingleValueReader sortedIndexSingleValueReader =
-              new SortedIndexSingleValueReaderImpl(fwdIndexBuffer, metadata.getCardinality());
-          _forwardIndex = sortedIndexSingleValueReader;
-          _invertedIndex = sortedIndexSingleValueReader;
+          SortedIndexReader sortedIndexReader =
+              new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
+          _forwardIndex = sortedIndexReader;
+          _invertedIndex = sortedIndexReader;
           return;
         } else {
           // Unsorted

@@ -26,8 +26,7 @@ import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.SortedIndexMultiValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.MultiValueBlock;
 import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
@@ -91,17 +90,14 @@ public final class ColumnDataSource extends DataSource {
     if (dictionary != null) {
       // Dictionary-based index
       if (isSorted) {
-        if (isSingleValue) {
-          Preconditions.checkState(invertedIndex instanceof SortedIndexSingleValueReader);
-        } else {
-          Preconditions.checkState(invertedIndex instanceof SortedIndexMultiValueReader);
-        }
+        Preconditions.checkState(invertedIndex instanceof SortedIndexReader);
       }
     } else {
       // Raw index
       // inverted index creation is supported for text index enabled columns
       // these columns are not dictionary encoded.
-      Preconditions.checkState(invertedIndex == null || invertedIndex instanceof LuceneTextIndexReader || invertedIndex instanceof RealtimeLuceneTextIndexReader);
+      Preconditions.checkState(invertedIndex == null || invertedIndex instanceof LuceneTextIndexReader
+          || invertedIndex instanceof RealtimeLuceneTextIndexReader);
     }
 
     _operatorName = "ColumnDataSource [" + columnName + "]";

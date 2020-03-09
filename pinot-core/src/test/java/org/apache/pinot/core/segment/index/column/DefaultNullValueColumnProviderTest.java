@@ -88,14 +88,14 @@ public class DefaultNullValueColumnProviderTest {
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvStringColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.STRING).setTotalDocs(1).setSingleValue(false).setDefaultNullValueString("null")
-            .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true).build(),
+            .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(false).build(),
         new DefaultNullValueColumnProvider(columnContext).buildMetadata(columnContext));
 
     columnContext = new ColumnContext(mvIntFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvIntColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.INT).setTotalDocs(1).setSingleValue(false).setDefaultNullValueString("-2147483648")
-            .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true).build(),
+            .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(false).build(),
         new DefaultNullValueColumnProvider(columnContext).buildMetadata(columnContext));
 
     columnContext = new ColumnContext(mvLongFieldSpec, 1);
@@ -103,21 +103,21 @@ public class DefaultNullValueColumnProviderTest {
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvLongColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.LONG).setTotalDocs(1).setSingleValue(false)
             .setDefaultNullValueString("-9223372036854775808").setCardinality(1).setHasDictionary(true)
-            .setHasInvertedIndex(true).setIsSorted(true).build(),
+            .setHasInvertedIndex(true).setIsSorted(false).build(),
         new DefaultNullValueColumnProvider(columnContext).buildMetadata(columnContext));
 
     columnContext = new ColumnContext(mvDoubleFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvDoubleColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.DOUBLE).setTotalDocs(1).setSingleValue(false).setDefaultNullValueString("-Infinity")
-            .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true).build(),
+            .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(false).build(),
         new DefaultNullValueColumnProvider(columnContext).buildMetadata(columnContext));
 
     columnContext = new ColumnContext(mvFloatFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvFloatColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.FLOAT).setTotalDocs(1).setSingleValue(false).setDefaultNullValueString("-Infinity")
-            .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true).build(),
+            .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(false).build(),
         new DefaultNullValueColumnProvider(columnContext).buildMetadata(columnContext));
   }
 

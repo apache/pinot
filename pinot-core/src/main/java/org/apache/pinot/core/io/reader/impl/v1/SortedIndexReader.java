@@ -28,7 +28,7 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 /**
  * Interface for sorted index readers.
  */
-public interface SortedIndexSingleValueReader<T extends ReaderContext> extends SingleColumnSingleValueReader<T>, InvertedIndexReader<Pairs.IntPair> {
+public interface SortedIndexReader<T extends ReaderContext> extends SingleColumnSingleValueReader<T>, InvertedIndexReader<Pairs.IntPair> {
   @Override
   int getInt(int row);
 

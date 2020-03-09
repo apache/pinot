@@ -24,11 +24,10 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
 
 
@@ -59,7 +58,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    SortedIndexSingleValueReader invertedIndex = (SortedIndexSingleValueReader) _dataSource.getInvertedIndex();
+    SortedIndexReader invertedIndex = (SortedIndexReader) _dataSource.getInvertedIndex();
     List<IntPair> pairs = new ArrayList<>();
 
     // At this point, we need to create a list of matching docId ranges. There are two kinds of operators:

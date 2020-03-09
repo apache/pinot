@@ -23,8 +23,8 @@ import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReaderImpl;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.column.BaseColumnProvider;
 import org.apache.pinot.core.segment.index.column.ColumnContext;
@@ -101,7 +101,7 @@ public class DocIdVirtualColumnProvider extends BaseColumnProvider {
     }
   }
 
-  private class DocIdInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexSingleValueReaderImpl.Context> implements SortedIndexSingleValueReader<SortedIndexSingleValueReaderImpl.Context> {
+  private class DocIdInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
     @Override
     public Pairs.IntPair getDocIds(int dictId) {
       return new Pairs.IntPair(dictId, dictId);
@@ -120,7 +120,7 @@ public class DocIdVirtualColumnProvider extends BaseColumnProvider {
     }
 
     @Override
-    public SortedIndexSingleValueReaderImpl.Context createContext() {
+    public SortedIndexReaderImpl.Context createContext() {
       return null;
     }
 
@@ -130,7 +130,7 @@ public class DocIdVirtualColumnProvider extends BaseColumnProvider {
     }
 
     @Override
-    public int getInt(int rowId, SortedIndexSingleValueReaderImpl.Context context) {
+    public int getInt(int rowId, SortedIndexReaderImpl.Context context) {
       return rowId;
     }
   }

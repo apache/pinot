@@ -21,13 +21,15 @@ package org.apache.pinot.core.io.reader.impl;
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
+import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 /**
  * Reader for the multi-value column with the constant value
  */
-public class ConstantMultiValueInvertedIndex extends BaseSingleColumnMultiValueReader<FixedBitMultiValueReader.Context> implements SortedIndexMultiValueReader<FixedBitMultiValueReader.Context> {
+public class ConstantMultiValueInvertedIndex implements SingleColumnMultiValueReader<FixedBitMultiValueReader.Context>, InvertedIndexReader<Pairs.IntPair> {
   private int _length;
 
   public ConstantMultiValueInvertedIndex(int length) {
@@ -51,7 +53,42 @@ public class ConstantMultiValueInvertedIndex extends BaseSingleColumnMultiValueR
   }
 
   @Override
+  public int getCharArray(int row, char[] charArray) {
+    return 0;
+  }
+
+  @Override
+  public int getShortArray(int row, short[] shortsArray) {
+    return 0;
+  }
+
+  @Override
   public int getIntArray(int row, int[] intArray) {
+    return 0;
+  }
+
+  @Override
+  public int getLongArray(int row, long[] longArray) {
+    return 0;
+  }
+
+  @Override
+  public int getFloatArray(int row, float[] floatArray) {
+    return 0;
+  }
+
+  @Override
+  public int getDoubleArray(int row, double[] doubleArray) {
+    return 0;
+  }
+
+  @Override
+  public int getStringArray(int row, String[] stringArray) {
+    return 0;
+  }
+
+  @Override
+  public int getBytesArray(int row, byte[][] bytesArray) {
     return 0;
   }
 

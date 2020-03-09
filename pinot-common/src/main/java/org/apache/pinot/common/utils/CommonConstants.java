@@ -211,6 +211,7 @@ public class CommonConstants {
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";
+    // Whether to reload consuming segment on scheme update. Will change default behavior to true when this feature is stabilized
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = false;
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";

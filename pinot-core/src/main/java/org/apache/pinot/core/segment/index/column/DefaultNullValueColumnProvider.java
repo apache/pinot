@@ -45,7 +45,8 @@ public class DefaultNullValueColumnProvider extends BaseColumnProvider {
   @Override
   public ColumnMetadata buildMetadata(ColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
-    columnMetadataBuilder.setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true);
+    columnMetadataBuilder.setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true)
+        .setIsSorted(context.getFieldSpec().isSingleValueField() ? true : false);
     return columnMetadataBuilder.build();
   }
 
