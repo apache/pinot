@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -443,7 +444,7 @@ public class PinotTableRestletResource {
 
     String newTimeColumnName = newSegmentConfig.getTimeColumnName();
     String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
-    if (!existingTimeColumnName.equals(newTimeColumnName)) {
+    if (!Objects.equal(existingTimeColumnName, newTimeColumnName)) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(String
           .format("Time column names are different! Existing time column name: %s. New time column name: %s",
               existingTimeColumnName, newTimeColumnName));
