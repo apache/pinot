@@ -188,22 +188,22 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
   @Test
   public void testAlertFilterNoResend() throws Exception {
+    // Assume below 2 anomalies have already been notified
     MergedAnomalyResultDTO existingOld = makeAnomaly(1001L, 1000, 1100);
-    existingOld.setId(5L);
-
+    existingOld.setCreatedTime(1100L);
     MergedAnomalyResultDTO existingNew = makeAnomaly(1001L, 1100, 1200);
-    existingNew.setId(6L);
+    existingNew.setCreatedTime(1200L);
 
+    // This newly detected anomaly needs to be notified to the user
     MergedAnomalyResultDTO existingFuture = makeAnomaly(1001L, 1200, 1300);
-    existingFuture.setId(7L);
+    existingFuture.setCreatedTime(1300L);
 
     this.detectedAnomalies.clear();
     this.detectedAnomalies.add(existingOld);
     this.detectedAnomalies.add(existingNew);
     this.detectedAnomalies.add(existingFuture);
 
-    this.alertConfig.setHighWaterMark(6L);
-    this.alertConfig.setVectorClocks(Collections.singletonMap(1001L, 1100L));
+    this.alertConfig.setVectorClocks(Collections.singletonMap(1001L, 1200L));
 
     this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
 
@@ -219,20 +219,19 @@ public class ToAllRecipientsDetectionAlertFilterTest {
   @Test
   public void testAlertFilterResend() throws Exception {
     MergedAnomalyResultDTO existingOld = makeAnomaly(1001L, 1000, 1100);
-    existingOld.setId(5L);
+    existingOld.setCreatedTime(1100L);
 
     MergedAnomalyResultDTO existingNew = makeAnomaly(1001L, 1100, 1200);
-    existingNew.setId(6L);
+    existingNew.setCreatedTime(1200L);
 
     MergedAnomalyResultDTO existingFuture = makeAnomaly(1001L, 1200, 1300);
-    existingFuture.setId(7L);
+    existingFuture.setCreatedTime(1300L);
 
     this.detectedAnomalies.clear();
     this.detectedAnomalies.add(existingOld);
     this.detectedAnomalies.add(existingNew);
     this.detectedAnomalies.add(existingFuture);
 
-    this.alertConfig.setHighWaterMark(5L);
     this.alertConfig.setVectorClocks(Collections.singletonMap(1001L, 1100L));
     this.alertConfig.getProperties().put(PROP_SEND_ONCE, false);
 

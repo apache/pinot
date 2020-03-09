@@ -118,8 +118,13 @@ public class DetectionAlertJob implements Job {
     for (Map.Entry<Long, Long> vectorLock : vectorLocks.entrySet()) {
       long configId = vectorLock.getKey();
       long lastNotifiedTime = vectorLock.getValue();
-      if (anomalyDAO.findByStartTimeInRangeAndDetectionConfigId(lastNotifiedTime, System.currentTimeMillis(), configId)
-          .stream().anyMatch(x -> !x.isChild())) {
+
+      Predicate predicate = Predicate.AND(
+          Predicate.GE("createdTime", lastNotifiedTime),
+          Predicate.LT("createdTime", System.currentTimeMillis()),
+          Predicate.EQ("detectionConfigId", configId));
+
+      if (anomalyDAO.findByPredicate(predicate).stream().anyMatch(x -> !x.isChild())) {
         return true;
       }
     }

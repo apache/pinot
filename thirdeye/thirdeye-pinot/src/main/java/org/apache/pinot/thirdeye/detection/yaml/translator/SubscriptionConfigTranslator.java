@@ -195,7 +195,6 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
 
     alertConfigDTO.setAlertSchemes(buildAlertSchemes(yamlConfigMap));
     alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(yamlConfigMap));
-    alertConfigDTO.setHighWaterMark(0L);
 
     // NOTE: The below fields will/should be hidden from the YAML/UI. They will only be updated by the backend pipeline.
     List<Long> detectionConfigIds = new ArrayList<>();
