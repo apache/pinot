@@ -23,7 +23,7 @@ module('Integration | Component | detection-yaml', function(hooks) {
   setupRenderingTest(hooks);
   const testText = 'default yaml';
 
-  test(`displays yaml file of alert configuration in edit mode`, async function(assert) {
+  test(`displays yaml file of detection configuration in edit mode`, async function(assert) {
     this.setProperties({
       alertId: 1,
       subscriptionGroups: [],
@@ -40,15 +40,15 @@ module('Integration | Component | detection-yaml', function(hooks) {
     assert.ok(this.$('.ace_line')[0].innerText === testText);
   });
 
-  test(`displays default yaml file of alert configuration in create mode`, async function(assert) {
+  test(`displays default detection yaml in create mode`, async function(assert) {
 
-    const defaultText = '# Give a unique name to this alert and describe it';
+    const defaultText = "detectionName: 'give_a_unique_name_to_this_alert'";
     await render(hbs`
       {{detection-yaml
         isEditMode=false
       }}
     `);
 
-    assert.ok(this.$('.ace_line')[0].children[0].textContent === defaultText);
+    assert.ok(this.$('.ace_line')[0].innerText === defaultText);
   });
 });

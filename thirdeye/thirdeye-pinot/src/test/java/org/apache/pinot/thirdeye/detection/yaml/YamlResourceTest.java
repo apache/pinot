@@ -91,7 +91,7 @@ public class YamlResourceTest {
     try {
       this.yamlResource.validateCreateAlertYaml(config);
     } catch (IllegalArgumentException e) {
-      Assert.assertEquals(e.getMessage(), "You have not subscribed to the alert. Please copy-paste the"
+      Assert.assertEquals(e.getMessage(), "You have not subscribed to the alert. Please configure the"
           + " detectionName under the subscribedDetections field in your subscription group.");
       return;
     }

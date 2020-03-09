@@ -275,7 +275,7 @@ public class YamlResource {
     Map<String, Object> subscriptionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(config.get(PROP_SUBSCRIPTION))));
     List<String> detectionNames = ConfigUtils.getList(subscriptionConfigMap.get(PROP_DETECTION_NAMES));
     Preconditions.checkArgument(detectionNames.contains(detectionName),
-        "You have not subscribed to the alert. Please copy-paste the detectionName under the "
+        "You have not subscribed to the alert. Please configure the detectionName under the "
             + PROP_DETECTION_NAMES + " field in your subscription group.");
   }
 
