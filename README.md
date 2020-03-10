@@ -20,12 +20,13 @@
 -->
 # Apache Pinot (incubating)
 
-[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) [![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot) [![Join the chat at https://gitter.im/linkedin/pinot](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/linkedin/pinot?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![license](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
+[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) [![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot) [![license](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE) 
 
 Apache Pinot is a realtime distributed OLAP datastore, which is used to deliver scalable real time analytics with low latency. It can ingest data from offline data sources (such as Hadoop and flat files) as well as online sources (such as Kafka). Pinot is designed to scale horizontally.
 
 These presentations on Pinot give an overview of Pinot:
 
+* [Building realtime applications using Pinot @ DataCouncil](https://www.youtube.com/watch?v=mOzjVRf0yt4)
 * [Pinot: Enabling Real-time Analytics Applications @ LinkedIn's Scale  - ApacheCon 2019 (Sep 2019)](https://www.slideshare.net/seunghyunlee1460/pinot-enabling-realtime-analytics-applications-linkedins-scale)
 * [Pinot: Realtime OLAP for 530 Million Users - Sigmod 2018 (Jun 2018)](http://www.slideshare.net/seunghyunlee1460/pinot-realtime-olap-for-530-million-users-sigmod-2018-107394584)
 * [Open Source Analytics Pipeline at LinkedIn (Sep 2016, covers Gobblin and Pinot)](http://www.slideshare.net/IssacBuenrostro/open-source-linkedin-analytics-pipeline-vldb-2016)
@@ -47,8 +48,8 @@ Looking for the ThirdEye anomaly detection and root-cause analysis platform? Che
 Because of the design choices we made to achieve these goals, there are certain limitations present in Pinot:
 
 - Pinot is not a replacement for database i.e it cannot be used as source of truth store, cannot mutate data 
-- Not a replacement for search engine i.e full text search, relevance not supported
-- Query cannot span across multiple tables
+- While Pinot supports text search, its not a replacement for search engine i.e relevance is not supported
+- Query cannot span across multiple tables - Use Presto-Pinot connector to achieve joins and other features
 
 Pinot works very well for querying time series data with lots of Dimensions and Metrics. Example - Query (profile views, ad campaign performance, etc.) in an analytical fashion (who viewed this profile in the last weeks, how many ads were clicked per campaign). 
 
@@ -79,6 +80,7 @@ Pinot also provides k8s integration with interactive query engine [Presto](kuber
    dev@pinot.apache.org (posting to pinot-dev mailing list)  
    users-subscribe@pinot.apache.org (subscribe to pinot-user mailing list)  
    users@pinot.apache.org (posting to pinot-user mailing list)
+ - Apache Pinot Meetup Group: https://www.meetup.com/apache-pinot/
 
 ## Documentation
 Check out [Pinot documentation](https://pinot.readthedocs.io) for a complete description of Pinot's features.
