@@ -164,7 +164,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *
    * @return Action Map for each column.
    */
-  private Map<String, DefaultColumnAction> computeDefaultColumnActionMap() {
+  Map<String, DefaultColumnAction> computeDefaultColumnActionMap() {
     Map<String, DefaultColumnAction> defaultColumnActionMap = new HashMap<>();
 
     // Compute ADD and UPDATE actions.

@@ -79,7 +79,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
     }
 
-    if(segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
+    if (segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
       PinotDataBuffer nullValueVectorBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR);
       _nullValueVectorReader = new NullValueVectorReaderImpl(nullValueVectorBuffer);
     } else {
@@ -103,7 +103,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         // Single-value
         if (metadata.isSorted()) {
           // Sorted
-          SortedIndexReader sortedIndexReader = new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
+          SortedIndexReader sortedIndexReader =
+              new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
           return;

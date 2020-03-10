@@ -20,11 +20,12 @@ package org.apache.pinot.core.indexsegment;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.data.readers.GenericRow;
+
 
 @InterfaceAudience.Private
 public interface IndexSegment {

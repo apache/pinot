@@ -52,7 +52,7 @@ public class SegmentPrunerService {
   public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
     for (SegmentPruner segmentPruner : _segmentPruners) {
       if (segmentPruner.prune(segment, queryRequest)) {
-        LOGGER.debug("Pruned segment: {}", segment.getSegmentName());
+        LOGGER.debug("{} pruned segment: {}", segmentPruner.getClass().getName(), segment.getSegmentName());
         return true;
       }
     }

@@ -22,7 +22,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Miscellaneous context information about the virtual column.
+ * Miscellaneous context information about the column.
  * It will be used to build various components (dictionary, reader, etc) in the virtual column provider.
  */
 public class VirtualColumnContext {

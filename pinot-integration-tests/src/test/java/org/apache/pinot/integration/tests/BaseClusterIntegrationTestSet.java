@@ -27,11 +27,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -55,6 +60,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
   private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
+
+  static final String TEST_SELECT_QUERY_TEMPLATE = "SELECT %s FROM %s limit 10000000";
 
   /**
    * Can be overridden to change default setting
@@ -508,5 +515,22 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         return null;
       }
     }, 60_000L, errorMessage);
+  }
+
+  /**
+   * Construct the new column and add it to the columnsMap
+   */
+  void addNewField(Map<String, FieldSpec> columnsMap, FieldSpec.FieldType fieldType, FieldSpec.DataType dataType,
+      boolean isSingleValue) {
+    String columnName = String.format("New%s%s%s", isSingleValue ? "Singlevalue" : "Multivalue",
+        StringUtils.capitalize(dataType.toString().toLowerCase()),
+        StringUtils.capitalize(fieldType.toString().toLowerCase()));
+    if (fieldType.equals(FieldSpec.FieldType.DIMENSION)) {
+      columnsMap.put(columnName, new DimensionFieldSpec(columnName, dataType, isSingleValue));
+    } else if (fieldType.equals(FieldSpec.FieldType.METRIC)) {
+      columnsMap.put(columnName, new MetricFieldSpec(columnName, dataType));
+    } else {
+      throw new RuntimeException(String.format("dataType [%s] not added. " + dataType.toString()));
+    }
   }
 }
