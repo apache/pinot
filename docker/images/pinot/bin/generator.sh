@@ -32,16 +32,13 @@ TEMPLATE_NAME="$1"
 DATA_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}"
 SEGMENT_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}Segment"
 
-echo "Extracting template files"
-/bin/sh -c "cd ${TEMP_DIR} && jar -f \"${JAR_PATH}\" -x generator/${TEMPLATE_NAME}_schema.json generator/${TEMPLATE_NAME}_config.json generator/${TEMPLATE_NAME}_generator.json"
-
-ls ${TEMPLATE_BASEDIR}
-pause
-
 echo "Preparing temp directory for ${TEMPLATE_NAME}"
 rm -rf "${DATA_DIR}"
 rm -rf "${SEGMENT_DIR}"
 mkdir -p "${TEMP_DIR}"
+
+echo "Extracting template files"
+/bin/sh -c "cd \"${TEMP_DIR}\" && jar -xf \"${JAR_PATH}\" \"generator/${TEMPLATE_NAME}_schema.json\" \"generator/${TEMPLATE_NAME}_config.json\" \"generator/${TEMPLATE_NAME}_generator.json\""
 
 echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
 ${ADMIN_PATH} GenerateData \
