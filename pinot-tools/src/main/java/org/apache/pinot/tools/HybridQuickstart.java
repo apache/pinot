@@ -126,15 +126,11 @@ public class HybridQuickstart {
     File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
     final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 2, 2, 1, tempDir, false);
+        new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 1, 1, 1, tempDir);
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
-    printStatus(Color.YELLOW, "***** Starting Zookeeper, 2 servers, 2 brokers and 1 controller *****");
+    printStatus(Color.YELLOW, "***** Starting Zookeeper, 1 servers, 1 brokers and 1 controller *****");
     runner.startAll();
-    printStatus(Color.YELLOW, "***** Creating a server tenant with name 'DefaultTenant' *****");
-    runner.createServerTenantWith(1, 1, TagNameUtils.DEFAULT_TENANT_NAME);
-    printStatus(Color.YELLOW, "***** Creating a broker tenant with name 'DefaultTenant' *****");
-    runner.createBrokerTenantWith(2, TagNameUtils.DEFAULT_TENANT_NAME);
     printStatus(Color.YELLOW, "***** Adding airlineStats offline and realtime table *****");
     runner.addTable();
     printStatus(Color.YELLOW, "***** Launch data ingestion job to build index segments for airlineStats and push to controller *****");
