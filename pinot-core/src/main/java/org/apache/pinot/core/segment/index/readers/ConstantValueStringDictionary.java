@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-/**
- * Dictionary for constant-value string
- */
+import org.apache.pinot.spi.utils.BytesUtils;
 
+
+/**
+ * Dictionary of a single string value.
+ */
 public class ConstantValueStringDictionary extends BaseImmutableDictionary {
-  final String _value;
+  private final String _value;
 
   public ConstantValueStringDictionary(String value) {
     super(1);
@@ -32,6 +34,13 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
+    int result = stringValue.compareTo(_value);
+    if (result < 0) {
+      return -1;
+    }
+    if (result > 0) {
+      return -2;
+    }
     return 0;
   }
 
@@ -63,5 +72,10 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
   @Override
   public String getStringValue(int dictId) {
     return _value;
+  }
+
+  @Override
+  public byte[] getBytesValue(int dictId) {
+    return BytesUtils.toBytes(_value);
   }
 }

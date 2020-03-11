@@ -22,9 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -35,12 +33,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -171,77 +164,6 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Test
   public void testReload()
       throws Exception {
-    long numTotalDocs = getCountStarResult();
-    JsonNode queryResponse = postQuery(String.format(TEST_SELECT_QUERY_TEMPLATE, "*", "mytable"));
-    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
-    // Get the current schema
-    Schema schema = Schema.fromString(sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(getTableName())));
-    int originalSchemaSize = schema.size();
-    // Construct new columns
-    Map<String, FieldSpec> newColumnsMap = new HashMap<>();
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.STRING, true);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.INT, true);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.LONG, true);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.FLOAT, true);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.DOUBLE, true);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.BOOLEAN, true);
-    addNewField(newColumnsMap, FieldType.METRIC, DataType.INT, true);
-    addNewField(newColumnsMap, FieldType.METRIC, DataType.LONG, true);
-    addNewField(newColumnsMap, FieldType.METRIC, DataType.FLOAT, true);
-    addNewField(newColumnsMap, FieldType.METRIC, DataType.DOUBLE, true);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.STRING, false);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.INT, false);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.LONG, false);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.FLOAT, false);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.DOUBLE, false);
-    addNewField(newColumnsMap, FieldType.DIMENSION, DataType.BOOLEAN, false);
-    // Add new columns to the schema
-    newColumnsMap.values().stream().forEach(schema::addField);
-    sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(getTableName()),
-        schema.toSingleLineJsonString());
-
-    // Reload the table
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(getTableName(), "realtime"), null);
-
-    // Wait for all segments to finish reloading, and test querying the new columns
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        JsonNode newQueryResponse = postQuery(String.format(TEST_SELECT_QUERY_TEMPLATE,
-            newColumnsMap.keySet().isEmpty() ? schema.getTimeColumnName() : String.join(", ", newColumnsMap.keySet()),
-            "mytable"));
-        // When querying the new columns after the reload, total number of docs should not change.
-        // Also, both consuming and committed segments should be matched in the result
-        long totalDocs = newQueryResponse.get("totalDocs").asLong();
-        long numSegmentsQueried = newQueryResponse.get("numSegmentsQueried").asLong();
-        long numSegmentsMatched = newQueryResponse.get("numSegmentsMatched").asLong();
-        if (totalDocs != numTotalDocs || numSegmentsQueried != numSegmentsMatched) {
-          return false;
-        }
-        return true;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 1_000L, 300_000L, "Failed to generate default values for new columns");
-
-    // Test select star query. All columns should be returned with no exceptions.
-    queryResponse = postQuery(String.format(TEST_SELECT_QUERY_TEMPLATE, "*", "mytable"));
-    assertEquals(queryResponse.get("selectionResults").get("columns").size(),
-        originalSchemaSize + newColumnsMap.size());
-    assertEquals(queryResponse.get("selectionResults").get("results").size(), numTotalDocs);
-    assertEquals(queryResponse.get("exceptions").toString(), "[]");
-
-    // Test more queries on new columns
-    queryResponse = postQuery("SELECT MAX(NewSinglevalueIntDimension) from mytable");
-    assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asInt(), Integer.MIN_VALUE);
-
-    queryResponse = postQuery("SELECT "
-        + "MIN(NewSinglevalueDoubleMetric), MIN(NewSinglevalueFloatMetric), MIN(NewSinglevalueIntMetric), MIN(NewSinglevalueLongMetric) "
-        + "FROM mytable GROUP BY "
-        + "NewSinglevalueLongDimension, NewSinglevalueIntDimension, NewSinglevalueFloatDimension, NewSinglevalueDoubleDimension, "
-        + "NewSinglevalueStringDimension, NewMultivalueIntDimension, NewMultivalueStringDimension");
-    JsonNode groupByResultArray = queryResponse.get("aggregationResults");
-    Assert.assertEquals(groupByResultArray.size(), 4);
-    Assert.assertEquals(groupByResultArray.get(0).get("groupByResult").get(0).get("value").asDouble(), 0.0);
+    super.testReload(false);
   }
 }

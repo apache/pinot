@@ -18,16 +18,21 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
+import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.impl.ConstantMVForwardIndex;
+import org.apache.pinot.core.io.reader.impl.ConstantMVInvertedIndex;
+import org.apache.pinot.core.io.reader.impl.ConstantSVSortedIndex;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.readers.ConstantValueBytesDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueDoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueIntDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueLongDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueStringDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -35,39 +40,48 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProvider {
 
-  Dictionary _dictionary;
+  @Override
+  public DataFileReader buildReader(VirtualColumnContext context) {
+    if (context.getFieldSpec().isSingleValueField()) {
+      return new ConstantSVSortedIndex(context.getTotalDocCount());
+    } else {
+      return new ConstantMVForwardIndex();
+    }
+  }
 
-  public DefaultNullValueVirtualColumnProvider(VirtualColumnContext virtualColumnContext) {
-    buildDictionary(virtualColumnContext);
-    buildMetadata(virtualColumnContext);
-    buildColumnIndexContainer(virtualColumnContext);
+  @Override
+  public Dictionary buildDictionary(VirtualColumnContext context) {
+    FieldSpec fieldSpec = context.getFieldSpec();
+    switch (fieldSpec.getDataType()) {
+      case INT:
+        return new ConstantValueIntDictionary((int) fieldSpec.getDefaultNullValue());
+      case LONG:
+        return new ConstantValueLongDictionary((long) fieldSpec.getDefaultNullValue());
+      case FLOAT:
+        return new ConstantValueFloatDictionary((float) fieldSpec.getDefaultNullValue());
+      case DOUBLE:
+        return new ConstantValueDoubleDictionary((double) fieldSpec.getDefaultNullValue());
+      case STRING:
+        return new ConstantValueStringDictionary((String) fieldSpec.getDefaultNullValue());
+      case BYTES:
+        return new ConstantValueBytesDictionary((byte[]) fieldSpec.getDefaultNullValue());
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  @Override
+  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
+    if (context.getFieldSpec().isSingleValueField()) {
+      return new ConstantSVSortedIndex(context.getTotalDocCount());
+    } else {
+      return new ConstantMVInvertedIndex(context.getTotalDocCount());
+    }
   }
 
   @Override
   public ColumnMetadata buildMetadata(VirtualColumnContext context) {
-    ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
-    columnMetadataBuilder.setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true)
-        .setIsSorted(context.getFieldSpec().isSingleValueField() ? true : false);
-    return columnMetadataBuilder.build();
-  }
-
-  public Dictionary buildDictionary(VirtualColumnContext context) {
-    FieldSpec fieldSpec = context.getFieldSpec();
-    DataType dataType = fieldSpec.getDataType().getStoredType();
-    if (dataType.equals(DataType.STRING)) {
-      _dictionary = new ConstantValueStringDictionary((String) fieldSpec.getDefaultNullValue());
-    } else if (dataType.equals(FieldSpec.DataType.FLOAT)) {
-      _dictionary = new ConstantValueFloatDictionary((float) fieldSpec.getDefaultNullValue());
-    } else if (dataType.equals(DataType.DOUBLE)) {
-      _dictionary = new ConstantValueDoubleDictionary((double) fieldSpec.getDefaultNullValue());
-    } else if (dataType.equals(DataType.INT)) {
-      _dictionary = new ConstantValueIntDictionary((int) fieldSpec.getDefaultNullValue());
-    } else if (dataType.equals(DataType.LONG)) {
-      _dictionary = new ConstantValueLongDictionary((long) fieldSpec.getDefaultNullValue());
-    } else {
-      throw new IllegalStateException(
-          "Caught exception building dictionary. Unsupported data type: " + dataType.toString());
-    }
-    return _dictionary;
+    return getColumnMetadataBuilder(context).setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true)
+        .setIsSorted(context.getFieldSpec().isSingleValueField()).build();
   }
 }

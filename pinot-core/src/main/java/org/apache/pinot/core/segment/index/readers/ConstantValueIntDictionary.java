@@ -19,19 +19,25 @@
 package org.apache.pinot.core.segment.index.readers;
 
 /**
- * Dictionary for constant-value int
+ * Dictionary of a single int value.
  */
-
 public class ConstantValueIntDictionary extends BaseImmutableDictionary {
-  final Integer _value;
+  private final int _value;
 
-  public ConstantValueIntDictionary(Integer value) {
+  public ConstantValueIntDictionary(int value) {
     super(1);
     _value = value;
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
+    int intValue = Integer.parseInt(stringValue);
+    if (intValue < _value) {
+      return -1;
+    }
+    if (intValue > _value) {
+      return -2;
+    }
     return 0;
   }
 
@@ -42,22 +48,22 @@ public class ConstantValueIntDictionary extends BaseImmutableDictionary {
 
   @Override
   public int getIntValue(int dictId) {
-    return _value.intValue();
+    return _value;
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return _value.longValue();
+    return _value;
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return _value.floatValue();
+    return _value;
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return _value.doubleValue();
+    return _value;
   }
 
   @Override
