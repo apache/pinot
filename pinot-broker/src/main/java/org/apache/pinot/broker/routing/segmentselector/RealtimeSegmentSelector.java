@@ -136,6 +136,9 @@ public class RealtimeSegmentSelector implements SegmentSelector {
 
   @Override
   public List<String> select(BrokerRequest brokerRequest) {
+    if (_hlcSegments == null && _llcSegments == null) {
+      return Collections.emptyList();
+    }
     if (_hlcSegments == null) {
       return selectLLCSegments();
     }

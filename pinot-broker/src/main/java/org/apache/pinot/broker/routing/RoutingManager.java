@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -289,13 +290,21 @@ public class RoutingManager implements ClusterChangeHandler {
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
-    // NOTE: External view might be null for new created tables. In such case, create an empty one.
+
     ExternalView externalView = getExternalView(tableNameWithType);
+    int externalViewVersion;
+    // NOTE: External view might be null for new created tables. In such case, create an empty one and set the version
+    // to -1 to ensure the version does not match the next external view
     if (externalView == null) {
       externalView = new ExternalView(tableNameWithType);
+      externalViewVersion = -1;
+    } else {
+      externalViewVersion = externalView.getRecord().getVersion();
     }
+
     Set<String> onlineSegments = getOnlineSegments(tableNameWithType);
     Preconditions.checkState(onlineSegments != null, "Failed to find ideal state for table: {}", tableNameWithType);
+
     Set<String> enabledInstances = _enabledServerInstanceMap.keySet();
 
     SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
@@ -306,7 +315,6 @@ public class RoutingManager implements ClusterChangeHandler {
     }
     InstanceSelector instanceSelector = InstanceSelectorFactory.getInstanceSelector(tableConfig, _brokerMetrics);
     instanceSelector.init(enabledInstances, externalView, onlineSegments);
-    int externalViewVersion = externalView.getRecord().getVersion();
 
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
@@ -511,6 +519,9 @@ public class RoutingManager implements ClusterChangeHandler {
 
     Map<String, String> calculateSegmentToInstanceMap(BrokerRequest brokerRequest) {
       List<String> selectedSegments = _segmentSelector.select(brokerRequest);
+      if (selectedSegments.isEmpty()) {
+        return Collections.emptyMap();
+      }
       for (SegmentPruner segmentPruner : _segmentPruners) {
         selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
       }
