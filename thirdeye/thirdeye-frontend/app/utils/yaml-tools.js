@@ -1,13 +1,12 @@
 import yamljs from 'yamljs';
 import jsyaml from 'js-yaml';
 
-export const defaultDetectionYaml = `# Give a unique name to this alert and describe it
-detectionName: 'name_of_this_alert'
-description: 'If this alert fires then it means so-and-so'
+export const defaultDetectionYaml = `detectionName: 'give_a_unique_name_to_this_alert'
+description: 'If this alert fires then it means ...'
 
 # Tip: Type a few characters and look ahead (ctrl + space) to auto-fill.
-metric: 'metric_to_monitor'
-dataset: 'dataset_to_which_this_metric_belongs'
+metric: metric_to_monitor
+dataset: dataset_to_which_this_metric_belongs
 
 # Configure multiple rules with "OR" relationship.
 rules:
@@ -27,16 +26,14 @@ rules:
         threshold: 0.05           # Filter out all changes less than 5% compared to baseline.
 `;
 
-export const defaultSubscriptionYaml = `# subscriptionGroupName: 'give_a_unique_name_to_this_group'
+export const defaultSubscriptionYaml = `subscriptionGroupName: 'give_a_unique_name_to_this_group'
 
 # Specify your registered application name here. Contact admin/team to register one.
 application: thirdeye-internal
-# Enable or disable notification of alert
-active: true
 
 # List all alerts (detectionName) you want to subscribe to.
 subscribedDetections:
-- 'name_of_the_detection_above'
+- 'list_the_detection_you_want_to_subscribe'
 
 # Setup Email, Jira or other notification channels
 alertSchemes:
