@@ -23,8 +23,8 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -70,8 +70,8 @@ public class MutableSegmentImplNullValueVectorTest {
   @Test
   public void testNullValueVector()
       throws Exception {
-    ColumnDataSource cityIdDataSource = _mutableSegmentImpl.getDataSource("cityid");
-    ColumnDataSource descriptionDataSource = _mutableSegmentImpl.getDataSource("description");
+    DataSource cityIdDataSource = _mutableSegmentImpl.getDataSource("cityid");
+    DataSource descriptionDataSource = _mutableSegmentImpl.getDataSource("description");
     NullValueVectorReader cityIdNullValueVector = cityIdDataSource.getNullValueVector();
     NullValueVectorReader descNullValueVector = descriptionDataSource.getNullValueVector();
     Assert.assertFalse(cityIdNullValueVector.isNull(1));

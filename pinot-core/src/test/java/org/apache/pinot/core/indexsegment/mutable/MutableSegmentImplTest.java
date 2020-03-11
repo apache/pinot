@@ -116,8 +116,8 @@ public class MutableSegmentImplTest {
       Assert.assertEquals(actualDataSourceMetadata.isSingleValue(), expectedDataSourceMetadata.isSingleValue());
       Assert.assertEquals(actualDataSourceMetadata.getNumDocs(), expectedDataSourceMetadata.getNumDocs());
       if (!expectedDataSourceMetadata.isSingleValue()) {
-        Assert.assertEquals(actualDataSourceMetadata.getMaxNumMultiValues(),
-            expectedDataSourceMetadata.getMaxNumMultiValues());
+        Assert.assertEquals(actualDataSourceMetadata.getMaxNumValuesPerMVEntry(),
+            expectedDataSourceMetadata.getMaxNumValuesPerMVEntry());
       }
     }
   }
@@ -171,9 +171,9 @@ public class MutableSegmentImplTest {
         BlockMultiValIterator expectedMVIterator =
             (BlockMultiValIterator) expectedDataSource.nextBlock().getBlockValueSet().iterator();
 
-        int numMaxMultiValues = expectedDataSource.getDataSourceMetadata().getMaxNumMultiValues();
-        int[] actualDictIds = new int[numMaxMultiValues];
-        int[] expectedDictIds = new int[numMaxMultiValues];
+        int maxNumValuesPerMVEntry = expectedDataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
+        int[] actualDictIds = new int[maxNumValuesPerMVEntry];
+        int[] expectedDictIds = new int[maxNumValuesPerMVEntry];
 
         while (expectedMVIterator.hasNext()) {
           Assert.assertTrue(actualMVIterator.hasNext());

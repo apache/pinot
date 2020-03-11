@@ -19,7 +19,6 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -59,18 +58,6 @@ public class SegmentPartitionConfig extends BaseJsonConfig {
   public String getFunctionName(String column) {
     ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
     return (columnPartitionConfig != null) ? columnPartitionConfig.getFunctionName() : null;
-  }
-
-  /**
-   * Set the number of partitions for all columns.
-   *
-   * @param numPartitions Number of partitions.
-   */
-  @JsonIgnore
-  public void setNumPartitions(int numPartitions) {
-    for (ColumnPartitionConfig columnPartitionConfig : _columnPartitionMap.values()) {
-      columnPartitionConfig.setNumPartitions(numPartitions);
-    }
   }
 
   /**

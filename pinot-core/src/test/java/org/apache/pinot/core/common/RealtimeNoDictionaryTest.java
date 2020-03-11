@@ -21,16 +21,16 @@ package org.apache.pinot.core.common;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.io.readerwriter.impl.VarByteSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
+import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -109,15 +109,18 @@ public class RealtimeNoDictionaryTest {
     }
 
     Map<String, DataSource> dataSourceBlock = new HashMap<>();
-    dataSourceBlock.put(INT_COL_NAME, new ColumnDataSource(intSpec, NUM_ROWS, 0, intRawIndex, null, null, null, null));
-    dataSourceBlock.put(LONG_COL_NAME, new ColumnDataSource(longSpec, NUM_ROWS, 0, longRawIndex, null, null, null, null));
-    dataSourceBlock.put(FLOAT_COL_NAME, new ColumnDataSource(floatSpec, NUM_ROWS, 0, floatRawIndex, null, null, null, null));
-    dataSourceBlock
-        .put(DOUBLE_COL_NAME, new ColumnDataSource(doubleSpec, NUM_ROWS, 0, doubleRawIndex, null, null, null, null));
-    dataSourceBlock
-        .put(STRING_COL_NAME, new ColumnDataSource(stringSpec, NUM_ROWS, 0, stringRawIndex, null, null, null, null));
-    dataSourceBlock
-        .put(BYTES_COL_NAME, new ColumnDataSource(bytesSpec, NUM_ROWS, 0, bytesRawIndex, null, null, null, null));
+    dataSourceBlock.put(INT_COL_NAME,
+        new MutableDataSource(intSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, intRawIndex, null, null, null, null));
+    dataSourceBlock.put(LONG_COL_NAME,
+        new MutableDataSource(longSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, longRawIndex, null, null, null, null));
+    dataSourceBlock.put(FLOAT_COL_NAME,
+        new MutableDataSource(floatSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, floatRawIndex, null, null, null, null));
+    dataSourceBlock.put(DOUBLE_COL_NAME,
+        new MutableDataSource(doubleSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, doubleRawIndex, null, null, null, null));
+    dataSourceBlock.put(STRING_COL_NAME,
+        new MutableDataSource(stringSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, stringRawIndex, null, null, null, null));
+    dataSourceBlock.put(BYTES_COL_NAME,
+        new MutableDataSource(bytesSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, bytesRawIndex, null, null, null, null));
 
     return new DataFetcher(dataSourceBlock);
   }
@@ -167,7 +170,7 @@ public class RealtimeNoDictionaryTest {
       long[] longValues = new long[NUM_ROWS];
       dataFetcher.fetchLongValues(INT_COL_NAME, docIds, numDocIds, longValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(longValues[i], (long) _intVals[docIds[i]], " for row " + docIds[i]);
+        Assert.assertEquals(longValues[i], _intVals[docIds[i]], " for row " + docIds[i]);
       }
 
       float[] floatValues = new float[NUM_ROWS];

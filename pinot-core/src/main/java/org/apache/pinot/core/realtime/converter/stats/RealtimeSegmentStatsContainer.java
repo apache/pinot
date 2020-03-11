@@ -20,12 +20,11 @@ package org.apache.pinot.core.realtime.converter.stats;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 
 
 /**
@@ -33,23 +32,18 @@ import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
  */
 public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContainer {
   private final MutableSegmentImpl _realtimeSegment;
-  private final RealtimeSegmentRecordReader _realtimeSegmentRecordReader;
   private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
 
   public RealtimeSegmentStatsContainer(MutableSegmentImpl realtimeSegment,
       RealtimeSegmentRecordReader realtimeSegmentRecordReader) {
     _realtimeSegment = realtimeSegment;
-    _realtimeSegmentRecordReader = realtimeSegmentRecordReader;
-
-    SegmentPartitionConfig segmentPartitionConfig = _realtimeSegment.getSegmentPartitionConfig();
 
     // Create all column statistics
     for (String columnName : realtimeSegment.getPhysicalColumnNames()) {
-      ColumnDataSource dataSource = realtimeSegment.getDataSource(columnName);
-      if (dataSource.getDataSourceMetadata().hasDictionary()) {
+      DataSource dataSource = realtimeSegment.getDataSource(columnName);
+      if (dataSource.getDictionary() != null) {
         _columnStatisticsMap.put(columnName, new RealtimeColumnStatistics(realtimeSegment.getDataSource(columnName),
-            _realtimeSegmentRecordReader.getSortedDocIdIterationOrder(),
-            (segmentPartitionConfig == null) ? null : segmentPartitionConfig.getColumnPartitionMap().get(columnName)));
+            realtimeSegmentRecordReader.getSortedDocIdIterationOrder()));
       } else {
         _columnStatisticsMap.put(columnName, new RealtimeNoDictionaryColStatistics(dataSource));
       }

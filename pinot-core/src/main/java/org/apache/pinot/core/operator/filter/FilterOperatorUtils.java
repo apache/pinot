@@ -25,10 +25,8 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 
 
 public class FilterOperatorUtils {
@@ -54,15 +52,14 @@ public class FilterOperatorUtils {
     // TODO: make it exclusive
     int endDocId = numDocs - 1;
 
-    // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     Predicate.Type predicateType = predicateEvaluator.getPredicateType();
 
     if (predicateType == Predicate.Type.TEXT_MATCH) {
       return new TextMatchFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
     }
 
-    if (dataSourceMetadata.hasInvertedIndex() && (predicateType != Predicate.Type.REGEXP_LIKE)) {
+    // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
+    if (dataSource.getInvertedIndex() != null && predicateType != Predicate.Type.REGEXP_LIKE) {
       if (dataSource.getDataSourceMetadata().isSorted()) {
         return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
       } else if (predicateType != Predicate.Type.RANGE) {
@@ -180,17 +177,16 @@ public class FilterOperatorUtils {
    */
   private static int getScanBasedFilterPriority(ScanBasedFilterOperator scanBasedFilterOperator, int basePriority,
       @Nullable Map<String, String> debugOptions) {
-    boolean disabled = false;
     if (debugOptions != null
         && StringUtils.compareIgnoreCase(debugOptions.get(USE_SCAN_REORDER_OPTIMIZATION), "false") == 0) {
-      disabled = true;
-    }
-    DataSourceMetadata metadata = scanBasedFilterOperator.getDataSourceMetadata();
-    if (disabled || metadata == null || metadata.isSingleValue()) {
       return basePriority;
     }
 
-    // lower priority for multivalue
-    return basePriority + 1;
+    if (scanBasedFilterOperator.getDataSourceMetadata().isSingleValue()) {
+      return basePriority;
+    } else {
+      // Lower priority for multi-value column
+      return basePriority + 1;
+    }
   }
 }

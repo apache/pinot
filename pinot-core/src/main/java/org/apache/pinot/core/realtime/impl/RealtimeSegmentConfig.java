@@ -20,10 +20,10 @@ package org.apache.pinot.core.realtime.impl;
 
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.spi.data.Schema;
 
 
 public class RealtimeSegmentConfig {
@@ -40,17 +40,19 @@ public class RealtimeSegmentConfig {
   private final boolean _offHeap;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final RealtimeSegmentStatsHistory _statsHistory;
-  private final SegmentPartitionConfig _segmentPartitionConfig;
+  private final String _partitionColumn;
+  private final PartitionFunction _partitionFunction;
+  private final int _partitionId;
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final String _consumerDir;
 
   private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
       int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
-      Set<String> invertedIndexColumns, Set<String> textIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
-      boolean offHeap, PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory,
-      SegmentPartitionConfig segmentPartitionConfig, boolean aggregateMetrics, boolean nullHandlingEnabled,
-      String consumerDir) {
+      Set<String> invertedIndexColumns, Set<String> textIndexColumns,
+      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
+      RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
+      int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir) {
     _segmentName = segmentName;
     _streamName = streamName;
     _schema = schema;
@@ -64,7 +66,9 @@ public class RealtimeSegmentConfig {
     _offHeap = offHeap;
     _memoryManager = memoryManager;
     _statsHistory = statsHistory;
-    _segmentPartitionConfig = segmentPartitionConfig;
+    _partitionColumn = partitionColumn;
+    _partitionFunction = partitionFunction;
+    _partitionId = partitionId;
     _aggregateMetrics = aggregateMetrics;
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
@@ -127,8 +131,16 @@ public class RealtimeSegmentConfig {
     return _statsHistory;
   }
 
-  public SegmentPartitionConfig getSegmentPartitionConfig() {
-    return _segmentPartitionConfig;
+  public String getPartitionColumn() {
+    return _partitionColumn;
+  }
+
+  public PartitionFunction getPartitionFunction() {
+    return _partitionFunction;
+  }
+
+  public int getPartitionId() {
+    return _partitionId;
   }
 
   public boolean aggregateMetrics() {
@@ -157,7 +169,9 @@ public class RealtimeSegmentConfig {
     private boolean _offHeap;
     private PinotDataBufferMemoryManager _memoryManager;
     private RealtimeSegmentStatsHistory _statsHistory;
-    private SegmentPartitionConfig _segmentPartitionConfig;
+    private String _partitionColumn;
+    private PartitionFunction _partitionFunction;
+    private int _partitionId;
     private boolean _aggregateMetrics = false;
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
@@ -238,8 +252,18 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
-      _segmentPartitionConfig = segmentPartitionConfig;
+    public Builder setPartitionColumn(String partitionColumn) {
+      _partitionColumn = partitionColumn;
+      return this;
+    }
+
+    public Builder setPartitionFunction(PartitionFunction partitionFunction) {
+      _partitionFunction = partitionFunction;
+      return this;
+    }
+
+    public Builder setPartitionId(int partitionId) {
+      _partitionId = partitionId;
       return this;
     }
 
@@ -261,8 +285,8 @@ public class RealtimeSegmentConfig {
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_segmentName, _streamName, _schema, _capacity, _avgNumMultiValues,
           _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns, _textIndexColumns,
-          _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _segmentPartitionConfig,
-          _aggregateMetrics, _nullHandlingEnabled, _consumerDir);
+          _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _partitionColumn, _partitionFunction,
+          _partitionId, _aggregateMetrics, _nullHandlingEnabled, _consumerDir);
     }
   }
 }
