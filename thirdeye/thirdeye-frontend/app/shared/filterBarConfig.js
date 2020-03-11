@@ -94,6 +94,39 @@ export default [
     ]
   },
   {
+    header: "Alert Correlation",
+    eventType: "alertcorrelation",
+    framework: "eventAC",
+    color: "blue",
+    inputs: [
+      {
+        label: "services",
+        labelMapping: "services",
+        type: "dropdown"
+      },
+      {
+        label: "endpoints",
+        labelMapping: "endpoint",
+        type: "dropdown"
+      },
+      {
+        label: "upstreams",
+        labelMapping: "upstream",
+        type: "dropdown"
+      },
+      {
+        label: "upstream endpoints",
+        labelMapping: "upstreamendpoint",
+        type: "dropdown"
+      },
+      {
+        label: "fabrics",
+        labelMapping: "fabric",
+        type: "dropdown"
+      }
+    ]
+  },
+  {
     header: "Anomalies",
     eventType: "anomaly",
     framework: "eventAnomaly",
