@@ -53,7 +53,7 @@ Because of the design choices we made to achieve these goals, there are certain 
 Pinot works very well for querying time series data with lots of Dimensions and Metrics. Example - Query (profile views, ad campaign performance, etc.) in an analytical fashion (who viewed this profile in the last weeks, how many ads were clicked per campaign). 
 
 ## Instructions to build Pinot
-More detailed instructions can be found at [Quick Demo](https://pinot.readthedocs.io/en/latest/getting_started.html) section in the documentation.
+More detailed instructions can be found at [Quick Demo](https://apache-pinot.gitbook.io/apache-pinot-cookbook/getting-started) section in the documentation.
 ```
 # Clone a repo
 $ git clone https://github.com/apache/incubator-pinot.git
@@ -81,10 +81,10 @@ Pinot also provides k8s integration with interactive query engine [Presto](kuber
    users@pinot.apache.org (posting to pinot-user mailing list)
 
 ## Documentation
-Check out [Pinot documentation](https://pinot.readthedocs.io) for a complete description of Pinot's features.
-- [Quick Demo](https://pinot.readthedocs.io/en/latest/getting_started.html)
-- [Pinot Architecture](https://pinot.readthedocs.io/en/latest/architecture.html)
-- [Pinot Query Language](https://pinot.readthedocs.io/en/latest/pql_examples.html)
+Check out [Pinot documentation](https://apache-pinot.gitbook.io/apache-pinot-cookbook/) for a complete description of Pinot's features.
+- [Quick Demo](https://apache-pinot.gitbook.io/apache-pinot-cookbook/getting-started/running-pinot-locally)
+- [Pinot Architecture](https://apache-pinot.gitbook.io/apache-pinot-cookbook/concepts/architecture)
+- [Pinot Query Language](https://apache-pinot.gitbook.io/apache-pinot-cookbook/pinot-user-guide/pinot-query-language)
 
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
