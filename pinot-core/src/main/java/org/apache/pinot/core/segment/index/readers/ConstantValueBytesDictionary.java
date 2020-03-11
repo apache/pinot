@@ -18,56 +18,65 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-/**
- * Dictionary of a single long value.
- */
-public class ConstantValueLongDictionary extends BaseImmutableDictionary {
-  private final long _value;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
-  public ConstantValueLongDictionary(long value) {
+
+/**
+ * Dictionary of a single bytes ({@code byte[]}) value.
+ */
+public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
+  private final byte[] _value;
+
+  public ConstantValueBytesDictionary(byte[] value) {
     super(1);
     _value = value;
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    long longValue = Long.parseLong(stringValue);
-    if (longValue < _value) {
+    int result = ByteArray.compare(BytesUtils.toBytes(stringValue), _value);
+    if (result < 0) {
       return -1;
     }
-    if (longValue > _value) {
+    if (result > 0) {
       return -2;
     }
     return 0;
   }
 
   @Override
-  public Long get(int dictId) {
+  public byte[] get(int dictId) {
     return _value;
   }
 
   @Override
   public int getIntValue(int dictId) {
-    return (int) _value;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return _value;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return _value;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return _value;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return Long.toString(_value);
+    return BytesUtils.toHexString(_value);
+  }
+
+  @Override
+  public byte[] getBytesValue(int dictId) {
+    return _value;
   }
 }

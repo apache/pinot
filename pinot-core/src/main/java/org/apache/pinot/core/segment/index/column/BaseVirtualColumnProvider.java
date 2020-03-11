@@ -18,11 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.impl.ConstantMultiValueInvertedIndex;
-import org.apache.pinot.core.io.reader.impl.ConstantSingleValueInvertedIndex;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnIndexContainer;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
@@ -34,17 +30,6 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
 
-  ColumnIndexContainer _columnIndexContainer;
-  InvertedIndexReader _invertedIndexReader;
-
-  public DataFileReader buildReader(VirtualColumnContext context) {
-    if (context.getFieldSpec().isSingleValueField()) {
-      return new ConstantSingleValueInvertedIndex(0);
-    } else {
-      return new ConstantMultiValueInvertedIndex(0);
-    }
-  }
-
   protected ColumnMetadata.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
     FieldSpec fieldSpec = context.getFieldSpec();
     return new ColumnMetadata.Builder().setVirtual(true).setColumnName(fieldSpec.getName())
@@ -53,19 +38,8 @@ public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider
         .setDefaultNullValueString(context.getFieldSpec().getDefaultNullValueString());
   }
 
-  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
-    if (context.getFieldSpec().isSingleValueField()) {
-      _invertedIndexReader = new ConstantSingleValueInvertedIndex(context.getTotalDocCount());
-    } else {
-      _invertedIndexReader = new ConstantMultiValueInvertedIndex(context.getTotalDocCount());
-    }
-    return _invertedIndexReader;
-  }
-
   @Override
   public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
-    _columnIndexContainer =
-        new VirtualColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
-    return _columnIndexContainer;
+    return new VirtualColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
   }
 }

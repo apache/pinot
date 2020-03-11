@@ -40,9 +40,7 @@ public class VirtualColumnProviderFactory {
         return PluginManager.get().createInstance(virtualColumnProvider);
       }
       // Create the columnProvider that returns default null values based on the virtualColumnContext
-      return PluginManager.get()
-          .createInstance(DefaultNullValueVirtualColumnProvider.class.getName(), new Class[]{VirtualColumnContext.class},
-              new VirtualColumnContext[]{virtualColumnContext});
+      return new DefaultNullValueVirtualColumnProvider();
     } catch (Exception e) {
       throw new IllegalStateException("Caught exception while creating instance of: " + virtualColumnProvider, e);
     }

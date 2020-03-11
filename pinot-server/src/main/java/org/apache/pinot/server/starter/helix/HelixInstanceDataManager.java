@@ -23,7 +23,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -45,14 +44,11 @@ import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
-import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
-import org.apache.pinot.core.segment.index.loader.defaultcolumn.BaseDefaultColumnHandler;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -200,27 +196,33 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     String segmentName = segmentMetadata.getName();
     LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
 
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager == null) {
+      LOGGER.warn("Failed to find table data manager for table: {}, skipping reloading segment", tableNameWithType);
+      return;
+    }
+
     File indexDir = segmentMetadata.getIndexDir();
     if (indexDir == null) {
       if (!_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
         LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
         return;
       }
+      Preconditions.checkState(schema != null, "Failed to find schema for table: {}", tableNameWithType);
       LOGGER.info("Try reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
-      SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
-      SegmentDataManager segmentDataManager = _tableDataManagerMap.get(tableNameWithType)
-          .acquireSegment(segmentMetadataImpl.getName());
-      try {
-        MutableSegmentImpl mutableSegment = (MutableSegmentImpl) (segmentDataManager.getSegment());
-        mutableSegment.addExtraColumns(schema);
-      }
-      finally {
-        _tableDataManagerMap.get(tableNameWithType).releaseSegment(segmentDataManager);
+      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      if (segmentDataManager != null) {
+        try {
+          MutableSegmentImpl mutableSegment = (MutableSegmentImpl) segmentDataManager.getSegment();
+          mutableSegment.addExtraColumns(schema);
+        } finally {
+          tableDataManager.releaseSegment(segmentDataManager);
+        }
       }
       return;
     }
-    Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
 
+    Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
     File parentFile = indexDir.getParentFile();
     File segmentBackupDir =
         new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
@@ -245,7 +247,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
           .load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
 
       // Replace the old segment in memory
-      _tableDataManagerMap.get(tableNameWithType).addSegment(immutableSegment);
+      tableDataManager.addSegment(immutableSegment);
 
       // Rename segment backup directory to segment temporary directory (atomic)
       // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we

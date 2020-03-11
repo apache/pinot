@@ -54,14 +54,14 @@ public class DefaultNullValueVirtualColumnProviderTest {
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("svStringColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.STRING).setTotalDocs(1).setSingleValue(true).setDefaultNullValueString("null")
             .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(svIntFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("svIntColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.INT).setTotalDocs(1).setSingleValue(true).setDefaultNullValueString("-2147483648")
             .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(svLongFieldSpec, 1);
     Assert.assertEquals(
@@ -69,35 +69,35 @@ public class DefaultNullValueVirtualColumnProviderTest {
             .setDataType(DataType.LONG).setTotalDocs(1).setSingleValue(true)
             .setDefaultNullValueString("-9223372036854775808").setCardinality(1).setHasDictionary(true)
             .setHasInvertedIndex(true).setIsSorted(true).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(svDoubleFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("svDoubleColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.DOUBLE).setTotalDocs(1).setSingleValue(true).setDefaultNullValueString("-Infinity")
             .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(svFloatFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("svFloatColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.FLOAT).setTotalDocs(1).setSingleValue(true).setDefaultNullValueString("-Infinity")
             .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(true).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(mvStringFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvStringColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.STRING).setTotalDocs(1).setSingleValue(false).setDefaultNullValueString("null")
             .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(false).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(mvIntFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvIntColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.INT).setTotalDocs(1).setSingleValue(false).setDefaultNullValueString("-2147483648")
             .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(false).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(mvLongFieldSpec, 1);
     Assert.assertEquals(
@@ -105,73 +105,72 @@ public class DefaultNullValueVirtualColumnProviderTest {
             .setDataType(DataType.LONG).setTotalDocs(1).setSingleValue(false)
             .setDefaultNullValueString("-9223372036854775808").setCardinality(1).setHasDictionary(true)
             .setHasInvertedIndex(true).setIsSorted(false).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(mvDoubleFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvDoubleColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.DOUBLE).setTotalDocs(1).setSingleValue(false).setDefaultNullValueString("-Infinity")
             .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(false).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
 
     virtualColumnContext = new VirtualColumnContext(mvFloatFieldSpec, 1);
     Assert.assertEquals(
         new ColumnMetadata.Builder().setVirtual(true).setColumnName("mvFloatColumn").setFieldType(FieldType.DIMENSION)
             .setDataType(DataType.FLOAT).setTotalDocs(1).setSingleValue(false).setDefaultNullValueString("-Infinity")
             .setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true).setIsSorted(false).build(),
-        new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildMetadata(virtualColumnContext));
+        new DefaultNullValueVirtualColumnProvider().buildMetadata(virtualColumnContext));
   }
 
   @Test
   public void testBuildDictionary() {
     VirtualColumnContext virtualColumnContext = new VirtualColumnContext(svStringFieldSpec, 1);
-    Dictionary dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(
-        virtualColumnContext);
+    Dictionary dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueStringDictionary.class, dictionary.getClass());
     Assert.assertEquals("null", dictionary.getStringValue(0));
 
     virtualColumnContext = new VirtualColumnContext(svIntFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueIntDictionary.class, dictionary.getClass());
     Assert.assertEquals(Integer.MIN_VALUE, dictionary.getIntValue(0));
 
     virtualColumnContext = new VirtualColumnContext(svLongFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueLongDictionary.class, dictionary.getClass());
     Assert.assertEquals(Long.MIN_VALUE, dictionary.getLongValue(0));
 
     virtualColumnContext = new VirtualColumnContext(svDoubleFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueDoubleDictionary.class, dictionary.getClass());
     Assert.assertEquals(Double.NEGATIVE_INFINITY, dictionary.getDoubleValue(0));
 
     virtualColumnContext = new VirtualColumnContext(svFloatFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueFloatDictionary.class, dictionary.getClass());
     Assert.assertEquals(Float.NEGATIVE_INFINITY, dictionary.getFloatValue(0));
 
     virtualColumnContext = new VirtualColumnContext(mvStringFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueStringDictionary.class, dictionary.getClass());
     Assert.assertEquals("null", dictionary.getStringValue(0));
 
     virtualColumnContext = new VirtualColumnContext(mvIntFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueIntDictionary.class, dictionary.getClass());
     Assert.assertEquals(Integer.MIN_VALUE, dictionary.getIntValue(0));
 
     virtualColumnContext = new VirtualColumnContext(mvLongFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueLongDictionary.class, dictionary.getClass());
     Assert.assertEquals(Long.MIN_VALUE, dictionary.getLongValue(0));
 
     virtualColumnContext = new VirtualColumnContext(mvDoubleFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueDoubleDictionary.class, dictionary.getClass());
     Assert.assertEquals(Double.NEGATIVE_INFINITY, dictionary.getDoubleValue(0));
 
     virtualColumnContext = new VirtualColumnContext(mvFloatFieldSpec, 1);
-    dictionary = new DefaultNullValueVirtualColumnProvider(virtualColumnContext).buildDictionary(virtualColumnContext);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     Assert.assertEquals(ConstantValueFloatDictionary.class, dictionary.getClass());
     Assert.assertEquals(Float.NEGATIVE_INFINITY, dictionary.getFloatValue(0));
   }

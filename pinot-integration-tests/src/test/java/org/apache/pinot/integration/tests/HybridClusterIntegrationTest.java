@@ -22,9 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -33,7 +31,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -42,8 +39,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -227,78 +222,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testReload()
       throws Exception {
-    long numTotalDocs = getCountStarResult();
-    JsonNode queryResponse = postQuery(String.format(TEST_SELECT_QUERY_TEMPLATE, "*", getTableName()));
-    assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
-    // Get the current schema
-    Schema schema = Schema.fromString(sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(getTableName())));
-    int originalSchemaSize = schema.size();
-    // Construct new columns
-    Map<String, FieldSpec> newColumnsMap = new HashMap<>();
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.STRING, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.FLOAT, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.DOUBLE, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.BOOLEAN, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.METRIC, FieldSpec.DataType.INT, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.METRIC, FieldSpec.DataType.LONG, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.METRIC, FieldSpec.DataType.FLOAT, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.METRIC, FieldSpec.DataType.DOUBLE, true);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.STRING, false);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, false);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.LONG, false);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.FLOAT, false);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.DOUBLE, false);
-    addNewField(newColumnsMap, FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.BOOLEAN, false);
-    // Add new columns to the schema
-    newColumnsMap.values().stream().forEach(schema::addField);
-    sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(getTableName()),
-        schema.toSingleLineJsonString());
-
-    // Reload the table
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(getTableName(), "realtime"), null);
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(getTableName(), "offline"), null);
-
-    // Wait for all segments to finish reloading, and test querying the new columns
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        JsonNode newQueryResponse = postQuery(String.format(TEST_SELECT_QUERY_TEMPLATE,
-            newColumnsMap.keySet().isEmpty() ? schema.getTimeColumnName() : String.join(", ", newColumnsMap.keySet()),
-            getTableName()));
-        // When querying the new columns after the reload, total number of docs should not change.
-        // Also, both consuming and committed segments should be matched in the result
-        long numSegmentsQueried = newQueryResponse.get("numSegmentsQueried").asLong();
-        long numSegmentsMatched = newQueryResponse.get("numSegmentsMatched").asLong();
-        if (newQueryResponse.get("selectionResults").get("results").size() != numTotalDocs
-            || numSegmentsQueried != numSegmentsMatched) {
-          return false;
-        }
-        return true;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 1_000L, 300_000L, "Failed to generate default values for new columns");
-
-    // Test select star query. All columns should be returned with no exceptions.
-    queryResponse = postQuery(String.format(TEST_SELECT_QUERY_TEMPLATE, "*", getTableName()));
-    assertEquals(queryResponse.get("selectionResults").get("columns").size(),
-        originalSchemaSize + newColumnsMap.size());
-    assertEquals(queryResponse.get("selectionResults").get("results").size(), numTotalDocs);
-    assertEquals(queryResponse.get("exceptions").toString(), "[]");
-
-    // Test more queries on new columns
-    queryResponse = postQuery("SELECT MAX(NewSinglevalueIntDimension) from mytable");
-    assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asInt(), Integer.MIN_VALUE);
-
-    queryResponse = postQuery("SELECT "
-        + "MIN(NewSinglevalueDoubleMetric), MIN(NewSinglevalueFloatMetric), MIN(NewSinglevalueIntMetric), MIN(NewSinglevalueLongMetric) "
-        + "FROM mytable GROUP BY "
-        + "NewSinglevalueLongDimension, NewSinglevalueIntDimension, NewSinglevalueFloatDimension, NewSinglevalueDoubleDimension, "
-        + "NewSinglevalueStringDimension, NewMultivalueIntDimension, NewMultivalueStringDimension");
-    JsonNode groupByResultArray = queryResponse.get("aggregationResults");
-    Assert.assertEquals(groupByResultArray.size(), 4);
-    Assert.assertEquals(groupByResultArray.get(0).get("groupByResult").get(0).get("value").asDouble(), 0.0);
+    super.testReload(true);
   }
 
   @Test
