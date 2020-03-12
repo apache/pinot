@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.spi.config.table;
 
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class IndexingConfig extends BaseJsonConfig {
@@ -38,6 +37,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _noDictionaryColumns; // TODO: replace this with noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig;
   private List<String> _onHeapDictionaryColumns;
+  private boolean _enableDefaultStarTree;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
@@ -163,6 +163,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
+  }
+
+  public boolean isEnableDefaultStarTree() {
+    return _enableDefaultStarTree;
+  }
+
+  public void setEnableDefaultStarTree(boolean enableDefaultStarTree) {
+    _enableDefaultStarTree = enableDefaultStarTree;
   }
 
   @Nullable

@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
@@ -87,6 +86,7 @@ public class SegmentGeneratorConfig {
   private SegmentVersion _segmentVersion = SegmentVersion.v3;
   private Schema _schema = null;
   private RecordReaderConfig _readerConfig = null;
+  private boolean _enableDefaultStarTree = false;
   private List<StarTreeV2BuilderConfig> _starTreeV2BuilderConfigs = null;
   private String _creatorVersion = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
@@ -150,6 +150,7 @@ public class SegmentGeneratorConfig {
       _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
 
       // Star-tree V2 configs
+      setEnableDefaultStarTree(indexingConfig.isEnableDefaultStarTree());
       List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
       if (starTreeIndexConfigs != null && !starTreeIndexConfigs.isEmpty()) {
         List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = new ArrayList<>(starTreeIndexConfigs.size());
@@ -508,6 +509,14 @@ public class SegmentGeneratorConfig {
 
   public void setReaderConfig(RecordReaderConfig readerConfig) {
     _readerConfig = readerConfig;
+  }
+
+  public boolean isEnableDefaultStarTree() {
+    return _enableDefaultStarTree;
+  }
+
+  public void setEnableDefaultStarTree(boolean enableDefaultStarTree) {
+    _enableDefaultStarTree = enableDefaultStarTree;
   }
 
   public List<StarTreeV2BuilderConfig> getStarTreeV2BuilderConfigs() {

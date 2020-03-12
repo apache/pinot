@@ -23,6 +23,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -262,8 +263,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void buildStarTreeV2IfNecessary(File indexDir)
       throws Exception {
-    List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = config.getStarTreeV2BuilderConfigs();
-    if (starTreeV2BuilderConfigs != null && !starTreeV2BuilderConfigs.isEmpty()) {
+    List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = new ArrayList<>();
+    if (config.getStarTreeV2BuilderConfigs() != null) {
+      starTreeV2BuilderConfigs.addAll(config.getStarTreeV2BuilderConfigs());
+    }
+    // Append the default star-tree after the customized star-trees if enabled
+    if (config.isEnableDefaultStarTree()) {
+      starTreeV2BuilderConfigs.add(null);
+    }
+    if (!starTreeV2BuilderConfigs.isEmpty()) {
       MultipleTreesBuilder.BuildMode buildMode =
           config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
       new MultipleTreesBuilder(starTreeV2BuilderConfigs, indexDir, buildMode).build();
