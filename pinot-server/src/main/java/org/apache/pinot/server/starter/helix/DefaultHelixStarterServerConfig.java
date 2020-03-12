@@ -60,11 +60,7 @@ public class DefaultHelixStarterServerConfig {
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_CLASS,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_CLASS);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS,
-        "DataSchemaSegmentPruner,ColumnValueSegmentPruner,ValidSegmentPruner,PartitionSegmentPruner");
-    serverConf.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "0");
-    serverConf.addProperty("pinot.server.query.executor.pruner.ColumnValueSegmentPruner.id", "1");
-    serverConf.addProperty("pinot.server.query.executor.pruner.ValidSegmentPruner.id", "2");
-    serverConf.addProperty("pinot.server.query.executor.pruner.PartitionSegmentPruner.id", "3");
+        "ValidSegmentPruner,DataSchemaSegmentPruner,ColumnValueSegmentPruner");
 
     // request handler factory parameters
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS,
