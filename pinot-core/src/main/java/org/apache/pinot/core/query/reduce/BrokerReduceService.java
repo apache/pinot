@@ -181,6 +181,12 @@ public class BrokerReduceService {
       }
     }
 
+    // NOTE: When there is no cached data schema, that means all servers encountered exception. In such case, return the
+    //       response with metadata only.
+    if (cachedDataSchema == null) {
+      return brokerResponseNative;
+    }
+
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(brokerRequest);
     dataTableReducer
         .reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
