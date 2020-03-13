@@ -261,13 +261,13 @@ public class GcsPinotFS  extends PinotFS {
     ImmutableList.Builder<URI> builder = ImmutableList.builder();
     Path srcPath = Paths.get(srcUri.getPath());
     try {
-      boolean copySucceeded = false;
+      boolean copySucceeded = true;
       for (String directoryEntry : listFiles(srcUri, true)) {
         URI src = new URI(srcUri.getScheme(), srcUri.getHost(), directoryEntry, null);
         String relativeSrcPath = srcPath.relativize(Paths.get(directoryEntry)).toString();
         String dstPath = dstUri.resolve(relativeSrcPath).getPath();
         URI dst = new URI(dstUri.getScheme(), dstUri.getHost(), dstPath, null);
-        copySucceeded |= copyFile(src, dst);
+        copySucceeded &= copyFile(src, dst);
       }
       return copySucceeded;
     } catch (URISyntaxException e) {

@@ -63,6 +63,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Azure Data Lake Storage Gen2 implementation for the PinotFS interface.
+ *
+ * TODO: add the unit test
  */
 public class AzureGen2PinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(AzureGen2PinotFS.class);
@@ -115,7 +117,7 @@ public class AzureGen2PinotFS extends PinotFS {
     _blobServiceClient =
         new BlobServiceClientBuilder().credential(sharedKeyCredential).endpoint(blobServiceEndpointUrl).buildClient();
     _fileSystemClient = serviceClient.getFileSystemClient(fileSystemName);
-    LOGGER.error("AzureGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, "
+    LOGGER.info("AzureGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, "
             + "blobServiceEndpointUrl={}, enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl,
         blobServiceEndpointUrl, _enableChecksum);
   }
@@ -135,7 +137,7 @@ public class AzureGen2PinotFS extends PinotFS {
       if (e.getStatusCode() == ALREADY_EXISTS_STATUS_CODE && e.getErrorCode().equals(PATH_ALREADY_EXISTS_ERROR_CODE)) {
         return true;
       }
-      LOGGER.error("Exception thrown while calling mkdir (uri = {})", uri, e);
+      LOGGER.error("Exception thrown while calling mkdir (uri={}, errorStatus ={})", uri, e.getStatusCode(), e);
       throw new IOException(e);
     }
   }
@@ -197,7 +199,7 @@ public class AzureGen2PinotFS extends PinotFS {
       // In case we are copying a directory, we need to recursively look into the directory and copy all the files and
       // directories accordingly
       try {
-        boolean copySucceeded = false;
+        boolean copySucceeded = true;
         Path srcPath = Paths.get(srcUri.getPath());
         for (String path : listFiles(srcUri, true)) {
           // Compute the src path for the given path
@@ -213,7 +215,7 @@ public class AzureGen2PinotFS extends PinotFS {
             mkdir(newDst);
           } else {
             // If src is a file, we need to copy.
-            copySucceeded |= copySrcToDst(currentSrc, newDst);
+            copySucceeded &= copySrcToDst(currentSrc, newDst);
           }
         }
         return copySucceeded;
