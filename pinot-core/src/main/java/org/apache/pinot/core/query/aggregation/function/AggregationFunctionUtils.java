@@ -111,12 +111,13 @@ public class AggregationFunctionUtils {
 
   public static String formatValue(Object value) {
     if (value instanceof Double) {
-      Double doubleValue = (Double) value;
+      double doubleValue = (double) value;
 
-      // String.format is very expensive, so avoid it for whole numbers that can fit in Long.
-      // We simply append ".00000" to long, in order to keep the existing behavior.
-      if (doubleValue <= Long.MAX_VALUE && DoubleMath.isMathematicalInteger(doubleValue)) {
-        return doubleValue.longValue() + ".00000";
+      // NOTE: String.format() is very expensive, so avoid it for whole numbers that can fit in Long.
+      //       We simply append ".00000" to long, in order to keep the existing behavior.
+      if (doubleValue <= Long.MAX_VALUE && doubleValue >= Long.MIN_VALUE && DoubleMath
+          .isMathematicalInteger(doubleValue)) {
+        return (long) doubleValue + ".00000";
       } else {
         return String.format(Locale.US, "%1.5f", doubleValue);
       }
