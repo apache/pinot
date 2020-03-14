@@ -18,8 +18,19 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.util.QueryOptions;
 
 
 /**
@@ -37,7 +48,7 @@ public class DataTableUtils {
    * @param columnOffsets array of column offsets.
    * @return row size in bytes.
    */
-  public static int computeColumnOffsets(@Nonnull DataSchema dataSchema, @Nonnull int[] columnOffsets) {
+  public static int computeColumnOffsets(DataSchema dataSchema, int[] columnOffsets) {
     int numColumns = columnOffsets.length;
     assert numColumns == dataSchema.size();
 
@@ -70,5 +81,113 @@ public class DataTableUtils {
     }
 
     return rowSizeInBytes;
+  }
+
+  /**
+   * Builds an empty data table based on the broker request.
+   */
+  public static DataTable buildEmptyDataTable(BrokerRequest brokerRequest)
+      throws IOException {
+    // Selection query.
+    if (brokerRequest.isSetSelections()) {
+      Selection selection = brokerRequest.getSelections();
+      List<String> selectionColumns = selection.getSelectionColumns();
+      int numSelectionColumns = selectionColumns.size();
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numSelectionColumns];
+      // Use STRING column data type as default for selection query.
+      Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
+      DataSchema dataSchema =
+          new DataSchema(selectionColumns.toArray(new String[numSelectionColumns]), columnDataTypes);
+      return new DataTableBuilder(dataSchema).build();
+    }
+
+    // Aggregation query.
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    int numAggregations = aggregationsInfo.size();
+    AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregations];
+    for (int i = 0; i < numAggregations; i++) {
+      aggregationFunctionContexts[i] =
+          AggregationFunctionUtils.getAggregationFunctionContext(aggregationsInfo.get(i), brokerRequest);
+    }
+    if (brokerRequest.isSetGroupBy()) {
+      // Aggregation group-by query.
+
+      if (new QueryOptions(brokerRequest.getQueryOptions()).isGroupByModeSQL()) {
+        // SQL format
+
+        List<String> expressions = brokerRequest.getGroupBy().getExpressions();
+        int numColumns = expressions.size() + numAggregations;
+        String[] columnNames = new String[numColumns];
+        DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
+        int index = 0;
+        for (String expression : expressions) {
+          columnNames[index] = expression;
+          // Use STRING column data type as default for group-by expressions
+          columnDataTypes[index] = DataSchema.ColumnDataType.STRING;
+          index++;
+        }
+        for (int i = 0; i < numAggregations; i++) {
+          AggregationFunctionContext aggregationFunctionContext = aggregationFunctionContexts[i];
+          columnNames[index] = aggregationFunctionContext.getResultColumnName();
+          AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
+          columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
+          index++;
+        }
+        return new DataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
+      } else {
+        // PQL format
+
+        String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
+        DataSchema.ColumnDataType[] columnDataTypes =
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.OBJECT};
+
+        // Build the data table.
+        DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
+        for (int i = 0; i < numAggregations; i++) {
+          dataTableBuilder.startRow();
+          dataTableBuilder.setColumn(0, aggregationFunctionContexts[i].getAggregationColumnName());
+          dataTableBuilder.setColumn(1, new HashMap<String, Object>());
+          dataTableBuilder.finishRow();
+        }
+        return dataTableBuilder.build();
+      }
+    } else {
+      // Aggregation only query.
+
+      String[] aggregationColumnNames = new String[numAggregations];
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregations];
+      Object[] aggregationResults = new Object[numAggregations];
+      for (int i = 0; i < numAggregations; i++) {
+        AggregationFunctionContext aggregationFunctionContext = aggregationFunctionContexts[i];
+        aggregationColumnNames[i] = aggregationFunctionContext.getAggregationColumnName();
+        AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
+        columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
+        aggregationResults[i] =
+            aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder());
+      }
+
+      // Build the data table.
+      DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(aggregationColumnNames, columnDataTypes));
+      dataTableBuilder.startRow();
+      for (int i = 0; i < numAggregations; i++) {
+        switch (columnDataTypes[i]) {
+          case LONG:
+            dataTableBuilder.setColumn(i, ((Number) aggregationResults[i]).longValue());
+            break;
+          case DOUBLE:
+            dataTableBuilder.setColumn(i, ((Double) aggregationResults[i]).doubleValue());
+            break;
+          case OBJECT:
+            dataTableBuilder.setColumn(i, aggregationResults[i]);
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Unsupported aggregation column data type: " + columnDataTypes[i] + " for column: "
+                    + aggregationColumnNames[i]);
+        }
+      }
+      dataTableBuilder.finishRow();
+      return dataTableBuilder.build();
+    }
   }
 }

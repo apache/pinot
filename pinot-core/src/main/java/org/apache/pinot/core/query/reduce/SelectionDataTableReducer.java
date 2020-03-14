@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.reduce;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -71,26 +70,17 @@ public class SelectionDataTableReducer implements DataTableReducer {
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
       BrokerMetrics brokerMetrics) {
-    Collection<DataTable> dataTables = dataTableMap.values();
-
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query if exists
-      if (dataSchema != null) {
-        List<String> selectionColumns =
-            SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
-        if (_responseFormatSql) {
-          DataSchema selectionDataSchema =
-              SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
-          brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
-        } else {
-          brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, Collections.emptyList()));
-        }
+      List<String> selectionColumns =
+          SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
+      if (_responseFormatSql) {
+        DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
+        brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
+      } else {
+        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, Collections.emptyList()));
       }
-      return;
     } else {
-
-      assert dataSchema != null;
-
       // For data table map with more than one data tables, remove conflicting data tables
       if (dataTableMap.size() > 1) {
         List<ServerRoutingInstance> droppedServers = removeConflictingResponses(dataSchema, dataTableMap);
@@ -111,7 +101,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
       if (selectionSize > 0 && _selection.isSetSelectionSortSequence()) {
         // Selection order-by
         SelectionOperatorService selectionService = new SelectionOperatorService(_selection, dataSchema);
-        selectionService.reduceWithOrdering(dataTables);
+        selectionService.reduceWithOrdering(dataTableMap.values());
         if (_responseFormatSql) {
           // TODO: Selection uses Serializable[] in all its operations
           //   Converting that to Object[] end to end would be a big change, and will be done in future PRs
@@ -123,7 +113,8 @@ public class SelectionDataTableReducer implements DataTableReducer {
         // Selection only
         List<String> selectionColumns =
             SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
-        List<Serializable[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTables, selectionSize);
+        List<Serializable[]> reducedRows =
+            SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), selectionSize);
         if (_responseFormatSql) {
           // TODO: Selection uses Serializable[] in all its operations
           //   Converting that to Object[] end to end would be a big change, and will be done in future PRs
