@@ -22,23 +22,20 @@ import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -49,6 +46,10 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -375,7 +376,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
     Iterator<Record> iterator = distinctTable.iterator();
     while (iterator.hasNext()) {
-     Record record = iterator.next();
+      Record record = iterator.next();
       Assert.assertEquals(record.getValues().length, columnNames.length);
       if (op == 1) {
         Assert.assertTrue(_expectedAddTransformResults.contains(record));
@@ -511,7 +512,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         createSegment(schema, recordReader, SEGMENT_NAME_1, tableName);
         final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
         _indexSegments.add(segment);
-        _segmentDataManagers = Arrays.asList(new ImmutableSegmentDataManager(segment), new ImmutableSegmentDataManager(segment));
+        _segmentDataManagers =
+            Arrays.asList(new ImmutableSegmentDataManager(segment), new ImmutableSegmentDataManager(segment));
 
         // without ORDER BY
         runFilterQueryInnerSegment(q1ExpectedResults, query1, new String[]{"State", "City"},
@@ -630,7 +632,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
         runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
 
-        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount LIMIT 100";
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName
+            + " ORDER BY State, City, SaleAmount LIMIT 100";
         sortedResults = new ArrayList<>();
         sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
         sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
@@ -644,14 +647,17 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         sortedResults.add(new Record(new Object[]{"Washington", "Seattle", 100000}));
         runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
 
-        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount LIMIT 10";
+        orderByQuery =
+            "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount LIMIT 10";
         runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
 
-        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount LIMIT 5";
+        orderByQuery =
+            "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount LIMIT 5";
         sortedResults = sortedResults.subList(0, 5);
         runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
 
-        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount DESC LIMIT 100";
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName
+            + " ORDER BY State, City, SaleAmount DESC LIMIT 100";
         sortedResults = new ArrayList<>();
         sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
         sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
@@ -665,14 +671,17 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         sortedResults.add(new Record(new Object[]{"Washington", "Seattle", 100000}));
         runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
 
-        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount DESC LIMIT 10";
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName
+            + " ORDER BY State, City, SaleAmount DESC LIMIT 10";
         runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
 
-        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount DESC LIMIT 5";
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName
+            + " ORDER BY State, City, SaleAmount DESC LIMIT 5";
         sortedResults = sortedResults.subList(0, 5);
         runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
 
-        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State DESC, City, SaleAmount DESC LIMIT 100";
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName
+            + " ORDER BY State DESC, City, SaleAmount DESC LIMIT 100";
         sortedResults = new ArrayList<>();
         sortedResults.add(new Record(new Object[]{"Washington", "Bellevue", 150000}));
         sortedResults.add(new Record(new Object[]{"Washington", "Bellevue", 100000}));
@@ -685,6 +694,18 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
         sortedResults.add(new Record(new Object[]{"California", "Sunnyvale", 300000}));
         runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        String emptyResultQuery =
+            "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " WHERE SaleAmount = 0";
+        // All column data types should be STRING for empty result
+        runFilterQueryInnerSegment(Collections.emptySet(), emptyResultQuery,
+            new String[]{"State", "City", "SaleAmount"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+        runQueryInterSegmentWithOrderBy(emptyResultQuery, Collections.emptyList(),
+            new String[]{"State", "City", "SaleAmount"});
+        emptyResultQuery += " ORDER BY State, City LIMIT 100";
+        runQueryInterSegmentWithOrderBy(emptyResultQuery, Collections.emptyList(),
+            new String[]{"State", "City", "SaleAmount"});
       }
     } finally {
       destroySegments();

@@ -82,7 +82,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     _brokerRequest = brokerRequest;
     _aggregationFunctions = aggregationFunctions;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _aggregationFunctionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, null);
+    _aggregationFunctionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest);
     _numAggregationFunctions = aggregationFunctions.length;
     _groupBy = brokerRequest.getGroupBy();
     _numGroupBy = _groupBy.getExpressionsSize();

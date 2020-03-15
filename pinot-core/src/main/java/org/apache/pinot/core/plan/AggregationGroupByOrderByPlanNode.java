@@ -21,7 +21,6 @@ package org.apache.pinot.core.plan;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
@@ -56,14 +55,13 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
 
-  public AggregationGroupByOrderByPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest,
+  public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest,
       int maxInitialResultHolderCapacity, int numGroupsLimit) {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _functionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest, indexSegment.getSegmentMetadata());
+    _functionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest);
     _groupBy = brokerRequest.getGroupBy();
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();

@@ -26,7 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
@@ -64,11 +63,17 @@ public class AggregationFunctionUtils {
 
   /**
    * Creates an {@link AggregationFunctionContext} from the {@link AggregationInfo}.
+   * NOTE: This method does not work for {@code DISTINCT} aggregation function.
+   * TODO: Remove this method and always pass in the broker request
    */
   public static AggregationFunctionContext getAggregationFunctionContext(AggregationInfo aggregationInfo) {
     return getAggregationFunctionContext(aggregationInfo, null);
   }
 
+  /**
+   * NOTE: Broker request cannot be {@code null} for {@code DISTINCT} aggregation function.
+   * TODO: Always pass in non-null broker request
+   */
   public static AggregationFunctionContext getAggregationFunctionContext(AggregationInfo aggregationInfo,
       @Nullable BrokerRequest brokerRequest) {
     String column = getColumn(aggregationInfo);
@@ -77,8 +82,7 @@ public class AggregationFunctionUtils {
     return new AggregationFunctionContext(aggregationFunction, column);
   }
 
-  public static AggregationFunctionContext[] getAggregationFunctionContexts(BrokerRequest brokerRequest,
-      @Nullable SegmentMetadata segmentMetadata) {
+  public static AggregationFunctionContext[] getAggregationFunctionContexts(BrokerRequest brokerRequest) {
     List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
     int numAggregationFunctions = aggregationInfos.size();
     AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregationFunctions];

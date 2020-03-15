@@ -73,7 +73,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       columnNames[index] = groupByColumn;
       TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(groupByColumn);
       columnDataTypes[index] =
-          DataSchema.ColumnDataType.fromDataType(_transformOperator.getResultMetadata(expression).getDataType(), true);
+          DataSchema.ColumnDataType.fromDataTypeSV(_transformOperator.getResultMetadata(expression).getDataType());
       index++;
     }
 

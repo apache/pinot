@@ -20,9 +20,8 @@ package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.utils.DataSchema;
@@ -102,13 +101,9 @@ public class DataTableUtils {
     }
 
     // Aggregation query.
-    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
-    int numAggregations = aggregationsInfo.size();
-    AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregations];
-    for (int i = 0; i < numAggregations; i++) {
-      aggregationFunctionContexts[i] =
-          AggregationFunctionUtils.getAggregationFunctionContext(aggregationsInfo.get(i), brokerRequest);
-    }
+    AggregationFunctionContext[] aggregationFunctionContexts =
+        AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest);
+    int numAggregations = aggregationFunctionContexts.length;
     if (brokerRequest.isSetGroupBy()) {
       // Aggregation group-by query.
 
@@ -126,8 +121,7 @@ public class DataTableUtils {
           columnDataTypes[index] = DataSchema.ColumnDataType.STRING;
           index++;
         }
-        for (int i = 0; i < numAggregations; i++) {
-          AggregationFunctionContext aggregationFunctionContext = aggregationFunctionContexts[i];
+        for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
           columnNames[index] = aggregationFunctionContext.getResultColumnName();
           AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
           columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
@@ -143,10 +137,10 @@ public class DataTableUtils {
 
         // Build the data table.
         DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
-        for (int i = 0; i < numAggregations; i++) {
+        for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
           dataTableBuilder.startRow();
-          dataTableBuilder.setColumn(0, aggregationFunctionContexts[i].getAggregationColumnName());
-          dataTableBuilder.setColumn(1, new HashMap<String, Object>());
+          dataTableBuilder.setColumn(0, aggregationFunctionContext.getAggregationColumnName());
+          dataTableBuilder.setColumn(1, Collections.emptyMap());
           dataTableBuilder.finishRow();
         }
         return dataTableBuilder.build();
