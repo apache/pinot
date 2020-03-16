@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index;
+package org.apache.pinot.core.segment.index.metadata;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.lang.reflect.Field;
@@ -39,27 +39,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.CARDINALITY;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.COLUMN_TYPE;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DATA_TYPE;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DATETIME_FORMAT;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DATETIME_GRANULARITY;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DEFAULT_NULL_VALUE;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.HAS_DICTIONARY;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.HAS_NULL_VALUE;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.IS_AUTO_GENERATED;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.IS_SORTED;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.MAX_VALUE;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.MIN_VALUE;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TEXT_INDEX_TYPE;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TOTAL_DOCS;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.getKeyFor;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
 

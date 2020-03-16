@@ -20,7 +20,7 @@ package org.apache.pinot.core.segment.store;
 
 import java.io.IOException;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;

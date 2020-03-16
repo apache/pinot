@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.segment;
+package org.apache.pinot.core.segment.index.metadata;
 
 import java.io.File;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.Schema;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -28,6 +29,7 @@ import org.joda.time.Interval;
 /**
  * The <code>SegmentMetadata</code> class holds the segment level management information and data statistics.
  */
+@InterfaceAudience.Private
 public interface SegmentMetadata {
 
   String getTableName();

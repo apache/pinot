@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
-import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.ConstantValueDoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueIntDictionary;
