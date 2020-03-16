@@ -37,7 +37,7 @@ public class SegmentPrunerService {
   private final List<SegmentPruner> _segmentPruners;
 
   public SegmentPrunerService(SegmentPrunerConfig config) {
-    int numPruners = config.numberOfSegmentPruner();
+    int numPruners = config.numSegmentPruners();
     _segmentPruners = new ArrayList<>(numPruners);
     for (int i = 0; i < numPruners; i++) {
       LOGGER.info("Adding segment pruner: " + config.getSegmentPrunerName(i));
