@@ -22,7 +22,7 @@ import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ConstantMVForwardIndex;
 import org.apache.pinot.core.io.reader.impl.ConstantMVInvertedIndex;
 import org.apache.pinot.core.io.reader.impl.ConstantSVSortedIndex;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.ConstantValueBytesDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueDoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueFloatDictionary;

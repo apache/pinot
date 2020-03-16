@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 @SuppressWarnings("unchecked")

@@ -45,7 +45,7 @@ import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -21,9 +21,9 @@ package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 import java.io.File;
 import java.util.Set;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
