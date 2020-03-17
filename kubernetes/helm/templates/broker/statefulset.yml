@@ -83,7 +83,7 @@ spec:
             path: /health
             port: {{ .Values.broker.port }}
         resources:
-          {{ toYaml .Values.broker.resources | indent 12 }}
+{{ toYaml .Values.broker.resources | indent 12 }}
       restartPolicy: Always
       volumes:
         - name: config

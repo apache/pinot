@@ -45,14 +45,14 @@ spec:
         release: {{ .Release.Name }}
         component: {{ .Values.server.name }}
       annotations:
-{{ toYaml .Values.controller.podAnnotations | indent 8 }}
+{{ toYaml .Values.server.podAnnotations | indent 8 }}
     spec:
       nodeSelector:
-{{ toYaml .Values.controller.nodeSelector | indent 8 }}
+{{ toYaml .Values.server.nodeSelector | indent 8 }}
       affinity:
-{{ toYaml .Values.controller.affinity | indent 8 }}
+{{ toYaml .Values.server.affinity | indent 8 }}
       tolerations:
-{{ toYaml .Values.controller.tolerations | indent 8 }}
+{{ toYaml .Values.server.tolerations | indent 8 }}
       containers:
       - name: server
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -76,6 +76,8 @@ spec:
             mountPath: /var/pinot/server/config
           - name: data
             mountPath: "{{ .Values.server.persistence.mountPath }}"
+        resources:
+{{ toYaml .Values.server.resources | indent 12 }}
       restartPolicy: Always
       volumes:
         - name: config
