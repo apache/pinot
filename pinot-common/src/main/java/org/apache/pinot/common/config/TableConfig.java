@@ -22,17 +22,14 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import javax.validation.constraints.Null;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
@@ -51,6 +48,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String QUOTA_CONFIG_KEY = "quota";
   public static final String TASK_CONFIG_KEY = "task";
   public static final String ROUTING_CONFIG_KEY = "routing";
+  public static final String QUERY_CONFIG_KEY = "query";
   public static final String INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY = "instanceAssignmentConfigMap";
   public static final String FIELD_CONFIG_LIST_KEY = "fieldConfigList";
 
@@ -72,8 +70,9 @@ public class TableConfig extends BaseJsonConfig {
 
   private TableTaskConfig _taskConfig;
   private RoutingConfig _routingConfig;
-  private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+  private QueryConfig _queryConfig;
 
+  private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
 
   /**
@@ -88,6 +87,7 @@ public class TableConfig extends BaseJsonConfig {
   private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
       TenantConfig tenantConfig, IndexingConfig indexingConfig, TableCustomConfig customConfig,
       @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
+      @Nullable QueryConfig queryConfig,
       @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @Nullable List<FieldConfig> fieldConfigList) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
@@ -99,6 +99,7 @@ public class TableConfig extends BaseJsonConfig {
     _quotaConfig = quotaConfig;
     _taskConfig = taskConfig;
     _routingConfig = routingConfig;
+    _queryConfig = queryConfig;
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
     _fieldConfigList = fieldConfigList;
   }
@@ -144,16 +145,19 @@ public class TableConfig extends BaseJsonConfig {
 
     RoutingConfig routingConfig = extractChildConfig(jsonConfig, ROUTING_CONFIG_KEY, RoutingConfig.class);
 
+    QueryConfig queryConfig = extractChildConfig(jsonConfig, QUERY_CONFIG_KEY, QueryConfig.class);
+
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
         extractChildConfig(jsonConfig, INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY,
             new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() {
             });
 
-    List<FieldConfig> fieldConfigList = extractChildConfig(jsonConfig, FIELD_CONFIG_LIST_KEY,
-        new TypeReference<List<FieldConfig>>() {});
+    List<FieldConfig> fieldConfigList =
+        extractChildConfig(jsonConfig, FIELD_CONFIG_LIST_KEY, new TypeReference<List<FieldConfig>>() {
+        });
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, instanceAssignmentConfigMap, fieldConfigList);
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList);
   }
 
   /**
@@ -217,6 +221,9 @@ public class TableConfig extends BaseJsonConfig {
     }
     if (_routingConfig != null) {
       jsonConfig.set(ROUTING_CONFIG_KEY, JsonUtils.objectToJsonNode(_routingConfig));
+    }
+    if (_queryConfig != null) {
+      jsonConfig.set(QUERY_CONFIG_KEY, JsonUtils.objectToJsonNode(_queryConfig));
     }
     if (_instanceAssignmentConfigMap != null) {
       jsonConfig.set(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToJsonNode(_instanceAssignmentConfigMap));
@@ -287,6 +294,12 @@ public class TableConfig extends BaseJsonConfig {
       routingConfig = JsonUtils.stringToObject(routingConfigString, RoutingConfig.class);
     }
 
+    QueryConfig queryConfig = null;
+    String queryConfigString = simpleFields.get(QUERY_CONFIG_KEY);
+    if (queryConfigString != null) {
+      queryConfig = JsonUtils.stringToObject(queryConfigString, QueryConfig.class);
+    }
+
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = null;
     String instanceAssignmentConfigMapString = simpleFields.get(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY);
     if (instanceAssignmentConfigMapString != null) {
@@ -298,11 +311,12 @@ public class TableConfig extends BaseJsonConfig {
     List<FieldConfig> fieldConfigList = null;
     String fieldConfigListString = simpleFields.get(FIELD_CONFIG_LIST_KEY);
     if (fieldConfigListString != null) {
-      fieldConfigList = JsonUtils.stringToObject(fieldConfigListString, new TypeReference<List<FieldConfig>>() {});
+      fieldConfigList = JsonUtils.stringToObject(fieldConfigListString, new TypeReference<List<FieldConfig>>() {
+      });
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, instanceAssignmentConfigMap, fieldConfigList);
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList);
   }
 
   public ZNRecord toZNRecord()
@@ -328,6 +342,9 @@ public class TableConfig extends BaseJsonConfig {
     }
     if (_routingConfig != null) {
       simpleFields.put(ROUTING_CONFIG_KEY, JsonUtils.objectToString(_routingConfig));
+    }
+    if (_queryConfig != null) {
+      simpleFields.put(QUERY_CONFIG_KEY, JsonUtils.objectToString(_queryConfig));
     }
     if (_instanceAssignmentConfigMap != null) {
       simpleFields.put(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToString(_instanceAssignmentConfigMap));
@@ -430,6 +447,15 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @Nullable
+  public QueryConfig getQueryConfig() {
+    return _queryConfig;
+  }
+
+  public void setQueryConfig(QueryConfig queryConfig) {
+    _queryConfig = queryConfig;
+  }
+
+  @Nullable
   public Map<InstancePartitionsType, InstanceAssignmentConfig> getInstanceAssignmentConfigMap() {
     return _instanceAssignmentConfigMap;
   }
@@ -487,6 +513,7 @@ public class TableConfig extends BaseJsonConfig {
     private QuotaConfig _quotaConfig;
     private TableTaskConfig _taskConfig;
     private RoutingConfig _routingConfig;
+    private QueryConfig _queryConfig;
     private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
     private List<FieldConfig> _fieldConfigList;
 
@@ -640,6 +667,11 @@ public class TableConfig extends BaseJsonConfig {
       return this;
     }
 
+    public Builder setQueryConfig(QueryConfig queryConfig) {
+      _queryConfig = queryConfig;
+      return this;
+    }
+
     public Builder setInstanceAssignmentConfigMap(
         Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
       _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
@@ -695,7 +727,7 @@ public class TableConfig extends BaseJsonConfig {
       TextIndexConfigValidator.validate(_fieldConfigList, _noDictionaryColumns);
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
-          _quotaConfig, _taskConfig, _routingConfig, _instanceAssignmentConfigMap, _fieldConfigList);
+          _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap, _fieldConfigList);
     }
   }
 }

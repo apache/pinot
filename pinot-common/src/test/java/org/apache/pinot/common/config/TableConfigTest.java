@@ -32,7 +32,6 @@ import org.apache.pinot.common.config.instance.InstanceConstraintConfig;
 import org.apache.pinot.common.config.instance.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -260,6 +259,28 @@ public class TableConfigTest {
       checkTableConfigWithCompletionConfig(tableConfig, tableConfigToCompare);
     }
     {
+      // With routing config
+      RoutingConfig routingConfig =
+          new RoutingConfig("builder", Arrays.asList("pruner0", "pruner1", "pruner2"), "selector");
+      TableConfig tableConfig = tableConfigBuilder.setRoutingConfig(routingConfig).build();
+
+      // Serialize then de-serialize
+      assertEquals(TableConfig.fromJsonConfig(tableConfig.toJsonConfig()).getRoutingConfig(),
+          tableConfig.getRoutingConfig());
+      assertEquals(TableConfig.fromZnRecord(tableConfig.toZNRecord()).getRoutingConfig(),
+          tableConfig.getRoutingConfig());
+    }
+    {
+      // With query config
+      QueryConfig queryConfig = new QueryConfig(1000L);
+      TableConfig tableConfig = tableConfigBuilder.setQueryConfig(queryConfig).build();
+
+      // Serialize then de-serialize
+      assertEquals(TableConfig.fromJsonConfig(tableConfig.toJsonConfig()).getQueryConfig(),
+          tableConfig.getQueryConfig());
+      assertEquals(TableConfig.fromZnRecord(tableConfig.toZNRecord()).getQueryConfig(), tableConfig.getQueryConfig());
+    }
+    {
       // With instance assignment config
       InstanceAssignmentConfig instanceAssignmentConfig =
           new InstanceAssignmentConfig(new InstanceTagPoolConfig("tenant_OFFLINE", true, 3, null),
@@ -273,6 +294,7 @@ public class TableConfigTest {
       checkTableConfigWithInstanceAssignmentConfigMap(TableConfig.fromZnRecord(tableConfig.toZNRecord()));
     }
     {
+      // With field config
       Map<String, String> properties = new HashMap<>();
       properties.put(FieldConfig.TEXT_INDEX_REALTIME_READER_REFRESH_KEY, "100");
       FieldConfig fieldConfigTextCol =
@@ -299,17 +321,17 @@ public class TableConfigTest {
       TableConfig tableConfigWithoutFieldConfig =
           new TableConfig.Builder(TableType.OFFLINE).setTableName("foo").build();
       toCompare = TableConfig.fromJsonConfig(tableConfigWithoutFieldConfig.toJsonConfig());
-      Assert.assertNull(toCompare.getFieldConfigList());
+      assertNull(toCompare.getFieldConfigList());
       toCompare = TableConfig.fromZnRecord(tableConfigWithoutFieldConfig.toZNRecord());
-      Assert.assertNull(toCompare.getFieldConfigList());
+      assertNull(toCompare.getFieldConfigList());
     }
   }
 
   private void compareConfigHavingFieldConfig(TableConfig toCompare, Map<String, String> properties,
       Map<String, String> properties1) {
     List<FieldConfig> fieldConfigs = toCompare.getFieldConfigList();
-    Assert.assertNotNull(fieldConfigs);
-    Assert.assertEquals(4, fieldConfigs.size());
+    assertNotNull(fieldConfigs);
+    assertEquals(4, fieldConfigs.size());
 
     FieldConfig config = fieldConfigs.get(0);
     checkFieldConfigList(config, properties, "text_col", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT);
@@ -325,11 +347,11 @@ public class TableConfigTest {
 
   private void checkFieldConfigList(FieldConfig config, Map<String, String> expectedProperties, String expectedColumn,
       FieldConfig.EncodingType expectedEncodingType, FieldConfig.IndexType expectedIndexType) {
-    Assert.assertEquals(expectedColumn, config.getName());
-    Assert.assertEquals(expectedEncodingType, config.getEncodingType());
-    Assert.assertEquals(expectedIndexType, config.getIndexType());
+    assertEquals(expectedColumn, config.getName());
+    assertEquals(expectedEncodingType, config.getEncodingType());
+    assertEquals(expectedIndexType, config.getIndexType());
     Map<String, String> properties = config.getProperties();
-    Assert.assertEquals(properties, expectedProperties);
+    assertEquals(properties, expectedProperties);
   }
 
   private void checkTableConfigWithAssignmentConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
@@ -347,7 +369,7 @@ public class TableConfigTest {
   }
 
   private void checkTableConfigWithCompletionConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
-    // Check that the segment assignment configuration does exist.
+    // Check that the segment completion configuration does exist.
     assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
     assertNotNull(tableConfigToCompare.getValidationConfig().getCompletionConfig());
     assertEquals(tableConfigToCompare.getValidationConfig().getCompletionConfig(),
