@@ -78,6 +78,7 @@ import org.apache.pinot.thirdeye.detection.annotation.DetectionConfigurationReso
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.rootcause.RCAFramework;
 import org.apache.pinot.thirdeye.rootcause.impl.RCAFrameworkLoader;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
@@ -113,6 +114,7 @@ public class ThirdEyeDashboardApplication
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
 
   private RequestStatisticsLogger requestStatisticsLogger;
+  private ModelDownloaderManager modelDownloaderManager;
 
   @Override
   public String getName() {
@@ -253,6 +255,11 @@ public class ThirdEyeDashboardApplication
       env.jersey().register(new AuthValueFactoryProvider.Binder<>(ThirdEyePrincipal.class));
     }
 
+    if (config.getModelDownloaderConfig() != null) {
+      modelDownloaderManager = new ModelDownloaderManager(config.getModelDownloaderConfig());
+      modelDownloaderManager.start();
+    }
+
     env.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
@@ -264,6 +271,9 @@ public class ThirdEyeDashboardApplication
       public void stop() throws Exception {
         if (requestStatisticsLogger != null) {
           requestStatisticsLogger.shutdown();
+        }
+        if (modelDownloaderManager != null) {
+          modelDownloaderManager.shutdown();
         }
       }
     });
