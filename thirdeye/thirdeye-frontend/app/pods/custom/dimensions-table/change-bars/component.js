@@ -5,7 +5,7 @@
  *
  * @example for usage in models table columns definitions
  *  {
- *    propertyName: 'contributionToOverallChange',
+ *    propertyName: 'percentageChange',
  *    component: 'custom/dimensions-table/change-bars',
  *    title: 'Contribution to Overall Change',
  *    className: 'rootcause-dimensions-table__column rootcause-dimensions-table__column--bar-cell',
@@ -63,7 +63,7 @@ export default Component.extend({
     setProperties(this, {
       containerWidthNegative,
       containerWidthPositive,
-      isNegativeChange: toWidthNumber(this.record.contributionToOverallChange) < 0,
+      isNegativeChange: toWidthNumber(this.record.percentageChange) < 0,
       barWidthNegative: negativeBarScale(toWidthNumber(this.record.elementWidth.negative)),
       barWidthPositive: positiveBarScale(toWidthNumber(this.record.elementWidth.positive))
     });
