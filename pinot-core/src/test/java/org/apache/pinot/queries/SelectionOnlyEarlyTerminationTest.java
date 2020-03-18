@@ -20,26 +20,23 @@ package org.apache.pinot.queries;
 
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.operator.CombineOperator;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 /**
- * Tests selection only queries
+ * Early termination test for selection-only queries.
  */
 public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTest {
-
-  /**
-   * Default test setup, duplicate server instance into DataMap.
-   *
-   * See {@link #getBrokerResponseForBrokerRequest}.
-   */
-  private static int numDocsPerTestSegment = 30000;
-  private static int numTestServers = 2;
+  private static final int NUM_DOCS_PER_SEGMENT = 30000;
+  private static final int NUM_SERVERS = 2;
 
   /**
    * In order to ensure each thread is executing more than 1 segment, this test is against
-   * (2 * MAX_NUM_THREADS_PER_QUERY) segments.
+   * (2 * MAX_NUM_THREADS_PER_QUERY) segments per server.
    */
   @Override
   protected int getNumSegmentDataManagers() {
@@ -47,45 +44,45 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
   }
 
   /**
-   * With early termination, Selection Only query is scheduled with getNumSegmentDataManagers() threads,
-   * total segment processed is same at num threads.
+   * With early termination, selection-only query is scheduled with {@link CombineOperator#MAX_NUM_THREADS_PER_QUERY}
+   * threads per server, and the total number of segments matched (segments with non-zero documents scanned) should be
+   * the same as the total number of threads for each server.
    */
   @Test
   public void testSelectOnlyQuery() {
-    int numThreadsPerInstanceRequest = CombineOperator.MAX_NUM_THREADS_PER_QUERY;
+    int numThreadsPerServer = CombineOperator.MAX_NUM_THREADS_PER_QUERY;
+    int numSegmentsPerServer = getNumSegmentDataManagers();
 
-    // LIMIT = 5,15,35,75,155,315,635
-    for (int limit = 5; limit < 1000; limit += (limit + 5)) {
+    // LIMIT = 5, 10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480
+    for (int limit = 5; limit < NUM_DOCS_PER_SEGMENT; limit *= 2) {
       String query = String.format("SELECT column1, column7, column9, column6 FROM testTable LIMIT %d", limit);
       int numColumnsInSelection = 4;
       BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-      Assert.assertNotNull(brokerResponse.getSelectionResults());
-      Assert.assertNull(brokerResponse.getResultTable());
-      Assert.assertEquals(brokerResponse.getNumSegmentsMatched(), numThreadsPerInstanceRequest * numTestServers);
-      Assert.assertEquals(brokerResponse.getNumSegmentsProcessed(), numThreadsPerInstanceRequest * numTestServers);
-      Assert.assertEquals(brokerResponse.getNumDocsScanned(), numThreadsPerInstanceRequest * numTestServers * limit);
-      Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-      Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-          numThreadsPerInstanceRequest * numTestServers * limit * numColumnsInSelection);
-      Assert.assertEquals(brokerResponse.getTotalDocs(),
-          numThreadsPerInstanceRequest * numTestServers * numDocsPerTestSegment);
+      assertNotNull(brokerResponse.getSelectionResults());
+      assertNull(brokerResponse.getResultTable());
+      assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * NUM_SERVERS);
+      assertEquals(brokerResponse.getNumSegmentsMatched(), numThreadsPerServer * NUM_SERVERS);
+      assertEquals(brokerResponse.getNumDocsScanned(), numThreadsPerServer * NUM_SERVERS * limit);
+      assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+      assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
+          numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
+      assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
 
       brokerResponse = getBrokerResponseForSqlQuery(query);
-      Assert.assertNull(brokerResponse.getSelectionResults());
-      Assert.assertNotNull(brokerResponse.getResultTable());
-      Assert.assertEquals(brokerResponse.getNumSegmentsMatched(), numThreadsPerInstanceRequest * numTestServers);
-      Assert.assertEquals(brokerResponse.getNumSegmentsProcessed(), numThreadsPerInstanceRequest * numTestServers);
-      Assert.assertEquals(brokerResponse.getNumDocsScanned(), numThreadsPerInstanceRequest * numTestServers * limit);
-      Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-      Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-          numThreadsPerInstanceRequest * numTestServers * limit * numColumnsInSelection);
-      Assert.assertEquals(brokerResponse.getTotalDocs(),
-          numThreadsPerInstanceRequest * numTestServers * numDocsPerTestSegment);
+      assertNull(brokerResponse.getSelectionResults());
+      assertNotNull(brokerResponse.getResultTable());
+      assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * NUM_SERVERS);
+      assertEquals(brokerResponse.getNumSegmentsMatched(), numThreadsPerServer * NUM_SERVERS);
+      assertEquals(brokerResponse.getNumDocsScanned(), numThreadsPerServer * NUM_SERVERS * limit);
+      assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+      assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
+          numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
+      assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
     }
   }
 
   /**
-   * Without early termination, Selection order by query should hit all segments.
+   * Without early termination, selection order-by query should hit all segments.
    */
   @Test
   public void testSelectWithOrderByQuery() {
@@ -93,27 +90,25 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
     String query = "SELECT column11, column18, column1 FROM testTable ORDER BY column11";
     int numColumnsInSelection = 3;
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    Assert.assertNotNull(brokerResponse.getSelectionResults());
-    Assert.assertNull(brokerResponse.getResultTable());
-    Assert.assertEquals(brokerResponse.getNumSegmentsMatched(), numSegmentsPerServer * numTestServers);
-    Assert.assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * numTestServers);
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(),
-        numSegmentsPerServer * numTestServers * numDocsPerTestSegment);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-        numSegmentsPerServer * numTestServers * numDocsPerTestSegment * numColumnsInSelection);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * numTestServers * numDocsPerTestSegment);
+    assertNotNull(brokerResponse.getSelectionResults());
+    assertNull(brokerResponse.getResultTable());
+    assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * NUM_SERVERS);
+    assertEquals(brokerResponse.getNumSegmentsMatched(), numSegmentsPerServer * NUM_SERVERS);
+    assertEquals(brokerResponse.getNumDocsScanned(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
+    assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
+        numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT * numColumnsInSelection);
+    assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
 
     brokerResponse = getBrokerResponseForSqlQuery(query);
-    Assert.assertNull(brokerResponse.getSelectionResults());
-    Assert.assertNotNull(brokerResponse.getResultTable());
-    Assert.assertEquals(brokerResponse.getNumSegmentsMatched(), numSegmentsPerServer * numTestServers);
-    Assert.assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * numTestServers);
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(),
-        numSegmentsPerServer * numTestServers * numDocsPerTestSegment);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-        numSegmentsPerServer * numTestServers * numDocsPerTestSegment * numColumnsInSelection);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * numTestServers * numDocsPerTestSegment);
+    assertNull(brokerResponse.getSelectionResults());
+    assertNotNull(brokerResponse.getResultTable());
+    assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * NUM_SERVERS);
+    assertEquals(brokerResponse.getNumSegmentsMatched(), numSegmentsPerServer * NUM_SERVERS);
+    assertEquals(brokerResponse.getNumDocsScanned(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
+    assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
+        numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT * numColumnsInSelection);
+    assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
   }
 }

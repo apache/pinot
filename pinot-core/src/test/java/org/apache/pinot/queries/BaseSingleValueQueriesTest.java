@@ -66,6 +66,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_126164076_167572854";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
+  private static final int NUM_SEGMENT_DATA_MANAGERS = 2;
 
   // Hard-coded query filter.
   private static final String QUERY_FILTER =
@@ -122,14 +123,15 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
       throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
-    _segmentDataManagers = new ArrayList<>();
-    for (int i = 0; i < getNumSegmentDataManagers(); i++) {
+    int numSegmentDataManagers = getNumSegmentDataManagers();
+    _segmentDataManagers = new ArrayList<>(numSegmentDataManagers);
+    for (int i = 0; i < numSegmentDataManagers; i++) {
       _segmentDataManagers.add(new ImmutableSegmentDataManager(immutableSegment));
     }
   }
 
   protected int getNumSegmentDataManagers() {
-    return 2;
+    return NUM_SEGMENT_DATA_MANAGERS;
   }
 
   @AfterClass

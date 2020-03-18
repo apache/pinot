@@ -50,7 +50,6 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final Map<String, Dictionary> _dictionaryMap;
   private final long _numTotalDocs;
-  private ExecutionStatistics _executionStatistics;
 
   /**
    * Constructor for the class.
@@ -96,11 +95,6 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
       aggregationResults.add(function.extractAggregationResult(resultHolder));
     }
 
-    // Create execution statistics. Set numDocsScanned to numTotalDocs for backward compatibility.
-    _executionStatistics =
-        new ExecutionStatistics(_numTotalDocs, 0/* numEntriesScannedInFilter */, 0/* numEntriesScannedPostFilter */,
-            _numTotalDocs);
-
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctionContexts, aggregationResults, false);
   }
@@ -112,6 +106,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _executionStatistics;
+    // NOTE: Set numDocsScanned to numTotalDocs for backward compatibility.
+    return new ExecutionStatistics(_numTotalDocs, 0, 0, _numTotalDocs);
   }
 }

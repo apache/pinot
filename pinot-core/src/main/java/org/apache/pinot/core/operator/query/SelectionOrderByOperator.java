@@ -52,7 +52,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private final int _numRowsToKeep;
   private final PriorityQueue<Serializable[]> _rows;
 
-  private ExecutionStatistics _executionStatistics;
+  private int _numDocsScanned = 0;
 
   public SelectionOrderByOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
@@ -139,8 +139,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numDocsScanned = 0;
-
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       int numExpressions = _expressions.size();
@@ -152,18 +150,11 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
 
       int numDocsFetched = transformBlock.getNumDocs();
-      numDocsScanned += numDocsFetched;
+      _numDocsScanned += numDocsFetched;
       for (int i = 0; i < numDocsFetched; i++) {
         SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
       }
     }
-
-    // Create execution statistics.
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
-    long numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs);
 
     return new IntermediateResultsBlock(_dataSchema, _rows);
   }
@@ -175,6 +166,10 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _executionStatistics;
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+        numTotalDocs);
   }
 }

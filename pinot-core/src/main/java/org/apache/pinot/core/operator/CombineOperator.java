@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.io.Serializable;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -29,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.reduce.CombineService;
@@ -187,10 +190,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     // Update execution statistics.
     ExecutionStatistics executionStatistics = new ExecutionStatistics();
     for (Operator operator : _operators) {
-      ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
-      if (executionStatisticsToMerge != null) {
-        executionStatistics.merge(executionStatisticsToMerge);
-      }
+      executionStatistics.merge(operator.getExecutionStatistics());
     }
     mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
     mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
@@ -202,13 +202,17 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     return mergedBlock;
   }
 
-  // This will check if IntermediateResultsBlock already satisfying query, so there is no need to continue query processing.
+  /**
+   * Returns {@code true} if the query is already satisfied with the IntermediateResultsBlock so that there is no need to
+   * process more segments, {@code false} otherwise.
+   * <p>For selection-only query, the query is satisfied when enough records are gathered.
+   */
   private boolean isQuerySatisfied(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
-    // Check for selection only query, if first segment already offers enough records, then there is no need to scan for the rest segments.
-    if ((brokerRequest.getSelections() != null) && (brokerRequest.getOrderBy() == null)) {
-      if ((mergedBlock.getSelectionResult() != null) && (mergedBlock.getSelectionResult().size() >= brokerRequest.getSelections().getSize())) {
-        return true;
-      }
+    Selection selections = brokerRequest.getSelections();
+    if (selections != null && brokerRequest.getOrderBy() == null) {
+      // Selection-only
+      Collection<Serializable[]> selectionResult = mergedBlock.getSelectionResult();
+      return selectionResult != null && selectionResult.size() >= selections.getSize();
     }
     return false;
   }
