@@ -116,7 +116,7 @@ public class GithubEventsQuickstart {
       }
     }));
 
-    printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
+    printStatus(Color.YELLOW, "***** Realtime github demo quickstart setup complete *****");
 
     String q1 = "select count(*) from pullRequestMergedEvents limit 0";
     printStatus(Color.YELLOW, "Total number of documents in the table");
@@ -124,25 +124,25 @@ public class GithubEventsQuickstart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q2 = "select repo, sum(numLinesAdded), sum(numLinesDeleted) from pullRequestMergedEvents group by repo top 10 limit 0";
-    printStatus(Color.YELLOW, "Top 10 repo with the most ");
+    String q2 = "select sum(numLinesAdded) from pullRequestMergedEvents group by repo top 10 limit 0";
+    printStatus(Color.YELLOW, "Top 10 repo with the most lines added");
     printStatus(Color.CYAN, "Query : " + q2);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q3 = "select count(*), authorAssociation from pullRequestMergedEvents group by authorAssociation order by count(*) limit 10";
-    printStatus(Color.YELLOW, "Show 10 most recent merged pull requests");
+    String q3 = "select * from pullRequestMergedEvents where authorAssociation = 'COLLABORATOR' limit 10";
+    printStatus(Color.YELLOW, "Show data for COLLABORATORS");
     printStatus(Color.CYAN, "Query : " + q3);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
     String q4 = "select max(elapsedTimeMillis) from pullRequestMergedEvents group by repo top 10 limit 0";
-    printStatus(Color.YELLOW, "Show longest alive pull requests");
+    printStatus(Color.YELLOW, "Show repos with longest alive pull requests");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q5 = "select count(*) from pullRequestMergedEvents limit 0";
+    String q5 = "select count(*) from pullRequestMergedEvents";
     printStatus(Color.YELLOW, "Total number of documents in the table");
     printStatus(Color.CYAN, "Query : " + q5);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
