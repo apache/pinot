@@ -144,7 +144,7 @@ public class CombineSlowOperatorsTest {
 
     @Override
     public ExecutionStatistics getExecutionStatistics() {
-      return null;
+      return new ExecutionStatistics();
     }
   }
 }
