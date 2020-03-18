@@ -25,7 +25,6 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
@@ -45,7 +44,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
   private final long _numTotalDocs;
   private final boolean _useStarTree;
 
-  private ExecutionStatistics _executionStatistics;
+  private int _numDocsScanned = 0;
 
   public AggregationGroupByOperator(AggregationFunctionContext[] functionContexts, GroupBy groupBy,
       int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, long numTotalDocs,
@@ -61,8 +60,6 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numDocsScanned = 0;
-
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
@@ -76,19 +73,12 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      numDocsScanned += transformBlock.getNumDocs();
+      _numDocsScanned += transformBlock.getNumDocs();
       groupByExecutor.process(transformBlock);
     }
-    AggregationGroupByResult groupByResult = groupByExecutor.getResult();
-
-    // Gather execution statistics
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
-    _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalDocs);
 
     // Build intermediate result block based on aggregation group-by result from the executor
-    return new IntermediateResultsBlock(_functionContexts, groupByResult);
+    return new IntermediateResultsBlock(_functionContexts, groupByExecutor.getResult());
   }
 
   @Override
@@ -98,6 +88,9 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _executionStatistics;
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+        _numTotalDocs);
   }
 }

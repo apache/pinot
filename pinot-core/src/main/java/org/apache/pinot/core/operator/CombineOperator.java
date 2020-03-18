@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.io.Serializable;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -29,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.reduce.CombineService;
@@ -48,7 +51,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
   // Use at most 10 or half of the processors threads for each query.
   // If there are less than 2 processors, use 1 thread.
   // Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
-  private static final int MAX_NUM_THREADS_PER_QUERY =
+  public static final int MAX_NUM_THREADS_PER_QUERY =
       Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
 
   private final List<Operator> _operators;
@@ -101,6 +104,9 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
 
             IntermediateResultsBlock mergedBlock = (IntermediateResultsBlock) _operators.get(index).nextBlock();
             for (int i = index + numThreads; i < numOperators; i += numThreads) {
+              if (isQuerySatisfied(_brokerRequest, mergedBlock)) {
+                break;
+              }
               IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) _operators.get(i).nextBlock();
               try {
                 CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
@@ -134,6 +140,9 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
             }
             int numMergedBlocks = 1;
             while (numMergedBlocks < numThreads) {
+              if (isQuerySatisfied(_brokerRequest, mergedBlock)) {
+                break;
+              }
               IntermediateResultsBlock blockToMerge =
                   blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
               if (blockToMerge == null) {
@@ -181,10 +190,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     // Update execution statistics.
     ExecutionStatistics executionStatistics = new ExecutionStatistics();
     for (Operator operator : _operators) {
-      ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
-      if (executionStatisticsToMerge != null) {
-        executionStatistics.merge(executionStatisticsToMerge);
-      }
+      executionStatistics.merge(operator.getExecutionStatistics());
     }
     mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
     mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
@@ -194,6 +200,21 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
 
     return mergedBlock;
+  }
+
+  /**
+   * Returns {@code true} if the query is already satisfied with the IntermediateResultsBlock so that there is no need to
+   * process more segments, {@code false} otherwise.
+   * <p>For selection-only query, the query is satisfied when enough records are gathered.
+   */
+  private boolean isQuerySatisfied(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
+    Selection selections = brokerRequest.getSelections();
+    if (selections != null && brokerRequest.getOrderBy() == null) {
+      // Selection-only
+      Collection<Serializable[]> selectionResult = mergedBlock.getSelectionResult();
+      return selectionResult != null && selectionResult.size() >= selections.getSize();
+    }
+    return false;
   }
 
   @Override

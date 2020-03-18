@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.List;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -41,7 +40,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private final long _numTotalDocs;
   private final boolean _useStarTree;
 
-  private ExecutionStatistics _executionStatistics;
+  private int _numDocsScanned = 0;
 
   public AggregationOperator(AggregationFunctionContext[] functionContexts, TransformOperator transformOperator,
       long numTotalDocs, boolean useStarTree) {
@@ -53,8 +52,6 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numDocsScanned = 0;
-
     // Perform aggregation on all the transform blocks
     AggregationExecutor aggregationExecutor;
     if (_useStarTree) {
@@ -64,19 +61,12 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      numDocsScanned += transformBlock.getNumDocs();
+      _numDocsScanned += transformBlock.getNumDocs();
       aggregationExecutor.aggregate(transformBlock);
     }
-    List<Object> aggregationResult = aggregationExecutor.getResult();
-
-    // Create execution statistics
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
-    _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalDocs);
 
     // Build intermediate result block based on aggregation result from the executor
-    return new IntermediateResultsBlock(_functionContexts, aggregationResult, false);
+    return new IntermediateResultsBlock(_functionContexts, aggregationExecutor.getResult(), false);
   }
 
   @Override
@@ -86,6 +76,9 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _executionStatistics;
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+        _numTotalDocs);
   }
 }

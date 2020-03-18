@@ -40,7 +40,6 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final Map<String, DataSource> _dataSourceMap;
   private final SegmentMetadata _segmentMetadata;
-  private ExecutionStatistics _executionStatistics;
 
   /**
    * Constructor for the class.
@@ -71,11 +70,6 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
       aggregationResults.add(numTotalDocs);
     }
 
-    // Create execution statistics. Set numDocsScanned to numTotalDocs for backward compatibility.
-    _executionStatistics =
-        new ExecutionStatistics(numTotalDocs, 0/*numEntriesScannedInFilter*/, 0/*numEntriesScannedPostFilter*/,
-            numTotalDocs);
-
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctionContexts, aggregationResults, false);
   }
@@ -87,6 +81,8 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _executionStatistics;
+    // NOTE: Set numDocsScanned to numTotalDocs for backward compatibility.
+    int numTotalDocs = _segmentMetadata.getTotalDocs();
+    return new ExecutionStatistics(numTotalDocs, 0, 0, numTotalDocs);
   }
 }

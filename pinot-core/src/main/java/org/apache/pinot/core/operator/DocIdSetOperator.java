@@ -70,12 +70,12 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
     // Initialize filter block document Id set
     if (_filterBlockDocIdSet == null) {
-      _filterBlockDocIdSet = (FilterBlockDocIdSet) _filterOperator.nextBlock().getBlockDocIdSet();
+      _filterBlockDocIdSet = _filterOperator.nextBlock().getBlockDocIdSet();
       _blockDocIdIterator = _filterBlockDocIdSet.iterator();
     }
 
     int pos = 0;
-    int[] docIds = _threadLocal? THREAD_LOCAL_DOC_IDS.get(): new int[_maxSizeOfDocIdSet];
+    int[] docIds = _threadLocal ? THREAD_LOCAL_DOC_IDS.get() : new int[_maxSizeOfDocIdSet];
     for (int i = 0; i < _maxSizeOfDocIdSet; i++) {
       _currentDocId = _blockDocIdIterator.next();
       if (_currentDocId == Constants.EOF) {
@@ -97,6 +97,8 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return new ExecutionStatistics(0L, _filterBlockDocIdSet.getNumEntriesScannedInFilter(), 0L, 0L);
+    long numEntriesScannedInFilter =
+        _filterBlockDocIdSet != null ? _filterBlockDocIdSet.getNumEntriesScannedInFilter() : 0;
+    return new ExecutionStatistics(0, numEntriesScannedInFilter, 0, 0);
   }
 }

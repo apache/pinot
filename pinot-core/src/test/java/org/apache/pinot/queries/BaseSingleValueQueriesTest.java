@@ -20,12 +20,11 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -35,6 +34,8 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterTest;
@@ -65,6 +66,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_126164076_167572854";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
+  private static final int NUM_SEGMENT_DATA_MANAGERS = 2;
 
   // Hard-coded query filter.
   private static final String QUERY_FILTER =
@@ -121,8 +123,15 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
       throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
-    _segmentDataManagers = Arrays
-        .asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
+    int numSegmentDataManagers = getNumSegmentDataManagers();
+    _segmentDataManagers = new ArrayList<>(numSegmentDataManagers);
+    for (int i = 0; i < numSegmentDataManagers; i++) {
+      _segmentDataManagers.add(new ImmutableSegmentDataManager(immutableSegment));
+    }
+  }
+
+  protected int getNumSegmentDataManagers() {
+    return NUM_SEGMENT_DATA_MANAGERS;
   }
 
   @AfterClass
