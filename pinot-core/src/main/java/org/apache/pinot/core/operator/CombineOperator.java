@@ -101,6 +101,9 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
 
             IntermediateResultsBlock mergedBlock = (IntermediateResultsBlock) _operators.get(index).nextBlock();
             for (int i = index + numThreads; i < numOperators; i += numThreads) {
+              if (allowEarlyTermination(_brokerRequest, mergedBlock)) {
+                break;
+              }
               IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) _operators.get(i).nextBlock();
               try {
                 CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
@@ -134,6 +137,9 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
             }
             int numMergedBlocks = 1;
             while (numMergedBlocks < numThreads) {
+              if (allowEarlyTermination(_brokerRequest, mergedBlock)) {
+                break;
+              }
               IntermediateResultsBlock blockToMerge =
                   blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
               if (blockToMerge == null) {
@@ -194,6 +200,17 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
 
     return mergedBlock;
+  }
+
+  // This will check if IntermediateResultsBlock already satisfying query, so there is no need to continue query processing.
+  private boolean allowEarlyTermination(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
+    // Check for selection only query, if first segment already offers enough records, then there is no need to scan for the rest segments.
+    if ((brokerRequest.getSelections() != null) && (brokerRequest.getOrderBy() == null)) {
+      if ((mergedBlock.getSelectionResult() != null) && (mergedBlock.getSelectionResult().size() >= brokerRequest.getSelections().getSize())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

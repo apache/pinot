@@ -20,6 +20,7 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -121,8 +122,14 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
       throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
-    _segmentDataManagers = Arrays
-        .asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
+    _segmentDataManagers = new ArrayList<>();
+    for (int i = 0; i< getNumSegmentDataManagers(); i++) {
+      _segmentDataManagers.add(new ImmutableSegmentDataManager(immutableSegment));
+    }
+  }
+
+  protected int getNumSegmentDataManagers() {
+    return 2;
   }
 
   @AfterClass
