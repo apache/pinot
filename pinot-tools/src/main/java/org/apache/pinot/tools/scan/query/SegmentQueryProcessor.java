@@ -37,8 +37,8 @@ import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.query.utils.Pair;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,16 +114,16 @@ class SegmentQueryProcessor {
       if (brokerRequest.isSetSelections()) {
         List<String> columns = brokerRequest.getSelections().getSelectionColumns();
         if (columns.contains("*")) {
-          columns = new ArrayList<>(_immutableSegment.getPhysicalColumnNames());
+          columns = new ArrayList<>(_immutableSegment.getColumnNames());
         }
         List<Pair> selectionColumns = new ArrayList<>();
-        Set<String> columSet = new HashSet<>();
+        Set<String> columnSet = new HashSet<>();
 
         // Collect a unique list of columns, in case input has duplicates.
         for (String column : columns) {
-          if (!columSet.contains(column)) {
+          if (!columnSet.contains(column) && column.charAt(0) != '$') {
             selectionColumns.add(new Pair(column, null));
-            columSet.add(column);
+            columnSet.add(column);
           }
         }
         Selection selection = new Selection(_immutableSegment, _metadata, filteredDocIds, selectionColumns);

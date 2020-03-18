@@ -64,7 +64,8 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     for (Long detectionId : vectorClocks.keySet()) {
       long startTime = vectorClocks.get(detectionId);
 
-      AnomalySlice slice = new AnomalySlice()
+      AnomalySlice slice =
+          new AnomalySlice()
           .withDetectionId(detectionId)
           .withStart(startTime)
           .withEnd(this.endTime);

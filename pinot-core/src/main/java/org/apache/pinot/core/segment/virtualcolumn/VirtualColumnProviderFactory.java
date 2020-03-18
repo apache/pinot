@@ -20,19 +20,28 @@ package org.apache.pinot.core.segment.virtualcolumn;
 
 import org.apache.pinot.common.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.core.segment.index.column.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.plugin.PluginManager;
 
 
 /**
  * Factory for virtual column providers.
  */
 public class VirtualColumnProviderFactory {
-  public static VirtualColumnProvider buildProvider(String virtualColumnProvider) {
+  public static VirtualColumnProvider buildProvider(VirtualColumnContext virtualColumnContext) {
+    String virtualColumnProvider = virtualColumnContext.getFieldSpec().getVirtualColumnProvider();
     try {
-      return (VirtualColumnProvider) Class.forName(virtualColumnProvider).newInstance();
-    } catch (ReflectiveOperationException e) {
+      // Use the preset virtualColumnProvider if available
+      if (virtualColumnProvider != null && !virtualColumnProvider
+          .equals(DefaultNullValueVirtualColumnProvider.class.getName())) {
+        return PluginManager.get().createInstance(virtualColumnProvider);
+      }
+      // Create the columnProvider that returns default null values based on the virtualColumnContext
+      return new DefaultNullValueVirtualColumnProvider();
+    } catch (Exception e) {
       throw new IllegalStateException("Caught exception while creating instance of: " + virtualColumnProvider, e);
     }
   }
@@ -45,12 +54,12 @@ public class VirtualColumnProviderFactory {
 
     if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueSingleStringVirtualColumnProvider.class, NetUtil.getHostnameOrAddress()));
+          DefaultNullValueVirtualColumnProvider.class, NetUtil.getHostnameOrAddress()));
     }
 
     if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueSingleStringVirtualColumnProvider.class, segmentName));
+          DefaultNullValueVirtualColumnProvider.class, segmentName));
     }
   }
 }

@@ -155,6 +155,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     return _defaultNullValue;
   }
 
+  public String getDefaultNullValueString() {
+    return getStringValue(_defaultNullValue);
+  }
+
   /**
    * Helper method to return the String value for the given object.
    * This is required as not all data types have a toString() (eg byte[]).

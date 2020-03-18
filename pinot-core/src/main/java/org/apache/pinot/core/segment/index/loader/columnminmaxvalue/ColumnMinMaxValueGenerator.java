@@ -20,11 +20,9 @@ package org.apache.pinot.core.segment.index.loader.columnminmaxvalue;
 
 import com.clearspring.analytics.util.Preconditions;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
@@ -33,6 +31,8 @@ import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 
 
 public class ColumnMinMaxValueGenerator {

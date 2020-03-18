@@ -55,13 +55,13 @@ public abstract class BaseMutableDictionary extends BaseDictionary {
    * Returns the minimum value in the dictionary. Note that for type BYTES, {@code ByteArray} will be returned. This API
    * is for stats collection and will be called after all values are inserted.
    */
-  public abstract Object getMinVal();
+  public abstract Comparable getMinVal();
 
   /**
    * Returns the maximum value in the dictionary. Note that for type BYTES, {@code ByteArray} will be returned. This API
    * is for stats collection and will be called after all values are inserted.
    */
-  public abstract Object getMaxVal();
+  public abstract Comparable getMaxVal();
 
   /**
    * Returns an sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array will

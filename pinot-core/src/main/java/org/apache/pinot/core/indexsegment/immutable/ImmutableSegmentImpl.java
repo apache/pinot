@@ -23,19 +23,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
+import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,8 +89,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public ColumnDataSource getDataSource(String column) {
-    return new ColumnDataSource(_indexContainerMap.get(column), _segmentMetadata.getColumnMetadataFor(column));
+  public DataSource getDataSource(String column) {
+    return new ImmutableDataSource(_segmentMetadata.getColumnMetadataFor(column), _indexContainerMap.get(column));
   }
 
   @Override

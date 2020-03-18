@@ -102,7 +102,6 @@
                       <shadedPattern>shaded.org.apache.http</shadedPattern>
                     </relocation>
                   </relocations>
-                  <outputDirectory>${pinot.root}/pinot-plugins/target/plugins/${plugin.type}/${project.artifactId}</outputDirectory>
                 </configuration>
               </execution>
             </executions>

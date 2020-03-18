@@ -16,15 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.segment.index.column;
 
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnIndexContainer;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Shared implementation code between virtual column providers.
+ * Shared implementation code between column providers.
  */
 public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
 
@@ -32,7 +34,8 @@ public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider
     FieldSpec fieldSpec = context.getFieldSpec();
     return new ColumnMetadata.Builder().setVirtual(true).setColumnName(fieldSpec.getName())
         .setFieldType(fieldSpec.getFieldType()).setDataType(fieldSpec.getDataType())
-        .setTotalDocs(context.getTotalDocCount());
+        .setTotalDocs(context.getTotalDocCount()).setSingleValue(fieldSpec.isSingleValueField())
+        .setDefaultNullValueString(context.getFieldSpec().getDefaultNullValueString());
   }
 
   @Override

@@ -25,7 +25,7 @@ import com.google.common.base.Preconditions;
 
 public class ColumnPartitionConfig extends BaseJsonConfig {
   private final String _functionName;
-  private int _numPartitions;
+  private final int _numPartitions;
 
   /**
    * Constructor for the class.
@@ -58,10 +58,5 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
    */
   public int getNumPartitions() {
     return _numPartitions;
-  }
-
-  public void setNumPartitions(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
-    _numPartitions = numPartitions;
   }
 }

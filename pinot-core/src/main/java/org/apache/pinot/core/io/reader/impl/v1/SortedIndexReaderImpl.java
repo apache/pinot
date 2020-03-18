@@ -21,7 +21,6 @@ package org.apache.pinot.core.io.reader.impl.v1;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;

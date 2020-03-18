@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -137,6 +138,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
         getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(), getSegmentPartitionConfig());
   }
 
+  @Override
+  protected void overrideServerConf(Configuration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
+  }
+
   protected List<File> getAllAvroFiles()
       throws Exception {
     // Unpack the Avro files
@@ -211,6 +217,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       JsonNode offlineSegments = offlineElement.get("OFFLINE");
       Assert.assertEquals(offlineSegments.size(), 8);
     }
+  }
+
+  @Test
+  public void testReload()
+      throws Exception {
+    super.testReload(true);
   }
 
   @Test

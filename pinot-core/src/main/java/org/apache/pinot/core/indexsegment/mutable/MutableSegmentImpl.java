@@ -19,6 +19,7 @@
 package org.apache.pinot.core.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.File;
 import java.io.IOException;
@@ -30,9 +31,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
@@ -51,8 +55,10 @@ import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefr
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.core.realtime.impl.nullvalue.RealtimeNullValueVectorReaderWriter;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
+import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
@@ -96,12 +102,15 @@ public class MutableSegmentImpl implements MutableSegment {
   private final boolean _offHeap;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final RealtimeSegmentStatsHistory _statsHistory;
-  private final SegmentPartitionConfig _segmentPartitionConfig;
+  private final String _partitionColumn;
+  private final PartitionFunction _partitionFunction;
+  private final int _partitionId;
   private final boolean _nullHandlingEnabled;
 
+  // TODO: Keep one map to store all these info
+  private final Map<String, NumValuesInfo> _numValuesInfoMap = new HashMap<>();
   private final Map<String, BaseMutableDictionary> _dictionaryMap = new HashMap<>();
   private final Map<String, DataFileReader> _indexReaderWriterMap = new HashMap<>();
-  private final Map<String, Integer> _maxNumValuesMap = new HashMap<>();
   private final Map<String, InvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
   private final Map<String, RealtimeNullValueVectorReaderWriter> _nullValueVectorMap = new HashMap<>();
@@ -125,6 +134,9 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   private RealtimeLuceneReaders _realtimeLuceneReaders;
+  // If the table schema is changed before the consuming segment is committed, newly added columns would appear in _newlyAddedColumnsFieldMap.
+  private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
+  private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -150,7 +162,9 @@ public class MutableSegmentImpl implements MutableSegment {
     _offHeap = config.isOffHeap();
     _memoryManager = config.getMemoryManager();
     _statsHistory = config.getStatsHistory();
-    _segmentPartitionConfig = config.getSegmentPartitionConfig();
+    _partitionColumn = config.getPartitionColumn();
+    _partitionFunction = config.getPartitionFunction();
+    _partitionId = config.getPartitionId();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -179,7 +193,6 @@ public class MutableSegmentImpl implements MutableSegment {
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
 
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
-
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     Set<String> textIndexColumns = config.getTextIndexColumns();
 
@@ -188,7 +201,7 @@ public class MutableSegmentImpl implements MutableSegment {
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
-      _maxNumValuesMap.put(column, 0);
+      _numValuesInfoMap.put(column, new NumValuesInfo());
 
       // Check whether to generate raw index for the column while consuming
       // Only support generating raw index on single-value columns that do not have inverted index while
@@ -312,7 +325,12 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
-    return _segmentPartitionConfig;
+    if (_partitionColumn != null) {
+      return new SegmentPartitionConfig(Collections.singletonMap(_partitionColumn,
+          new ColumnPartitionConfig(_partitionFunction.toString(), _partitionFunction.getNumPartitions())));
+    } else {
+      return null;
+    }
   }
 
   public long getMinTime() {
@@ -321,6 +339,19 @@ public class MutableSegmentImpl implements MutableSegment {
 
   public long getMaxTime() {
     return _maxTime;
+  }
+
+  public void addExtraColumns(Schema newSchema) {
+    for (String columnName : newSchema.getColumnNames()) {
+      if (!_schema.getColumnNames().contains(columnName)) {
+        FieldSpec fieldSpec = newSchema.getFieldSpecFor(columnName);
+        _newlyAddedColumnsFieldMap.put(columnName, fieldSpec);
+        if (!fieldSpec.isVirtualColumn()) {
+          _newlyAddedPhysicalColumnsFieldMap.put(columnName, fieldSpec);
+        }
+      }
+    }
+    _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
   }
 
   @Override
@@ -374,11 +405,6 @@ public class MutableSegmentImpl implements MutableSegment {
         } else {
           int[] dictIds = dictionary.index((Object[]) value);
           dictIdMap.put(column, dictIds);
-          int numValues = dictIds.length;
-          // Update max number of values for multi-value column
-          if (_maxNumValuesMap.get(column) < numValues) {
-            _maxNumValuesMap.put(column, numValues);
-          }
 
           // No need to update min/max time value as time column cannot be multi-valued
           continue;
@@ -405,6 +431,7 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
       Object value = row.getValue(column);
+      NumValuesInfo numValuesInfo = _numValuesInfoMap.get(column);
       if (fieldSpec.isSingleValueField()) {
         // SV column
         BaseSingleColumnSingleValueReaderWriter indexReaderWriter =
@@ -440,10 +467,14 @@ public class MutableSegmentImpl implements MutableSegment {
                   "Unsupported data type: " + dataType + " for no-dictionary column: " + column);
           }
         }
+
+        numValuesInfo.updateSVEntry();
       } else {
         // MV column: always dictionary encoded
         int[] dictIds = (int[]) dictIdMap.get(column);
         ((FixedByteSingleColumnMultiValueReaderWriter) _indexReaderWriterMap.get(column)).setIntArray(docId, dictIds);
+
+        numValuesInfo.updateMVEntry(dictIds.length);
       }
     }
   }
@@ -536,7 +567,7 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public Set<String> getColumnNames() {
     // Return all column names, virtual and physical.
-    return _schema.getColumnNames();
+    return Sets.union(_schema.getColumnNames(), _newlyAddedColumnsFieldMap.keySet());
   }
 
   @Override
@@ -546,23 +577,41 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       physicalColumnNames.add(fieldSpec.getName());
     }
-
-    return physicalColumnNames;
+    // We should include newly added columns in the physical columns
+    return Sets.union(physicalColumnNames, _newlyAddedPhysicalColumnsFieldMap.keySet());
   }
 
   @Override
-  public ColumnDataSource getDataSource(String columnName) {
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-    if (fieldSpec.isVirtualColumn()) {
+  public DataSource getDataSource(String column) {
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+    if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
+      // Column is either added during ingestion, or was initiated with a virtual column provider
+      if (fieldSpec == null) {
+        // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to provide values
+        fieldSpec = _newlyAddedColumnsFieldMap.get(column);
+        Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + column + " should not be null");
+      }
+      // TODO: Refactor virtual column provider to directly generate data source
       VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
-      VirtualColumnProvider virtualColumnProvider =
-          VirtualColumnProviderFactory.buildProvider(_schema.getFieldSpecFor(columnName).getVirtualColumnProvider());
-      return new ColumnDataSource(virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext),
-          virtualColumnProvider.buildMetadata(virtualColumnContext));
+      VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
+      return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
+          virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
     } else {
-      return new ColumnDataSource(fieldSpec, _numDocsIndexed, _maxNumValuesMap.get(columnName),
-          _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),
-          _bloomFilterMap.get(columnName), _nullValueVectorMap.get(columnName));
+      PartitionFunction partitionFunction = null;
+      int partitionId = 0;
+      if (column.equals(_partitionColumn)) {
+        partitionFunction = _partitionFunction;
+        partitionId = _partitionId;
+      }
+      NumValuesInfo numValuesInfo = _numValuesInfoMap.get(column);
+      DataFileReader forwardIndex = _indexReaderWriterMap.get(column);
+      BaseMutableDictionary dictionary = _dictionaryMap.get(column);
+      InvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
+      BloomFilterReader bloomFilter = _bloomFilterMap.get(column);
+      RealtimeNullValueVectorReaderWriter nullValueVector = _nullValueVectorMap.get(column);
+      return new MutableDataSource(fieldSpec, _numDocsIndexed, numValuesInfo.getNumValues(),
+          numValuesInfo.getMaxNumValuesPerMVEntry(), partitionFunction, partitionId, forwardIndex, dictionary,
+          invertedIndex, bloomFilter, nullValueVector);
     }
   }
 
@@ -582,7 +631,7 @@ public class MutableSegmentImpl implements MutableSegment {
       String column = fieldSpec.getName();
       Object value = IndexSegmentUtils
           .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
-              _maxNumValuesMap.getOrDefault(column, 0));
+              _numValuesInfoMap.get(column).getMaxNumValuesPerMVEntry());
       reuse.putValue(column, value);
 
       if (_nullHandlingEnabled) {
@@ -839,5 +888,29 @@ public class MutableSegmentImpl implements MutableSegment {
         maxOverFlowHashSize);
     return new FixedIntArrayOffHeapIdMap(estimatedRowsToIndex, maxOverFlowHashSize, _numKeyColumns, _memoryManager,
         RECORD_ID_MAP);
+  }
+
+  // NOTE: Okay for single-writer
+  @SuppressWarnings("NonAtomicOperationOnVolatileField")
+  private static class NumValuesInfo {
+    volatile int _numValues = 0;
+    volatile int _maxNumValuesPerMVEntry = -1;
+
+    void updateSVEntry() {
+      _numValues++;
+    }
+
+    void updateMVEntry(int numValuesInMVEntry) {
+      _numValues += numValuesInMVEntry;
+      _maxNumValuesPerMVEntry = Math.max(_maxNumValuesPerMVEntry, numValuesInMVEntry);
+    }
+
+    int getNumValues() {
+      return _numValues;
+    }
+
+    int getMaxNumValuesPerMVEntry() {
+      return _maxNumValuesPerMVEntry;
+    }
   }
 }

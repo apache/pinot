@@ -16,13 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.io.reader.impl;
+
+import java.io.IOException;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 
 /**
- * Provide the default null value as a single string.
+ * Inverted index for multi-value column with constant values.
  */
-public class DefaultNullValueSingleStringVirtualColumnProvider extends SingleStringVirtualColumnProvider {
-  protected String getValue(VirtualColumnContext context) {
-    return context.getFieldSpec().getDefaultNullValue().toString();
+public class ConstantMVInvertedIndex implements InvertedIndexReader<MutableRoaringBitmap> {
+  private final MutableRoaringBitmap _bitmap;
+
+  public ConstantMVInvertedIndex(int numDocs) {
+    _bitmap = new MutableRoaringBitmap();
+    _bitmap.add(0, numDocs);
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(int dictId) {
+    return _bitmap;
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(Object value) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void close()
+      throws IOException {
   }
 }

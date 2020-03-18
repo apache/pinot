@@ -28,15 +28,24 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -169,14 +178,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     List<String> h2queries;
-    query =
-        "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
+    query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testSqlQuery(query, Collections.singletonList(query));
     query =
         "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
     testSqlQuery(query, Collections.singletonList(query));
-    query =
-        "SELECT COUNT(*) FROM mytable WHERE ArrDelay > CarrierDelay LIMIT 1";
+    query = "SELECT COUNT(*) FROM mytable WHERE ArrDelay > CarrierDelay LIMIT 1";
     testSqlQuery(query, Collections.singletonList(query));
     query =
         "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
@@ -251,7 +258,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     for (String query : pqlQueries) {
       JsonNode response = postQuery(query);
       for (String statName : statNames) {
-        Assert.assertTrue(response.has(statName));
+        assertTrue(response.has(statName));
       }
     }
   }
@@ -261,7 +268,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     ResultSetGroup resultSetGroup = getPinotConnection().execute("select * from mytable");
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     for (int i = 0; i < resultSet.getColumnCount(); i++) {
-      Assert.assertFalse(resultSet.getColumnName(i).startsWith("$"),
+      assertFalse(resultSet.getColumnName(i).startsWith("$"),
           "Virtual column " + resultSet.getColumnName(i) + " is present in the results!");
     }
 
@@ -281,7 +288,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testQueriesFromQueryFile()
       throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
-    Assert.assertNotNull(resourceUrl);
+    assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
 
     int maxNumQueriesToSkipInQueryFile = getMaxNumQueriesToSkipInQueryFile();
@@ -318,7 +325,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testSqlQueriesFromQueryFile()
       throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getSqlQueryFileName());
-    Assert.assertNotNull(resourceUrl);
+    assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
 
     int maxNumQueriesToSkipInQueryFile = getMaxNumQueriesToSkipInQueryFile();
@@ -407,7 +414,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   private void testQueryException(String query)
       throws Exception {
     JsonNode jsonObject = postQuery(query);
-    Assert.assertTrue(jsonObject.get("exceptions").size() > 0);
+    assertTrue(jsonObject.get("exceptions").size() > 0);
   }
 
   /**
@@ -418,7 +425,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testInstanceShutdown()
       throws Exception {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
-    Assert.assertFalse(instances.isEmpty(), "List of instances should not be empty");
+    assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
     // Mark all instances in the cluster as shutting down
     for (String instance : instances) {
@@ -508,5 +515,89 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         return null;
       }
     }, 60_000L, errorMessage);
+  }
+
+  /**
+   * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
+   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns()}.
+   */
+  public void testReload(boolean includeOfflineTable)
+      throws Exception {
+    String rawTableName = getTableName();
+    Schema schema = Schema.fromFile(getSchemaFile());
+
+    String selectStarQuery = "SELECT * FROM " + rawTableName;
+    JsonNode queryResponse = postQuery(selectStarQuery);
+    assertEquals(queryResponse.get("selectionResults").get("columns").size(), schema.size());
+    long numTotalDocs = queryResponse.get("totalDocs").asLong();
+
+    schema.addField(constructNewDimension(FieldSpec.DataType.INT, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.LONG, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.FLOAT, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.DOUBLE, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.STRING, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.INT, false));
+    schema.addField(constructNewDimension(FieldSpec.DataType.LONG, false));
+    schema.addField(constructNewDimension(FieldSpec.DataType.FLOAT, false));
+    schema.addField(constructNewDimension(FieldSpec.DataType.DOUBLE, false));
+    schema.addField(constructNewDimension(FieldSpec.DataType.STRING, false));
+    schema.addField(constructNewMetric(FieldSpec.DataType.INT));
+    schema.addField(constructNewMetric(FieldSpec.DataType.LONG));
+    schema.addField(constructNewMetric(FieldSpec.DataType.FLOAT));
+    schema.addField(constructNewMetric(FieldSpec.DataType.DOUBLE));
+    schema.addField(constructNewMetric(FieldSpec.DataType.BYTES));
+
+    // Upload the schema with extra columns
+    addSchema(schema);
+
+    // Reload the table
+    if (includeOfflineTable) {
+      sendPostRequest(_controllerRequestURLBuilder.forTableReload(rawTableName, "OFFLINE"), null);
+    }
+    sendPostRequest(_controllerRequestURLBuilder.forTableReload(rawTableName, "REALTIME"), null);
+
+    // Wait for all segments to finish reloading, and test querying the new columns
+    // NOTE: Use count query to prevent schema inconsistency error
+    String testQuery = "SELECT COUNT(*) FROM " + rawTableName + " WHERE NewIntSVDimension < 0";
+    long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(testQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0);
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return testQueryResponse.get("aggregationResults").get(0).get("value").asLong() == countStarResult;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to generate default values for new columns");
+
+    // Select star query should return all the columns
+    queryResponse = postQuery(selectStarQuery);
+    assertEquals(queryResponse.get("exceptions").size(), 0);
+    JsonNode selectionResults = queryResponse.get("selectionResults");
+    assertEquals(selectionResults.get("columns").size(), schema.size());
+    assertEquals(selectionResults.get("results").size(), 10);
+
+    // Test filter on all new added columns
+    String countStarQuery = "SELECT COUNT(*) FROM " + rawTableName
+        + " WHERE NewIntSVDimension < 0 AND NewLongSVDimension < 0 AND NewFloatSVDimension < 0 AND NewDoubleSVDimension < 0 AND NewStringSVDimension = 'null'"
+        + " AND NewIntMVDimension < 0 AND NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension < 0 AND NewStringMVDimension = 'null'"
+        + " AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
+    queryResponse = postQuery(countStarQuery);
+    assertEquals(queryResponse.get("exceptions").size(), 0);
+    assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asLong(), countStarResult);
+  }
+
+  private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {
+    String column =
+        "New" + StringUtils.capitalize(dataType.toString().toLowerCase()) + (singleValue ? "SV" : "MV") + "Dimension";
+    return new DimensionFieldSpec(column, dataType, singleValue);
+  }
+
+  private MetricFieldSpec constructNewMetric(FieldSpec.DataType dataType) {
+    String column = "New" + StringUtils.capitalize(dataType.toString().toLowerCase()) + "Metric";
+    return new MetricFieldSpec(column, dataType);
   }
 }

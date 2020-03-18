@@ -20,7 +20,7 @@
 -->
 # Apache Pinot (incubating)
 
-[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) [![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot) [![license](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE) 
+[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) [![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot) [![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot) [![license](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
 
 Apache Pinot is a realtime distributed OLAP datastore, which is used to deliver scalable real time analytics with low latency. It can ingest data from offline data sources (such as Hadoop and flat files) as well as online sources (such as Kafka). Pinot is designed to scale horizontally.
 
@@ -54,7 +54,7 @@ Because of the design choices we made to achieve these goals, there are certain 
 Pinot works very well for querying time series data with lots of Dimensions and Metrics. Example - Query (profile views, ad campaign performance, etc.) in an analytical fashion (who viewed this profile in the last weeks, how many ads were clicked per campaign). 
 
 ## Instructions to build Pinot
-More detailed instructions can be found at [Quick Demo](https://pinot.readthedocs.io/en/latest/getting_started.html) section in the documentation.
+More detailed instructions can be found at [Quick Demo](https://apache-pinot.gitbook.io/apache-pinot-cookbook/getting-started) section in the documentation.
 ```
 # Clone a repo
 $ git clone https://github.com/apache/incubator-pinot.git
@@ -83,10 +83,20 @@ Pinot also provides k8s integration with interactive query engine [Presto](kuber
  - Apache Pinot Meetup Group: https://www.meetup.com/apache-pinot/
 
 ## Documentation
-Check out [Pinot documentation](https://pinot.readthedocs.io) for a complete description of Pinot's features.
-- [Quick Demo](https://pinot.readthedocs.io/en/latest/getting_started.html)
-- [Pinot Architecture](https://pinot.readthedocs.io/en/latest/architecture.html)
-- [Pinot Query Language](https://pinot.readthedocs.io/en/latest/pql_examples.html)
+Check out [Pinot documentation](https://apache-pinot.gitbook.io/apache-pinot-cookbook/) for a complete description of Pinot's features.
+- [Quick Demo](https://apache-pinot.gitbook.io/apache-pinot-cookbook/getting-started/running-pinot-locally)
+- [Pinot Architecture](https://apache-pinot.gitbook.io/apache-pinot-cookbook/concepts/architecture)
+- [Pinot Query Language](https://apache-pinot.gitbook.io/apache-pinot-cookbook/pinot-user-guide/pinot-query-language)
+
+## Pinot Query Clients
+
+Pinot community has contributed libraries to interact with Apache Pinot with other languages.
+
+### Python
+  - [python-pinot-dbapi/pinot-dbapi](https://github.com/python-pinot-dbapi/pinot-dbapi) - Python DB-API and SQLAlchemy dialect for Pinot
+
+### Golang
+  - [fx19880617/pinot-client-go](https://github.com/fx19880617/pinot-client-go) - A Golang Query Client for Pinot
 
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)

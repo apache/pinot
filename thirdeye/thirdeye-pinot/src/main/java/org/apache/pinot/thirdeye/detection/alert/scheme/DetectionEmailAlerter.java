@@ -106,7 +106,8 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     if (recipients.getCc() == null) {
       recipients.setCc(new HashSet<>());
     }
-    recipients.getCc().addAll(ConfigUtils.getList(this.teConfig.getAlerterConfiguration().get(PROP_ADMIN_RECIPIENTS)));
+    recipients.getCc().addAll(ConfigUtils.getList(this.teConfig.getAlerterConfiguration()
+        .get(SMTP_CONFIG_KEY).get(PROP_ADMIN_RECIPIENTS)));
   }
 
   private void whitelistRecipients(DetectionAlertFilterRecipients recipients) {
@@ -151,7 +152,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, subsConfig)
         .getEmailEntity(anomalies);
     if (Strings.isNullOrEmpty(this.subsConfig.getFrom())) {
-      String fromAddress = MapUtils.getString(this.teConfig.getAlerterConfiguration(), PROP_FROM_ADDRESS);
+      String fromAddress = MapUtils.getString(this.teConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY), PROP_FROM_ADDRESS);
       if (Strings.isNullOrEmpty(fromAddress)) {
         throw new IllegalArgumentException("Invalid sender's email");
       }

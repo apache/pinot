@@ -104,6 +104,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     }
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
   @Test
@@ -158,5 +159,11 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     TableConfig tableConfig = new TableConfig.Builder(TableType.REALTIME).setTableName("testTable")
         .setStreamConfigs(Collections.singletonMap("stream.kafka.consumer.type", "HIGHLEVEL")).build();
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
+  }
+
+  @Test
+  public void testReload()
+      throws Exception {
+    super.testReload(false);
   }
 }

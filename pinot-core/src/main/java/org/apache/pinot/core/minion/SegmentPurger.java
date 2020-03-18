@@ -28,7 +28,7 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;

@@ -28,7 +28,6 @@ import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
 
 

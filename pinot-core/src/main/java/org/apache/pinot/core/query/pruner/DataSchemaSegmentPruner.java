@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -36,8 +35,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
 
   @Override
   public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
-    Set<String> columnsInSchema = segment.getSegmentMetadata().getSchema().getColumnNames();
-    return !columnsInSchema.containsAll(queryRequest.getAllColumns());
+    return !segment.getColumnNames().containsAll(queryRequest.getAllColumns());
   }
 
   @Override

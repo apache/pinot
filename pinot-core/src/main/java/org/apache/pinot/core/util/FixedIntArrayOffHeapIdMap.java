@@ -125,12 +125,12 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public Object getMinVal() {
+  public Comparable getMinVal() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public Object getMaxVal() {
+  public Comparable getMaxVal() {
     throw new UnsupportedOperationException();
   }
 

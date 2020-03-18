@@ -30,8 +30,8 @@ import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.query.utils.Pair;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 

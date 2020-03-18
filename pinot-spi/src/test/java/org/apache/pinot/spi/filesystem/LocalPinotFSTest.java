@@ -120,6 +120,14 @@ public class LocalPinotFSTest {
     Assert.assertTrue(localPinotFS.exists(new File(newAbsoluteTempDirPath3, "testDir").toURI()));
     Assert.assertTrue(localPinotFS.exists(new File(new File(newAbsoluteTempDirPath3, "testDir"), "testFile").toURI()));
 
+    // Check if using a different scheme on URI still works
+    URI uri = URI.create("hdfs://localhost:9999" + newAbsoluteTempDirPath.getPath());
+    localPinotFS.move(newAbsoluteTempDirPath3.toURI(), uri, true);
+    Assert.assertFalse(localPinotFS.exists(newAbsoluteTempDirPath3.toURI()));
+    Assert.assertTrue(localPinotFS.exists(newAbsoluteTempDirPath.toURI()));
+    Assert.assertTrue(localPinotFS.exists(new File(newAbsoluteTempDirPath, "testDir").toURI()));
+    Assert.assertTrue(localPinotFS.exists(new File(new File(newAbsoluteTempDirPath, "testDir"), "testFile").toURI()));
+
     // Check file copy to location where something already exists still works
     localPinotFS.copy(testFileUri, thirdTestFile.toURI());
     // Check length of file
