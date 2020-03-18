@@ -70,7 +70,6 @@ public class GithubAPICaller {
     CloseableHttpResponse httpResponse;
     try {
       httpResponse = _closeableHttpClient.execute(request);
-      System.out.println("Remaining " + httpResponse.getFirstHeader(RATE_LIMIT_REMAINING_HEADER).getValue());
       StatusLine statusLine = httpResponse.getStatusLine();
       githubAPIResponse.setStatusCode(statusLine.getStatusCode());
       githubAPIResponse.setStatusMessage(statusLine.getReasonPhrase());

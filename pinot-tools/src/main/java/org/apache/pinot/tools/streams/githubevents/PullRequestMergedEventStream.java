@@ -122,7 +122,6 @@ public class PullRequestMergedEventStream {
                 try {
                   GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
                   if (genericRecord != null) {
-                    System.out.println(genericRecord);
                     publish(genericRecord);
                   }
                 } catch (Exception e) {
@@ -138,7 +137,7 @@ public class PullRequestMergedEventStream {
               // Rate Limit exceeded
               if (githubAPIResponse.remainingLimit == 0) {
                 LOGGER.warn("Rate limit exceeded, retry after 1 minute");
-                // TODO: get renewal time from header
+                // TODO: get renewal time from header. Github won't allow retry until 60 minutes
                 Thread.sleep(60000L);
                 break;
               }
