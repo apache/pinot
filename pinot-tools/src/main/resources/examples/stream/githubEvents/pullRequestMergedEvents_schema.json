@@ -1,0 +1,136 @@
+{
+  "schemaName": "pullRequestMergedEvents",
+  "dimensionFieldSpecs": [
+    {
+      "name": "title",
+      "dataType": "STRING"
+    },
+    {
+      "name": "labels",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "userId",
+      "dataType": "STRING"
+    },
+    {
+      "name": "userType",
+      "dataType": "STRING"
+    },
+    {
+      "name": "authorAssociation",
+      "dataType": "STRING"
+    },
+    {
+      "name": "mergedBy",
+      "dataType": "STRING"
+    },
+    {
+      "name": "assignees",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "authors",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "committers",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "requestedReviewers",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "requestedTeams",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "reviewers",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "commenters",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "repo",
+      "dataType": "STRING"
+    },
+    {
+      "name": "organization",
+      "dataType": "STRING"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "count",
+      "dataType": "LONG",
+      "defaultNullValue": 1
+    },
+    {
+      "name": "numComments",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numReviewComments",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numCommits",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numLinesAdded",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numLinesDeleted",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numFilesChanged",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numAuthors",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numCommitters",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numReviewers",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numCommenters",
+      "dataType": "LONG"
+    },
+    {
+      "name": "createdTimeMillis",
+      "dataType": "LONG"
+    },
+    {
+      "name": "elapsedTimeMillis",
+      "dataType": "LONG"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "MILLISECONDS",
+      "timeFormat": "EPOCH",
+      "dataType": "LONG",
+      "name": "mergedTimeMillis"
+    }
+  }
+}

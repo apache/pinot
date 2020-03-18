@@ -29,13 +29,14 @@ import org.apache.pinot.tools.admin.command.AvroSchemaToPinotSchema;
 import org.apache.pinot.tools.admin.command.BackfillDateTimeColumnCommand;
 import org.apache.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import org.apache.pinot.tools.admin.command.ChangeTableState;
-import org.apache.pinot.tools.admin.command.OperateClusterConfigCommand;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
+import org.apache.pinot.tools.admin.command.GithubEventsDemoCommand;
 import org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
 import org.apache.pinot.tools.admin.command.OfflineSegmentIntervalCheckerCommand;
+import org.apache.pinot.tools.admin.command.OperateClusterConfigCommand;
 import org.apache.pinot.tools.admin.command.PostQueryCommand;
 import org.apache.pinot.tools.admin.command.QuickStartCommand;
 import org.apache.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
@@ -125,7 +126,8 @@ public class PinotAdministrator {
       @SubCommand(name = "CollectMetadataForIndexTuning", impl = CollectMetadataForIndexTuning.class),
       @SubCommand(name = "EntriesScannedQuantileReport", impl = EntriesScannedQuantileReport.class),
       @SubCommand(name = "IndexTuner", impl = IndexTunerCommand.class),
-      @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class)
+      @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class),
+      @SubCommand(name = "GithubEventsDemo", impl = GithubEventsDemoCommand.class)
   })
   Command _subCommand;
   //@formatter:on
