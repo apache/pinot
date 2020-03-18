@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.core.operator.CombineOperator;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,8 +33,9 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
    * In order to ensure each thread is executing more than 1 segment, this test is against
    * (2 * MAX_NUM_THREADS_PER_QUERY) segments.
    */
+  @Override
   protected int getNumSegmentDataManagers() {
-    return Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2)) * 2;
+    return CombineOperator.MAX_NUM_THREADS_PER_QUERY * 2;
   }
 
   /**

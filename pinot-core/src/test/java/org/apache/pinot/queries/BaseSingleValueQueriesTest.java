@@ -25,8 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -36,6 +34,8 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterTest;
@@ -123,7 +123,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
     _segmentDataManagers = new ArrayList<>();
-    for (int i = 0; i< getNumSegmentDataManagers(); i++) {
+    for (int i = 0; i < getNumSegmentDataManagers(); i++) {
       _segmentDataManagers.add(new ImmutableSegmentDataManager(immutableSegment));
     }
   }

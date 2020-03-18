@@ -48,7 +48,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
   // Use at most 10 or half of the processors threads for each query.
   // If there are less than 2 processors, use 1 thread.
   // Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
-  private static final int MAX_NUM_THREADS_PER_QUERY =
+  public static final int MAX_NUM_THREADS_PER_QUERY =
       Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
 
   private final List<Operator> _operators;
@@ -101,7 +101,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
 
             IntermediateResultsBlock mergedBlock = (IntermediateResultsBlock) _operators.get(index).nextBlock();
             for (int i = index + numThreads; i < numOperators; i += numThreads) {
-              if (allowEarlyTermination(_brokerRequest, mergedBlock)) {
+              if (isQuerySatisfied(_brokerRequest, mergedBlock)) {
                 break;
               }
               IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) _operators.get(i).nextBlock();
@@ -137,7 +137,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
             }
             int numMergedBlocks = 1;
             while (numMergedBlocks < numThreads) {
-              if (allowEarlyTermination(_brokerRequest, mergedBlock)) {
+              if (isQuerySatisfied(_brokerRequest, mergedBlock)) {
                 break;
               }
               IntermediateResultsBlock blockToMerge =
@@ -203,7 +203,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
   }
 
   // This will check if IntermediateResultsBlock already satisfying query, so there is no need to continue query processing.
-  private boolean allowEarlyTermination(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
+  private boolean isQuerySatisfied(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
     // Check for selection only query, if first segment already offers enough records, then there is no need to scan for the rest segments.
     if ((brokerRequest.getSelections() != null) && (brokerRequest.getOrderBy() == null)) {
       if ((mergedBlock.getSelectionResult() != null) && (mergedBlock.getSelectionResult().size() >= brokerRequest.getSelections().getSize())) {
