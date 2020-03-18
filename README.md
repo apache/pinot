@@ -20,7 +20,7 @@
 -->
 # Apache Pinot (incubating)
 
-[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) [![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot) [![Join the chat at https://gitter.im/linkedin/pinot](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/linkedin/pinot?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![license](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
+[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) [![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot) [![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot) [![license](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
 
 Apache Pinot is a realtime distributed OLAP datastore, which is used to deliver scalable real time analytics with low latency. It can ingest data from offline data sources (such as Hadoop and flat files) as well as online sources (such as Kafka). Pinot is designed to scale horizontally.
 
@@ -85,6 +85,16 @@ Check out [Pinot documentation](https://apache-pinot.gitbook.io/apache-pinot-coo
 - [Quick Demo](https://apache-pinot.gitbook.io/apache-pinot-cookbook/getting-started/running-pinot-locally)
 - [Pinot Architecture](https://apache-pinot.gitbook.io/apache-pinot-cookbook/concepts/architecture)
 - [Pinot Query Language](https://apache-pinot.gitbook.io/apache-pinot-cookbook/pinot-user-guide/pinot-query-language)
+
+## Pinot Query Clients
+
+Pinot community has contributed libraries to interact with Apache Pinot with other languages.
+
+### Python
+  - [python-pinot-dbapi/pinot-dbapi](https://github.com/python-pinot-dbapi/pinot-dbapi) - Python DB-API and SQLAlchemy dialect for Pinot
+
+### Golang
+  - [fx19880617/pinot-client-go](https://github.com/fx19880617/pinot-client-go) - A Golang Query Client for Pinot
 
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
