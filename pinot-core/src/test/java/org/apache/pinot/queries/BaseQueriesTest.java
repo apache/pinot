@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.queries;
 
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -182,7 +184,9 @@ public abstract class BaseQueriesTest {
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE), instanceResponse);
     dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME), instanceResponse);
-    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
+    BrokerResponseNative brokerResponseNative =
+        brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
+    return brokerResponseNative;
   }
 
   /**
