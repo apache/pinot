@@ -97,6 +97,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private final TimeUnit windowDelayUnit;
   private int windowSize;
   private TimeUnit windowUnit;
+  private boolean isSpeedUp = false;
   private final MetricConfigDTO metric;
   private final MetricEntity metricEntity;
   private final boolean isMovingWindowDetection;
@@ -290,6 +291,16 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           DateTime startTime = endTime.minus(windowSizePeriod);
           monitoringWindows.add(new Interval(startTime, endTime));
         }
+        if (isSpeedUp) {
+          /* Note: This is to adjust the latest window in speed-up case, in order to show the latest data.
+           * For example, when running detection on minute-level metrics for multiple days, the speed-up will use daily
+           * window to speed up the detection, so the latest window includes future time range, which will be trimmed.
+           */
+          Interval lastWindow = monitoringWindows.remove(monitoringWindows.size() - 1);
+          Interval updatedLastWindow = (lastWindow.getEndMillis()  > endTime) ?
+              lastWindow.withEndMillis(endTime) : lastWindow;
+          monitoringWindows.add(updatedLastWindow);
+        }
         for (Interval window : monitoringWindows){
           LOG.info("Will run detection in window {}", window);
         }
@@ -388,6 +399,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       bucketPeriod = Period.days(1);
       windowSize = 1;
       windowUnit = TimeUnit.DAYS;
+      isSpeedUp = true;
     }
   }
 }
