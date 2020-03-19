@@ -23,7 +23,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 
 
+/**
+ * The {@code QueryConfig} class contains the table-level query execution related configurations.
+ */
 public class QueryConfig extends BaseJsonConfig {
+  // The timeout for the entire query execution in milliseconds. This value will be gathered on the broker side, and
+  // passed to the servers within the broker request.
+  // If the broker times out, it will stop waiting for more server responses and return the reduced server responses
+  // gathered so far, and numServersResponded should be smaller than numServersQueried.
+  // If the server times out, it will directly interrupt the query execution. The server response does not matter much
+  // because by the time the server times out, the broker should already timed out and returned the response.
   private final Long _timeoutMs;
 
   @JsonCreator
