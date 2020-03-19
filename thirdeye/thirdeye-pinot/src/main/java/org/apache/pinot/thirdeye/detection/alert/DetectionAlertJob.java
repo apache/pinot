@@ -102,16 +102,16 @@ public class DetectionAlertJob implements Job {
   }
 
   /**
-   * Check if we need to create a notification task.
-   * If there is no anomaly generated (by looking at anomaly start_time) between last notification time
+   * Check if we need to create a subscription task.
+   * If there is no anomaly generated (by looking at anomaly create_time) between last notification time
    * till now (left inclusive, right exclusive) then no need to create this task.
    *
-   * The reason we use start_time is end_time is not accurate due to anomaly merge.
-   * The timestamp stored in vectorLock is anomaly end_time, which should be fine.
-   * For example, if previous anomaly is from t1 to t2, then the timestamp in vectorLock is t2.
-   * If there is a new anomaly generated from t2 to t3 then we can still get this anomaly.
+   * Even if an anomaly gets merged (end_time updated) it will not renotify this anomaly as the create_time is not
+   * modified.
+   * For example, if previous anomaly is from t1 to t2 generated at t3, then the timestamp in vectorLock is t3.
+   * If there is a new anomaly from t2 to t4 generated at t5, then we can still get this anomaly as t5 > t3.
    *
-   * @param configDTO The DetectionAlert Configuration.
+   * @param configDTO The Subscription Configuration.
    * @return true if it needs notification task. false otherwise.
    */
   private boolean needNotification(DetectionAlertConfigDTO configDTO) {
@@ -119,7 +119,6 @@ public class DetectionAlertJob implements Job {
     for (Map.Entry<Long, Long> vectorLock : vectorLocks.entrySet()) {
       long configId = vectorLock.getKey();
       long lastNotifiedTime = vectorLock.getValue();
-      List<MergedAnomalyResultDTO> anomalies = anomalyDAO.findAll();
       if (anomalyDAO.findByCreatedTimeInRangeAndDetectionConfigId(lastNotifiedTime, System.currentTimeMillis(), configId)
           .stream().anyMatch(x -> !x.isChild())) {
         return true;
