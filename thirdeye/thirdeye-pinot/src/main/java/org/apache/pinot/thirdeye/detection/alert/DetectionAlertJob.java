@@ -28,6 +28,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -118,13 +119,9 @@ public class DetectionAlertJob implements Job {
     for (Map.Entry<Long, Long> vectorLock : vectorLocks.entrySet()) {
       long configId = vectorLock.getKey();
       long lastNotifiedTime = vectorLock.getValue();
-
-      Predicate predicate = Predicate.AND(
-          Predicate.GE("createdTime", lastNotifiedTime),
-          Predicate.LT("createdTime", System.currentTimeMillis()),
-          Predicate.EQ("detectionConfigId", configId));
-
-      if (anomalyDAO.findByPredicate(predicate).stream().anyMatch(x -> !x.isChild())) {
+      List<MergedAnomalyResultDTO> anomalies = anomalyDAO.findAll();
+      if (anomalyDAO.findByCreatedTimeInRangeAndDetectionConfigId(lastNotifiedTime, System.currentTimeMillis(), configId)
+          .stream().anyMatch(x -> !x.isChild())) {
         return true;
       }
     }
