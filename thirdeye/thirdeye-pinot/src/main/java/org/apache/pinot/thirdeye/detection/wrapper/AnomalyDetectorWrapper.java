@@ -97,7 +97,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private final TimeUnit windowDelayUnit;
   private int windowSize;
   private TimeUnit windowUnit;
-  private boolean isSpeedUp = false;
   private final MetricConfigDTO metric;
   private final MetricEntity metricEntity;
   private final boolean isMovingWindowDetection;
@@ -397,7 +396,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       bucketPeriod = Period.days(1);
       windowSize = 1;
       windowUnit = TimeUnit.DAYS;
-      isSpeedUp = true;
     }
   }
 }
