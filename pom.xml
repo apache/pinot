@@ -99,8 +99,9 @@
 
   <distributionManagement>
     <repository>
-      <id>pinot</id>
-      <url>https://dl.bintray.com/linkedin/maven/pinot/;publish=1</url>
+      <id>bintray-linkedin-maven</id>
+      <name>linkedin-maven</name>
+      <url>https://api.bintray.com/maven/linkedin/maven/pinot/;publish=1</url>
     </repository>
   </distributionManagement>
 
