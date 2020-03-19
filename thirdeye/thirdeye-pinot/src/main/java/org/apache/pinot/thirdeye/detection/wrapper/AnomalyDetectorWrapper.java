@@ -166,8 +166,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       }
     }
 
-    List<Interval> monitoringWindows =
-        this.getMonitoringWindows().stream().filter(i -> i.getEndMillis() <= this.endTime).collect(Collectors.toList());
+    List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     TimeSeries predictedResult = TimeSeries.empty();
     int totalWindows = monitoringWindows.size();
@@ -291,15 +290,14 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           DateTime startTime = endTime.minus(windowSizePeriod);
           monitoringWindows.add(new Interval(startTime, endTime));
         }
-        if (isSpeedUp) {
-          /* Note: This is to adjust the latest window in speed-up case, in order to show the latest data.
-           * For example, when running detection on minute-level metrics for multiple days, the speed-up will use daily
-           * window to speed up the detection, so the latest window includes future time range, which will be trimmed.
+        Interval latestWindow = monitoringWindows.get(monitoringWindows.size() - 1);
+        if (latestWindow.getEndMillis() > endTime) {
+          /* Note: This can happen when the bucketPeriod (windowStep) is greater than the granularity of the metrics.
+           * For example, when we run detection for multiple days on minute-level metrics, we set window step to one day,
+           * in order to speed up the detection.
            */
-          Interval lastWindow = monitoringWindows.remove(monitoringWindows.size() - 1);
-          Interval updatedLastWindow = (lastWindow.getEndMillis()  > endTime) ?
-              lastWindow.withEndMillis(endTime) : lastWindow;
-          monitoringWindows.add(updatedLastWindow);
+          monitoringWindows.remove(monitoringWindows.size() - 1);
+          monitoringWindows.add(latestWindow.withEndMillis(endTime));
         }
         for (Interval window : monitoringWindows){
           LOG.info("Will run detection in window {}", window);
