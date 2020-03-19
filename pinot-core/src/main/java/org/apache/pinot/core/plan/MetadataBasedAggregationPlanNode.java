@@ -61,7 +61,7 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
   public Operator run() {
     SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
     AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, segmentMetadata);
+        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest);
 
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {

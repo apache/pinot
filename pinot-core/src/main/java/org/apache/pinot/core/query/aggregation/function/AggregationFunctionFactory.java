@@ -24,7 +24,6 @@ import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.pql.parsers.pql2.ast.SelectAstNode;
 
 
 /**
@@ -112,8 +111,10 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTRAWHLLMV:
             return new DistinctCountRawHLLMVAggregationFunction();
           case DISTINCT:
+            Preconditions.checkState(brokerRequest != null,
+                "Broker request must be provided for 'DISTINCT' aggregation function");
             return new DistinctAggregationFunction(AggregationFunctionUtils.getColumn(aggregationInfo),
-                brokerRequest != null ? brokerRequest.getLimit() : SelectAstNode.DEFAULT_RECORD_LIMIT, brokerRequest.getOrderBy());
+                brokerRequest.getOrderBy(), brokerRequest.getLimit());
           default:
             throw new IllegalArgumentException();
         }

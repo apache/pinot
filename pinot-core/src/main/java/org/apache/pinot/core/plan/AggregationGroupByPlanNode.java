@@ -56,14 +56,13 @@ public class AggregationGroupByPlanNode implements PlanNode {
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
 
-  public AggregationGroupByPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest,
+  public AggregationGroupByPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest,
       int maxInitialResultHolderCapacity, int numGroupsLimit) {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _functionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest, indexSegment.getSegmentMetadata());
+    _functionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest);
     _groupBy = brokerRequest.getGroupBy();
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
