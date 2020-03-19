@@ -43,17 +43,18 @@ public class PinotFSBenchmarkDriver {
 
   private static final int DEFAULT_NUM_SEGMENTS_FOR_LIST_TEST = 1000;
   private static final int DEFAULT_DATA_SIZE_IN_MB_FOR_COPY_TEST = 1024; // 1GB
-  private static final int DEFAULT_RETRY = 5; // 5
+  private static final int DEFAULT_NUM_OPS = 5; // 5
 
   private String _mode;
   private PinotFS _pinotFS;
   private URI _baseDirectoryUri;
   private File _localTempDir;
   private int _numSegmentsForListFilesTest;
+  private int _numOps;
   private int _dataSizeInMBsForCopyTest;
 
   public PinotFSBenchmarkDriver(String mode, String configFilePath, String baseDirectoryUri, String localTempDir,
-      Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest) throws ConfigurationException {
+      Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest, Integer numOps) throws ConfigurationException {
     Configuration configuration = new PropertiesConfiguration(new File(configFilePath));
     PinotFSFactory.init(configuration);
     _mode = mode;
@@ -63,12 +64,13 @@ public class PinotFSBenchmarkDriver {
         (localTempDir != null) ? new File(localTempDir) : new File(FileUtils.getTempDirectory(), "benchmark");
     _numSegmentsForListFilesTest =
         (numSegmentsForListFilesTest != null) ? numSegmentsForListFilesTest : DEFAULT_NUM_SEGMENTS_FOR_LIST_TEST;
+    _numOps = (numOps != null) ? numOps : DEFAULT_NUM_OPS;
     _dataSizeInMBsForCopyTest =
         (dataSizeInMBsForCopyTest != null) ? dataSizeInMBsForCopyTest : DEFAULT_DATA_SIZE_IN_MB_FOR_COPY_TEST;
     LOGGER.info("PinotFS has been initialized sucessfully. (mode = {}, pinotFSClass = {}, configFile = {}, "
             + "baseDirectoryUri = {}, localTempDir = {}, numSegmentsForListFilesTest = {}, "
-            + "dataSizeInMBsForCopyTest = {})", _mode, _pinotFS.getClass().getSimpleName(), configFilePath,
-        baseDirectoryUri, _localTempDir, _numSegmentsForListFilesTest, _dataSizeInMBsForCopyTest);
+            + "dataSizeInMBsForCopyTest = {}, numOps = {})", _mode, _pinotFS.getClass().getSimpleName(), configFilePath,
+        baseDirectoryUri, _localTempDir, _numSegmentsForListFilesTest, _dataSizeInMBsForCopyTest, _numOps);
   }
 
   public void run() throws Exception {
@@ -110,7 +112,8 @@ public class PinotFSBenchmarkDriver {
   private void cleanUpBenchmark() throws IOException {
     _pinotFS.delete(_baseDirectoryUri, true);
     FileUtils.deleteQuietly(_localTempDir);
-    LOGGER.info("Working directories have been cleaned up successfully.");
+    LOGGER.info("Working directories have been cleaned up successfully. (baseDirectoryUri={}, localTempDir={})",
+        _baseDirectoryUri, _localTempDir);
   }
 
   private void testListFilesInMultipleDirectories() throws Exception {
@@ -120,9 +123,8 @@ public class PinotFSBenchmarkDriver {
     _pinotFS.mkdir(listTestUri);
     LOGGER.info("Created {} for list test...", listTestUri);
 
-    int numDirectories = 5;
     int numSegments = 1;
-    for (int i = 0; i < numDirectories; i++) {
+    for (int i = 0; i < 5; i++) {
       String directoryPath = "directory_" + i;
       File tmpDirectory = new File(_localTempDir.getPath(), directoryPath);
       URI directoryUri = combinePath(listTestUri, directoryPath);
@@ -141,8 +143,8 @@ public class PinotFSBenchmarkDriver {
 
     // reset numSegments
     numSegments = 1;
-    for (int i = 0; i < numDirectories; i++) {
-      for (int j = 0; j < DEFAULT_RETRY; j++) {
+    for (int i = 0; i < 5; i++) {
+      for (int j = 0; j < _numOps; j++) {
         URI directoryUri = combinePath(listTestUri, "directory_" + i);
         long listFilesStart = System.currentTimeMillis();
         String[] lists = _pinotFS.listFiles(directoryUri, true);
@@ -151,13 +153,12 @@ public class PinotFSBenchmarkDriver {
         Preconditions.checkState(lists.length == numSegments);
       }
       numSegments *= 10;
-      LOGGER.info("");
     }
   }
 
   private void testListFiles() throws Exception {
     LOGGER.info("========= List Files ==========");
-    long prepareTime = System.currentTimeMillis();
+    long testStartTime = System.currentTimeMillis();
     URI listTestUri = combinePath(_baseDirectoryUri, "listTest");
     _pinotFS.mkdir(listTestUri);
     LOGGER.info("Created {} for list test...", listTestUri);
@@ -169,9 +170,9 @@ public class PinotFSBenchmarkDriver {
       _pinotFS.copyFromLocalFile(tmpFile, combinePath(listTestUri, relativePath));
     }
     LOGGER.info("Took {} ms to create {} segments.",
-        System.currentTimeMillis() - prepareTime, _numSegmentsForListFilesTest);
+        System.currentTimeMillis() - testStartTime, _numSegmentsForListFilesTest);
 
-    for (int i = 0; i < DEFAULT_RETRY; i++) {
+    for (int i = 0; i < _numOps; i++) {
       long listFilesStart = System.currentTimeMillis();
       String[] lists = _pinotFS.listFiles(listTestUri, true);
       LOGGER.info("{}: took {} ms to listFiles.", i, System.currentTimeMillis() - listFilesStart);
@@ -187,7 +188,7 @@ public class PinotFSBenchmarkDriver {
 
     long fileSizeInBytes = _dataSizeInMBsForCopyTest * 1024 * 1024;
     File largeTmpFile = createFileWithSize("largeFile", fileSizeInBytes);
-    for (int i = 0; i < DEFAULT_RETRY; i++) {
+    for (int i = 0; i < _numOps; i++) {
       URI largeFileDstUri = combinePath(copyTestUri, largeTmpFile.getName() + "_" + i);
       long copyStart = System.currentTimeMillis();
       _pinotFS.copyFromLocalFile(largeTmpFile, largeFileDstUri);
@@ -195,8 +196,7 @@ public class PinotFSBenchmarkDriver {
           _dataSizeInMBsForCopyTest);
     }
 
-    LOGGER.info("");
-    for (int i = 0; i < DEFAULT_RETRY; i++) {
+    for (int i = 0; i < _numOps; i++) {
       URI largeFileSrcUri = combinePath(copyTestUri, largeTmpFile.getName() + "_" + i);
       File localTmpLargeFile = new File(_localTempDir, "largeFile_" + i);
       long copyStart = System.currentTimeMillis();
@@ -205,8 +205,7 @@ public class PinotFSBenchmarkDriver {
           _dataSizeInMBsForCopyTest);
     }
 
-    LOGGER.info("");
-    for (int i = 0; i < DEFAULT_RETRY; i++) {
+    for (int i = 0; i < _numOps; i++) {
       URI largeFileSrcUri = combinePath(copyTestUri, largeTmpFile.getName() + "_" + i);
       URI largeFileDstUri = combinePath(copyTestUri, largeTmpFile.getName() + "_copy_" + i);
 
@@ -216,8 +215,7 @@ public class PinotFSBenchmarkDriver {
           _dataSizeInMBsForCopyTest);
     }
 
-    LOGGER.info("");
-    for (int i = 0; i < DEFAULT_RETRY; i++) {
+    for (int i = 0; i < _numOps; i++) {
       URI largeFileSrcUri = combinePath(copyTestUri, largeTmpFile.getName() + "_copy_" + i);
       URI largeFileDstUri = combinePath(copyTestUri, largeTmpFile.getName() + "_rename_" + i);
 
@@ -227,8 +225,7 @@ public class PinotFSBenchmarkDriver {
           _dataSizeInMBsForCopyTest);
     }
 
-    LOGGER.info("");
-    for (int i = 0; i < DEFAULT_RETRY; i++) {
+    for (int i = 0; i < _numOps; i++) {
       URI largeFileDstUri = combinePath(copyTestUri, largeTmpFile.getName() + "_" + i);
       long deleteStart = System.currentTimeMillis();
       _pinotFS.delete(largeFileDstUri, true);

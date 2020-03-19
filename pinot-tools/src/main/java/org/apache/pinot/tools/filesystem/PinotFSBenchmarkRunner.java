@@ -47,6 +47,9 @@ public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Comma
   @Option(name = "-dataSizeInMBsForCopyTest", required = false, metaVar = "<Integer>", usage = "Data size in MB for copy test. (e.g. 1024 = 1GB)")
   private Integer _dataSizeInMBsForCopyTest;
 
+  @Option(name = "-numOps", required = false, metaVar = "<Integer>", usage = "The number of trials of operations when running a benchmark.")
+  private Integer _numOps;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -55,7 +58,7 @@ public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Comma
     try {
       LOGGER.info("Run filesystem benchmark...");
       PinotFSBenchmarkDriver driver = new PinotFSBenchmarkDriver(_mode, _pinotFSConfigFile, _baseDirectoryUri, _localTempDir,
-          _numSegmentsForListTest, _dataSizeInMBsForCopyTest);
+          _numSegmentsForListTest, _dataSizeInMBsForCopyTest, _numOps);
       driver.run();
     } catch (Exception e) {
       LOGGER.error("Error while running benchmark: ", e);
