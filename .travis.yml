@@ -27,31 +27,35 @@ branches:
 
 jobs:
   include:
-    - name: "Integration Tests - OracleJDK 8"
-      jdk: oraclejdk8
+    - stage: Test
+        - name: "Integration Tests - OracleJDK 8"
+          jdk: oraclejdk8
+          script:
+            - ./.travis_test.sh
+          env:
+            - RUN_INTEGRATION_TESTS=true
+        - name: "Unit Tests - OracleJDK 8"
+          jdk: oraclejdk8
+          script:
+            - ./.travis_test.sh
+          env:
+            - RUN_INTEGRATION_TESTS=false
+        - name: "QuickStart - OracleJDK 8"
+          jdk: oraclejdk8
+          script:
+            - ./.travis_quickstart.sh
+        - name: "QuickStart - OracleJDK 11"
+          jdk: oraclejdk11
+          script:
+            - ./.travis_quickstart.sh
+        - name: "QuickStart - OpenJDK 8"
+          jdk: openjdk8
+          script:
+            - ./.travis_quickstart.sh
+        - name: "QuickStart - OpenJDK 11"
+          jdk: openjdk11
+          script:
+            - ./.travis_quickstart.sh
+    - stage: Deploy
       script:
-        - ./.travis_test.sh
-      env:
-        - RUN_INTEGRATION_TESTS=true
-    - name: "Unit Tests - OracleJDK 8"
-      jdk: oraclejdk8
-      script:
-        - ./.travis_test.sh
-      env:
-        - RUN_INTEGRATION_TESTS=false
-    - name: "QuickStart - OracleJDK 8"
-      jdk: oraclejdk8
-      script:
-        - ./.travis_quickstart.sh
-    - name: "QuickStart - OracleJDK 11"
-      jdk: oraclejdk11
-      script:
-        - ./.travis_quickstart.sh
-    - name: "QuickStart - OpenJDK 8"
-      jdk: openjdk8
-      script:
-        - ./.travis_quickstart.sh
-    - name: "QuickStart - OpenJDK 11"
-      jdk: openjdk11
-      script:
-        - ./.travis_quickstart.sh
+        - mvn clean deploy -s .ci.settings.xml -Drevision=0.2.$TRAVIS_BUILD_NUMBER

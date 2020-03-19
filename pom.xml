@@ -97,6 +97,13 @@
   <!-- Apache project inception year for generating correct NOTICE file for jar bundle. -->
   <inceptionYear>2018</inceptionYear>
 
+  <distributionManagement>
+    <repository>
+      <id>pinot</id>
+      <url>https://dl.bintray.com/linkedin/maven/pinot/;publish=1</url>
+    </repository>
+  </distributionManagement>
+
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
