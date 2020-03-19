@@ -126,8 +126,12 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
         }
       });
     }
+    // TODO: we can track a volatile variable "desiredLimitReached"
+    // which can be set to true before we break out from the if check.
+    // check the volatile variable here and cancel the remaining futures
 
     // Submit operator groups merge job
+    // this is single-threaded merge across all segments.
     Future<IntermediateResultsBlock> mergedBlockFuture =
         _executorService.submit(new TraceCallable<IntermediateResultsBlock>() {
           @Override

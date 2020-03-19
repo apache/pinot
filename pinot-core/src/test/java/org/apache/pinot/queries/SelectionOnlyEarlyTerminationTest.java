@@ -25,6 +25,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -62,7 +63,8 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
       assertNull(brokerResponse.getResultTable());
       assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * NUM_SERVERS);
       assertEquals(brokerResponse.getNumSegmentsMatched(), numThreadsPerServer * NUM_SERVERS);
-      assertEquals(brokerResponse.getNumDocsScanned(), numThreadsPerServer * NUM_SERVERS * limit);
+      long numDocsScanned = brokerResponse.getNumDocsScanned();
+      assertTrue(limit <= numDocsScanned && numDocsScanned <= numThreadsPerServer * NUM_SERVERS * limit);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
       assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
           numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
@@ -73,7 +75,8 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
       assertNotNull(brokerResponse.getResultTable());
       assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * NUM_SERVERS);
       assertEquals(brokerResponse.getNumSegmentsMatched(), numThreadsPerServer * NUM_SERVERS);
-      assertEquals(brokerResponse.getNumDocsScanned(), numThreadsPerServer * NUM_SERVERS * limit);
+      numDocsScanned = brokerResponse.getNumDocsScanned();
+      assertTrue(limit <= numDocsScanned && numDocsScanned <= numThreadsPerServer * NUM_SERVERS * limit);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
       assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
           numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
