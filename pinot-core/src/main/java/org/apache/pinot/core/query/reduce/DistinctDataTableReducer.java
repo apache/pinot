@@ -108,7 +108,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
       if (mergedIntermediateResult == null) {
         mergedIntermediateResult = intermediateResultToMerge;
       } else {
-        _aggregationFunction.merge(mergedIntermediateResult, intermediateResultToMerge);
+        mergedIntermediateResult = _aggregationFunction.merge(mergedIntermediateResult, intermediateResultToMerge);
       }
     }
 

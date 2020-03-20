@@ -44,10 +44,10 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
  * Base class for queries tests.
  */
 public abstract class BaseQueriesTest {
-  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
-  private static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
+  protected static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
+  protected static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
+  protected static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
+  protected static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
 
   protected abstract String getFilter();
 
