@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
@@ -312,8 +313,31 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long routingEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING, routingEndTimeNs - routingStartTimeNs);
 
+    // Set timeout in the requests
+    long timeSpentMs = TimeUnit.NANOSECONDS.toMillis(routingEndTimeNs - compilationStartTimeNs);
+    // Remaining time in milliseconds for the server query execution
+    // NOTE: For hybrid use case, in most cases offline table and real-time table should have the same query timeout
+    //       configured, but if necessary, we also allow different timeout for them.
+    //       If the timeout is not the same for offline table and real-time table, use the max of offline table
+    //       remaining time and realtime table remaining time. Server side will have different remaining time set for
+    //       each table type, and broker should wait for both types to return.
+    long remainingTimeMs = 0;
+    try {
+      if (offlineBrokerRequest != null) {
+        remainingTimeMs = setQueryTimeout(offlineTableName, offlineBrokerRequest.getQueryOptions(), timeSpentMs);
+      }
+      if (realtimeBrokerRequest != null) {
+        remainingTimeMs = Math.max(remainingTimeMs,
+            setQueryTimeout(realtimeTableName, realtimeBrokerRequest.getQueryOptions(), timeSpentMs));
+      }
+    } catch (TimeoutException e) {
+      String errorMessage = e.getMessage();
+      LOGGER.info("{} {}: {}", errorMessage, requestId, query);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS, 1);
+      return new BrokerResponseNative(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
+    }
+
     // Execute the query
-    long remainingTimeMs = _brokerTimeoutMs - TimeUnit.NANOSECONDS.toMillis(routingEndTimeNs - compilationStartTimeNs);
     ServerStats serverStats = new ServerStats();
     BrokerResponse brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
@@ -531,11 +555,47 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (queryOptionsFromBrokerRequest != null) {
       queryOptions.putAll(queryOptionsFromBrokerRequest);
     }
+    // NOTE: Always set query options because we will put 'timeoutMs' later
+    brokerRequest.setQueryOptions(queryOptions);
     if (!queryOptions.isEmpty()) {
-      brokerRequest.setQueryOptions(queryOptions);
       LOGGER
           .debug("Query options are set to: {} for request {}: {}", brokerRequest.getQueryOptions(), requestId, query);
     }
+  }
+
+  /**
+   * Sets the query timeout (remaining time in milliseconds) into the query options, and returns the remaining time in
+   * milliseconds.
+   * <p>For the overall query timeout, use query-level timeout (in the query options) if exists, or use table-level
+   * timeout (in the table config) if exists, or use instance-level timeout (in the broker config).
+   */
+  private long setQueryTimeout(String tableNameWithType, Map<String, String> queryOptions, long timeSpentMs)
+      throws TimeoutException {
+    long queryTimeoutMs;
+    Long queryLevelTimeoutMs = QueryOptions.getTimeoutMs(queryOptions);
+    if (queryLevelTimeoutMs != null) {
+      // Use query-level timeout if exists
+      queryTimeoutMs = queryLevelTimeoutMs;
+    } else {
+      Long tableLevelTimeoutMs = _routingManager.getQueryTimeoutMs(tableNameWithType);
+      if (tableLevelTimeoutMs != null) {
+        // Use table-level timeout if exists
+        queryTimeoutMs = tableLevelTimeoutMs;
+      } else {
+        // Use instance-level timeout
+        queryTimeoutMs = _brokerTimeoutMs;
+      }
+    }
+
+    long remainingTimeMs = queryTimeoutMs - timeSpentMs;
+    if (remainingTimeMs <= 0) {
+      String errorMessage = String
+          .format("Query timed out (time spent: %dms, timeout: %dms) for table: %s before scattering the request",
+              timeSpentMs, queryLevelTimeoutMs, tableNameWithType);
+      throw new TimeoutException(errorMessage);
+    }
+    queryOptions.put(Broker.Request.QueryOptionKey.TIMEOUT_MS, Long.toString(remainingTimeMs));
+    return remainingTimeMs;
   }
 
   /**
