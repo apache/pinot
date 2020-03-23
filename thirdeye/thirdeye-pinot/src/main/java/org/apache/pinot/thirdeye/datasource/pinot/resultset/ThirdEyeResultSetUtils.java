@@ -90,14 +90,10 @@ public class ThirdEyeResultSetUtils {
       dataGranularity = dataTimeSpec.getDataGranularity();
       boolean isISOFormat = false;
       DateTimeFormatter inputDataDateTimeFormatter = null;
-      DateTimeFormatter serverDataDateTimeFormatter = null;
       String timeFormat = dataTimeSpec.getFormat();
       if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
         isISOFormat = true;
         inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dateTimeZone);
-      }
-      if (isISOFormat && (sourceName.equals(MYSQL) || sourceName.equals(H2))) {
-        serverDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(DateTimeZone.getDefault());
       }
 
       List<ThirdEyeResultSet> resultSets = entry.getValue();
@@ -123,11 +119,7 @@ public class ThirdEyeResultSetUtils {
                 if (!isISOFormat) {
                   millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
                 } else {
-                  if (sourceName.equals(MYSQL)) {
-                    millis = DateTime.parse(groupKeyVal, serverDataDateTimeFormatter).getMillis();
-                  } else {
                     millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
-                  }
                 }
                 if (millis < startTime) {
                   LOG.error("Data point earlier than requested start time {}: {}", new Date(startTime), new Date(millis));
