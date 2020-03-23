@@ -93,7 +93,6 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   private static final TimeGranularity DEFAULT_SHOW_GRANULARITY = new TimeGranularity(1, TimeUnit.DAYS);
 
   private static final String ALGORITHM_TYPE = "ALGORITHM";
-  private static final String MIGRATED_ALGORITHM_TYPE = "MIGRATED_ALGORITHM";
   private static final String CONFIGURATION = "configuration";
 
   private final MetricConfigManager metricDAO;
@@ -250,8 +249,6 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
       Map<String, Object> specs = (Map<String, Object>) entry.getValue();
       if (entry.getKey().equals(ALGORITHM_TYPE)) {
         extractTimeGranularitiesFromAlgorithmSpecs(specs, PROP_BUCKET_PERIOD).ifPresent(monitoringGranularities::add);
-      } else if (entry.getKey().equals(MIGRATED_ALGORITHM_TYPE)) {
-        extractTimeGranularitiesFromAlgorithmSpecs(specs, PROP_VARIABLES_BUCKET_PERIOD).ifPresent(monitoringGranularities::add);
       } else if (specs.containsKey(PROP_MONITORING_GRANULARITY)) {
         monitoringGranularities.add(TimeGranularity.fromString(MapUtils.getString(specs, (PROP_MONITORING_GRANULARITY))));
       }
