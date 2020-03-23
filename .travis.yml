@@ -19,6 +19,7 @@ addons:
   firefox: latest
 
 install:
+#  - mvn versions:set -DnewVersion=0.2.0-dev-$TRAVIS_BUILD_NUMBER
   - ./.travis_install.sh
 
 branches:
@@ -27,7 +28,7 @@ branches:
 
 jobs:
   include:
-    - stage: Test
+     - stage: Test
         - name: "Integration Tests - OracleJDK 8"
           jdk: oraclejdk8
           script:
@@ -56,6 +57,6 @@ jobs:
           jdk: openjdk11
           script:
             - ./.travis_quickstart.sh
-    - stage: Deploy
+     - stage: Deploy
       script:
-        - mvn clean deploy -s .ci.settings.xml -Drevision=0.2.$TRAVIS_BUILD_NUMBER
+        - ./.travis_nightly_build.sh

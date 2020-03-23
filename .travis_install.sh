@@ -48,7 +48,7 @@ if [ $noThirdEyeChange -ne 0 ]; then
   echo "No ThirdEye changes"
   if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
     # JDK 11 prints more logs exceeding Travis limits.
-    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true ${KAFKA_BUILD_OPTS} > /tmp/mvn_build_log
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Drevision=-dev-${TRAVIS_BUILD_NUMBER} ${KAFKA_BUILD_OPTS} > /tmp/mvn_build_log
     if [ $? -eq 0 ]; then
       exit 0
     else
@@ -56,7 +56,7 @@ if [ $noThirdEyeChange -ne 0 ]; then
       exit 1
     fi
   else
-    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true ${KAFKA_BUILD_OPTS} || exit $?
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Drevision=-dev-${TRAVIS_BUILD_NUMBER} ${KAFKA_BUILD_OPTS} || exit $?
   fi
 fi
 

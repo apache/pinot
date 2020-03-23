@@ -31,13 +31,14 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.3.0-SNAPSHOT</version>
+  <version>0.3.0${revision}</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
   <url>https://pinot.apache.org/</url>
 
   <modules>
+
     <module>pinot-spi</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
@@ -99,14 +100,15 @@
 
   <distributionManagement>
     <repository>
-      <id>bintray-linkedin-maven</id>
-      <name>linkedin-maven</name>
-      <url>https://api.bintray.com/maven/linkedin/maven/pinot/;publish=1</url>
+      <id>bintray-linkedin-test-repo</id>
+      <name>linkedin-test-repo</name>
+      <url>https://api.bintray.com/maven/linkedin/test-repo/pinot/;publish=1</url>
     </repository>
   </distributionManagement>
 
   <properties>
     <pinot.root>${basedir}</pinot.root>
+    <revision>-SNAPSHOT</revision>
     <build.profile.id>dev</build.profile.id>
     <jdk.version>1.8</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -1489,4 +1491,22 @@
       </plugin>
     </plugins>
   </reporting>
+
+  <repositories>
+    <repository>
+      <id>central</id>
+      <url>http://repo.dev.bloomberg.com/content/groups/public</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+    </repository>
+  </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>central</id>
+      <url>http://repo.dev.bloomberg.com/content/groups/public</url>
+      <releases><enabled>false</enabled></releases>
+    </pluginRepository>
+  </pluginRepositories>
 </project>

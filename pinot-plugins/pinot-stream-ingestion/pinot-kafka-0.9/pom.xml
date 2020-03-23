@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.3.0-SNAPSHOT</version>
+    <version>0.3.0${revision}</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>pinot-kafka-0.9</artifactId>
