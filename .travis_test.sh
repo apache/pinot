@@ -36,7 +36,7 @@ if [ $? -eq 0 ]; then
   fi
 
   cd thirdeye
-  mvn test -B
+  mvn test -B -Drevision="${REVISION}"
   failed=$?
   # Remove Pinot/ThirdEye files from local Maven repository to avoid a useless cache rebuild
   rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
@@ -64,12 +64,12 @@ fi
 
 # Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != 'false' ]; then
-  mvn test -B -P travis,travis-integration-tests-only ${KAFKA_BUILD_OPTS}
+  mvn test -B -Drevision="${REVISION}" -P travis,travis-integration-tests-only ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi
 else
-  mvn test -B -P travis,travis-no-integration-tests ${KAFKA_BUILD_OPTS}
+  mvn test -B -Drevision="${REVISION}" -P travis,travis-no-integration-tests ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi

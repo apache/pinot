@@ -21,9 +21,9 @@ addons:
 install:
   - ./.travis_install.sh
 
-branches:
-  only:
-    - master
+#branches:
+#  only:
+#    - master
 
 jobs:
   include:

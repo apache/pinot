@@ -22,4 +22,9 @@
 # mvn versions:set -DnewVersion=0.2.0-dev-$TRAVIS_BUILD_NUMBER
 
 # deploy the release to bintray
-mvn clean deploy -s .ci.settings.xml
+#if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
+#  echo "Deploying to bintray"
+#  mvn clean deploy -s .ci.settings.xml -Drevision="${REVISION}"
+#fi
+echo "Deploying to bintray"
+mvn clean deploy -s .ci.settings.xml -Drevision="${REVISION}"
