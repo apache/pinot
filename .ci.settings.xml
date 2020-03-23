@@ -24,8 +24,8 @@
   <servers>
     <server>
       <id>bintray-linkedin-test-repo</id>
-      <username>${env.MVN_DEPLOY_USER}</username>
-      <password>${env.MVN_DEPLOY_KEY}</password>
+      <username>${env.MVN_DEPLOY_BINTRAY_USER}</username>
+      <password>${env.MVN_DEPLOY_BINTRAY_KEY}</password>
     </server>
   </servers>
 </settings>
