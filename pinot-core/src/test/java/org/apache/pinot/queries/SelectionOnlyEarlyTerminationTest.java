@@ -25,6 +25,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -61,8 +62,13 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
       assertNotNull(brokerResponse.getSelectionResults());
       assertNull(brokerResponse.getResultTable());
       assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * NUM_SERVERS);
-      assertEquals(brokerResponse.getNumSegmentsMatched(), numThreadsPerServer * NUM_SERVERS);
-      assertEquals(brokerResponse.getNumDocsScanned(), numThreadsPerServer * NUM_SERVERS * limit);
+      // NOTE: 'numSegmentsMatched' and 'numDocsScanned' could be in a range because when the CombineOperator second
+      //       phase merge early terminates, the operators might not finish scanning the documents
+      long numSegmentsMatched = brokerResponse.getNumSegmentsMatched();
+      assertTrue(numSegmentsMatched >= NUM_SERVERS && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS);
+      long numDocsScanned = brokerResponse.getNumDocsScanned();
+      assertTrue(
+          numDocsScanned >= NUM_SERVERS * limit && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS * limit);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
       assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
           numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
@@ -72,8 +78,13 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
       assertNull(brokerResponse.getSelectionResults());
       assertNotNull(brokerResponse.getResultTable());
       assertEquals(brokerResponse.getNumSegmentsProcessed(), numSegmentsPerServer * NUM_SERVERS);
-      assertEquals(brokerResponse.getNumSegmentsMatched(), numThreadsPerServer * NUM_SERVERS);
-      assertEquals(brokerResponse.getNumDocsScanned(), numThreadsPerServer * NUM_SERVERS * limit);
+      // NOTE: 'numSegmentsMatched' and 'numDocsScanned' could be in a range because when the CombineOperator second
+      //       phase merge early terminates, the operators might not finish scanning the documents
+      numSegmentsMatched = brokerResponse.getNumSegmentsMatched();
+      assertTrue(numSegmentsMatched >= NUM_SERVERS && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS);
+      numDocsScanned = brokerResponse.getNumDocsScanned();
+      assertTrue(
+          numDocsScanned >= NUM_SERVERS * limit && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS * limit);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
       assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
           numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
