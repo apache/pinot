@@ -68,7 +68,7 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
       assertTrue(numSegmentsMatched >= NUM_SERVERS && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS);
       long numDocsScanned = brokerResponse.getNumDocsScanned();
       assertTrue(
-          numDocsScanned >= NUM_SERVERS * limit && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS * limit);
+          numDocsScanned >= NUM_SERVERS * limit && numDocsScanned <= numThreadsPerServer * NUM_SERVERS * limit);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
       assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
           numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
@@ -84,7 +84,7 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
       assertTrue(numSegmentsMatched >= NUM_SERVERS && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS);
       numDocsScanned = brokerResponse.getNumDocsScanned();
       assertTrue(
-          numDocsScanned >= NUM_SERVERS * limit && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS * limit);
+          numDocsScanned >= NUM_SERVERS * limit && numDocsScanned <= numThreadsPerServer * NUM_SERVERS * limit);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
       assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
           numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
