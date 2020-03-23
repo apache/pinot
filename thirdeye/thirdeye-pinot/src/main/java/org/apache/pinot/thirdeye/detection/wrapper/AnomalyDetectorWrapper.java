@@ -165,8 +165,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       }
     }
 
-    List<Interval> monitoringWindows =
-        this.getMonitoringWindows().stream().filter(i -> i.getEndMillis() <= this.endTime).collect(Collectors.toList());
+    List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     TimeSeries predictedResult = TimeSeries.empty();
     int totalWindows = monitoringWindows.size();
@@ -285,9 +284,11 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         Period windowSizePeriod = DetectionUtils.periodFromTimeUnit(windowSize, windowUnit);
         List<Interval> monitoringWindows = new ArrayList<>();
         List<DateTime> monitoringWindowEndTimes = getMonitoringWindowEndTimes();
+        DateTime detectionEndTime = new DateTime(endTime, dateTimeZone).minus(windowDelayPeriod);
         for (DateTime monitoringEndTime : monitoringWindowEndTimes) {
           DateTime endTime = monitoringEndTime.minus(windowDelayPeriod);
           DateTime startTime = endTime.minus(windowSizePeriod);
+          endTime =  endTime.isAfter(detectionEndTime) ? detectionEndTime : endTime;
           monitoringWindows.add(new Interval(startTime, endTime));
         }
         for (Interval window : monitoringWindows){
