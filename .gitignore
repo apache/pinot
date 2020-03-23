@@ -22,3 +22,5 @@ docs/_build
 **/.docker/
 **/.env
 kubernetes/examples/helm/charts/
+**/node_modules
+
