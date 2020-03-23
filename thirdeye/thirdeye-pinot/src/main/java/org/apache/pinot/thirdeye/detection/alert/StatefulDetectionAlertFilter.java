@@ -47,18 +47,22 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
   public static final String PROP_BCC = "bcc";
   public static final String PROP_RECIPIENTS = "recipients";
 
+  private static final String PROP_SEND_ONCE = "sendOnce";
+  private final boolean sendOnce;
+
   public StatefulDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
+    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
   public DetectionAlertFilterResult run() throws Exception {
-    return this.run(this.config.getVectorClocks(), this.getAnomalyMinId());
+    return this.run(this.config.getVectorClocks());
   }
 
-  protected abstract DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark);
+  protected abstract DetectionAlertFilterResult run(Map<Long, Long> vectorClocks);
 
-  protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks, final long minId) {
+  protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks) {
     // retrieve all candidate anomalies
     Set<MergedAnomalyResultDTO> allAnomalies = new HashSet<>();
     for (Long detectionId : vectorClocks.keySet()) {
@@ -79,7 +83,6 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
               return mergedAnomalyResultDTO != null
                   && !mergedAnomalyResultDTO.isChild()
                   && !AlertUtils.hasFeedback(mergedAnomalyResultDTO)
-                  && (mergedAnomalyResultDTO.getId() == null || mergedAnomalyResultDTO.getId() >= minId)
                   && mergedAnomalyResultDTO.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
             }
           });
@@ -97,13 +100,6 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     }
 
     return clocks;
-  }
-
-  private long getAnomalyMinId() {
-    if (this.config.getHighWaterMark() != null) {
-      return this.config.getHighWaterMark();
-    }
-    return 0;
   }
 
   protected Set<String> cleanupRecipients(Set<String> recipient) {
