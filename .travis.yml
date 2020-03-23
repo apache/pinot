@@ -19,7 +19,6 @@ addons:
   firefox: latest
 
 install:
-#  - mvn versions:set -DnewVersion=0.2.0-dev-$TRAVIS_BUILD_NUMBER
   - ./.travis_install.sh
 
 branches:
@@ -28,35 +27,36 @@ branches:
 
 jobs:
   include:
-     - stage: Test
-        - name: "Integration Tests - OracleJDK 8"
-          jdk: oraclejdk8
-          script:
-            - ./.travis_test.sh
-          env:
-            - RUN_INTEGRATION_TESTS=true
-        - name: "Unit Tests - OracleJDK 8"
-          jdk: oraclejdk8
-          script:
-            - ./.travis_test.sh
-          env:
-            - RUN_INTEGRATION_TESTS=false
-        - name: "QuickStart - OracleJDK 8"
-          jdk: oraclejdk8
-          script:
-            - ./.travis_quickstart.sh
-        - name: "QuickStart - OracleJDK 11"
-          jdk: oraclejdk11
-          script:
-            - ./.travis_quickstart.sh
-        - name: "QuickStart - OpenJDK 8"
-          jdk: openjdk8
-          script:
-            - ./.travis_quickstart.sh
-        - name: "QuickStart - OpenJDK 11"
-          jdk: openjdk11
-          script:
-            - ./.travis_quickstart.sh
-     - stage: Deploy
+    - name: "Integration Tests - OracleJDK 8"
+      jdk: oraclejdk8
       script:
-        - ./.travis_nightly_build.sh
+        - ./.travis_test.sh
+      env:
+        - RUN_INTEGRATION_TESTS=true
+    - name: "Unit Tests - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_test.sh
+      env:
+        - RUN_INTEGRATION_TESTS=false
+    - name: "QuickStart - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OracleJDK 11"
+      jdk: oraclejdk11
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OpenJDK 8"
+      jdk: openjdk8
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OpenJDK 11"
+      jdk: openjdk11
+      script:
+        - ./.travis_quickstart.sh
+
+deploy:
+  provider: script
+  script:
+    ./.travis_nightly_build.sh
