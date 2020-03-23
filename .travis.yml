@@ -1,55 +1,71 @@
 language: java
 sudo: false
 dist: trusty
+
 before_install:
-- mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64
-  && chmod +x ~/bin/jq
-- export PATH=$PATH:~/bin
-- jq --version
+  - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
+  - export PATH=$PATH:~/bin
+  - jq --version
+
 jdk:
-- oraclejdk8
+  - oraclejdk8
+
 cache:
   directories:
-  - "$HOME/.m2"
+    - $HOME/.m2
   yarn: true
+
 addons:
   firefox: latest
+
 install:
-- "./.travis_install.sh"
+  - ./.travis_install.sh
+
+#branches:
+#  only:
+#    - master
+
+stages:
+  - test
+  - name: deploy
+    if: branch = master
+
 jobs:
   include:
-  - name: Integration Tests - OracleJDK 8
-    jdk: oraclejdk8
-    script:
-    - "./.travis_test.sh"
-    env:
-    - RUN_INTEGRATION_TESTS=true
-  - name: Unit Tests - OracleJDK 8
-    jdk: oraclejdk8
-    script:
-    - "./.travis_test.sh"
-    env:
-    - RUN_INTEGRATION_TESTS=false
-  - name: QuickStart - OracleJDK 8
-    jdk: oraclejdk8
-    script:
-    - "./.travis_quickstart.sh"
-  - name: QuickStart - OracleJDK 11
-    jdk: oraclejdk11
-    script:
-    - "./.travis_quickstart.sh"
-  - name: QuickStart - OpenJDK 8
-    jdk: openjdk8
-    script:
-    - "./.travis_quickstart.sh"
-  - name: QuickStart - OpenJDK 11
-    jdk: openjdk11
-    script:
-    - "./.travis_quickstart.sh"
-deploy:
-  skip_cleanup: true
-  provider: script
-  script: "./.travis_nightly_build.sh"
+    - name: "Integration Tests - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_test.sh
+      env:
+        - RUN_INTEGRATION_TESTS=true
+    - name: "Unit Tests - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_test.sh
+      env:
+        - RUN_INTEGRATION_TESTS=false
+    - name: "QuickStart - OracleJDK 8"
+      jdk: oraclejdk8
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OracleJDK 11"
+      jdk: oraclejdk11
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OpenJDK 8"
+      jdk: openjdk8
+      script:
+        - ./.travis_quickstart.sh
+    - name: "QuickStart - OpenJDK 11"
+      jdk: openjdk11
+      script:
+        - ./.travis_quickstart.sh
+    - stage: deploy
+      deploy:
+        skip_cleanup: true
+        provider: script
+        script: "./.travis_nightly_build.sh"
+
 env:
   global:
     - secure: KB5/5jykJdDlwKKgA+b1SwwgjlNKFaBGTi7io5tpOPVypcbu8xyN00Xb4QIfC5RepdmUceV5buWLEs7CBIxeE+TBUcyjTvInk2+f1qsHZPZtEjq/6hvXae8u56S8HhofAl8XDQbd3ybwKFpdFoVosboVJueUXNEQORkdRwQcOKSiCpuQSlewSXfy/3CmSTUyPW6nuLtcR+8RuvrgAQBTjx5gKdxdP76vO4mcBl3J9Ay8ZYBCKP1AfaPrkbHRs0w7kPWNR5GHgjeQZOb30qcFqF78GPo9Uy4bENhhwj+i2f62czxNUWkNUZM+4t3st9/5JoOhkxqzGX57NJF2xwi7e7VIv6AbkYpYB2TLJybz9sU7ITU4+rupEh9BISjLlbhjZBA8oUmkbGzsOIXz6dWxNjuGIYcMy5JqjXY96ndW7is9bstXQ4T4tDaPMtq/guXyxsGDYTlwYlrWe3ahPm0R/XDRQ5ZY+Nc2suItMBJFJ0CeL4X9obCyZPaPZfDSdyVd35Punyo9e/01CaVj9I8BRhCFZNGHIgt4zT//Sh99jsg3a1VTvLokOHCW+OBF0C+bfws2+96+oM0A+L6fy3ZPiKYe3Vb68er0xpHSWgwm+YABssYpSZ3A9i9PeUpyzH0JzAgI1+6E1CTawKYH81IvIr0EVNmaJvpwf39mPYUvoak=
