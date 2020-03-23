@@ -46,8 +46,9 @@
     }
   }
   &__dimension-content {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: inline-block;
+    overflow: auto !important;
+    text-overflow: initial !important;
     max-width: 164px;
   }
   &__dimension-content--first {

@@ -8,7 +8,7 @@
 <div class="rootcause-dimensions-table__dimension-content {{if column.isFirstColumn "rootcause-dimensions-table__dimension-content--first"}}" title="{{dimensionValue}}">
   {{#if isValueShown}}
     {{#if excludedDimensions}}
-      <a class="te-anomaly-table__link" href="#">
+      <a class="te-anomaly-table__link">
         {{dimensionValue}}
         {{#tooltip-on-element}}
           OTHER includes => {{excludedDimensions}}

@@ -17,9 +17,8 @@ export default Component.extend({
 
   init() {
     this._super(...arguments);
-    if (toWidthNumber(this.record.contributionChange) < 0) {
+    if (toWidthNumber(this.record.percentageChange) < 0) {
       set(this, 'isNegativeChange', true);
     }
   }
 });
-
