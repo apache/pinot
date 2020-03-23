@@ -284,19 +284,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         Period windowSizePeriod = DetectionUtils.periodFromTimeUnit(windowSize, windowUnit);
         List<Interval> monitoringWindows = new ArrayList<>();
         List<DateTime> monitoringWindowEndTimes = getMonitoringWindowEndTimes();
+        DateTime detectionEndTime = new DateTime(endTime, dateTimeZone).minus(windowDelayPeriod);
         for (DateTime monitoringEndTime : monitoringWindowEndTimes) {
           DateTime endTime = monitoringEndTime.minus(windowDelayPeriod);
           DateTime startTime = endTime.minus(windowSizePeriod);
+          endTime =  endTime.isAfter(detectionEndTime) ? detectionEndTime : endTime;
           monitoringWindows.add(new Interval(startTime, endTime));
-        }
-        Interval latestWindow = monitoringWindows.get(monitoringWindows.size() - 1);
-        if (latestWindow.getEndMillis() > endTime) {
-          /* Note: This can happen when the bucketPeriod (windowStep) is greater than the granularity of the metrics.
-           * For example, when we run detection for multiple days on minute-level metrics, we set window step to one day,
-           * in order to speed up the detection.
-           */
-          monitoringWindows.remove(monitoringWindows.size() - 1);
-          monitoringWindows.add(latestWindow.withEndMillis(endTime));
         }
         for (Interval window : monitoringWindows){
           LOG.info("Will run detection in window {}", window);
