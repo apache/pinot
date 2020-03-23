@@ -40,6 +40,8 @@
 
   <modules>
     <module>pinot-avro</module>
+    <module>pinot-avro-base</module>
+    <module>pinot-confluent-avro</module>
     <module>pinot-orc</module>
     <module>pinot-json</module>
     <module>pinot-parquet</module>
