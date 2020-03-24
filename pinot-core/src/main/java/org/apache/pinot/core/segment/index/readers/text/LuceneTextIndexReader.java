@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.segment.index.readers.text;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
@@ -32,6 +34,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -51,6 +54,9 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
   private final IndexSearcher _indexSearcher;
   private final QueryParser _queryParser;
   private final String _column;
+  private final DocIdTranslator _docIdTranslator;
+
+  public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
 
   /**
    * As part of loading the segment in ImmutableSegmentLoader,
@@ -58,18 +64,22 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
    * the reference in {@link org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer}
    * similar to how it is done for other types of indexes.
    * @param column column name
-   * @param segmentIndexDir segment index directory
+   * @param indexDir segment index directory
+   * @param numDocs number of documents in the segment
    */
-  public LuceneTextIndexReader(String column, File segmentIndexDir) {
+  public LuceneTextIndexReader(String column, File indexDir, int numDocs) {
     _column = column;
     try {
-      File indexFile = getTextIndexFile(segmentIndexDir);
+      File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
       // Disable Lucene query result cache. While it helps a lot with performance for
       // repeated queries, on the downside it cause heap issues.
       _indexSearcher.setQueryCache(null);
+      // TODO: consider using a threshold of num docs per segment to decide between building
+      // mapping file upfront on segment load v/s on-the-fly during query processing
+      _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
     } catch (Exception e) {
       LOGGER
           .error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());
@@ -123,9 +133,8 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
       _indexSearcher.search(query, docIDCollector);
       return getPinotDocIds(docIDs);
     } catch (Exception e) {
-      LOGGER.error("Failed while searching the text index for column {}, search query {}, exception {}", _column,
-          searchQuery, e.getMessage());
-      throw new RuntimeException(e);
+      String msg = "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
+      throw new RuntimeException(msg, e);
     }
   }
 
@@ -145,15 +154,10 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
   private MutableRoaringBitmap getPinotDocIds(MutableRoaringBitmap luceneDocIds) {
     IntIterator luceneDocIDIterator = luceneDocIds.getIntIterator();
     MutableRoaringBitmap actualDocIDs = new MutableRoaringBitmap();
-    try {
-      while (luceneDocIDIterator.hasNext()) {
-        int luceneDocId = luceneDocIDIterator.next();
-        Document document = _indexSearcher.doc(luceneDocId);
-        int pinotDocId = Integer.valueOf(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
-        actualDocIDs.add(pinotDocId);
-      }
-    } catch (Exception e) {
-      throw new RuntimeException("Error: failed while retrieving document from index: " + e);
+    while (luceneDocIDIterator.hasNext()) {
+      int luceneDocId = luceneDocIDIterator.next();
+      int pinotDocId = _docIdTranslator.getPinotDocId(luceneDocId);
+      actualDocIDs.add(pinotDocId);
     }
     return actualDocIDs;
   }
@@ -169,5 +173,50 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
       throws IOException {
     _indexReader.close();
     _indexDirectory.close();
+    _docIdTranslator.close();
+  }
+
+  private static class DocIdTranslator implements Closeable {
+    final PinotDataBuffer _buffer;
+
+    DocIdTranslator(File segmentIndexDir, String column, int numDocs, IndexSearcher indexSearcher)
+        throws Exception {
+      int length = Integer.BYTES * numDocs;
+      File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
+          column + LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+      // The mapping is local to a segment. It is created on the server during segment load.
+      // Unless we are running Pinot on Solaris/SPARC, the underlying architecture is
+      // LITTLE_ENDIAN (Linux/x86). So use that as byte order.
+      String desc = "Text index docId mapping buffer: " + column;
+      if (docIdMappingFile.exists()) {
+        // we will be here for segment reload and server restart
+        // for refresh, we will not be here since segment is deleted/replaced
+        // TODO: see if we can prefetch the pages
+        _buffer =
+            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ true, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
+      } else {
+        _buffer =
+            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
+        for (int i = 0; i < numDocs; i++) {
+          try {
+            Document document = indexSearcher.doc(i);
+            int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+            _buffer.putInt(i * Integer.BYTES, pinotDocId);
+          } catch (Exception e) {
+            throw new RuntimeException("Caught exception while building doc id mapping for text index column: " + column, e);
+          }
+        }
+      }
+    }
+
+    int getPinotDocId(int luceneDocId) {
+      return _buffer.getInt(luceneDocId * Integer.BYTES);
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      _buffer.close();
+    }
   }
 }
