@@ -3,71 +3,86 @@
   "dimensionFieldSpecs": [
     {
       "name": "title",
-      "dataType": "STRING"
+      "dataType": "STRING",
+      "defaultNullValue": ""
     },
     {
       "name": "labels",
       "dataType": "STRING",
-      "singleValueField": false
+      "singleValueField": false,
+      "defaultNullValue": ""
     },
     {
       "name": "userId",
-      "dataType": "STRING"
+      "dataType": "STRING",
+      "defaultNullValue": ""
     },
     {
       "name": "userType",
-      "dataType": "STRING"
+      "dataType": "STRING",
+      "defaultNullValue": ""
     },
     {
       "name": "authorAssociation",
-      "dataType": "STRING"
+      "dataType": "STRING",
+      "defaultNullValue": ""
     },
     {
       "name": "mergedBy",
-      "dataType": "STRING"
+      "dataType": "STRING",
+      "defaultNullValue": ""
     },
     {
       "name": "assignees",
       "dataType": "STRING",
-      "singleValueField": false
+      "singleValueField": false,
+      "defaultNullValue": ""
     },
     {
       "name": "authors",
       "dataType": "STRING",
-      "singleValueField": false
+      "singleValueField": false,
+      "defaultNullValue": ""
     },
     {
       "name": "committers",
       "dataType": "STRING",
-      "singleValueField": false
+      "singleValueField": false,
+      "defaultNullValue": ""
     },
     {
       "name": "requestedReviewers",
       "dataType": "STRING",
-      "singleValueField": false
+      "singleValueField": false,
+      "defaultNullValue": ""
     },
     {
       "name": "requestedTeams",
       "dataType": "STRING",
-      "singleValueField": false
+      "singleValueField": false,
+      "defaultNullValue": ""
     },
     {
       "name": "reviewers",
       "dataType": "STRING",
-      "singleValueField": false
+      "singleValueField": false,
+      "defaultNullValue": ""
     },
     {
       "name": "commenters",
       "dataType": "STRING",
-      "singleValueField": false
+      "singleValueField": false,
+      "defaultNullValue": ""
     },
     {
       "name": "repo",
-      "dataType": "STRING"
+      "dataType": "STRING",
+      "defaultNullValue": ""
     },
     {
       "name": "organization",
-      "dataType": "STRING"
+      "dataType": "STRING",
+      "defaultNullValue": ""
     }
   ],
   "metricFieldSpecs": [
