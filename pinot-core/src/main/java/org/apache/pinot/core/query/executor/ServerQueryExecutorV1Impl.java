@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
@@ -50,6 +49,7 @@ import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +64,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
   private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
-  private final Map<String, Long> _tableTimeoutMs = new ConcurrentHashMap<>();
   private ServerMetrics _serverMetrics;
 
   @Override
@@ -108,8 +107,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long requestId = queryRequest.getRequestId();
     BrokerRequest brokerRequest = queryRequest.getBrokerRequest();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
-    String tableNameWithType = queryRequest.getTableNameWithType();
-    long queryTimeoutMs = _tableTimeoutMs.getOrDefault(tableNameWithType, _defaultTimeOutMs);
+    // Use the timeout passed from the request if exists, or the instance-level timeout
+    long queryTimeoutMs = _defaultTimeOutMs;
+    Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+    if (queryOptions != null) {
+      Long timeoutFromQueryOptions = QueryOptions.getTimeoutMs(queryOptions);
+      if (timeoutFromQueryOptions != null) {
+        queryTimeoutMs = timeoutFromQueryOptions;
+      }
+    }
     long remainingTimeMs = queryTimeoutMs - querySchedulingTimeMs;
 
     // Query scheduler wait time already exceeds query timeout, directly return
@@ -124,6 +130,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return dataTable;
     }
 
+    String tableNameWithType = queryRequest.getTableNameWithType();
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
 
@@ -282,10 +289,5 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     return numTotalDocs;
-  }
-
-  @Override
-  public void setTableTimeoutMs(String tableNameWithType, long timeOutMs) {
-    _tableTimeoutMs.put(tableNameWithType, timeOutMs);
   }
 }

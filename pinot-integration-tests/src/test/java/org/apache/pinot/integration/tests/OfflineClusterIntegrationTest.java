@@ -34,14 +34,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.config.QueryConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -58,6 +60,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_SEGMENTS = 12;
+
+  // For table config refresh test, make an expensive query to ensure the query won't finish in 5ms
+  private static final String TEST_TIMEOUT_QUERY =
+      "SELECT DISTINCTCOUNT(AirlineID) FROM mytable GROUP BY Carrier TOP 10000";
 
   // For inverted index triggering test
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
@@ -183,6 +189,59 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // Should get response code 400 (BAD_REQUEST)
       assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
+  }
+
+  @Test
+  public void testRefreshTableConfigAndQueryTimeout()
+      throws Exception {
+    TableConfig tableConfig = _helixResourceManager.getOfflineTableConfig(getTableName());
+    assertNotNull(tableConfig);
+
+    // Set timeout as 5ms so that query will timeout
+    tableConfig.setQueryConfig(new QueryConfig(5L));
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Wait for at most 1 minute for broker to receive and process the table config refresh message
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
+        JsonNode exceptions = queryResponse.get("exceptions");
+        if (exceptions.size() != 0) {
+          // Timed out on broker side
+          return exceptions.get(0).get("errorCode").asInt() == QueryException.BROKER_TIMEOUT_ERROR_CODE;
+        } else {
+          // Timed out on server side
+          int numServersQueried = queryResponse.get("numServersQueried").asInt();
+          int numServersResponded = queryResponse.get("numServersResponded").asInt();
+          int numDocsScanned = queryResponse.get("numDocsScanned").asInt();
+          return numServersQueried == getNumServers() && numServersResponded == 0 && numDocsScanned == 0;
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to refresh table config");
+
+    // Remove timeout so that query will finish
+    tableConfig.setQueryConfig(null);
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Wait for at most 1 minute for broker to receive and process the table config refresh message
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
+        JsonNode exceptions = queryResponse.get("exceptions");
+        if (exceptions.size() != 0) {
+          return false;
+        }
+        int numServersQueried = queryResponse.get("numServersQueried").asInt();
+        int numServersResponded = queryResponse.get("numServersResponded").asInt();
+        int numDocsScanned = queryResponse.get("numDocsScanned").asInt();
+        return numServersQueried == getNumServers() && numServersResponded == getNumServers()
+            && numDocsScanned == getCountStarResult();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to refresh table config");
   }
 
   @Test

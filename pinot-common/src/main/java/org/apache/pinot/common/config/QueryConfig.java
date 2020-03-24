@@ -20,6 +20,7 @@ package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 
 
@@ -37,6 +38,9 @@ public class QueryConfig extends BaseJsonConfig {
 
   @JsonCreator
   public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs) {
+    if (timeoutMs != null) {
+      Preconditions.checkArgument(timeoutMs > 0, "Invalid timeoutMs: %s", timeoutMs);
+    }
     _timeoutMs = timeoutMs;
   }
 

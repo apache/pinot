@@ -25,8 +25,8 @@ import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
-import org.apache.pinot.common.messages.QueryQuotaUpdateMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
+import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,12 +56,14 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     switch (msgSubType) {
       case SegmentRefreshMessage.REFRESH_SEGMENT_MSG_SUB_TYPE:
         return new RefreshSegmentMessageHandler(new SegmentRefreshMessage(message), context);
-      case QueryQuotaUpdateMessage.UPDATE_QUERY_QUOTA_MSG_SUB_TYPE:
-        return new QueryQuotaUpdateMessageHandler(new QueryQuotaUpdateMessage(message), context);
+      case TableConfigRefreshMessage.REFRESH_TABLE_CONFIG_MSG_SUB_TYPE:
+        return new RefreshTableConfigMessageHandler(new TableConfigRefreshMessage(message), context);
       default:
-        LOGGER.warn("Unsupported user defined message sub type: {} for table: {}", msgSubType,
-            message.getPartitionName());
-        return new DefaultMessageHandler(message, context);
+        // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
+        //       a new message sub-type is added, and the sender gets deployed first while receiver is still running the
+        //       old version.
+        LOGGER.warn("Received message with unsupported sub-type: {}, using no-op message handler", msgSubType);
+        return new NoOpMessageHandler(message, context);
     }
   }
 
@@ -74,10 +76,11 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
   public void reset() {
   }
 
-  private class RefreshSegmentMessageHandler extends DefaultMessageHandler {
-    private final String _segmentName;
+  private class RefreshSegmentMessageHandler extends MessageHandler {
+    final String _tableNameWithType;
+    final String _segmentName;
 
-    public RefreshSegmentMessageHandler(SegmentRefreshMessage segmentRefreshMessage, NotificationContext context) {
+    RefreshSegmentMessageHandler(SegmentRefreshMessage segmentRefreshMessage, NotificationContext context) {
       super(segmentRefreshMessage, context);
       _tableNameWithType = segmentRefreshMessage.getTableNameWithType();
       _segmentName = segmentRefreshMessage.getSegmentName();
@@ -92,21 +95,24 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     }
 
     @Override
-    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
-      LOGGER.error("Caught exception while refreshing segment: {} of table: {} (code: {}, type: {})", _segmentName,
-          _tableNameWithType, errorCode, errorType, e);
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while refreshing segment: {} of table: {} (error code: {}, error type: {})", _segmentName,
+          _tableNameWithType, code, type, e);
     }
   }
 
-  private class QueryQuotaUpdateMessageHandler extends DefaultMessageHandler {
+  private class RefreshTableConfigMessageHandler extends MessageHandler {
+    final String _tableNameWithType;
 
-    public QueryQuotaUpdateMessageHandler(QueryQuotaUpdateMessage queryQuotaUpdateMessage,
-        NotificationContext context) {
-      super(queryQuotaUpdateMessage, context);
+    RefreshTableConfigMessageHandler(TableConfigRefreshMessage tableConfigRefreshMessage, NotificationContext context) {
+      super(tableConfigRefreshMessage, context);
+      _tableNameWithType = tableConfigRefreshMessage.getTableNameWithType();
     }
 
     @Override
     public HelixTaskResult handleMessage() {
+      // TODO: Fetch the table config here and pass it into the managers, or consider merging these 2 managers
+      _routingManager.buildRouting(_tableNameWithType);
       _queryQuotaManager.initOrUpdateTableQueryQuota(_tableNameWithType);
       HelixTaskResult result = new HelixTaskResult();
       result.setSuccess(true);
@@ -114,18 +120,16 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     }
 
     @Override
-    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
-      LOGGER.error("Caught exception while updating query quota of table: {} (code: {}, type: {})", _tableNameWithType,
-          errorCode, errorType, e);
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while refreshing table config for table: {} (error code: {}, error type: {})",
+          _tableNameWithType, code, type, e);
     }
   }
 
-  private static class DefaultMessageHandler extends MessageHandler {
-    String _tableNameWithType;
+  private static class NoOpMessageHandler extends MessageHandler {
 
-    public DefaultMessageHandler(Message message, NotificationContext context) {
+    NoOpMessageHandler(Message message, NotificationContext context) {
       super(message, context);
-      _tableNameWithType = message.getPartitionName();
     }
 
     @Override
@@ -136,8 +140,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     }
 
     @Override
-    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
-      LOGGER.error("Caught exception on table: {} (code: {}, type: {})", _tableNameWithType, errorCode, errorType, e);
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error for no-op message handling (error code: {}, error type: {})", code, type, e);
     }
   }
 }
