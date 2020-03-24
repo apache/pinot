@@ -38,6 +38,11 @@ if [ $noThirdEyeChange -eq 0 ]; then
   fi
 fi
 
+# If the build is triggered by cron job, deploy to bintray
+#if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
+#  export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
+#fi
+
 KAFKA_BUILD_OPTS=""
 if [ "$KAFKA_VERSION" != '2.0' ] && [ "$KAFKA_VERSION" != '' ]; then
   KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"
@@ -48,7 +53,7 @@ if [ $noThirdEyeChange -ne 0 ]; then
   echo "No ThirdEye changes"
   if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
     # JDK 11 prints more logs exceeding Travis limits.
-    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true ${KAFKA_BUILD_OPTS} > /tmp/mvn_build_log
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Dsha1="${DEV_VERSION}" ${KAFKA_BUILD_OPTS} > /tmp/mvn_build_log
     if [ $? -eq 0 ]; then
       exit 0
     else
@@ -56,7 +61,7 @@ if [ $noThirdEyeChange -ne 0 ]; then
       exit 1
     fi
   else
-    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true ${KAFKA_BUILD_OPTS} || exit $?
+    mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true -Dsha1="${DEV_VERSION}" ${KAFKA_BUILD_OPTS} || exit $?
   fi
 fi
 
@@ -64,7 +69,7 @@ fi
 if [ $noThirdEyeChange -eq 0 ]; then
   echo "Partial Pinot build"
   echo "ThirdEye changes only"
-  mvn install -B -DskipTests -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true -pl pinot-common,pinot-core,pinot-api -am
+  mvn install -B -DskipTests -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true -Dsha1="${DEV_VERSION}" -pl pinot-common,pinot-core,pinot-api -am
   cd thirdeye/thirdeye-hadoop
   mvn clean compile -B -DskipTests
   cd ../..
