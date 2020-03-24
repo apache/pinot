@@ -1,71 +1,25 @@
 language: java
 sudo: false
 dist: trusty
-
 before_install:
-  - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
-  - export PATH=$PATH:~/bin
-  - jq --version
-  - export REVISION="-dev-${TRAVIS_BUILD_NUMBER}"
-
+- mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64
+  && chmod +x ~/bin/jq
+- export PATH=$PATH:~/bin
+- jq --version
+- export REVISION="-dev-${TRAVIS_BUILD_NUMBER}"
 jdk:
-  - oraclejdk8
-
+- oraclejdk8
 cache:
   directories:
-    - $HOME/.m2
+  - "$HOME/.m2"
   yarn: true
-
 addons:
   firefox: latest
-
 install:
-  - ./.travis_install.sh
-
-#branches:
-#  only:
-#    - master
-
-stages:
-  - test
-  - name: deploy
-    if: branch = master
-
-jobs:
-  include:
-    - name: "Integration Tests - OracleJDK 8"
-      jdk: oraclejdk8
-      script:
-        - ./.travis_test.sh
-      env:
-        - RUN_INTEGRATION_TESTS=true
-    - name: "Unit Tests - OracleJDK 8"
-      jdk: oraclejdk8
-      script:
-        - ./.travis_test.sh
-      env:
-        - RUN_INTEGRATION_TESTS=false
-    - name: "QuickStart - OracleJDK 8"
-      jdk: oraclejdk8
-      script:
-        - ./.travis_quickstart.sh
-    - name: "QuickStart - OracleJDK 11"
-      jdk: oraclejdk11
-      script:
-        - ./.travis_quickstart.sh
-    - name: "QuickStart - OpenJDK 8"
-      jdk: openjdk8
-      script:
-        - ./.travis_quickstart.sh
-    - name: "QuickStart - OpenJDK 11"
-      jdk: openjdk11
-      script:
-        - ./.travis_quickstart.sh
-    - stage: deploy
-      script:
-        - ./.travis_nightly_build.sh
-
+- "./.travis_install.sh"
+script:
+- "./.travis_nightly_build.sh"
 env:
   global:
-    - secure: KB5/5jykJdDlwKKgA+b1SwwgjlNKFaBGTi7io5tpOPVypcbu8xyN00Xb4QIfC5RepdmUceV5buWLEs7CBIxeE+TBUcyjTvInk2+f1qsHZPZtEjq/6hvXae8u56S8HhofAl8XDQbd3ybwKFpdFoVosboVJueUXNEQORkdRwQcOKSiCpuQSlewSXfy/3CmSTUyPW6nuLtcR+8RuvrgAQBTjx5gKdxdP76vO4mcBl3J9Ay8ZYBCKP1AfaPrkbHRs0w7kPWNR5GHgjeQZOb30qcFqF78GPo9Uy4bENhhwj+i2f62czxNUWkNUZM+4t3st9/5JoOhkxqzGX57NJF2xwi7e7VIv6AbkYpYB2TLJybz9sU7ITU4+rupEh9BISjLlbhjZBA8oUmkbGzsOIXz6dWxNjuGIYcMy5JqjXY96ndW7is9bstXQ4T4tDaPMtq/guXyxsGDYTlwYlrWe3ahPm0R/XDRQ5ZY+Nc2suItMBJFJ0CeL4X9obCyZPaPZfDSdyVd35Punyo9e/01CaVj9I8BRhCFZNGHIgt4zT//Sh99jsg3a1VTvLokOHCW+OBF0C+bfws2+96+oM0A+L6fy3ZPiKYe3Vb68er0xpHSWgwm+YABssYpSZ3A9i9PeUpyzH0JzAgI1+6E1CTawKYH81IvIr0EVNmaJvpwf39mPYUvoak=
-    - secure: kjuRWcma4zLW8C5GSR75PeQYQYkhmXqn9ayk8FyRciHla3mu3EdmckyUDnuN9ynV+U0YkD07s9M+BKJE5ZZ3ZoXWxGqfkc/sOkb9eRl5Y1SMv0mpe4PDsgTGHmShbA1S7CW4rBshdiPCFZxLTPzKxPu7d8xl75pejXGN3Uk9S5E4aQNK3X/+6q8+Cdvrsh9dkA1E1Gx/26QKP6gnY8vgNXZBgyQ5MIUAnvbmqb1SfrQ28l1xeZlFybeB7y+D6xs6T/UMAXS3yjevxUSS8q8vmiHqG7RYLjuhqPWSxYqN724hxiHwsezGqgV6MldjWqGg7bJBUEecCb7NrLAFHTpHSdf9IJT97MIcJEjaATp0cwkwEytnpzyUtdszI/JB3fhdqA+i9s0oBMXDorby49Bk1WPG6aqiAixMvhMd024ukzuagC/9Jszi55Qif7C9XKlics3zNYiatVvTOlTMGxrsP7LeDpCDG3nshzykj5f4Cuy+0kdiY+F0m3ZXEEjpLR7AY8F7bBzxCcqurSrfImPFGlZ5abKTakudZt72GT0gHthG0yFTPcExPPokR0TIfulE44Uv6GkJPfXbtG5lt3+UYa7jPKejbdNAIAVcQ2Z62W77mLgYQ9VB5ov1kETqgb7W0bxqm6DmvynwlQFG6+9WMGGVIbGgsU6YS+MGED5GNds=
+  - secure: jUmGgAtizTZD5hVeBKbejCMIbyUX7XrmB2ZX5MUkFZtUNqtVZ3TdVgo8n3ndba4qq5JZ5EzACZTeNOqnWaIghcj9KzlX8xr1e7JvcmIef/2RKljq7Klxr6mh2oC3YyIoIbK5H57VpFuxcItUNo1LGTNJytomibPvPoGAuLRnH1meFhkMxZWvLMw0nv7IGxvnMh3n7FcRD0nH0zfipgwGTXS8IwblTag9hzLzyFaxsEZL0sa5UX02uwfaisJuzEknDf0BlDfsfGkfYKrubfVawM5lUxLaStr0Ljx7Cfys8oJURoUNDjKrTQbyYYCSuO3KzKcEEqCw4baLIi0hPDZ4qEYpt8NOzAD320uzONxzEatx01c3B2TRiDhFJau/1XUH8uy7xu0nru7EXckmzq51QByzGx7dh81ANcwvxxNSTchFyP9PReGPQaC5Q/xizfpbD+2WRJSYQThrceDyEVE1MVASRB3+Ra6IJvmgEOwXDcUdsvg6HpQ1zxgUvWYmxEKrAZX6/73Me6WOcJ3j7BUym8DfuEK1K+1TeU82gzvdMqth9ed8FjGZjlBO9BFEdtRhrgqI/GmbSqKhK6GBcSAA3WFONMxzT44QJomk1+nOj4Y5RyhR+hrTBIiNQ9boJgsvTWOo+zKwinqiZrw2N0feO0S/CI7Zgzm0aYQEsgMelwI=
+  - secure: U6eoWopE3P8vkC2Fwh5ux+Hdgs5ULOh0PxkgUc40ix3pE2lJEoXKxPMLELa4xSdqnTLWCU2s9Sb7kxh5WY5127ijCNFN2jvSDhq5MHWnAOFqa+OEol8mg/tzcRnAebkgZBK/Br+t0YLJZ7Rov4S1d+z4NXL5PMn/SDPQlnINHVbxR9eIhopLUnxJS8wUqSwPLRFB3uTBFea5vdwbDT+XbaWXrSK7U0CWdxLkhtESk6OO4MhlUehe32+QAxTMcnGuFo68AVqbDRPA+7dg0F26mD+CCY0SNY+idPN0czblnTPOt5CylQYzsqpmTvSp+3/BpGjwv5uY+5gZBD+aO39GYv6taIl+10gnHBUO88bBP0Zw7ys5OblpIT/KrB5yIeS0UwOUFJogTztcn2H6r9SSxUE8FsPMAJgCbMrHCC2fsP8a459UZukhcFIrnOlMFM4SARu88MIrbkCWevPMbetp2hYaOmAoY8aefwG0INSNxGgTI3+PBQ1Rre8/k7M8VEJYcRxEMm37KDhvcF0m16CwxxkTxavQDOMjoGlj9dPz25W1ody0cF3ss2wqAZvSb92XEvBwCoy2NeR4LNr5C7y+8Xbb9ooB6C4Kef4QDjDvK+EhVdCszQ+vadkoi+k79jvWbXcaQpOBeYZd/sTPmLyC0p3qHp6mLHO2R2ZyfU6mQIg=
