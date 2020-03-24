@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
@@ -40,11 +41,11 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 // To use this segment fetcher, servers need to put "server" in their segment fetcher protocol.
 public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
   public static final String SCHEME = "server";
-  private HelixAdmin _helixAdmin;
+  private HelixManager _helixManager;
   private String _helixClusterName;
 
-  public PeerServerSegmentFetcher(HelixAdmin helixAdmin, String helixClusterName) {
-    _helixAdmin = helixAdmin;
+  public PeerServerSegmentFetcher(HelixManager helixManager, String helixClusterName) {
+    _helixManager = helixManager;
     _helixClusterName = helixClusterName;
   }
 
@@ -73,7 +74,7 @@ public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
         tableNameWithType(llcSegmentName.getTableName());
 
     ExternalView externalViewForResource =
-        HelixHelper.getExternalViewForResource(_helixAdmin, _helixClusterName, tableNameWithType);
+        HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixClusterName, tableNameWithType);
     if (externalViewForResource == null) {
       _logger.warn("External View not found for segment {}", segmentName);
       return null;
@@ -101,7 +102,7 @@ public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
       Random r = new Random();
       String instanceId = availableServers.get(r.nextInt(availableServers.size()));
 
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, instanceId);
+      InstanceConfig instanceConfig = _helixManager.getClusterManagmentTool().getInstanceConfig(_helixClusterName, instanceId);
       String hostName = instanceConfig.getHostName();
 
       int port;

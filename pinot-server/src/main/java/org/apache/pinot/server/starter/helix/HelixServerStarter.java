@@ -136,13 +136,9 @@ public class HelixServerStarter {
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
-    LOGGER.info("Connecting Helix manager");
-    _helixManager.connect();
-    _helixAdmin = _helixManager.getClusterManagmentTool();
-    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager, _helixAdmin, _helixClusterName);
+    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    SegmentFetcherAndLoader fetcherAndLoader =
-        new SegmentFetcherAndLoader(_serverConf, instanceDataManager, _helixAdmin, _helixClusterName);
+    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverConf, instanceDataManager, _helixManager, _helixClusterName);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
     _helixManager.getStateMachineEngine()
@@ -151,6 +147,9 @@ public class HelixServerStarter {
     // access the property store, but before receiving state transitions
     _helixManager.addPreConnectCallback(_serverInstance::start);
 
+    LOGGER.info("Connecting Helix manager");
+    _helixManager.connect();
+    _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(host, port);
 
     // Init the Pinot FS for uploading and downloading segments.

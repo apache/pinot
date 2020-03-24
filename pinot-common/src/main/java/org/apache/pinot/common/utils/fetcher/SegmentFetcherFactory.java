@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,12 +60,12 @@ public class SegmentFetcherFactory {
     initSegmentFetcherFactory(config, null, null);
   }
 
-  public static void init(Configuration config, HelixAdmin helixAdmin, String helixClusterName)
+  public static void init(Configuration config, HelixManager helixManager, String helixClusterName)
       throws Exception {
-    initSegmentFetcherFactory(config, helixAdmin, helixClusterName);
+    initSegmentFetcherFactory(config, helixManager, helixClusterName);
   }
 
-  private static void initSegmentFetcherFactory(Configuration config, HelixAdmin helixAdmin, String helixClusterName)
+  private static void initSegmentFetcherFactory(Configuration config, HelixManager helixManager, String helixClusterName)
       throws Exception {
     @SuppressWarnings("unchecked")
     List<String> protocols = config.getList(PROTOCOLS_KEY);
@@ -81,8 +82,8 @@ public class SegmentFetcherFactory {
             segmentFetcher = new HttpsSegmentFetcher();
             break;
           case PEER_2_PEER_PROTOCOL:
-            if (helixAdmin != null && helixClusterName != null) {
-              segmentFetcher = new PeerServerSegmentFetcher(helixAdmin, helixClusterName);
+            if (helixManager != null && helixClusterName != null) {
+              segmentFetcher = new PeerServerSegmentFetcher(helixManager, helixClusterName);
               break;
             }
           default:

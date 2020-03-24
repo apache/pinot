@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.InstanceConfig;
@@ -65,6 +66,7 @@ public class PeerServerSegmentFetcherTest {
     config.addProperty(HTTP_PROTOCOL + SegmentFetcherFactory.SEGMENT_FETCHER_CLASS_KEY_SUFFIX,
         FakeHttpSegmentFetcher.class.getName());
 
+    HelixManager helixManager;
     HelixAdmin helixAdmin;
     {
       ExternalView ev = new ExternalView(TABLE_NAME_WITH_TYPE);
@@ -72,7 +74,9 @@ public class PeerServerSegmentFetcherTest {
       ev.setState(SEGMENT_1, INSTANCE_ID2, "OFFLINE");
       ev.setState(SEGMENT_2, INSTANCE_ID1, "OFFLINE");
       ev.setState(SEGMENT_2, INSTANCE_ID2, "OFFLINE");
+      helixManager = mock(HelixManager.class);
       helixAdmin = mock(HelixAdmin.class);
+      when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
       when(helixAdmin.getResourceExternalView(CLUSTER_NAME, TABLE_NAME_WITH_TYPE)).thenReturn(ev);
       when(helixAdmin.getConfigKeys(any(HelixConfigScope.class))).thenReturn(new ArrayList<>());
       Map<String, String> instanceConfigMap = new HashMap<>();
@@ -89,7 +93,7 @@ public class PeerServerSegmentFetcherTest {
       when(helixAdmin.getInstanceConfig(any(String.class), eq(INSTANCE_ID2))).thenReturn(instanceConfig2);
     }
 
-    SegmentFetcherFactory.init(config, helixAdmin, CLUSTER_NAME);
+    SegmentFetcherFactory.init(config, helixManager, CLUSTER_NAME);
 
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTP_PROTOCOL).getClass(), FakeHttpSegmentFetcher.class);
     assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTPS_PROTOCOL).getClass(), HttpsSegmentFetcher.class);

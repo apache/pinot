@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -51,7 +52,7 @@ public class SegmentFetcherAndLoader {
 
   private final InstanceDataManager _instanceDataManager;
 
-  public SegmentFetcherAndLoader(Configuration config, InstanceDataManager instanceDataManager, HelixAdmin helixAdmin, String helixClusterName)
+  public SegmentFetcherAndLoader(Configuration config, InstanceDataManager instanceDataManager, HelixManager helixManager, String helixClusterName)
       throws Exception {
     _instanceDataManager = instanceDataManager;
 
@@ -61,7 +62,7 @@ public class SegmentFetcherAndLoader {
     Configuration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
 
     PinotFSFactory.init(pinotFSConfig);
-    SegmentFetcherFactory.init(segmentFetcherFactoryConfig, helixAdmin, helixClusterName);
+    SegmentFetcherFactory.init(segmentFetcherFactoryConfig, helixManager, helixClusterName);
     PinotCrypterFactory.init(pinotCrypterConfig);
   }
 
