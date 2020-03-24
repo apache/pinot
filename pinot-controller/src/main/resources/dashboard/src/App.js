@@ -1,13 +1,12 @@
-import React, { Component } from 'react'
+import React from 'react'
 import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
-import TypoGraphy from '@material-ui/core/Typography';
 import NavBar from "./components/NavBar";
 import Posts from "./components/Posts";
 import Posts1 from "./components/Posts1";
 import Posts2 from "./components/Posts2";
-import { posts } from "./components/dummy-posts";
 import Cluster from "./components/Cluster";
+
 class App extends React.Component {
 
     constructor(props) {
