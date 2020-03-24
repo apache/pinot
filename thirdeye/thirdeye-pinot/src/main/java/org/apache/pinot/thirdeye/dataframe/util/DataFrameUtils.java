@@ -67,6 +67,10 @@ public class DataFrameUtils {
   public static final String COL_UPPER_BOUND = "upper_bound";
   public static final String COL_LOWER_BOUND = "lower_bound";
 
+  // To put things in context, we roughly need 8k data points for representing 4 weeks of 5 min granular data.
+  // Anything over this limit (padded to 10k) need not be dealt with and thereby avoid potential OOM issues.
+  private static final long DATA_POINTS_MAX = 10000;
+
   /**
    * Returns a Thirdeye response parsed as a DataFrame. The method stores the time values in
    * {@code COL_TIME} by default, and creates columns for each groupBy attribute and for each
@@ -321,13 +325,34 @@ public class DataFrameUtils {
     DateTime start = new DateTime(slice.start, timezone).withFields(makeOrigin(period.getPeriodType()));
     DateTime end = new DateTime(slice.end, timezone).withFields(makeOrigin(period.getPeriodType()));
 
-    MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start.getMillis(), end.getMillis(), slice.filters, slice.granularity);
+    MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start.getMillis(), end.getMillis(), slice.filters, granularity);
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, metric, dataset, expressions, metricDAO)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, dataset, expressions)
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
     return new TimeSeriesRequestContainer(request, expressions, start, end, granularity.toPeriod());
+  }
+
+  /**
+   * Validation on the time-series retrieval size. We will fail if the number of data points
+   * to retrieve is more than {@link #DATA_POINTS_MAX}
+   */
+  public static void validateTimeSeriesSize(DatasetConfigDTO dataset, long start, long end, TimeGranularity requestGranularity) {
+    TimeGranularity granularity = dataset.bucketTimeGranularity();
+    if (requestGranularity!= null && !MetricSlice.NATIVE_GRANULARITY.equals(requestGranularity)
+        && requestGranularity.toMillis() >= granularity.toMillis()) {
+      granularity = requestGranularity;
+    }
+
+    if (granularity.toMillis() != 0) {
+      long dataPoints = (end - start) / granularity.toMillis();
+      if (dataPoints > DATA_POINTS_MAX) {
+        throw new IllegalArgumentException(String.format("Num of timeseries data points to retrieve exceeds upper limit"
+            + " %d. granularity=%s start=%d end=%d", DATA_POINTS_MAX, granularity.toAggregationGranularityString(),
+            start, end));
+      }
+    }
   }
 
   /**
@@ -364,7 +389,7 @@ public class DataFrameUtils {
     DateTime start = new DateTime(slice.start, timezone).withFields(makeOrigin(period.getPeriodType()));
     DateTime end = new DateTime(slice.end, timezone).withFields(makeOrigin(period.getPeriodType()));
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions, metricDAO)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, dataset, expressions)
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
@@ -413,7 +438,7 @@ public class DataFrameUtils {
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
         metric.getDefaultAggFunction(), metric.getDataset());
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions, metricDAO)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, dataset, expressions)
         .setGroupBy(dimensions)
         .setLimit(limit)
         .build(reference);
@@ -493,14 +518,14 @@ public class DataFrameUtils {
    * Helper: Returns a pre-populated ThirdeyeRequestBuilder instance. Removes invalid filter values.
    *
    * @param slice metric data slice
-   * @param metric metric dto
    * @param dataset dataset dto
    * @param expressions metric expressions
-   * @param metricDAO metric config DAO
    * @return ThirdeyeRequestBuilder
    * @throws ExecutionException
    */
-  private static ThirdEyeRequest.ThirdEyeRequestBuilder makeThirdEyeRequestBuilder(MetricSlice slice, MetricConfigDTO metric, DatasetConfigDTO dataset, List<MetricExpression> expressions, MetricConfigManager metricDAO) throws ExecutionException {
+  private static ThirdEyeRequest.ThirdEyeRequestBuilder makeThirdEyeRequestBuilder(MetricSlice slice, DatasetConfigDTO dataset, List<MetricExpression> expressions) throws ExecutionException {
+    validateTimeSeriesSize(dataset, slice.getStart(), slice.getEnd(), slice.getGranularity());
+
     List<MetricFunction> functions = new ArrayList<>();
     for(MetricExpression exp : expressions) {
       functions.addAll(exp.computeMetricFunctions());

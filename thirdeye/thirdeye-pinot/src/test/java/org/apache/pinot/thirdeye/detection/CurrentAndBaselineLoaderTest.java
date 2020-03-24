@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -107,6 +108,8 @@ public class CurrentAndBaselineLoaderTest {
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
     datasetConfigDTO.setDataset(COLLECTION_VALUE);
     datasetConfigDTO.setDataSource("myDataSource");
+    datasetConfigDTO.setNonAdditiveBucketSize(1);
+    datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.MINUTES);
     this.dataSetDAO.save(datasetConfigDTO);
 
     this.aggregationLoader = new DefaultAggregationLoader(this.metricDAO, this.dataSetDAO,

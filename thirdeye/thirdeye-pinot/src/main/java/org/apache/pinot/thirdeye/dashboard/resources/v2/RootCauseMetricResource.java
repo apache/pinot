@@ -25,6 +25,7 @@ import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
+import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -453,6 +454,7 @@ public class RootCauseMetricResource {
     long start = data.getLongs(COL_TIME).min().longValue();
     long end = slice.getEnd();
     Period stepSize = granularity.toPeriod();
+    DataFrameUtils.validateTimeSeriesSize(dataset, start, end, granularity);
 
     DateTime current = new DateTime(start, tz);
     List<Long> timestamps = new ArrayList<>();
