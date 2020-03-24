@@ -33,7 +33,6 @@ import java.util.concurrent.Executors;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -46,13 +45,13 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 /**
- * Creates a Kafka producer.
+ * Creates a Kafka producer, for given kafka broker list
  * Continuously fetches github events data.
  * Creates a PullRequestMergedEvent for each valid PR event.
- * Publishes the PullRequestMergedEvent to the kafka topic pullRequestMergedEvent
+ * Publishes the PullRequestMergedEvent to the given kafka topic
  */
-public class PullRequestMergedEventStream {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventStream.class);
+public class PullRequestMergedEventsStream {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
 
   private ExecutorService _service;
   private boolean _keepStreaming = true;
@@ -63,25 +62,40 @@ public class PullRequestMergedEventStream {
 
   private StreamDataProducer _producer;
 
-  public PullRequestMergedEventStream(org.apache.pinot.spi.data.Schema pinotSchema, String topicName,
-      String personalAccessToken)
+  public PullRequestMergedEventsStream(String topicName, String kafkaBrokerList, String personalAccessToken)
       throws Exception {
 
     _service = Executors.newFixedThreadPool(1);
-    _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema);
+    ClassLoader classLoader = PullRequestMergedEventsStream.class.getClassLoader();
+    URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
+    Preconditions.checkNotNull(resource);
+    File pinotSchema = new File(resource.getFile());
+    _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(pinotSchema));
     _topicName = topicName;
     _githubAPICaller = new GithubAPICaller(personalAccessToken);
 
     Properties properties = new Properties();
-    properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+    properties.put("metadata.broker.list", kafkaBrokerList);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
+  public void execute() {
+    start();
+
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        shutdown();
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }));
+  }
+
   public void shutdown()
       throws IOException, InterruptedException {
-    printStatus(Quickstart.Color.GREEN, "***** Shutting down PullRequestMergedEvents Stream *****");
+    printStatus(Quickstart.Color.GREEN, "***** Shutting down pullRequestMergedEvents Stream *****");
     _keepStreaming = false;
     Thread.sleep(3000L);
     _githubAPICaller.shutdown();
@@ -101,7 +115,9 @@ public class PullRequestMergedEventStream {
     _producer.produce(_topicName, message.toString().getBytes(StandardCharsets.UTF_8));
   }
 
-  public void run() {
+  public void start() {
+
+    printStatus(Quickstart.Color.CYAN, "***** Starting pullRequestMergedEvents Stream *****");
 
     _service.submit(() -> {
 
@@ -255,13 +271,10 @@ public class PullRequestMergedEventStream {
 
   public static void main(String[] args)
       throws Exception {
-    ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
-    Preconditions.checkNotNull(resource);
-    File schemaFile = new File("/tmp/pullRequestMergedEvents_schema.json");
-    FileUtils.copyURLToFile(resource, schemaFile);
-    org.apache.pinot.spi.data.Schema schema = org.apache.pinot.spi.data.Schema.fromFile(schemaFile);
-    PullRequestMergedEventStream stream = new PullRequestMergedEventStream(schema, "pullRequestMergedEvent", args[0]);
-    stream.run();
+    String personalAccessToken = args[0];
+    String topic = "pullRequestMergedEvent";
+    PullRequestMergedEventsStream stream =
+        new PullRequestMergedEventsStream(topic, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, personalAccessToken);
+    stream.execute();
   }
 }

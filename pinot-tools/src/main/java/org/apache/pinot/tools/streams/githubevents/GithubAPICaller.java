@@ -51,6 +51,7 @@ public class GithubAPICaller {
   private String _personalAccessToken;
 
   GithubAPICaller(String personalAccessToken) {
+    printStatus(Quickstart.Color.CYAN, "***** Initializing GithubAPICaller *****");
     _personalAccessToken = personalAccessToken;
     _closeableHttpClient = HttpClients.createDefault();
   }

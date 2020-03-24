@@ -24,9 +24,9 @@ import org.apache.pinot.tools.GithubEventsQuickstart;
 import org.kohsuke.args4j.Option;
 
 /**
- * Command to run GithubEventsQuickstart
+ * Command to run GithubEventsQuickStart
  */
-public class GithubEventsDemoCommand extends AbstractBaseAdminCommand implements Command {
+public class GithubEventsQuickStartCommand extends AbstractBaseAdminCommand implements Command {
 
   @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "Github personal access token.")
   private String _personalAccessToken;
@@ -45,12 +45,12 @@ public class GithubEventsDemoCommand extends AbstractBaseAdminCommand implements
 
   @Override
   public String getName() {
-    return "GithubEventsDemo";
+    return "GithubEventsQuickStart";
   }
 
   @Override
   public String toString() {
-    return ("GithubEventsDemo -personalAccessToken " + _personalAccessToken);
+    return ("GithubEventsQuickStart -personalAccessToken " + _personalAccessToken);
   }
 
   @Override

@@ -24,13 +24,12 @@ import java.io.File;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
-import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventStream;
+import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
@@ -38,17 +37,14 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 /**
- * Sets up a demo Pinot cluster with a realtime table  consuming realtime data from Github events
+ * Sets up a demo Pinot cluster with 1 zookeeper, 1 controller, 1 broker and 1 server
+ * Sets up a demo Kafka cluster, and creates a topic pullRequestMergedEvents
+ * Creates a realtime table pullRequestMergedEvents
+ * Starts the {@link PullRequestMergedEventsStream} to publish pullRequestMergedEvents into the topic
  */
 public class GithubEventsQuickstart {
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
-
-  public static void main(String[] args)
-      throws Exception {
-    PluginManager.get().init();
-    new GithubEventsQuickstart().execute(args[0]);
-  }
 
   private void startKafka() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
@@ -90,23 +86,23 @@ public class GithubEventsQuickstart {
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     startKafka();
 
-    printStatus(Color.CYAN, "***** Starting Zookeeper, controller, server and broker *****");
+    printStatus(Color.CYAN, "***** Starting zookeeper, controller, server and broker *****");
     runner.startAll();
 
     printStatus(Color.CYAN, "***** Adding pullRequestMergedEvents table *****");
     runner.addTable();
 
     printStatus(Color.CYAN, "***** Starting pullRequestMergedEvents data stream and publishing to Kafka *****");
-    final PullRequestMergedEventStream pullRequestMergedEventStream =
-        new PullRequestMergedEventStream(Schema.fromFile(schemaFile), "pullRequestMergedEvents", personalAccessToken);
-    pullRequestMergedEventStream.run();
+    final PullRequestMergedEventsStream pullRequestMergedEventsStream =
+        new PullRequestMergedEventsStream("pullRequestMergedEvents", KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+            personalAccessToken);
+    pullRequestMergedEventsStream.execute();
     printStatus(Color.CYAN, "***** Waiting for 10 seconds for a few events to get populated *****");
     Thread.sleep(10000);
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
-        printStatus(Color.GREEN, "***** Shutting down realtime quick start *****");
-        pullRequestMergedEventStream.shutdown();
+        printStatus(Color.GREEN, "***** Shutting down GithubEventsQuickStart *****");
         runner.stop();
         _kafkaStarter.stop();
         ZkStarter.stopLocalZkServer(_zookeeperInstance);
