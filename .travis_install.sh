@@ -42,7 +42,6 @@ fi
 #if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
 #  export REVISION="-dev-${TRAVIS_BUILD_NUMBER}"
 #fi
-export REVISION="-dev-${TRAVIS_BUILD_NUMBER}"
 
 KAFKA_BUILD_OPTS=""
 if [ "$KAFKA_VERSION" != '2.0' ] && [ "$KAFKA_VERSION" != '' ]; then

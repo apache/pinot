@@ -38,7 +38,6 @@
   <url>https://pinot.apache.org/</url>
 
   <modules>
-
     <module>pinot-spi</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
@@ -1497,21 +1496,21 @@
     </plugins>
   </reporting>
 
-  <repositories>
-    <repository>
-      <id>central</id>
-      <url>http://repo.dev.bloomberg.com/content/groups/public</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-    </repository>
-  </repositories>
+<!--  <repositories>-->
+<!--    <repository>-->
+<!--      <id>central</id>-->
+<!--      <url>http://repo.dev.bloomberg.com/content/groups/public</url>-->
+<!--      <releases>-->
+<!--        <enabled>false</enabled>-->
+<!--      </releases>-->
+<!--    </repository>-->
+<!--  </repositories>-->
 
-  <pluginRepositories>
-    <pluginRepository>
-      <id>central</id>
-      <url>http://repo.dev.bloomberg.com/content/groups/public</url>
-      <releases><enabled>false</enabled></releases>
-    </pluginRepository>
-  </pluginRepositories>
+<!--  <pluginRepositories>-->
+<!--    <pluginRepository>-->
+<!--      <id>central</id>-->
+<!--      <url>http://repo.dev.bloomberg.com/content/groups/public</url>-->
+<!--      <releases><enabled>false</enabled></releases>-->
+<!--    </pluginRepository>-->
+<!--  </pluginRepositories>-->
 </project>

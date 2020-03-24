@@ -6,6 +6,7 @@ before_install:
   - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
   - export PATH=$PATH:~/bin
   - jq --version
+  - export REVISION="-dev-${TRAVIS_BUILD_NUMBER}"
 
 jdk:
   - oraclejdk8
@@ -61,10 +62,8 @@ jobs:
       script:
         - ./.travis_quickstart.sh
     - stage: deploy
-      deploy:
-        skip_cleanup: true
-        provider: script
-        script: "./.travis_nightly_build.sh"
+      script:
+        - ./.travis_nightly_build.sh
 
 env:
   global:

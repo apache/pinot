@@ -18,13 +18,10 @@
 # under the License.
 #
 
-# Change the project version for nightly bintray
-# mvn versions:set -DnewVersion=0.2.0-dev-$TRAVIS_BUILD_NUMBER
-
 # deploy the release to bintray
 #if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
 #  echo "Deploying to bintray"
-#  mvn clean deploy -s .ci.settings.xml -Drevision="${REVISION}"
+#  mvn clean deploy -s .ci.settings.xml -Drevision="${REVISION}" -DskipTests
 #fi
 echo "Deploying to bintray"
-mvn clean deploy -s .ci.settings.xml -Drevision="${REVISION}"
+mvn clean deploy -s .ci.settings.xml -Drevision="${REVISION}" -DskipTests
