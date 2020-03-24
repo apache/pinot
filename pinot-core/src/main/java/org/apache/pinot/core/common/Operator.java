@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.query.exception.EarlyTerminationException;
 
 
 public interface Operator<T extends Block> {
@@ -28,7 +29,10 @@ public interface Operator<T extends Block> {
    * <p>For filter operator and operators above projection phase (aggregation, selection, combine etc.), method should
    * only be called once, and will return a non-null block.
    * <p>For operators in projection phase (docIdSet, projection, transformExpression), method can be called multiple
-   * times, and will return non-empty block or null if no more documents available</p>
+   * times, and will return non-empty block or null if no more documents available
+   *
+   * @throws EarlyTerminationException if the operator is early-terminated (interrupted) before processing the next
+   *         block of data. Operator can early terminated when the query times out, or is already satisfied.
    */
   T nextBlock();
 

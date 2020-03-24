@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.reduce.CombineService;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -117,6 +118,8 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
               }
             }
             blockingQueue.offer(mergedBlock);
+          } catch (EarlyTerminationException e) {
+            // Early-terminated because query times out or is already satisfied
           } catch (Exception e) {
             LOGGER.error("Caught exception while executing query.", e);
             blockingQueue.offer(new IntermediateResultsBlock(e));
