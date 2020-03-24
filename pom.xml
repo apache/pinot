@@ -19,7 +19,8 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -30,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.4.0-SNAPSHOT</version>
+  <version>${revision}${sha1}</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -96,8 +97,18 @@
   <!-- Apache project inception year for generating correct NOTICE file for jar bundle. -->
   <inceptionYear>2018</inceptionYear>
 
+  <distributionManagement>
+    <repository>
+      <id>bintray-linkedin-test-repo</id>
+      <name>linkedin-test-repo</name>
+      <url>https://api.bintray.com/maven/linkedin/test-repo/pinot/;publish=1</url>
+    </repository>
+  </distributionManagement>
+
   <properties>
     <pinot.root>${basedir}</pinot.root>
+    <revision>0.4.0</revision>
+    <sha1>-SNAPSHOT</sha1>
     <build.profile.id>dev</build.profile.id>
     <jdk.version>1.8</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -887,6 +898,11 @@
         <version>2.1</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.maven.surefire</groupId>
+        <artifactId>surefire-testng</artifactId>
+        <version>2.19</version>
+      </dependency>
+      <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
         <version>2.10.0</version>
@@ -1478,4 +1494,22 @@
       </plugin>
     </plugins>
   </reporting>
+
+<!--  <repositories>-->
+<!--    <repository>-->
+<!--      <id>central</id>-->
+<!--      <url>http://repo.dev.bloomberg.com/content/groups/public</url>-->
+<!--      <releases>-->
+<!--        <enabled>false</enabled>-->
+<!--      </releases>-->
+<!--    </repository>-->
+<!--  </repositories>-->
+
+<!--  <pluginRepositories>-->
+<!--    <pluginRepository>-->
+<!--      <id>central</id>-->
+<!--      <url>http://repo.dev.bloomberg.com/content/groups/public</url>-->
+<!--      <releases><enabled>false</enabled></releases>-->
+<!--    </pluginRepository>-->
+<!--  </pluginRepositories>-->
 </project>
