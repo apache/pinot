@@ -259,8 +259,15 @@ spec:
         - image: apachepinot/pinot:stream_github_events
           imagePullPolicy: Always
           name: pinot-github-events-data-into-kafka
-          args: [ "StreamGithubEvents", "-topic", "pullRequestMergedEvents", "-personalAccessToken", "22a06d518c194b3edd09d86722f56a0b4d3693a5", "-kafkaBrokerList", "kafka:9092", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json" ]
+          args: [ "StreamGithubEvents", "-topic", "pullRequestMergedEvents", "-personalAccessToken", "token_value", "-kafkaBrokerList", "kafka:9092", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json" ]
+          volumeMounts:
+            - name: examples
+              mountPath: /var/pinot/examples
       restartPolicy: Always
+      volumes:
+        - name: examples
+          configMap:
+            name: examples
 
 
 
