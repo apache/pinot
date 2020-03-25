@@ -132,9 +132,6 @@
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.42.Final</netty.version>
 
-    <!-- dependency for upsert component -->
-    <rocks-db.version>5.13.4</rocks-db.version>
-
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g</argLine>
 

@@ -30,7 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import javax.validation.constraints.Null;
 
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
@@ -104,7 +103,7 @@ public class TableConfig extends BaseJsonConfig {
   private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
             TenantConfig tenantConfig, IndexingConfig indexingConfig, TableCustomConfig customConfig,
             @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
-            @Null QueryConfig queryConfig,
+            @Nullable QueryConfig queryConfig,
             @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
             @Nullable List<FieldConfig> fieldConfigList, @Nullable UpdateSemantic updateSemantic) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
@@ -385,9 +384,11 @@ public class TableConfig extends BaseJsonConfig {
     if (_fieldConfigList != null) {
       simpleFields.put(FIELD_CONFIG_LIST_KEY, JsonUtils.objectToString(_fieldConfigList));
     }
+    if (_updateSemantic != null) {
+      simpleFields.put(UPDATE_SEMANTIC_CONFIG_KEY, _updateSemantic.toString());
+    }
 
     ZNRecord znRecord = new ZNRecord(_tableName);
-    simpleFields.put(UPDATE_SEMANTIC_CONFIG_KEY, _updateSemantic.toString());
     znRecord.setSimpleFields(simpleFields);
     return znRecord;
   }

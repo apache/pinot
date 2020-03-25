@@ -758,43 +758,4 @@ public final class Schema {
   }
 
 
-  @JsonIgnore
-  public static byte[] getByteArrayFromField(Object value, DimensionFieldSpec fieldSpec) {
-    switch (fieldSpec.getDataType()) {
-      case INT:
-        return ByteBuffer.allocate(4).putInt((int)value).array();
-      case LONG:
-        return ByteBuffer.allocate(8).putLong((long)value).array();
-      case FLOAT:
-        return ByteBuffer.allocate(4).putFloat((float)value).array();
-      case DOUBLE:
-        return ByteBuffer.allocate(8).putDouble((double)value).array();
-      case STRING:
-        return ((String) value).getBytes(StandardCharsets.UTF_8);
-      case BYTES:
-        return (byte[]) value;
-      default:
-        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
-    }
-  }
-
-  @JsonIgnore
-  public static Object getValueFromBytes(byte[] bytes, DimensionFieldSpec fieldSpec) {
-    switch (fieldSpec.getDataType()) {
-      case INT:
-        return ByteBuffer.wrap(bytes).asIntBuffer().get();
-      case LONG:
-        return ByteBuffer.wrap(bytes).asLongBuffer().get();
-      case FLOAT:
-        return ByteBuffer.wrap(bytes).asFloatBuffer().get();
-      case DOUBLE:
-        return ByteBuffer.wrap(bytes).asDoubleBuffer().get();
-      case STRING:
-        return new String(bytes, StandardCharsets.UTF_8);
-      case BYTES:
-        return bytes;
-      default:
-        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
-    }
-  }
 }

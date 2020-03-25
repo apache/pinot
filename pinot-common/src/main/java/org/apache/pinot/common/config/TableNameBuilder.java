@@ -132,19 +132,4 @@ public class TableNameBuilder {
   public static boolean isRealtimeTableResource(String resourceName) {
     return REALTIME.tableHasTypeSuffix(resourceName);
   }
-
-  /**
-   * ensure that table name ends with type info, if no, create one with the given type
-   * @param tableName the name of the table
-   * @param type the type of the table for it to fill in if the type info is missing
-   * @return the table type name with the type info
-   */
-  public static String ensureTableNameWithType(String tableName, TableType type) {
-    for (TableType tableType: TableType.values()) {
-      if (tableName.endsWith(TYPE_SUFFIX_SEPARATOR + tableType.toString())) {
-        return tableName;
-      }
-    }
-    return tableName + TYPE_SUFFIX_SEPARATOR + type.toString();
-  }
 }
