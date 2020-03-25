@@ -27,6 +27,7 @@
     <artifactId>pinot-file-system</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>${revision}${sha1}</version>
+    <relativePath>../pom.xml</relativePath>
   </parent>
 
   <artifactId>pinot-gcs</artifactId>

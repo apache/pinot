@@ -27,6 +27,7 @@
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>${revision}${sha1}</version>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <artifactId>pinot-clients</artifactId>
   <packaging>pom</packaging>

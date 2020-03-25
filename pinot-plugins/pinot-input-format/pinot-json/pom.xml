@@ -25,6 +25,7 @@
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>${revision}${sha1}</version>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
