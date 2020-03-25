@@ -31,7 +31,7 @@ rm -rf ~/.m2/repository/com/linkedin/pinot
 
 # Quickstart
 DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
-cd "${DIST_BIN_DIR}"
+cd ${DIST_BIN_DIR}
 
 # Test quick-start-batch
 bin/quick-start-batch.sh &
