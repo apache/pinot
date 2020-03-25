@@ -21,7 +21,7 @@
 # deploy the release to bintray
 #if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
 #  echo "Deploying to bintray"
-#  mvn clean deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests
+#  mvn clean deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e
 #fi
 echo "Deploying to bintray"
-mvn deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests
+mvn deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e
