@@ -22,7 +22,7 @@
 
 This is an implementation of the kafka stream for kafka versions 2.x The version used in this implementation is kafka 2.0.0.
 
-A stream plugin for another version of kafka, or another stream, can be added in a similar fashion. Refer to documentation on (Pluggable Streams)[https://pinot.readthedocs.io/en/latest/pluggable_streams.html] for the specfic interfaces to implement.
+A stream plugin for another version of kafka, or another stream, can be added in a similar fashion. Refer to documentation on (Pluggable Streams)[https://apache-pinot.gitbook.io/apache-pinot-cookbook/developers-and-contributors/extending-pinot/pluggable-streams] for the specfic interfaces to implement.
 
 * How to build and release Pinot package with Kafka 2.x connector
 ```$xslt
