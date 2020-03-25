@@ -149,6 +149,7 @@ public class PullRequestMergedEventsStream {
                 try {
                   GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
                   if (genericRecord != null) {
+                    printStatus(Quickstart.Color.CYAN,  genericRecord.toString());
                     publish(genericRecord);
                   }
                 } catch (Exception e) {
@@ -158,12 +159,14 @@ public class PullRequestMergedEventsStream {
               break;
             case 304:
               // Not Modified - check again in 10 seconds
+              printStatus(Quickstart.Color.YELLOW,  "Not modified. Check again in 10s.");
               Thread.sleep(10000L);
               break;
             case 403:
               // Rate Limit exceeded
               if (githubAPIResponse.remainingLimit == 0) {
                 LOGGER.warn("Rate limit exceeded, retry after 1 minute");
+                printStatus(Quickstart.Color.YELLOW,  "Rate limit exceeded, retry after 1 minute");
                 // TODO: get renewal time from header. Github won't allow retry until 60 minutes
                 Thread.sleep(60000L);
                 break;
@@ -174,6 +177,7 @@ public class PullRequestMergedEventsStream {
                       + ", from events API. Exiting.");
           }
         } catch (Exception e) {
+          printStatus(Quickstart.Color.YELLOW,  "Exception in reading events data");
           LOGGER.error("Exception in reading events data", e);
           return;
         }
