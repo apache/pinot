@@ -24,4 +24,4 @@
 #  mvn clean deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e
 #fi
 echo "Deploying to bintray"
-mvn deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e
+mvn deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e -X
