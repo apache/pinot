@@ -55,7 +55,7 @@ COUNT_STAR_RES_2=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"
 sleep 30
 COUNT_STAR_RES_3=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
 if [ "${COUNT_STAR_RES_3}" -le "${COUNT_STAR_RES_2}" ] || [ "${COUNT_STAR_RES_2}" -le "${COUNT_STAR_RES_1}" ]; then
-  echo 'Streaming Quickstart: Not getting incremental counts for 3 consecutive count star queries with 15 seconds interval.'
+  echo 'Streaming Quickstart: Not getting incremental counts for 3 consecutive count star queries with 30 seconds interval.'
   exit 1
 fi
 kill $PID
@@ -100,7 +100,7 @@ COUNT_STAR_RES_2=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"
 sleep 30
 COUNT_STAR_RES_3=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
 if [ "${COUNT_STAR_RES_3}" -le "${COUNT_STAR_RES_2}" ] || [ "${COUNT_STAR_RES_2}" -le "${COUNT_STAR_RES_1}" ]; then
-  echo 'Streaming Quickstart: Not getting incremental counts for 3 consecutive count star queries with 15 seconds interval.'
+  echo 'Streaming Quickstart: Not getting incremental counts for 3 consecutive count star queries with 30 seconds interval.'
   exit 1
 fi
 kill $PID
