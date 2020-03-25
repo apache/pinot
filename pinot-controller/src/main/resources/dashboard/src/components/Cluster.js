@@ -26,6 +26,11 @@ class Cluster extends Component {
         super(props);
     }
 
+    state = {
+        tabl : 'cluster',
+        rowss : 'cluster'
+    };
+
     createData(name, calories, fat, carbs, protein) {
         return { name, calories, fat, carbs, protein };
     }
@@ -47,23 +52,25 @@ class Cluster extends Component {
                             <Table  aria-label="simple table">
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell>Dessert (100g serving)</TableCell>
-                                        <TableCell align="right">Calories</TableCell>
-                                        <TableCell align="right">Fat&nbsp;(g)</TableCell>
-                                        <TableCell align="right">Carbs&nbsp;(g)</TableCell>
-                                        <TableCell align="right">Protein&nbsp;(g)</TableCell>
+                                        <TableCell> SERVER TENANT NAME</TableCell>
+                                        <TableCell align="right"> SERVER TENANT IP</TableCell>
+                                        <TableCell align="right"> BROKER TENANT NAME</TableCell>
+                                        <TableCell align="right"> SERVER TENANT IP</TableCell>
+
+
+
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {this.rows.map(row => (
-                                        <TableRow key={row.name}>
+                                        <TableRow key={this.state.tabl.SERVER_TENANTS}>
                                             <TableCell component="th" scope="row">
-                                                {row.name}
+                                                {this.state.tabl.SERVER_TENANTS}
                                             </TableCell>
-                                            <TableCell align="right">{row.calories}</TableCell>
-                                            <TableCell align="right">{row.fat}</TableCell>
-                                            <TableCell align="right">{row.carbs}</TableCell>
-                                            <TableCell align="right">{row.protein}</TableCell>
+                                            <TableCell align="right">{this.state.rowss.ServerInstances}</TableCell>
+                                            <TableCell align="right">{this.state.tabl.BROKER_TENANTS}</TableCell>
+                                            <TableCell align="right">{this.state.rowss.BrokerInstances}</TableCell>
+
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -105,6 +112,24 @@ class Cluster extends Component {
             </div>
         );
     }
-}
+    componentDidMount() {
+        fetch('http://localhost:9000/tenants ')
+            .then(res => res.json())
+            .then((data) => {
+                this.setState({ tabl: data })
+
+            })
+            .catch(console.log)
+
+        fetch('http://localhost:9000/tenants/DefaultTenant ')
+            .then(res1 => res1.json())
+            .then((data1) => {
+                this.setState({ rowss: data1 })
+
+            })
+            .catch(console.log)
+            };
+    }
+
 
 export default withStyles(useStyles) (Cluster);
