@@ -153,6 +153,7 @@ public class PullRequestMergedEventsStream {
                     publish(genericRecord);
                   }
                 } catch (Exception e) {
+                  printStatus(Quickstart.Color.YELLOW,  "Exception in publishing generic record. Skipping." + e.getMessage());
                   LOGGER.error("Exception in publishing generic record. Skipping", e);
                 }
               }
@@ -172,6 +173,7 @@ public class PullRequestMergedEventsStream {
                 break;
               }
             default:
+              printStatus(Quickstart.Color.YELLOW,  "Status code " + statusCode + " statusMessage " + githubAPIResponse.statusMessage);
               throw new IllegalStateException(
                   "Received statusCode: " + statusCode + ", statusMessage: " + githubAPIResponse.statusMessage
                       + ", from events API. Exiting.");

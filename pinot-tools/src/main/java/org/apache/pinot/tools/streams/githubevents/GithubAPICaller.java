@@ -44,6 +44,7 @@ public class GithubAPICaller {
   private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String IF_NONE_MATCH_HEADER = "If-None-Match";
   private static final String RATE_LIMIT_REMAINING_HEADER = "X-RateLimit-Remaining";
+  private static final String RATE_LIMIT_RESET_HEADER = "X-RateLimit-Reset";
   private static final String ETAG_HEADER = "ETag";
   private static final String TOKEN_PREFIX = "token ";
 
@@ -79,11 +80,13 @@ public class GithubAPICaller {
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
       } else {
         String remainingLimit = httpResponse.getFirstHeader(RATE_LIMIT_REMAINING_HEADER).getValue();
+        printStatus(Quickstart.Color.YELLOW,  "Rate limit remaining: " + remainingLimit + " Rate limit reset: " + httpResponse.getFirstHeader(RATE_LIMIT_RESET_HEADER).getValue());
         if (remainingLimit != null) {
           githubAPIResponse.setRemainingLimit(Integer.parseInt(remainingLimit));
         }
       }
     } catch (IOException e) {
+      printStatus(Quickstart.Color.YELLOW,  "Exception in call to GitHub events API." + e.getMessage());
       LOGGER.error("Exception in call to GitHub events API {}", EVENTS_API_URL, e);
       throw e;
     }
@@ -110,6 +113,7 @@ public class GithubAPICaller {
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
       }
     } catch (IOException e) {
+      printStatus(Quickstart.Color.YELLOW,  "Exception in call to GitHub API "  + url + " " + e.getMessage());
       LOGGER.error("Exception in call to GitHub API {}", url, e);
       throw e;
     }
