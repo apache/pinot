@@ -62,15 +62,26 @@ public class PullRequestMergedEventsStream {
 
   private StreamDataProducer _producer;
 
-  public PullRequestMergedEventsStream(String topicName, String kafkaBrokerList, String personalAccessToken)
+  public PullRequestMergedEventsStream(String schemaFilePath, String topicName, String kafkaBrokerList,
+      String personalAccessToken)
       throws Exception {
 
     _service = Executors.newFixedThreadPool(1);
-    ClassLoader classLoader = PullRequestMergedEventsStream.class.getClassLoader();
-    URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
-    Preconditions.checkNotNull(resource);
-    File pinotSchema = new File(resource.getFile());
-    _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(pinotSchema));
+    try {
+      File pinotSchema;
+      if (schemaFilePath == null) {
+        ClassLoader classLoader = PullRequestMergedEventsStream.class.getClassLoader();
+        URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
+        Preconditions.checkNotNull(resource);
+        pinotSchema = new File(resource.getFile());
+      } else {
+        pinotSchema = new File(schemaFilePath);
+      }
+      _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(pinotSchema));
+    } catch (Exception e) {
+      LOGGER.error("Got exception while reading Pinot schema from file: [" + schemaFilePath + "]");
+      throw e;
+    }
     _topicName = topicName;
     _githubAPICaller = new GithubAPICaller(personalAccessToken);
 
@@ -272,9 +283,11 @@ public class PullRequestMergedEventsStream {
   public static void main(String[] args)
       throws Exception {
     String personalAccessToken = args[0];
+    String schemaFile = args[1];
     String topic = "pullRequestMergedEvent";
     PullRequestMergedEventsStream stream =
-        new PullRequestMergedEventsStream(topic, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, personalAccessToken);
+        new PullRequestMergedEventsStream(schemaFile, topic, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+            personalAccessToken);
     stream.execute();
   }
 }

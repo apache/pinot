@@ -1,0 +1,266 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: examples
+  namespace: pinot-quickstart
+data:
+  pullRequestMergedEvents_realtime_table_config.json: |-
+    {
+      "tableName": "pullRequestMergedEvents",
+      "tableType": "REALTIME",
+      "segmentsConfig": {
+        "timeColumnName": "mergedTimeMillis",
+        "timeType": "MILLISECONDS",
+        "retentionTimeUnit": "DAYS",
+        "retentionTimeValue": "60",
+        "schemaName": "pullRequestMergedEvents",
+        "replication": "1",
+        "replicasPerPartition": "1"
+      },
+      "tenants": {},
+      "tableIndexConfig": {
+        "loadMode": "MMAP",
+        "streamConfigs": {
+          "streamType": "kafka",
+          "stream.kafka.consumer.type": "simple",
+          "stream.kafka.topic.name": "pullRequestMergedEvents",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "stream.kafka.hlc.zk.connect.string": "kafka-zookeeper:2181",
+          "stream.kafka.zk.broker.url": "kafka-zookeeper:2181",
+          "stream.kafka.broker.list": "kafka:9092",
+          "realtime.segment.flush.threshold.time": "12h",
+          "realtime.segment.flush.threshold.size": "100000",
+          "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+        }
+      },
+      "metadata": {
+        "customConfigs": {}
+      }
+    }
+
+  pullRequestMergedEvents_schema.json: |-
+    {
+      "schemaName": "pullRequestMergedEvents",
+      "dimensionFieldSpecs": [
+        {
+          "name": "title",
+          "dataType": "STRING",
+          "defaultNullValue": ""
+        },
+        {
+          "name": "labels",
+          "dataType": "STRING",
+          "singleValueField": false,
+          "defaultNullValue": ""
+        },
+        {
+          "name": "userId",
+          "dataType": "STRING",
+          "defaultNullValue": ""
+        },
+        {
+          "name": "userType",
+          "dataType": "STRING",
+          "defaultNullValue": ""
+        },
+        {
+          "name": "authorAssociation",
+          "dataType": "STRING",
+          "defaultNullValue": ""
+        },
+        {
+          "name": "mergedBy",
+          "dataType": "STRING",
+          "defaultNullValue": ""
+        },
+        {
+          "name": "assignees",
+          "dataType": "STRING",
+          "singleValueField": false,
+          "defaultNullValue": ""
+        },
+        {
+          "name": "authors",
+          "dataType": "STRING",
+          "singleValueField": false,
+          "defaultNullValue": ""
+        },
+        {
+          "name": "committers",
+          "dataType": "STRING",
+          "singleValueField": false,
+          "defaultNullValue": ""
+        },
+        {
+          "name": "requestedReviewers",
+          "dataType": "STRING",
+          "singleValueField": false,
+          "defaultNullValue": ""
+        },
+        {
+          "name": "requestedTeams",
+          "dataType": "STRING",
+          "singleValueField": false,
+          "defaultNullValue": ""
+        },
+        {
+          "name": "reviewers",
+          "dataType": "STRING",
+          "singleValueField": false,
+          "defaultNullValue": ""
+        },
+        {
+          "name": "commenters",
+          "dataType": "STRING",
+          "singleValueField": false,
+          "defaultNullValue": ""
+        },
+        {
+          "name": "repo",
+          "dataType": "STRING",
+          "defaultNullValue": ""
+        },
+        {
+          "name": "organization",
+          "dataType": "STRING",
+          "defaultNullValue": ""
+        }
+      ],
+      "metricFieldSpecs": [
+        {
+          "name": "count",
+          "dataType": "LONG",
+          "defaultNullValue": 1
+        },
+        {
+          "name": "numComments",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numReviewComments",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numCommits",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numLinesAdded",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numLinesDeleted",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numFilesChanged",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numAuthors",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numCommitters",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numReviewers",
+          "dataType": "LONG"
+        },
+        {
+          "name": "numCommenters",
+          "dataType": "LONG"
+        },
+        {
+          "name": "createdTimeMillis",
+          "dataType": "LONG"
+        },
+        {
+          "name": "elapsedTimeMillis",
+          "dataType": "LONG"
+        }
+      ],
+      "timeFieldSpec": {
+        "incomingGranularitySpec": {
+          "timeType": "MILLISECONDS",
+          "timeFormat": "EPOCH",
+          "dataType": "LONG",
+          "name": "mergedTimeMillis"
+        }
+      }
+    }
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pinot-github-events-table-creation
+  namespace: pinot-quickstart
+spec:
+  template:
+    spec:
+      containers:
+        - name: pinot-add-github-events-realtime-table-json
+          image: apachepinot/pinot:stream_github_events
+          args: [ "AddTable", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json", "-tableConfigFile", "/var/pinot/examples/pullRequestMergedEvents_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms4G -Xmx4G -Dpinot.admin.system.exit=true"
+          volumeMounts:
+            - name: examples
+              mountPath: /var/pinot/examples
+      restartPolicy: OnFailure
+      volumes:
+        - name: examples
+          configMap:
+            name: examples
+  backoffLimit: 100
+
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: pinot-github-events-data-into-kafka
+  namespace: pinot-quickstart
+  labels:
+    app: pinot-github-events-data-into-kafka
+spec:
+  selector:
+    matchLabels:
+      app: pinot-github-events-data-into-kafka
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: pinot-github-events-data-into-kafka
+    spec:
+      containers:
+        - image: apachepinot/pinot:stream_github_events
+          imagePullPolicy: Always
+          name: pinot-github-events-data-into-kafka
+          args: [ "StreamGithubEvents", "-topic", "pullRequestMergedEvents", "-personalAccessToken", "22a06d518c194b3edd09d86722f56a0b4d3693a5", "-kafkaBrokerList", "kafka:9092", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json" ]
+      restartPolicy: Always
+
+
+

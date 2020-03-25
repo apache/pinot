@@ -44,6 +44,9 @@ public class StreamGithubEventsCommand extends AbstractBaseAdminCommand implemen
   @Option(name = "-eventType", metaVar = "<String>", usage = "Type of Github event. Supported types - pullRequestMergedEvent")
   private String _eventType = PULL_REQUEST_MERGED_EVENT_TYPE;
 
+  @Option(name = "-schemaFile", metaVar = "<String>", usage = "Path to schema file. By default uses examples/stream/githubEvents/pullRequestMergedEvents_schema.json")
+  private String _schemaFile;
+
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -63,6 +66,10 @@ public class StreamGithubEventsCommand extends AbstractBaseAdminCommand implemen
     _eventType = eventType;
   }
 
+  public void setSchemaFile(String schemaFile) {
+    _schemaFile = schemaFile;
+  }
+
   @Override
   public boolean getHelp() {
     return _help;
@@ -76,7 +83,7 @@ public class StreamGithubEventsCommand extends AbstractBaseAdminCommand implemen
   @Override
   public String toString() {
     return ("StreamGithubEvents -personalAccessToken " + _personalAccessToken + " -kafkaBrokerList " + _kafkaBrokerList
-        + " -topic " + _topic + " eventType " + _eventType);
+        + " -topic " + _topic + " eventType " + _eventType + " schemaFile " + _schemaFile);
   }
 
   @Override
@@ -94,7 +101,7 @@ public class StreamGithubEventsCommand extends AbstractBaseAdminCommand implemen
     PluginManager.get().init();
     if (PULL_REQUEST_MERGED_EVENT_TYPE.equals(_eventType)) {
       PullRequestMergedEventsStream
-          pullRequestMergedEventsStream = new PullRequestMergedEventsStream(_topic, _kafkaBrokerList, _personalAccessToken);
+          pullRequestMergedEventsStream = new PullRequestMergedEventsStream(_schemaFile, _topic, _kafkaBrokerList, _personalAccessToken);
       pullRequestMergedEventsStream.execute();
     } else {
       throw new UnsupportedOperationException("Event type " + _eventType + " is unsupported");

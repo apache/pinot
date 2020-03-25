@@ -94,8 +94,8 @@ public class GithubEventsQuickstart {
 
     printStatus(Color.CYAN, "***** Starting pullRequestMergedEvents data stream and publishing to Kafka *****");
     final PullRequestMergedEventsStream pullRequestMergedEventsStream =
-        new PullRequestMergedEventsStream("pullRequestMergedEvents", KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-            personalAccessToken);
+        new PullRequestMergedEventsStream(schemaFile.getAbsolutePath(), "pullRequestMergedEvents",
+            KafkaStarterUtils.DEFAULT_KAFKA_BROKER, personalAccessToken);
     pullRequestMergedEventsStream.execute();
     printStatus(Color.CYAN, "***** Waiting for 10 seconds for a few events to get populated *****");
     Thread.sleep(10000);
