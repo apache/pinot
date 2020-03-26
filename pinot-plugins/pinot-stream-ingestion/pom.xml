@@ -27,7 +27,7 @@
     <artifactId>pinot-plugins</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>${revision}${sha1}</version>
-    <relativePath>../pom.xml</relativePath>
+    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-stream-ingestion</artifactId>
   <packaging>pom</packaging>

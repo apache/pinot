@@ -27,7 +27,7 @@
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>${revision}${sha1}</version>
-    <relativePath>../pom.xml</relativePath>
+    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-plugins</artifactId>
   <packaging>pom</packaging>
@@ -35,7 +35,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <plugin.type></plugin.type>
+    <plugin.type />
   </properties>
 
   <modules>
