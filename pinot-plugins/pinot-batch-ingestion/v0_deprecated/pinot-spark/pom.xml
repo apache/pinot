@@ -26,6 +26,7 @@
     <artifactId>v0_deprecated</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>${revision}${sha1}</version>
+    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-spark</artifactId>
   <name>Pinot Spark</name>

@@ -27,6 +27,7 @@
     <artifactId>pinot-batch-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>${revision}${sha1}</version>
+    <relativePath>..</relativePath>
   </parent>
 
   <artifactId>v0_deprecated</artifactId>

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -21,16 +21,14 @@
 # deploy the release to bintray
 #if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
 #  echo "Deploying to bintray"
-#  mvn clean deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e
+#  mvn clean deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e -DretryFailedDeploymentCount=5
 #fi
 echo "Deploying to bintray"
-echo ${BUILD_VERSION}
 
-mvn org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate -Dexpression=revision -N -q -DforceStdout
-
-export BUILD_VERSION=$(mvn org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate -Dexpression=revision -N -q -DforceStdout)
+BUILD_VERSION=$(grep -E "<revision>(.*)</revision>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1)
 echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
-#mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}"
-#mvn versions:commit
-#
-#mvn deploy --settings .ci.settings.xml -DskipTests -e
+mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}"
+mvn versions:commit
+
+# Deploy to bintray
+mvn deploy -s .ci.settings.xml -DskipTests -DretryFailedDeploymentCount=5
