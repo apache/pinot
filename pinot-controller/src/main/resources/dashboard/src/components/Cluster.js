@@ -24,16 +24,21 @@ class Cluster extends Component {
 
     constructor(props) {
         super(props);
+        this.state = {
+            tenants : '',
+            tenants_instance : '',
+            tabls : ''
+
+
+        };
     }
 
-    state = {
-        tabl : 'cluster',
-        rowss : 'cluster'
-    };
+
 
     createData(name, calories, fat, carbs, protein) {
         return { name, calories, fat, carbs, protein };
     }
+
 
     rows = [
         this.createData('Frozen yoghurt', 159, 6.0, 24, 4.0),
@@ -44,6 +49,35 @@ class Cluster extends Component {
     ];
 
     render() {
+        var numServers = 0;
+        var numBrokers = 0;
+        var numTables = 0;
+        var tents = this.state.tenants
+        var tblss = this.state.tabls
+
+        for (var keys in tents){
+            if (tents.hasOwnProperty(keys)) {
+                    if(keys === 'SERVER_TENANTS'){
+                        numServers = tents[keys].length
+
+                    }
+                    else{
+                        numBrokers = tents[keys].length
+
+                    }
+
+
+            }
+        }
+        for (var keys in tblss){
+            if (tblss.hasOwnProperty(keys)) {
+                numTables = tblss[keys].length;
+
+
+
+            }
+        }
+
         return (
             <div>
                 <Card style={{background:"#f5f5f5"}}>
@@ -52,27 +86,26 @@ class Cluster extends Component {
                             <Table  aria-label="simple table">
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell> SERVER TENANT NAME</TableCell>
-                                        <TableCell align="right"> SERVER TENANT IP</TableCell>
-                                        <TableCell align="right"> BROKER TENANT NAME</TableCell>
-                                        <TableCell align="right"> SERVER TENANT IP</TableCell>
+                                        <TableCell> TENANT NAME</TableCell>
+                                        <TableCell align="right"> Number of Servers</TableCell>
+                                        <TableCell align="right"> Number of Brokers</TableCell>
+                                        <TableCell align="right"> Number of Tables</TableCell>
 
 
 
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {this.rows.map(row => (
-                                        <TableRow key={this.state.tabl.SERVER_TENANTS}>
+                                <TableRow>
                                             <TableCell component="th" scope="row">
-                                                {this.state.tabl.SERVER_TENANTS}
+                                                {this.state.tenants.SERVER_TENANTS}
                                             </TableCell>
-                                            <TableCell align="right">{this.state.rowss.ServerInstances}</TableCell>
-                                            <TableCell align="right">{this.state.tabl.BROKER_TENANTS}</TableCell>
-                                            <TableCell align="right">{this.state.rowss.BrokerInstances}</TableCell>
+                                            <TableCell align="right">{numServers}</TableCell>
+                                            <TableCell align="right">{numBrokers}</TableCell>
+                                            <TableCell align="right">{numTables}</TableCell>
 
                                         </TableRow>
-                                    ))}
+
                                 </TableBody>
                             </Table>
                         </TableContainer>
@@ -116,15 +149,23 @@ class Cluster extends Component {
         fetch('http://localhost:9000/tenants ')
             .then(res => res.json())
             .then((data) => {
-                this.setState({ tabl: data })
+                this.setState({ tenants: data })
 
             })
+
             .catch(console.log)
 
         fetch('http://localhost:9000/tenants/DefaultTenant ')
             .then(res1 => res1.json())
             .then((data1) => {
-                this.setState({ rowss: data1 })
+                this.setState({ tenants_instance: data1 })
+
+            })
+            .catch(console.log)
+        fetch('http://localhost:9000/tables ')
+            .then(res2 => res2.json())
+            .then((data2) => {
+                this.setState({tabls : data2 })
 
             })
             .catch(console.log)
