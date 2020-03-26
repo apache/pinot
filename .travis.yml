@@ -6,15 +6,17 @@ before_install:
   - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
   - export PATH=$PATH:~/bin
   - jq --version
-  - export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
+  - source ./.travis_set_deploy_build_opts.sh
+#  - export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
+#  - export DEPLOY_BUILD_OPTS="-Dsha1=-dev-${TRAVIS_BUILD_NUMBER}"
 
 jdk:
   - oraclejdk8
 
-cache:
-  directories:
-    - $HOME/.m2
-  yarn: true
+cache: false
+#  directories:
+#    - $HOME/.m2
+#  yarn: true
 
 addons:
   firefox: latest
