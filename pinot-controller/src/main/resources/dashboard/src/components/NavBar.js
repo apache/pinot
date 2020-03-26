@@ -11,6 +11,7 @@ class NavBar extends Component {
         super(props);
         this.dsiplayPage = this.dsiplayPage.bind(this);
         this.displayServers = this.displayServers.bind(this);
+        this.displayTables = this.displayTables.bind(this);
     }
 
 
@@ -20,6 +21,10 @@ class NavBar extends Component {
 
     displayServers() {
         this.props.mutateState('servers');
+    };
+
+    displayTables() {
+        this.props.mutateState('tables');
     };
 
     render() {
@@ -38,7 +43,7 @@ class NavBar extends Component {
                         </TypoGraphy>
                     </ListItemText>
 
-                    <ListItemText inset>
+                    <ListItemText inset onClick={this.displayTables}>
                         <TypoGraphy color="inherit" variant="title">
                             Tables
                         </TypoGraphy>

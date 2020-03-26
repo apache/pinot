@@ -3,10 +3,9 @@ import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
 import NavBar from "./components/NavBar";
 import Posts from "./components/Posts";
-import Posts1 from "./components/Posts1";
-import Posts2 from "./components/Posts2";
 import Cluster from "./components/Cluster";
 import Servers from "./components/Servers";
+import Tables from "./components/Tables";
 
 class App extends React.Component {
 
@@ -36,8 +35,8 @@ class App extends React.Component {
         if(this.state.currentPost === 'servers') {
             displayPost = <Servers></Servers>
         }
-        if(this.state.currentPost === 'post2') {
-            displayPost = <Posts2></Posts2>
+        if(this.state.currentPost === 'tables') {
+            displayPost = <Tables></Tables>
         }
 
         return (
