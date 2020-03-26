@@ -9,6 +9,7 @@ import withStyles from "@material-ui/core/styles/withStyles";
 import TableBody from "@material-ui/core/TableBody";
 import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
+import TypoGraphy from "@material-ui/core/Typography";
 
 const useStyles = theme => ({
     table: {
@@ -73,13 +74,17 @@ class Cluster extends Component {
 
         return (
 
+
             <div>
+
+
                 <Card style={{background:"#f5f5f5"}}>
                     <CardContent >
                         <TableContainer component={Paper} >
                             <Table  aria-label="simple table">
                                 <TableHead>
                                     <TableRow>
+
                                         <TableCell> TENANT NAME</TableCell>
                                         <TableCell align="right"> Number of Servers</TableCell>
                                         <TableCell align="right"> Number of Brokers</TableCell>
@@ -87,7 +92,7 @@ class Cluster extends Component {
 
 
 
-                                    </TableRow>
+                                   </TableRow>
                                 </TableHead>
                                 <TableBody>
 
