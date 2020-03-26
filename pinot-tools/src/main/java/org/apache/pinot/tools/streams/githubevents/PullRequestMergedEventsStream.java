@@ -66,7 +66,7 @@ public class PullRequestMergedEventsStream {
       String personalAccessToken)
       throws Exception {
 
-    _service = Executors.newFixedThreadPool(1);
+    _service = Executors.newFixedThreadPool(2);
     try {
       File pinotSchema;
       if (schemaFilePath == null) {
@@ -123,9 +123,9 @@ public class PullRequestMergedEventsStream {
     if (!_keepStreaming) {
       return;
     }
-    printStatus(Quickstart.Color.YELLOW,  "Publishing");
+    printStatus(Quickstart.Color.YELLOW, "Publishing");
     _producer.produce(_topicName, message.toString().getBytes(StandardCharsets.UTF_8));
-    printStatus(Quickstart.Color.YELLOW,  "Published");
+    printStatus(Quickstart.Color.YELLOW, "Published");
   }
 
   public void start() {
@@ -140,57 +140,61 @@ public class PullRequestMergedEventsStream {
           return;
         }
         try {
-          printStatus(Quickstart.Color.YELLOW,  "Calling events api..");
           GithubAPICaller.GithubAPIResponse githubAPIResponse = _githubAPICaller.callEventsAPI(etag);
-          printStatus(Quickstart.Color.YELLOW,  "Called api..");
           int statusCode = githubAPIResponse.statusCode;
           switch (statusCode) {
             case 200:
               etag = githubAPIResponse.etag;
               String responseString = githubAPIResponse.responseString;
-              printStatus(Quickstart.Color.YELLOW,  "parsing " + statusCode);
               JsonArray jsonArray = new JsonParser().parse(responseString).getAsJsonArray();
-              printStatus(Quickstart.Color.YELLOW,  "parsed " + statusCode);
+              printStatus(Quickstart.Color.YELLOW, "parsed " + statusCode);
 
               for (JsonElement eventElement : jsonArray) {
                 try {
                   GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
                   if (genericRecord != null) {
-                    printStatus(Quickstart.Color.CYAN,  genericRecord.toString());
+                    printStatus(Quickstart.Color.CYAN, genericRecord.toString());
                     publish(genericRecord);
                   }
                 } catch (Exception e) {
-                  printStatus(Quickstart.Color.YELLOW,  "Exception in publishing generic record. Skipping." + e.getMessage());
+                  printStatus(Quickstart.Color.YELLOW,
+                      "Exception in publishing generic record. Skipping." + e.getMessage());
                   LOGGER.error("Exception in publishing generic record. Skipping", e);
                 }
               }
               break;
             case 304:
               // Not Modified - check again in 10 seconds
-              printStatus(Quickstart.Color.YELLOW,  "Not modified. Check again in 10s.");
-              Thread.sleep(10000L);
+              printStatus(Quickstart.Color.YELLOW, "Not modified. Check again in 10s.");
+              Thread.sleep(10_000L);
+              break;
+            case 408:
+              // Timeout - try again in 10 seconds
+              printStatus(Quickstart.Color.YELLOW, "Timeout. Try again in 10s.");
+              Thread.sleep(10_000L);
               break;
             case 403:
               // Rate Limit exceeded
-              if (githubAPIResponse.remainingLimit == 0) {
-                LOGGER.warn("Rate limit exceeded, retry after 1 minute");
-                printStatus(Quickstart.Color.YELLOW,  "Rate limit exceeded, retry after 1 minute");
-                // TODO: get renewal time from header. Github won't allow retry until 60 minutes
-                Thread.sleep(60000L);
-                break;
-              }
-            default:
-              printStatus(Quickstart.Color.YELLOW,  "Status code " + statusCode + " statusMessage " + githubAPIResponse.statusMessage);
+              printStatus(Quickstart.Color.YELLOW, "Rate limit exceeded, retry after 1 minute");
+              // TODO: get renewal time from header. Github won't allow retry until 60 minutes
+              Thread.sleep(60_000L);
+              break;
+            case 401:
+              printStatus(Quickstart.Color.YELLOW, "Unauthorized call. Exiting");
               throw new IllegalStateException(
-                  "Received statusCode: " + statusCode + ", statusMessage: " + githubAPIResponse.statusMessage
+                  "StatusCode: " + statusCode + ", statusMessage: " + githubAPIResponse.statusMessage
                       + ", from events API. Exiting.");
+            default:
+              printStatus(Quickstart.Color.YELLOW,
+                  "Unknown status code " + statusCode + " statusMessage " + githubAPIResponse.statusMessage);
+              Thread.sleep(10_000);
           }
         } catch (Exception e) {
-          printStatus(Quickstart.Color.YELLOW,  "Exception in reading events data");
+          printStatus(Quickstart.Color.YELLOW, "Exception in reading events data");
           LOGGER.error("Exception in reading events data", e);
           return;
         }
-        printStatus(Quickstart.Color.YELLOW,  "Continuing.." + _keepStreaming);
+        printStatus(Quickstart.Color.YELLOW, "Continuing.." + _keepStreaming);
       }
     });
   }
@@ -207,80 +211,75 @@ public class PullRequestMergedEventsStream {
     JsonObject event = eventJson.getAsJsonObject();
     String type = event.get("type").getAsString();
 
-    printStatus(Quickstart.Color.YELLOW,  "Convert to pr event");
+    if ("PullRequestEvent".equals(type)) {
+      printStatus(Quickstart.Color.YELLOW, "PR event");
+      JsonObject payload = event.get("payload").getAsJsonObject();
+      if (payload != null) {
+        String action = payload.get("action").getAsString();
+        JsonObject pullRequest = payload.get("pull_request").getAsJsonObject();
+        String merged = pullRequest.get("merged").getAsString();
+        if ("closed".equals(action) && "true".equals(merged)) { // valid pull request merge event
 
-    try {
-      if ("PullRequestEvent".equals(type)) {
-        printStatus(Quickstart.Color.YELLOW, "PR event");
-        JsonObject payload = event.get("payload").getAsJsonObject();
-        if (payload != null) {
-          String action = payload.get("action").getAsString();
-          JsonObject pullRequest = payload.get("pull_request").getAsJsonObject();
-          String merged = pullRequest.get("merged").getAsString();
-          if ("closed".equals(action) && "true".equals(merged)) { // valid pull request merge event
+          printStatus(Quickstart.Color.YELLOW, "Closed and merged");
+          JsonArray commits = null;
+          try {
+            // get commits
+            printStatus(Quickstart.Color.YELLOW, "Get commits");
+            String commitsURL = pullRequest.get("commits_url").getAsString();
+            GithubAPICaller.GithubAPIResponse commitsResponse = _githubAPICaller.callAPI(commitsURL);
 
-            printStatus(Quickstart.Color.YELLOW,  "Closed and merged");
-            JsonArray commits = null;
-            try {
-              // get commits
-              printStatus(Quickstart.Color.YELLOW,  "Get commits");
-              String commitsURL = pullRequest.get("commits_url").getAsString();
-              GithubAPICaller.GithubAPIResponse commitsResponse = _githubAPICaller.executeGet(commitsURL);
-
-              if (commitsResponse.responseString != null) {
-                commits = new JsonParser().parse(commitsResponse.responseString).getAsJsonArray();
-              }
-              printStatus(Quickstart.Color.YELLOW,  "Got commits");
-            } catch (Exception e) {
-              printStatus(Quickstart.Color.YELLOW,  "Exception in commits" + e.getMessage());
-              throw e;
+            if (commitsResponse.responseString != null) {
+              commits = new JsonParser().parse(commitsResponse.responseString).getAsJsonArray();
             }
-
-            JsonArray reviewComments = null;
-            try {
-              // get review comments
-              printStatus(Quickstart.Color.YELLOW,  "Get review comments");
-              String reviewCommentsURL = pullRequest.get("review_comments_url").getAsString();
-              GithubAPICaller.GithubAPIResponse reviewCommentsResponse = _githubAPICaller.executeGet(reviewCommentsURL);
-
-              if (reviewCommentsResponse.responseString != null) {
-                reviewComments = new JsonParser().parse(reviewCommentsResponse.responseString).getAsJsonArray();
-              }
-              printStatus(Quickstart.Color.YELLOW,  "Got review comments");
-            } catch (Exception e) {
-              printStatus(Quickstart.Color.YELLOW,  "Exception in review comments" + e.getMessage());
-              throw e;
-            }
-
-            JsonArray comments = null;
-            try {
-              // get comments
-              printStatus(Quickstart.Color.YELLOW,  "Get comments");
-              String commentsURL = pullRequest.get("comments_url").getAsString();
-              GithubAPICaller.GithubAPIResponse commentsResponse = _githubAPICaller.executeGet(commentsURL);
-
-              if (commentsResponse.responseString != null) {
-                comments = new JsonParser().parse(commentsResponse.responseString).getAsJsonArray();
-              }
-              printStatus(Quickstart.Color.YELLOW,  "Got comments");
-            } catch (Exception e) {
-              printStatus(Quickstart.Color.YELLOW,  "Exception in comments" + e.getMessage());
-              throw e;
-            }
-
-            // get PullRequestMergeEvent
-            PullRequestMergedEvent pullRequestMergedEvent = new PullRequestMergedEvent(event, commits, reviewComments, comments);
-            printStatus(Quickstart.Color.YELLOW,  "Made pr event");
-            // make generic record
-            genericRecord = convertToGenericRecord(pullRequestMergedEvent);
-            printStatus(Quickstart.Color.YELLOW,  "made generic record");
+            printStatus(Quickstart.Color.YELLOW, "Got commits");
+          } catch (Exception e) {
+            printStatus(Quickstart.Color.YELLOW, "Exception in commits" + e.getMessage());
+            throw e;
           }
+
+          JsonArray reviewComments = null;
+          try {
+            // get review comments
+            printStatus(Quickstart.Color.YELLOW, "Get review comments");
+            String reviewCommentsURL = pullRequest.get("review_comments_url").getAsString();
+            GithubAPICaller.GithubAPIResponse reviewCommentsResponse = _githubAPICaller.callAPI(reviewCommentsURL);
+
+            if (reviewCommentsResponse.responseString != null) {
+              reviewComments = new JsonParser().parse(reviewCommentsResponse.responseString).getAsJsonArray();
+            }
+            printStatus(Quickstart.Color.YELLOW, "Got review comments");
+          } catch (Exception e) {
+            printStatus(Quickstart.Color.YELLOW, "Exception in review comments" + e.getMessage());
+            throw e;
+          }
+
+          JsonArray comments = null;
+          try {
+            // get comments
+            printStatus(Quickstart.Color.YELLOW, "Get comments");
+            String commentsURL = pullRequest.get("comments_url").getAsString();
+            GithubAPICaller.GithubAPIResponse commentsResponse = _githubAPICaller.callAPI(commentsURL);
+
+            if (commentsResponse.responseString != null) {
+              comments = new JsonParser().parse(commentsResponse.responseString).getAsJsonArray();
+            }
+            printStatus(Quickstart.Color.YELLOW, "Got comments");
+          } catch (Exception e) {
+            printStatus(Quickstart.Color.YELLOW, "Exception in comments" + e.getMessage());
+            throw e;
+          }
+
+          // get PullRequestMergeEvent
+          PullRequestMergedEvent pullRequestMergedEvent =
+              new PullRequestMergedEvent(event, commits, reviewComments, comments);
+          printStatus(Quickstart.Color.YELLOW, "Made pr event");
+          // make generic record
+          genericRecord = convertToGenericRecord(pullRequestMergedEvent);
+          printStatus(Quickstart.Color.YELLOW, "made generic record");
         }
       }
-    } catch (Exception e) {
-      printStatus(Quickstart.Color.YELLOW,  "Exception " + e.getMessage());
     }
-    printStatus(Quickstart.Color.YELLOW,  "Return from conversion");
+    printStatus(Quickstart.Color.YELLOW, "Return from conversion");
     return genericRecord;
   }
 
