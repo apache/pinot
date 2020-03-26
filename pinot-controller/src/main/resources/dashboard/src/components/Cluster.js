@@ -10,6 +10,7 @@ import TableBody from "@material-ui/core/TableBody";
 import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
 import TypoGraphy from "@material-ui/core/Typography";
+import App from "../App";
 
 const useStyles = theme => ({
     table: {
@@ -50,7 +51,7 @@ class Cluster extends Component {
 
     populateInstance(instance) {
 
-        fetch('http://localhost:9000' + '/tenants/' + instance +'/metadata')
+        fetch(App.serverAddress + '/tenants/' + instance +'/metadata')
             .then(res => res.json())
             .then((data) => {
                 this.populateDisplayData(data);
@@ -59,7 +60,7 @@ class Cluster extends Component {
     }
 
     populateInstanceTbl(instance) {
-        fetch('http://localhost:9000' + '/tenants/' + instance +'/tables')
+        fetch(App.serverAddress + '/tenants/' + instance +'/tables')
             .then(res => res.json())
             .then((data) => {
                 this.populateTblDisplayData(data);
@@ -116,7 +117,7 @@ class Cluster extends Component {
         );
     }
     componentDidMount() {
-        fetch('http://localhost:9000/tenants ')
+        fetch(App.serverAddress+'/tenants ')
             .then(res => res.json())
             .then((data) => {
                 data.SERVER_TENANTS.forEach((ins) => {
