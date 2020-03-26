@@ -192,6 +192,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) throws Exception {
+    LOGGER.info("Get a request to download segment {} for table {}", segmentName, tableName);
     TableDataManager tableDataManager = checkGetTableDataManager(tableName);
     String tableDir = tableDataManager.getTableDataDir();
     String tarFilePath = TarGzCompressionUtils.createTarGzOfDirectory(tableDir + "/" + segmentName);

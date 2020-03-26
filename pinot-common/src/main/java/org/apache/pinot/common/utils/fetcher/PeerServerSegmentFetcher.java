@@ -60,10 +60,14 @@ public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
     }
     String peerServerUri = getPeerServerURI(uri.getPath().substring(1));
     if (peerServerUri == null) {
-      throw new Exception("Unable to found peer server for segment " + uri);
+      throw new Exception("Unable to find peer server for segment " + uri);
     }
 
+    _logger.info("Use peer server uri {} for segment download with class {}.", peerServerUri,
+        SegmentFetcherFactory.getSegmentFetcher(new URI(peerServerUri).getScheme()).getClass().getName());
     SegmentFetcherFactory.fetchSegmentToLocal(new URI(peerServerUri), dest);
+    _logger.info("Download succeed with {}",
+        SegmentFetcherFactory.getSegmentFetcher(new URI(peerServerUri).getScheme()).getClass().getName());
   }
 
   // Return the address of an ONLINE server hosting a segment. The returned address is of format
@@ -73,8 +77,9 @@ public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
     String tableNameWithType = TableNameBuilder.forType(CommonConstants.Helix.TableType.REALTIME).
         tableNameWithType(llcSegmentName.getTableName());
 
+    HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
     ExternalView externalViewForResource =
-        HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixClusterName, tableNameWithType);
+        HelixHelper.getExternalViewForResource(helixAdmin, _helixClusterName, tableNameWithType);
     if (externalViewForResource == null) {
       _logger.warn("External View not found for segment {}", segmentName);
       return null;
@@ -102,12 +107,14 @@ public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
       Random r = new Random();
       String instanceId = availableServers.get(r.nextInt(availableServers.size()));
 
-      InstanceConfig instanceConfig = _helixManager.getClusterManagmentTool().getInstanceConfig(_helixClusterName, instanceId);
+      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(_helixClusterName, instanceId);
       String hostName = instanceConfig.getHostName();
 
       int port;
       try {
-        port = Integer.parseInt(instanceConfig.getPort());
+        HelixHelper.getInstanceConfigsMapFor(instanceId, _helixClusterName, helixAdmin);
+        port = Integer.parseInt(HelixHelper.getInstanceConfigsMapFor(instanceId, _helixClusterName, helixAdmin)
+            .get(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
       } catch (Exception e) {
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
       }

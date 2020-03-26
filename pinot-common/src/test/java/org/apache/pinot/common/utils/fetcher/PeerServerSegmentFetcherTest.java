@@ -128,8 +128,9 @@ public class PeerServerSegmentFetcherTest {
     @Override
     public void fetchSegmentToLocal(URI uri, File dest)
         throws Exception {
+      // Verify that the correct server and its admin port is called.
       assertEquals(uri.toString(),
-          StringUtil.join("/","http://s1:1000", "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1));
+          StringUtil.join("/","http://s1:1008", "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1));
       _fetchFileToLocalCalled++;
     }
   }

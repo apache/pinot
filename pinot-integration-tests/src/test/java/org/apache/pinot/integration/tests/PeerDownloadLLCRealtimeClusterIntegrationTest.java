@@ -100,7 +100,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
       TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas)
       throws Exception {
-    System.out.println("Setup realtime table with download completion mode");
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);

@@ -231,6 +231,7 @@ public class SegmentCompletionProtocol {
         _segmentLocation = params.getSegmentLocation();
         _memoryUsedBytes = params.getMemoryUsedBytes();
         _segmentSizeBytes = params.getSegmentSizeBytes();
+        _segmentUploadToControllerEnabled = params.getSegmentUploadToControllerEnabled();
       }
 
       public Params withOffset(long offset) {

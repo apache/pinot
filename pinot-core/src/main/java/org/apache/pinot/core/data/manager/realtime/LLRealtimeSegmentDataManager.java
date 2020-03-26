@@ -804,12 +804,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (!segTarFile.exists()) {
       throw new RuntimeException("Segment file does not exist:" + segTarFileName);
     }
-    // Set the flag to true to prevent the server delete the segment for upload after receiving OFFLINE->ONLINE
+    // Set the flag to true to prevent the server from deleting the segment for upload after receiving OFFLINE->ONLINE
     // message from helix.
     _waitingForUploadToSegmentStore = true;
     SegmentCompletionProtocol.Response commitResponse = commit(controllerVipUrl, isSplitCommit);
 
     if (!commitResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
+      _waitingForUploadToSegmentStore = false;
       return false;
     }
     // Asynchronously upload the segment file to Pinot FS for backup. The upload result does not change the segment
@@ -840,6 +841,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         params.withSegmentLocation(StringUtil
             .join(File.separator, _realtimeTableDataManager.getTableSegmentStoreRootDir(), _tableNameWithType,
                 new File(_segmentBuildDescriptor.getSegmentTarFilePath()).getName()));
+      } else {
+        // Use an empty string to indicate the segment is not stored in a segment store.
+        params.withSegmentLocation("");
       }
     }
 

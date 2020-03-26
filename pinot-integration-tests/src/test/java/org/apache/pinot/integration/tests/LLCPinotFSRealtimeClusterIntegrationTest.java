@@ -193,7 +193,7 @@ public class LLCPinotFSRealtimeClusterIntegrationTest extends RealtimeClusterInt
     // For setting the HDFS segment fetcher.
     configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols", "file,http,hdfs");
     configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".hdfs.class",
-        "org.apache.pinot.common.segment.fetcher.PinotFSSegmentFetcher");
+        "org.apache.pinot.common.utils.fetcher.PinotFSSegmentFetcher");
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
     }

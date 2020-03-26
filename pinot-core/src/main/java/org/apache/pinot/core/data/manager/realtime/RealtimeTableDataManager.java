@@ -290,8 +290,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // If segment download from segment store fails, tried to download from peer server (only if the server
       // is configured with PeerServerSegmentFetcher.
       if (!downloadResult) {
-         SegmentFetcherFactory.fetchSegmentToLocal(new URI(StringUtil.join("/", PEER_2_PEER_PROTOCOL, segmentName)),
-             tempFile);
+        _logger.info("Download from segment store failed, use peer servers.");
+        SegmentFetcherFactory
+            .fetchSegmentToLocal(new URI(StringUtil.join("/", PEER_2_PEER_PROTOCOL, segmentName)), tempFile);
       }
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
       _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
