@@ -18,20 +18,10 @@
 # under the License.
 #
 
-# deploy the release to bintray
-#if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
-#  echo "Deploying to bintray"
-#  mvn clean deploy --settings .ci.settings.xml ${DEPLOY_BUILD_OPTS} -DskipTests -e -DretryFailedDeploymentCount=5
-#fi
-
-if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
-  echo "Deploying to bintray"
-
-  BUILD_VERSION=$(grep -E "<revision>(.*)</revision>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1)
-  echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
-  mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}" -q -B
-  mvn versions:commit -q -B
-
-  # Deploy to bintray
-  mvn deploy -s .ci.settings.xml -DskipTests -q -DretryFailedDeploymentCount=5
+# if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
+if true ; then
+  export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
+  export DEPLOY_BUILD_OPTS="-Dsha1=-dev-${TRAVIS_BUILD_NUMBER}"
+else
+  export DEPLOY_BUILD_OPTS=""
 fi

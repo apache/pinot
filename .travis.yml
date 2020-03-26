@@ -9,6 +9,9 @@ before_install:
   - export PATH=$PATH:~/bin
   - jq --version
   - curl -sSL -o ~/bin/install-jdk.sh https://raw.githubusercontent.com/sormuras/bach/master/install-jdk.sh && chmod +x ~/bin/install-jdk.sh
+  - source ./.travis_set_deploy_build_opts.sh
+#  - export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
+#  - export DEPLOY_BUILD_OPTS="-Dsha1=-dev-${TRAVIS_BUILD_NUMBER}"
 
 cache:
   directories:
@@ -24,6 +27,11 @@ install:
 branches:
   only:
     - master
+
+stages:
+  - test
+  - name: deploy
+    if: branch = master
 
 jobs:
   include:
@@ -56,3 +64,14 @@ jobs:
         - ./.travis_quickstart_openjdk.sh 11
         - ./.travis_quickstart_openjdk.sh 12
         - ./.travis_quickstart_openjdk.sh 13
+    - stage: deploy
+      script:
+        - travis_wait 40 ./.travis_nightly_build.sh
+
+#script:
+#  - travis_wait 40 ./.travis_nightly_build.sh
+
+env:
+  global:
+    - secure: R3NdobUAThkk6BBzXapek6PiuWHWa1ldnJBvXpk2TAi7Lua/Ctgg8EHCSve7+MK4SU3XFJSi1th32+VSy0K/ARfdVcxiVh6EJSL/Nw0LRQSvGk7VjO382SsWCFoJuZBBqjy9DfBgRLdoqEPfulIBC0XBxjJ+4xedRptkZo7+TAAvtB8Y32EA5ve+Z4cdJipLF1tviL5q2rVbkNXucYUYO2XIv5HOzF2Xy3Hw6lsNrHpbes2CLEkoMiLOQ30zfbXZT/5Xd6OhQNmoZJ9gKziT1opiN2AJMPv269K8FFJZTrDZX74/thq9wmeF4X4f3wPA7EbTupooj0i9LPzb8Xev1QKAsxBtHyRm9NGYOXM06c2yKiGsDtT4HZYQGk4m8/89moe3oGnEwvw/JLu5RvLIZzFE2cBhHrcxRAJgHLIr80+kebNg/YstNlDL+rmP0b9NRrGIVw5OO2BT27ZBgsMFmjnujQtCUJiJ5zqyMxygaYmgZha6xcbhFUPyf4DJ3T46etyFovg2EJnhM7HL9ECZHloQZFhEKs88sZXqvt6HKsA77xyL7ONMrwcPtdDVbFUkN/B1R7LLOf6Wq5vK/Y2EB18oXhKF0ngdahT8HKSMTXjuYf5MPybxhf4fdY6stFmIVkd9b633iZDMu+Aj8E1c8BApyDikCmYK2BI3grH49E0=
+    - secure: Hj71ADg7ZgQpn8PUbEjaz1RrjkPfPCpGksp+WDjE6jf+oDvl55ILQhPgNcxIy81UcxS3Gmx6UWteVGkNV4Fi59TJIQ8KPbQ9RU2FFVXcxHH2TmkOvdNezwkJIFUw0TNMCbRAXgDj7ov75BM6lLi271GfqPVg9pB504Bc43WohnV6lDo/y93Z/xWbuFk5uJ+cogAJme3pvYHxBNlNzwIYnNAAqrEb+YKsRuux3qWLTlm1guT78g3C9wl/WCelTo1A3hGd12FqFWmowcoQlAyhbnFJ7u7qwfSNTSGCFLYbrUGooXqTZg2B+2QZORT2b5b0P9SXgB2a/UJxXmxkUzbmPGdUJipmQCEemlxwkPCqMW0YSscTDHU5WjSxqy4Cvwa8y+DEpLu06WxAPwjBje53025PvLjsMEfNJ0wsQbm9jkrH0alzICemXyyV5uGBCmuiMv5WqZ70WEpy7xlPlk5aFTwWQRpYJ5mhQCnHCgQfiX1/reEo6Vi5DzsW6A0Qtr5UERwMpQwYd47ErbobyuJY4Bcfz/TXqfaCY2+ER9kWil87dBTDpH5K8X68FHxIwNx2OxGVwlc3JhpMXJ2uFDDeXvsPlQA2kQWgZnC03qXSZX5YmTOjHoNREGtgEsgDZS1vM5M3KZkOG0+76MWL5p/zgHfVjzS3T15W4PVWlki/WZ0=
