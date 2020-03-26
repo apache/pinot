@@ -9,6 +9,7 @@ import withStyles from "@material-ui/core/styles/withStyles";
 import TableBody from "@material-ui/core/TableBody";
 import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
+import TypoGraphy from "@material-ui/core/Typography";
 
 const useStyles = theme => ({
     table: {
@@ -40,7 +41,24 @@ class Cluster extends Component {
 
     render() {
         return (
-            <div>
+            <div style={{width:"90%", margin: "0 auto"}}>
+                <Card style={{background:"#f5f5f5"}}>
+                    <CardContent >
+                        <TableContainer component={Paper} >
+                            <Table  aria-label="simple table">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>
+                                            <TypoGraphy color="inherit" variant="h5" align= "center">
+                                                Summary Table
+                                            </TypoGraphy>
+                                        </TableCell>
+                                    </TableRow>
+                                </TableHead>
+                            </Table>
+                        </TableContainer>
+                    </CardContent>
+                </Card>
                 <Card style={{background:"#f5f5f5"}}>
                     <CardContent >
                         <TableContainer component={Paper} >
@@ -67,6 +85,23 @@ class Cluster extends Component {
                                         </TableRow>
                                     ))}
                                 </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </CardContent>
+                </Card>
+                <Card style={{background:"#f5f5f5"}}>
+                    <CardContent >
+                        <TableContainer component={Paper} >
+                            <Table  aria-label="simple table">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>
+                                            <TypoGraphy color="inherit" variant="h5" align= "center">
+                                                Tenant Details Table
+                                            </TypoGraphy>
+                                        </TableCell>
+                                    </TableRow>
+                                </TableHead>
                             </Table>
                         </TableContainer>
                     </CardContent>

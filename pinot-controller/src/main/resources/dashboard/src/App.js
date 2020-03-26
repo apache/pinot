@@ -6,8 +6,11 @@ import Posts from "./components/Posts";
 import Posts1 from "./components/Posts1";
 import Posts2 from "./components/Posts2";
 import Cluster from "./components/Cluster";
+import Servers from "./components/Servers";
 
 class App extends React.Component {
+
+    static serverAddress = "http://localhost:9000";
 
     constructor(props) {
         super(props);
@@ -19,7 +22,6 @@ class App extends React.Component {
     };
 
     processState(value) {
-        alert(value);
         this.setState({currentPost:value})
     }
 
@@ -31,8 +33,8 @@ class App extends React.Component {
         if(this.state.currentPost === 'post') {
             displayPost = <Posts></Posts>
         }
-        if(this.state.currentPost === 'post1') {
-            displayPost = <Posts1></Posts1>
+        if(this.state.currentPost === 'servers') {
+            displayPost = <Servers></Servers>
         }
         if(this.state.currentPost === 'post2') {
             displayPost = <Posts2></Posts2>
