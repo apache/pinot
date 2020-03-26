@@ -21,64 +21,58 @@ const useStyles = theme => ({
 class Cluster extends Component {
 
     classes = useStyles();
+    instances = new Array();
 
     constructor(props) {
         super(props);
-        this.state = {
-            tenants : '',
-            tenants_instance : '',
-            tabls : ''
+        this.state = {instances:[]};
 
 
-        };
+
     }
 
 
 
-    createData(name, calories, fat, carbs, protein) {
-        return { name, calories, fat, carbs, protein };
+    populateDisplayData(data) {
+        this.instances['tents_name']=data.tenantName
+        this.instances['numServers']=data.ServerInstances.length
+        this.instances['numBrokers']=data.BrokerInstances.length
+
+
+        this.setState({instances: this.instances})
+    }
+
+    populateTblDisplayData(data) {
+        this.instances['numTables']=data.tables.length
+        this.setState({instances: this.instances})
+    }
+
+    populateInstance(instance) {
+
+        fetch('http://localhost:9000' + '/tenants/' + instance +'/metadata')
+            .then(res => res.json())
+            .then((data) => {
+                this.populateDisplayData(data);
+            })
+            .catch(console.log)
+    }
+
+    populateInstanceTbl(instance) {
+        fetch('http://localhost:9000' + '/tenants/' + instance +'/tables')
+            .then(res => res.json())
+            .then((data) => {
+                this.populateTblDisplayData(data);
+            })
+            .catch(console.log)
     }
 
 
-    rows = [
-        this.createData('Frozen yoghurt', 159, 6.0, 24, 4.0),
-        this.createData('Ice cream sandwich', 237, 9.0, 37, 4.3),
-        this.createData('Eclair', 262, 16.0, 24, 6.0),
-        this.createData('Cupcake', 305, 3.7, 67, 4.3),
-        this.createData('Gingerbread', 356, 16.0, 49, 3.9),
-    ];
 
     render() {
-        var numServers = 0;
-        var numBrokers = 0;
-        var numTables = 0;
-        var tents = this.state.tenants
-        var tblss = this.state.tabls
 
-        for (var keys in tents){
-            if (tents.hasOwnProperty(keys)) {
-                    if(keys === 'SERVER_TENANTS'){
-                        numServers = tents[keys].length
-
-                    }
-                    else{
-                        numBrokers = tents[keys].length
-
-                    }
-
-
-            }
-        }
-        for (var keys in tblss){
-            if (tblss.hasOwnProperty(keys)) {
-                numTables = tblss[keys].length;
-
-
-
-            }
-        }
 
         return (
+
             <div>
                 <Card style={{background:"#f5f5f5"}}>
                     <CardContent >
@@ -96,52 +90,23 @@ class Cluster extends Component {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                <TableRow>
+
+                                    {/*{this.state.instances.map(instance => (*/}
+                                        <TableRow>
                                             <TableCell component="th" scope="row">
-                                                {this.state.tenants.SERVER_TENANTS}
+                                                {this.state.instances.tents_name}
                                             </TableCell>
-                                            <TableCell align="right">{numServers}</TableCell>
-                                            <TableCell align="right">{numBrokers}</TableCell>
-                                            <TableCell align="right">{numTables}</TableCell>
+                                            <TableCell align="right">{this.state.instances.numServers}</TableCell>
+                                            <TableCell align="right">{this.state.instances.numBrokers}</TableCell>
+                                            <TableCell align="right">{this.state.instances.numTables}</TableCell>
 
                                         </TableRow>
-
+                                        {/*))}*/}
                                 </TableBody>
                             </Table>
                         </TableContainer>
                     </CardContent>
                 </Card>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Dessert (100g serving)</TableCell>
-                                        <TableCell align="right">Calories</TableCell>
-                                        <TableCell align="right">Fat&nbsp;(g)</TableCell>
-                                        <TableCell align="right">Carbs&nbsp;(g)</TableCell>
-                                        <TableCell align="right">Protein&nbsp;(g)</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {this.rows.map(row => (
-                                        <TableRow key={row.name}>
-                                            <TableCell component="th" scope="row">
-                                                {row.name}
-                                            </TableCell>
-                                            <TableCell align="right">{row.calories}</TableCell>
-                                            <TableCell align="right">{row.fat}</TableCell>
-                                            <TableCell align="right">{row.carbs}</TableCell>
-                                            <TableCell align="right">{row.protein}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
-
             </div>
         );
     }
@@ -149,27 +114,25 @@ class Cluster extends Component {
         fetch('http://localhost:9000/tenants ')
             .then(res => res.json())
             .then((data) => {
-                this.setState({ tenants: data })
+                data.SERVER_TENANTS.forEach((ins) => {
+                    this.populateInstance(ins);
+                    this.populateInstanceTbl(ins);
+
+
+                });
 
             })
 
+
             .catch(console.log)
 
-        fetch('http://localhost:9000/tenants/DefaultTenant ')
-            .then(res1 => res1.json())
-            .then((data1) => {
-                this.setState({ tenants_instance: data1 })
 
-            })
-            .catch(console.log)
-        fetch('http://localhost:9000/tables ')
-            .then(res2 => res2.json())
-            .then((data2) => {
-                this.setState({tabls : data2 })
 
-            })
-            .catch(console.log)
             };
+
+
+
+
     }
 
 
