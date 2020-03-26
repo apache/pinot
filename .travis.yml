@@ -4,6 +4,7 @@ os:
 dist: trusty
 
 before_install:
+  - sudo apt-get update && sudo apt-get install -y --no-install-recommends gdb
   - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
   - export PATH=$PATH:~/bin
   - jq --version
@@ -38,18 +39,20 @@ jobs:
         - ./.travis_test.sh
       env:
         - RUN_INTEGRATION_TESTS=false
-    - name: "QuickStart - Java 8"
+    - name: "QuickStart - Java 8 & OpenJDK 14-15"
       jdk: oraclejdk8
       script:
         - ./.travis_quickstart.sh
         - jdk_switcher use openjdk8
         - ./.travis_install.sh
         - ./.travis_quickstart.sh
-    - name: "QuickStart - Java 11"
-      jdk: oraclejdk11
+        - ./.travis_quickstart_openjdk.sh 14
+        - ./.travis_quickstart_openjdk.sh 15
+    - name: "QuickStart - OpenJDK 10-13"
+      jdk: openjdk10
       script:
+        - java -version
         - ./.travis_quickstart.sh
-        - export JAVA_HOME=$HOME/openjdk11
-        - ~/bin/install-jdk.sh --target $JAVA_HOME --feature "11" --license "GPL" --cacerts
-        - ./.travis_install.sh
-        - ./.travis_quickstart.sh
+        - ./.travis_quickstart_openjdk.sh 11
+        - ./.travis_quickstart_openjdk.sh 12
+        - ./.travis_quickstart_openjdk.sh 13

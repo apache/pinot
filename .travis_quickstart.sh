@@ -26,6 +26,12 @@ if [ $? -eq 0 ]; then
   exit 0
 fi
 
+# Remove Pinot files from local Maven repository to avoid a useless cache rebuild
+rm -rf ~/.m2/repository/org/apache/pinot/
+
+# Java version
+java -version
+
 # Quickstart
 DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
 cd ${DIST_BIN_DIR}
@@ -35,6 +41,7 @@ bin/quick-start-batch.sh &
 PID=$!
 
 PASS=0
+sleep 30
 for i in $(seq 1 200)
 do
   COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
@@ -58,6 +65,7 @@ PID=$!
 
 PASS=0
 RES_1=0
+sleep 30
 
 for i in $(seq 1 200)
 do
@@ -93,6 +101,7 @@ PID=$!
 
 PASS=0
 RES_1=0
+sleep 30
 for i in $(seq 1 200)
 do
   COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
@@ -122,6 +131,6 @@ kill -9 $PID
 
 cd ../../../../../
 pwd
-mvn clean
+mvn clean > /dev/null
 
 exit 0
