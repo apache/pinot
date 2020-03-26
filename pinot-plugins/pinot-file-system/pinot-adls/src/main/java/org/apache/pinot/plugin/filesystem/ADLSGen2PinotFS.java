@@ -66,8 +66,8 @@ import org.slf4j.LoggerFactory;
  *
  * TODO: add the unit test
  */
-public class AzureGen2PinotFS extends PinotFS {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AzureGen2PinotFS.class);
+public class ADLSGen2PinotFS extends PinotFS {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
 
   private static final String ACCOUNT_NAME = "accountName";
   private static final String ACCESS_KEY = "accessKey";
@@ -117,7 +117,7 @@ public class AzureGen2PinotFS extends PinotFS {
     _blobServiceClient =
         new BlobServiceClientBuilder().credential(sharedKeyCredential).endpoint(blobServiceEndpointUrl).buildClient();
     _fileSystemClient = serviceClient.getFileSystemClient(fileSystemName);
-    LOGGER.info("AzureGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, "
+    LOGGER.info("ADLSGen2PinotFS is initialized (accountName={}, fileSystemName={}, dfsServiceEndpointUrl={}, "
             + "blobServiceEndpointUrl={}, enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl,
         blobServiceEndpointUrl, _enableChecksum);
   }
