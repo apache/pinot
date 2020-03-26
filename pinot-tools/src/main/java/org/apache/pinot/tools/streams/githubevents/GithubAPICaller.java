@@ -106,10 +106,14 @@ public class GithubAPICaller {
 
     CloseableHttpResponse httpResponse;
     try {
+      printStatus(Quickstart.Color.YELLOW,  "Execute get");
+
       httpResponse = _closeableHttpClient.execute(request);
       StatusLine statusLine = httpResponse.getStatusLine();
       githubAPIResponse.setStatusCode(statusLine.getStatusCode());
       githubAPIResponse.setStatusMessage(statusLine.getReasonPhrase());
+      printStatus(Quickstart.Color.YELLOW,  "Status code " + githubAPIResponse.statusCode + " status message " + githubAPIResponse.statusMessage);
+
       if (statusLine.getStatusCode() == 200) {
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
       }
@@ -118,6 +122,8 @@ public class GithubAPICaller {
       LOGGER.error("Exception in call to GitHub API {}", url, e);
       throw e;
     }
+    printStatus(Quickstart.Color.YELLOW,  "returning");
+
     return githubAPIResponse;
   }
 
