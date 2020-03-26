@@ -73,6 +73,20 @@
     }
   }
 
+  &--link-grey {
+    border-color: transparent;
+    color: grey;
+    background-color: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0px;
+
+    &:hover {
+      color: grey;
+      text-decoration: none;
+    }
+  }
+
   &--link-white {
     border-color: #FFF;
     color: #FFF;

@@ -29,6 +29,7 @@ import config from 'thirdeye-frontend/config/environment';
 export default Component.extend({
   classNames: ['subscription-yaml'],
   notifications: service('toast'),
+  email: config.email,
   /**
    * Properties we expect to receive for the subscription-yaml
    */
@@ -60,6 +61,14 @@ export default Component.extend({
   },
 
   actions: {
+
+    /**
+     * Closes modal for Subscription Error
+     */
+    toggleSubscriptionModal() {
+      set(this, 'showSubscriptionModal', !get(this, 'showSubscriptionModal'));
+    },
+
     /**
      * resets given yaml field to default value for creation mode and server value for edit mode
      */

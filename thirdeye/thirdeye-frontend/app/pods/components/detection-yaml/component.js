@@ -43,7 +43,9 @@ export default Component.extend({
   currentYamlAlertOriginal: defaultDetectionYaml,
   alertId: null, // only needed in edit mode
   setDetectionYaml: null, // bubble up detectionYaml changes to parent
-
+  detectionError: false,
+  detectionErrorMsg: null,
+  detectionErrorInfo: null,
 
 
   init() {
@@ -182,7 +184,21 @@ export default Component.extend({
     },
 
     /**
-     * Brings up appropriate modal, based on which yaml field is clicked
+     * Closes modal for Preview Error
+     */
+    togglePreviewModal() {
+      set(this, 'showPreviewModal', !get(this, 'showPreviewModal'));
+    },
+
+    /**
+     * Closes modal for Detection Error
+     */
+    toggleDetectionModal() {
+      set(this, 'showDetectionModal', !get(this, 'showDetectionModal'));
+    },
+
+    /**
+     * Opens link to detection configuration documentation
      */
     triggerDoc() {
       window.open(config.docs.detectionConfig);
@@ -248,6 +264,7 @@ export default Component.extend({
      * Grabs alert yaml and puts it to the backend.
      */
     async submitAlertEdit() {
+      set(this, 'detectionError', false);
       const {
         detectionYaml,
         notifications,
@@ -268,11 +285,21 @@ export default Component.extend({
         if (alert_status !== 200) {
           set(this, 'errorMsg', get(alert_json, 'message'));
           notifications.error(`Failed to save the detection configuration due to: ${alert_json.message}.`, 'Error', toastOptions);
+          this.setProperties({
+            detectionError: true,
+            detectionErrorMsg: alert_json.message,
+            detectionErrorInfo: alert_json["more-info"]
+          });
         } else {
           notifications.success('Detection configuration saved successfully', 'Done', toastOptions);
         }
       } catch (error) {
         notifications.error('Error while saving detection config.', error, toastOptions);
+        this.setProperties({
+          detectionError: true,
+          detectionErrorMsg: 'Error while saving detection config.',
+          detectionErrorInfo: error
+        });
       }
     }
   }
