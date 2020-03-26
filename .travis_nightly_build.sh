@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -24,4 +24,13 @@
 #  mvn clean deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e
 #fi
 echo "Deploying to bintray"
-mvn deploy --settings .ci.settings.xml -Dsha1="${DEV_VERSION}" -DskipTests -e -X
+echo ${BUILD_VERSION}
+
+mvn org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate -Dexpression=revision -N -q -DforceStdout
+
+export BUILD_VERSION=$(mvn org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate -Dexpression=revision -N -q -DforceStdout)
+echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
+#mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}"
+#mvn versions:commit
+#
+#mvn deploy --settings .ci.settings.xml -DskipTests -e

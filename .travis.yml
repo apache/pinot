@@ -7,6 +7,8 @@ before_install:
 - export PATH=$PATH:~/bin
 - jq --version
 - export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
+- export BUILD_VERSION=$(mvn org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate -Dexpression=revision -N -q -DforceStdout)
+- echo ${BUILD_VERSION}
 jdk:
 - oraclejdk8
 cache:
