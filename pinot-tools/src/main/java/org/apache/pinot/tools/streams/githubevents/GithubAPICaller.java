@@ -70,6 +70,7 @@ public class GithubAPICaller {
     }
     HttpUriRequest request = requestBuilder.build();
     CloseableHttpResponse httpResponse;
+    printStatus(Quickstart.Color.YELLOW,  "Http call..");
     try {
       httpResponse = _closeableHttpClient.execute(request);
       StatusLine statusLine = httpResponse.getStatusLine();

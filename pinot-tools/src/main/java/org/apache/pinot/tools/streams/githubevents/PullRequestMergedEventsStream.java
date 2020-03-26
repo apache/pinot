@@ -138,7 +138,9 @@ public class PullRequestMergedEventsStream {
           return;
         }
         try {
+          printStatus(Quickstart.Color.YELLOW,  "Calling events api..");
           GithubAPICaller.GithubAPIResponse githubAPIResponse = _githubAPICaller.callEventsAPI(etag);
+          printStatus(Quickstart.Color.YELLOW,  "Called api..");
           int statusCode = githubAPIResponse.statusCode;
           switch (statusCode) {
             case 200:
@@ -183,6 +185,7 @@ public class PullRequestMergedEventsStream {
           LOGGER.error("Exception in reading events data", e);
           return;
         }
+        printStatus(Quickstart.Color.YELLOW,  "Continuing.." + _keepStreaming);
       }
     });
   }
