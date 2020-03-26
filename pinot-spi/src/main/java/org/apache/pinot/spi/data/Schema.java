@@ -33,8 +33,6 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -66,18 +64,7 @@ public final class Schema {
 
   private String _schemaName;
 
-  // upsert related config
-  // primary key refers to the column name that is the primary key of this upsert table
-  private String _primaryKey;
-  // offset key refers to the column name that we are going to store the offset value to
-  private String _offsetKey;
-  // new config key to indicate if a table is for upsert. If this is define as upsert, it would be an upsert table
-  private String _updateSemantic;
-  private static final String UPSERT_TABLE_CONFIG_VALUE = "upsert";
-  @JsonIgnore
-  private DimensionFieldSpec _primaryKeyFieldSpec = null;
-  @JsonIgnore
-  private DimensionFieldSpec _offsetKeyFieldSpec = null;
+  private IngestionModeConfig _ingestionModeConfig;
 
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
@@ -90,6 +77,14 @@ public final class Schema {
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
+
+  // upsert related Json ignored fields
+  @JsonIgnore
+  private DimensionFieldSpec _primaryKeyFieldSpec = null;
+  @JsonIgnore
+  private DimensionFieldSpec _offsetKeyFieldSpec = null;
+  @JsonIgnore
+  private static final String INGESTION_MODE_CONFIG_KEY = "ingestionModeConfig";
 
   public static Schema fromFile(File schemaFile)
       throws IOException {
@@ -117,43 +112,47 @@ public final class Schema {
     _schemaName = schemaName;
   }
 
-  public String getPrimaryKey() {
-    return _primaryKey;
+  public IngestionModeConfig getIngestionModeConfig() {
+    return _ingestionModeConfig;
   }
 
-  public void setPrimaryKey(@Nonnull String primaryKey) {
-    _primaryKey = primaryKey;
-  }
-
-  public String getOffsetKey() {
-    return _offsetKey;
-  }
-
-  public void setOffsetKey(@Nonnull String offsetKey) {
-    _offsetKey = offsetKey;
-  }
-
-  public String getUpdateSemantic() {
-    return _updateSemantic;
-  }
-
-  public void setUpdateSemantic(@Nonnull String updateSemantic) {
-    _updateSemantic = updateSemantic;
+  public void setIngestionModeConfig(IngestionModeConfig ingestionModeConfig) {
+    _ingestionModeConfig = ingestionModeConfig;
   }
 
   @JsonIgnore
-  public boolean isTableForUpsert() {
-    return UPSERT_TABLE_CONFIG_VALUE.equalsIgnoreCase(_updateSemantic);
+  public String getPrimaryKey() {
+    if (_ingestionModeConfig != null) {
+      return _ingestionModeConfig.getPrimaryKey();
+    } else {
+      return StringUtils.EMPTY;
+    }
+  }
+
+  @JsonIgnore
+  public String getOffsetKey() {
+    if (_ingestionModeConfig != null) {
+      return _ingestionModeConfig.getOffsetKey();
+    } else {
+      return StringUtils.EMPTY;
+    }
+  }
+
+  @JsonIgnore
+  public boolean isSchemaForUpsert() {
+    return _ingestionModeConfig != null && _ingestionModeConfig.isSchemaForUpsert();
   }
 
   @JsonIgnore
   public DimensionFieldSpec getPrimaryKeyFieldSpec() {
+    String primaryKey = getPrimaryKey();
     if (_primaryKeyFieldSpec == null) {
       Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
-      Preconditions.checkState(StringUtils.isNotEmpty(_primaryKey), "primary key should not be empty");
+      Preconditions.checkState(StringUtils.isNotEmpty(primaryKey), "primary key should not be empty");
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
-        if (dimensionFieldSpec._name.equals(_primaryKey)) {
+        if (dimensionFieldSpec._name.equals(primaryKey)) {
           _primaryKeyFieldSpec = dimensionFieldSpec;
+          break;
         }
       }
     }
@@ -162,19 +161,17 @@ public final class Schema {
 
   @JsonIgnore
   public DimensionFieldSpec getOffsetKeyFieldSpec() {
+    String offsetKey = getOffsetKey();
     if (_offsetKeyFieldSpec == null) {
       Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
-      Preconditions.checkState(StringUtils.isNotEmpty(_offsetKey), "offset key should not be empty");
+      Preconditions.checkState(StringUtils.isNotEmpty(offsetKey), "offset key should not be empty");
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
-        if (dimensionFieldSpec._name.equals(_offsetKey)) {
+        if (dimensionFieldSpec._name.equals(offsetKey)) {
           _offsetKeyFieldSpec = dimensionFieldSpec;
           Preconditions.checkState(_offsetKeyFieldSpec.isSingleValueField(), "offset key should be single value");
           Preconditions.checkState(_offsetKeyFieldSpec.getDataType() == DataType.LONG, "offset key should be long type");
         }
       }
-    }
-    if (_offsetKeyFieldSpec == null) {
-      throw new RuntimeException("no dimension matches primary key name");
     }
     return _offsetKeyFieldSpec;
   }
@@ -428,12 +425,8 @@ public final class Schema {
    */
   @JsonIgnore
   public void withSchemaHint(@Nullable Schema upsertSchema) {
-    if (upsertSchema == null || !upsertSchema.isTableForUpsert()) {
-      return;
-    } else {
-      this._updateSemantic = UPSERT_TABLE_CONFIG_VALUE;
-      this._primaryKey = upsertSchema._primaryKey;
-      this._offsetKey = upsertSchema._offsetKey;
+    if (upsertSchema != null && upsertSchema.isSchemaForUpsert()) {
+      setIngestionModeConfig(upsertSchema._ingestionModeConfig);
       for (FieldSpec fieldSpec: upsertSchema.getAllFieldSpecs()) {
         if (fieldSpec.isVirtualColumnField()) {
           _fieldSpecMap.putIfAbsent(fieldSpec._name, fieldSpec);
@@ -472,11 +465,10 @@ public final class Schema {
       }
       jsonObject.set("dateTimeFieldSpecs", jsonArray);
     }
-    jsonObject.put("updateSemantic", _updateSemantic);
-    if (UPSERT_TABLE_CONFIG_VALUE.equalsIgnoreCase(_updateSemantic)) {
-      jsonObject.put("primaryKey", _primaryKey);
-      jsonObject.put("offsetKey", _offsetKey);
+    if (_ingestionModeConfig != null) {
+      jsonObject.set(INGESTION_MODE_CONFIG_KEY, _ingestionModeConfig.toJsonNode());
     }
+
     return jsonObject;
   }
 
@@ -715,7 +707,9 @@ public final class Schema {
         .isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) && EqualityUtils
         .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
         .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
-        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
+        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
+        .isEqual(_ingestionModeConfig, that._ingestionModeConfig);
+
   }
 
   /**
@@ -749,6 +743,7 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _ingestionModeConfig);
     return result;
   }
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.common.data;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.SchemaUtils;
@@ -59,14 +60,34 @@ public class SchemaTest {
   }
 
   private String makeSchema(FieldSpec.DataType metricType, FieldSpec.DataType dimensionType, boolean isSingleValue) {
-    return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
-        + metricType + "\"}" + "  ]," + "  \"dimensionFieldSpecs\":[" + "    {\"name\":\"d\",\"dataType\":\""
-        + dimensionType + "\",\"singleValueField\":" + isSingleValue + "}" + "  ]," + "  \"timeFieldSpec\":{"
+    return String.format("{"
+        + "\"schemaName\":\"SchemaTest\","
+        + "  \"metricFieldSpecs\":[ {\"name\":\"m\",\"dataType\":\"%s\"}],"
+        + "  \"dimensionFieldSpecs\":[ {\"name\":\"d\",\"dataType\":\"%s\",\"singleValueField\": %s }],"
+        + "   \"timeFieldSpec\":{"
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
-        + "    \"defaultNullValue\":12345" + "  }," + "  \"dateTimeFieldSpecs\":["
+        + "    \"defaultNullValue\":12345}, \"dateTimeFieldSpecs\":["
         + "    {\"name\":\"Date\", \"dataType\":\"LONG\", \"format\":\"1:MILLISECONDS:EPOCH\", \"granularity\":\"5:MINUTES\", \"dateTimeType\":\"PRIMARY\"}"
-        + "  ]" + "}";
+        + "  ]}", metricType, dimensionType, isSingleValue);
+
   }
+
+  private String makeUpsertSchema(FieldSpec.DataType metricType, FieldSpec.DataType dimensionType, boolean isSingleValue,
+    String ingestionMode, String primaryKey, String offsetKey) {
+    return String.format("{"
+        + "\"schemaName\":\"SchemaTest\","
+        + "  \"metricFieldSpecs\":[ {\"name\":\"m\",\"dataType\":\"%s\"}],"
+        + "  \"dimensionFieldSpecs\":[ {\"name\":\"primary\",\"dataType\":\"%s\",\"singleValueField\": %s },"
+        + " {\"name\":\"offset\",\"dataType\":\"LONG\"}, "
+        + " {\"name\":\"other\",\"dataType\":\"STRING\"}],"
+        + "   \"timeFieldSpec\":{"
+        + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
+        + "    \"defaultNullValue\":12345}, \"dateTimeFieldSpecs\":["
+        + "    {\"name\":\"Date\", \"dataType\":\"LONG\", \"format\":\"1:MILLISECONDS:EPOCH\", \"granularity\":\"5:MINUTES\", \"dateTimeType\":\"PRIMARY\"}],"
+        + "  \"ingestionModeConfig\": {\"ingestionMode\": \"%s\", \"primaryKey\": \"%s\", \"offsetKey\": \"%s\"}"
+        + "}", metricType, dimensionType, isSingleValue, ingestionMode, primaryKey, offsetKey);
+  }
+
 
   @Test
   public void testSchemaBuilder() {
@@ -378,4 +399,111 @@ public class SchemaTest {
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertTrue(schema6.isBackwardCompatibleWith(oldSchema));
   }
+
+  @Test
+  public void testUpsertSchema() throws Exception {
+    Schema rebuildSchema;
+
+    // test backward compatibility
+    Schema oldSchema = Schema.fromString(
+        makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true));
+    Assert.assertTrue(oldSchema.validate(LOGGER));
+    Assert.assertEquals(false, oldSchema.isSchemaForUpsert());
+    Assert.assertEquals("", oldSchema.getPrimaryKey());
+    Assert.assertEquals("", oldSchema.getOffsetKey());
+
+    // make deserialization and serialization works
+    rebuildSchema = Schema.fromString(oldSchema.toSingleLineJsonString());
+    Assert.assertEquals(oldSchema, rebuildSchema);
+    rebuildSchema = Schema.fromString(oldSchema.toPrettyJsonString());
+    Assert.assertEquals(oldSchema, rebuildSchema);
+
+    // specify the schema as append mode
+    Schema appendSchema = Schema.fromString(
+        makeUpsertSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true, "append",
+            "somekey", "otherkey"));
+    Assert.assertTrue(appendSchema.validate(LOGGER));
+    Assert.assertEquals(false, appendSchema.isSchemaForUpsert());
+    Assert.assertEquals("somekey", appendSchema.getPrimaryKey());
+    Assert.assertEquals("otherkey", appendSchema.getOffsetKey());
+
+    // make deserialization and serialization works
+    rebuildSchema = Schema.fromString(oldSchema.toSingleLineJsonString());
+    Assert.assertEquals(oldSchema, rebuildSchema);
+    rebuildSchema = Schema.fromString(oldSchema.toPrettyJsonString());
+    Assert.assertEquals(oldSchema, rebuildSchema);
+
+    // test if the ingestion mode has random string, should be accept as append table
+    appendSchema = Schema.fromString(
+        makeUpsertSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true, "random",
+            "somekey", "otherkey"));
+    Assert.assertTrue(appendSchema.validate(LOGGER));
+    Assert.assertEquals(false, appendSchema.isSchemaForUpsert());
+
+    // specify schema as upsert
+    Schema upsertSchema = Schema.fromString(
+        makeUpsertSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true, "upsert",
+            "somekey", "otherkey"));
+    Assert.assertTrue(upsertSchema.validate(LOGGER));
+    Assert.assertEquals(true, upsertSchema.isSchemaForUpsert());
+    Assert.assertEquals("somekey", upsertSchema.getPrimaryKey());
+    Assert.assertEquals("otherkey", upsertSchema.getOffsetKey());
+
+    // make deserialization and serialization works
+    rebuildSchema = Schema.fromString(oldSchema.toSingleLineJsonString());
+    Assert.assertEquals(oldSchema, rebuildSchema);
+    rebuildSchema = Schema.fromString(oldSchema.toPrettyJsonString());
+    Assert.assertEquals(oldSchema, rebuildSchema);
+
+    // testing if equals & hashcode work
+    Assert.assertNotEquals(oldSchema, upsertSchema);
+    Assert.assertNotEquals(oldSchema, appendSchema);
+    Assert.assertNotEquals(appendSchema, upsertSchema);
+
+    Assert.assertNotEquals(oldSchema.hashCode(), upsertSchema.hashCode());
+    Assert.assertNotEquals(oldSchema.hashCode(), appendSchema.hashCode());
+    Assert.assertNotEquals(appendSchema.hashCode(), upsertSchema.hashCode());
+  }
+
+  @Test
+  public void testUpsertSchemaFields() throws IOException {
+    Schema upsertSchema = Schema.fromString(
+        makeUpsertSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true, "upsert",
+            "primary", "offset"));
+
+    DimensionFieldSpec primaryKeyFieldSpec = upsertSchema.getPrimaryKeyFieldSpec();
+    Assert.assertNotNull(primaryKeyFieldSpec);
+    Assert.assertEquals("primary", primaryKeyFieldSpec.getName());
+    Assert.assertEquals(FieldSpec.DataType.STRING, primaryKeyFieldSpec.getDataType());
+    Assert.assertEquals(true, primaryKeyFieldSpec.isSingleValueField());
+
+    DimensionFieldSpec offsetField = upsertSchema.getPrimaryKeyFieldSpec();
+    Assert.assertNotNull(offsetField);
+    Assert.assertEquals("offset", offsetField.getName());
+    Assert.assertEquals(FieldSpec.DataType.LONG, primaryKeyFieldSpec.getDataType());
+    Assert.assertEquals(true, primaryKeyFieldSpec.isSingleValueField());
+  }
+
+  @Test
+  public void testSchemaHint() throws IOException {
+    Schema upsertSchema = Schema.fromString(
+        makeUpsertSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true, "upsert",
+            "primary", "offset"));
+
+    Schema oldSchema = Schema.fromString(
+        makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true));
+
+    Assert.assertEquals(false, oldSchema.isSchemaForUpsert());
+    Assert.assertEquals("", oldSchema.getPrimaryKey());
+    Assert.assertEquals("", oldSchema.getOffsetKey());
+
+    oldSchema.withSchemaHint(upsertSchema);
+
+    Assert.assertEquals(true, oldSchema.isSchemaForUpsert());
+    Assert.assertEquals("primary", oldSchema.getPrimaryKey());
+    Assert.assertEquals("offset", oldSchema.getOffsetKey());
+  }
+
+  @Test
+  public void test
 }
