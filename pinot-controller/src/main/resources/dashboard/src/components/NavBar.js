@@ -12,6 +12,8 @@ class NavBar extends Component {
         this.dsiplayPage = this.dsiplayPage.bind(this);
         this.displayServers = this.displayServers.bind(this);
         this.displayTables = this.displayTables.bind(this);
+        this.displayBrokers = this.displayBrokers.bind(this);
+        this.displayControllers = this.displayControllers.bind(this);
     }
 
 
@@ -21,6 +23,14 @@ class NavBar extends Component {
 
     displayServers() {
         this.props.mutateState('servers');
+    };
+
+    displayBrokers() {
+        this.props.mutateState('brokers');
+    };
+
+    displayControllers() {
+        this.props.mutateState('controllers');
     };
 
     displayTables() {
@@ -49,7 +59,7 @@ class NavBar extends Component {
                         </TypoGraphy>
                     </ListItemText>
 
-                    <ListItemText inset>
+                    <ListItemText inset onClick={this.displayControllers}>
                         <TypoGraphy color="inherit" variant="title">
                             Controllers
                         </TypoGraphy>
@@ -61,7 +71,7 @@ class NavBar extends Component {
                         </TypoGraphy>
                     </ListItemText>
 
-                    <ListItemText inset>
+                    <ListItemText inset onClick={this.displayBrokers}>
                         <TypoGraphy color="inherit" variant="title">
                             Brokers
                         </TypoGraphy>

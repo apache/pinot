@@ -21,7 +21,7 @@ const useStyles = theme => ({
 });
 
 
-class Servers extends Component {
+class Instance extends Component {
 
     classes = useStyles();
     instances = new Array();
@@ -31,35 +31,7 @@ class Servers extends Component {
         this.state = {instances:[]};
     }
 
-    componentDidMount() {
-        this.loadInstances();
-    }
 
-    loadInstances() {
-        fetch(App.serverAddress + '/instances')
-            .then(res => res.json())
-            .then((data) => {
-                data.instances.forEach((ins) => {
-                    this.populateInstance(ins);
-                });
-
-            })
-            .catch(console.log)
-    }
-
-    populateDisplayData(data) {
-        this.instances.push({name: data.instanceName, enabled: ''+data.enabled, port: data.port, hostName: data.hostName});
-        this.setState({instances: this.instances})
-    }
-
-    populateInstance(instance) {
-        fetch(App.serverAddress + '/instances/' + instance)
-            .then(res => res.json())
-            .then((data) => {
-                this.populateDisplayData(data);
-            })
-            .catch(console.log)
-    }
 
     render() {
         return (
@@ -72,7 +44,7 @@ class Servers extends Component {
                                     <TableRow>
                                         <TableCell>
                                             <TypoGraphy color="inherit" variant="h5" align= "center">
-                                                Server Summary Table
+                                                {this.props.instanceName} Summary Table
                                             </TypoGraphy>
                                         </TableCell>
                                     </TableRow>
@@ -94,7 +66,7 @@ class Servers extends Component {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {this.state.instances.map(instance => (
+                                    {this.props.instances.map(instance => (
                                         <TableRow key={instance.name}>
                                             <TableCell component="th" scope="row">
                                                 {instance.name}
@@ -115,4 +87,4 @@ class Servers extends Component {
 
 }
 
-export default withStyles(useStyles) (Servers);
+export default withStyles(useStyles) (Instance);
