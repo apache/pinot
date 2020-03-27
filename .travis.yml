@@ -10,8 +10,6 @@ before_install:
   - jq --version
   - curl -sSL -o ~/bin/install-jdk.sh https://raw.githubusercontent.com/sormuras/bach/master/install-jdk.sh && chmod +x ~/bin/install-jdk.sh
   - source ./.travis_set_deploy_build_opts.sh
-#  - export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
-#  - export DEPLOY_BUILD_OPTS="-Dsha1=-dev-${TRAVIS_BUILD_NUMBER}"
 
 cache:
   directories:
@@ -67,9 +65,6 @@ jobs:
     - stage: deploy
       script:
         - travis_wait 40 ./.travis_nightly_build.sh
-
-#script:
-#  - travis_wait 40 ./.travis_nightly_build.sh
 
 env:
   global:

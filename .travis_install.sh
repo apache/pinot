@@ -38,11 +38,6 @@ if [ $noThirdEyeChange -eq 0 ]; then
   fi
 fi
 
-# If the build is triggered by cron job, deploy to bintray
-#if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
-#  export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
-#fi
-
 KAFKA_BUILD_OPTS=""
 if [ "$KAFKA_VERSION" != '2.0' ] && [ "$KAFKA_VERSION" != '' ]; then
   KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"

@@ -18,12 +18,6 @@
 # under the License.
 #
 
-# deploy the release to bintray
-#if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
-#  echo "Deploying to bintray"
-#  mvn clean deploy --settings .ci.settings.xml ${DEPLOY_BUILD_OPTS} -DskipTests -e -DretryFailedDeploymentCount=5
-#fi
-
 if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   echo "Deploying to bintray"
 

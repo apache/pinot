@@ -99,9 +99,9 @@
 
   <distributionManagement>
     <repository>
-      <id>bintray-linkedin-test-repo</id>
-      <name>linkedin-test-repo</name>
-      <url>https://api.bintray.com/maven/linkedin/test-repo/pinot/;publish=1;override=1</url>
+      <id>bintray-linkedin-maven</id>
+      <name>linkedin-maven</name>
+      <url>https://api.bintray.com/maven/linkedin/maven/pinot/;publish=1</url>
     </repository>
   </distributionManagement>
 
@@ -1494,22 +1494,4 @@
       </plugin>
     </plugins>
   </reporting>
-
-<!--  <repositories>-->
-<!--    <repository>-->
-<!--      <id>central</id>-->
-<!--      <url>http://repo.dev.bloomberg.com/content/groups/public</url>-->
-<!--      <releases>-->
-<!--        <enabled>false</enabled>-->
-<!--      </releases>-->
-<!--    </repository>-->
-<!--  </repositories>-->
-
-<!--  <pluginRepositories>-->
-<!--    <pluginRepository>-->
-<!--      <id>central</id>-->
-<!--      <url>http://repo.dev.bloomberg.com/content/groups/public</url>-->
-<!--      <releases><enabled>false</enabled></releases>-->
-<!--    </pluginRepository>-->
-<!--  </pluginRepositories>-->
 </project>
