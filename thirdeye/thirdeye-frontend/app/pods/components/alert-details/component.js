@@ -855,9 +855,17 @@ export default Component.extend({
       }
       set(this, 'cachedMetric', getValueFromYaml('metric', alertYaml, 'string'));
     } catch (error) {
-      const message = (error.body && typeof error.body === 'object') ? error.body.message : error.message;
-      notifications.error(`_getAnomalies failed: ${message}`, 'Error', toastOptions);
+      const previewErrorMsg = (error.body && typeof error.body === 'object') ? error.body.message : error.message;
+      const previewErrorInfo = (error.body && typeof error.body === 'object') ? error.body['more-info'] : error['more-info'];
+      notifications.error('Failed to get anomalies, please check warning above detection configuration', 'Error', toastOptions);
       this.set('getAnomaliesError', true);
+      if (this.get('isPreviewMode')) {
+        this.get('sendPreviewError')({
+          previewError: true,
+          previewErrorMsg,
+          previewErrorInfo
+        });
+      }
     }
 
     return {
@@ -1029,6 +1037,13 @@ export default Component.extend({
 
   _fetchAnomalies() {
     set(this, 'getAnomaliesError', false);
+    if (this.get('isPreviewMode')) {
+      this.get('sendPreviewError')({
+        previewError: false,
+        previewErrorMsg: null,
+        previewErrorInfo: null
+      });
+    }
 
     // If the user is running the detection with a new metric, we should reset the state of time series and anomalies for comparison
     if (this._checkMetricIfCreateAlertPreview()) {
@@ -1049,18 +1064,32 @@ export default Component.extend({
           if (get(this, 'metricUrn')) {
             this._fetchTimeseries();
           } else {
-            throw new Error('There was no anomaly data returned for the detection');
+            throw new Error('There was no metric or anomaly data returned for the detection');
           }
         })
         .catch(error => {
           if (error.name !== 'TaskCancelation') {
             this.get('notifications').error(error, 'Error', toastOptions);
             set(this, 'getAnomaliesError', true);
+            if (this.get('isPreviewMode')) {
+              this.get('sendPreviewError')({
+                previewError: true,
+                previewErrorMsg: 'There was an error generating the preview.',
+                previewErrorInfo: error
+              });
+            }
           }
         });
     } catch (error) {
       this.get('notifications').error(error, 'Error', toastOptions);
       set(this, 'getAnomaliesError', true);
+      if (this.get('isPreviewMode')) {
+        this.get('sendPreviewError')({
+          previewError: true,
+          previewErrorMsg: 'There was an error generating the preview.',
+          previewErrorInfo: error
+        });
+      }
     }
   },
 

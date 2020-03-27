@@ -37,6 +37,7 @@ export const selfServeConst = {
   SUBMIT_BUTTON: '.te-button--submit',
   RESET_BUTTON: '.te-button--cancel',
   SECONDARY_LINK: '.thirdeye-link-secondary',
+  SECONDARY_LINK_GREY: '.thirdeye-link-secondary-grey',
   IMPORT_DASHBOARD_INPUT: '#existing-dashboard-name',
   IMPORT_DATASET_INPUT: '#import-custom-dataset',
   IMPORT_METRIC_INPUT: '#import-custom-metric',

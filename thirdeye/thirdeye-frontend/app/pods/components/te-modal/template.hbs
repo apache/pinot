@@ -38,9 +38,11 @@
               {{cancelButtonText}}
             </button>
 
-            <button {{action "onSubmit"}} type="submit" class="te-button te-button--small te-button--submit btn" disabled={{isInvalid}}>
-              {{submitButtonText}}
-            </button>
+            {{#unless hideSubmit}}
+              <button {{action "onSubmit"}} type="submit" class="te-button te-button--small te-button--submit btn" disabled={{isInvalid}}>
+                {{submitButtonText}}
+              </button>
+            {{/unless}}
           {{/unless}}
 
         </div>

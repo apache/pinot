@@ -1,4 +1,12 @@
 .detection-yaml {
+  .mdi-error-outline {
+    width: 19px;
+
+    &::before {
+      font-size: 16px;
+    }
+  }
+
   .detection-yaml-msg {
     color: #e75858;
 
@@ -6,6 +14,33 @@
       font-size: 20px;
       &--error {
         padding-right: 5px;
+      }
+    }
+
+    &__tooltip-link {
+      text-decoration: underline;
+
+      &:hover {
+        cursor: pointer;
+      }
+    }
+  }
+
+  .detection-yaml-msg-preview {
+    color: grey;
+
+    &__icon {
+      font-size: 20px;
+      &--error {
+        padding-right: 5px;
+      }
+    }
+
+    &__tooltip-link {
+      text-decoration: underline;
+
+      &:hover {
+        cursor: pointer;
       }
     }
   }
@@ -18,6 +53,12 @@
     &.bottom-margin {
       margin-bottom: 10px;
     }
+  }
+}
+
+.col-md-10 {
+  &.no-padding {
+    padding: 0px;
   }
 }
 
