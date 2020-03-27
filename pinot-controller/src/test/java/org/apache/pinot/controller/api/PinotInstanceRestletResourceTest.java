@@ -26,18 +26,16 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.config.Instance;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
-import org.apache.pinot.common.utils.CommonConstants.Helix.InstanceType;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.api.Instance;
+import org.apache.pinot.spi.config.api.InstanceType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -130,8 +128,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          String getResponse =
-              sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation(instanceName));
+          String getResponse = sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation(instanceName));
           JsonNode instance = JsonUtils.stringToJsonNode(getResponse);
           boolean result =
               (instance.get("instanceName") != null) && (instance.get("instanceName").asText().equals(instanceName))

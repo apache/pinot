@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.util;
 
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
@@ -30,7 +30,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 public class ReplicationUtils {
 
   /**
-   * Decides if {@link SegmentsValidationAndRetentionConfig::getReplicationNumber} should be used
+   * Decides if {@link SegmentsValidationAndRetentionConfig ::getReplicationNumber} should be used
    */
   public static boolean useReplication(TableConfig tableConfig) {
 
@@ -44,7 +44,7 @@ public class ReplicationUtils {
   }
 
   /**
-   * Decides if {@link SegmentsValidationAndRetentionConfig::getReplicasPerPartitionNumber} should be used
+   * Decides if {@link SegmentsValidationAndRetentionConfig ::getReplicasPerPartitionNumber} should be used
    */
   public static boolean useReplicasPerPartition(TableConfig tableConfig) {
 

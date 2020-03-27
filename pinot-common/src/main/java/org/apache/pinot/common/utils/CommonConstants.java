@@ -95,21 +95,6 @@ public class CommonConstants {
       public static final String ADMIN_PORT_KEY = "adminPort";
     }
 
-    public enum InstanceType {
-      CONTROLLER, BROKER, SERVER, MINION
-    }
-
-    public enum TableType {
-      OFFLINE, REALTIME;
-
-      public ServerType getServerType() {
-        if (this == OFFLINE) {
-          return ServerType.OFFLINE;
-        }
-        return ServerType.REALTIME;
-      }
-    }
-
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
 
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";

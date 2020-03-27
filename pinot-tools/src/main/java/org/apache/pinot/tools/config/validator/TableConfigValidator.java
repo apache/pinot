@@ -17,8 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.tools.config.validator;
-
-import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.spi.config.TableConfig;
 
 
 public class TableConfigValidator {

@@ -19,10 +19,12 @@
 package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -45,10 +47,9 @@ public class ControllerSentinelTestV2 extends ControllerTest {
       throws IOException {
     // Create offline table creation request
     String tableName = "testTable";
-    String tableJSONConfigString =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName).setNumReplicas(3)
-            .build().toJsonConfigString();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNumReplicas(3).build();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
             .getPartitionSet().size(), 1);

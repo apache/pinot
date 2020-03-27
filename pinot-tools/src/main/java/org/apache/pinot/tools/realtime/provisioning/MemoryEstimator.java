@@ -25,7 +25,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -34,9 +33,10 @@ import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.DataSize;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
 /**
@@ -67,7 +67,8 @@ public class MemoryEstimator {
   private String[][] _optimalSegmentSize;
   private String[][] _consumingMemoryPerHost;
 
-  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, long sampleSegmentConsumedSeconds, long maxUsableHostMemory) {
+  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, long sampleSegmentConsumedSeconds,
+      long maxUsableHostMemory) {
     _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
     _tableNameWithType = tableConfig.getTableName();
@@ -124,21 +125,18 @@ public class MemoryEstimator {
 
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
-            .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema())
-            .setCapacity(_segmentMetadata.getTotalDocs()).setAvgNumMultiValues(_avgMultiValues)
-            .setNoDictionaryColumns(_noDictionaryColumns)
-            .setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
-            .setInvertedIndexColumns(_invertedIndexColumns)
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
-            .setMemoryManager(memoryManager)
+        new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
+            .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
+            .setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
+            .setVarLengthDictionaryColumns(_varLengthDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
+            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
             .setStatsHistory(sampleStatsHistory);
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
 
     // read all rows and index them
-    try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_sampleCompletedSegment);) {
+    try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_sampleCompletedSegment)) {
       GenericRow row = new GenericRow();
       while (segmentRecordReader.hasNext()) {
         segmentRecordReader.next(row);
@@ -226,13 +224,11 @@ public class MemoryEstimator {
 
       RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
           new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
-              .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema())
-              .setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues)
-              .setNoDictionaryColumns(_noDictionaryColumns)
-              .setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
-              .setInvertedIndexColumns(_invertedIndexColumns)
-              .setRealtimeSegmentZKMetadata(segmentZKMetadata)
-              .setOffHeap(true).setMemoryManager(memoryManager).setStatsHistory(statsHistory);
+              .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema()).setCapacity(totalDocs)
+              .setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
+              .setVarLengthDictionaryColumns(_varLengthDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
+              .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
+              .setStatsHistory(statsHistory);
 
       // create mutable segment impl
       MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
@@ -260,9 +256,9 @@ public class MemoryEstimator {
           _consumingMemoryPerHost[i][j] = NOT_APPLICABLE;
           _optimalSegmentSize[i][j] = NOT_APPLICABLE;
         } else {
-          _totalMemoryPerHost[i][j] = DataSize.fromBytes(totalMemoryPerHostBytes);
-          _consumingMemoryPerHost[i][j] = DataSize.fromBytes(totalMemoryForConsumingSegmentsPerHost);
-          _optimalSegmentSize[i][j] = DataSize.fromBytes(completedSegmentSizeBytes);
+          _totalMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryPerHostBytes);
+          _consumingMemoryPerHost[i][j] = DataSizeUtils.fromBytes(totalMemoryForConsumingSegmentsPerHost);
+          _optimalSegmentSize[i][j] = DataSizeUtils.fromBytes(completedSegmentSizeBytes);
         }
       }
     }

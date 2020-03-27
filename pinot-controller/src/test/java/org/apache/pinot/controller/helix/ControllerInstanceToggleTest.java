@@ -21,12 +21,14 @@ package org.apache.pinot.controller.helix;
 import java.io.IOException;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -55,10 +57,9 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   public void testInstanceToggle()
       throws Exception {
     // Create an offline table
-    String tableJSONConfigString =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-            .setNumReplicas(NUM_INSTANCES).build().toJsonConfigString();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_INSTANCES).build();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
             .getPartitionSet().size(), 1);

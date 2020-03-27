@@ -22,11 +22,11 @@ import java.io.File;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.minion.SegmentPurger;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {

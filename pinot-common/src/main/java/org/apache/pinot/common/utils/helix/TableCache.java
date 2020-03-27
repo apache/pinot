@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -27,13 +26,13 @@ import org.I0Itec.zkclient.IZkChildListener;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.store.HelixPropertyListener;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.SchemaUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,7 +96,7 @@ public class TableCache {
         if (children != null) {
           for (ZNRecord znRecord : children) {
             try {
-              TableConfig tableConfig = TableConfig.fromZnRecord(znRecord);
+              TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
               String tableNameWithType = tableConfig.getTableName();
               _tableConfigMap.put(tableNameWithType, tableConfig);
               String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);

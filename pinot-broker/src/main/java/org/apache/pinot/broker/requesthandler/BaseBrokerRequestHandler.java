@@ -49,7 +49,6 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -73,6 +72,8 @@ import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -207,13 +208,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Get the tables hit by the request
     String offlineTableName = null;
     String realtimeTableName = null;
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == TableType.OFFLINE) {
       // Offline table
       if (_routingManager.routingExists(tableName)) {
         offlineTableName = tableName;
       }
-    } else if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+    } else if (tableType == TableType.REALTIME) {
       // Realtime table
       if (_routingManager.routingExists(tableName)) {
         realtimeTableName = tableName;
