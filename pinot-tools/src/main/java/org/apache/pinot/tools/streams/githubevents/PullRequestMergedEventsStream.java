@@ -92,6 +92,10 @@ public class PullRequestMergedEventsStream {
     _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
+  /**
+   * Starts the stream.
+   * Adds shutdown hook.
+   */
   public void execute() {
     start();
 
@@ -104,6 +108,9 @@ public class PullRequestMergedEventsStream {
     }));
   }
 
+  /**
+   * Shuts down the stream.
+   */
   public void shutdown()
       throws IOException, InterruptedException {
     printStatus(Quickstart.Color.GREEN, "***** Shutting down pullRequestMergedEvents Stream *****");
@@ -123,9 +130,7 @@ public class PullRequestMergedEventsStream {
     if (!_keepStreaming) {
       return;
     }
-    printStatus(Quickstart.Color.YELLOW, "Publishing");
     _producer.produce(_topicName, message.toString().getBytes(StandardCharsets.UTF_8));
-    printStatus(Quickstart.Color.YELLOW, "Published");
   }
 
   public void start() {
@@ -141,13 +146,10 @@ public class PullRequestMergedEventsStream {
         }
         try {
           GithubAPICaller.GithubAPIResponse githubAPIResponse = _githubAPICaller.callEventsAPI(etag);
-          int statusCode = githubAPIResponse.statusCode;
-          switch (statusCode) {
-            case 200:
+          switch (githubAPIResponse.statusCode) {
+            case 200: // Read new events
               etag = githubAPIResponse.etag;
-              String responseString = githubAPIResponse.responseString;
-              JsonArray jsonArray = new JsonParser().parse(responseString).getAsJsonArray();
-              printStatus(Quickstart.Color.YELLOW, "parsed " + statusCode);
+              JsonArray jsonArray = new JsonParser().parse(githubAPIResponse.responseString).getAsJsonArray();
 
               for (JsonElement eventElement : jsonArray) {
                 try {
@@ -157,44 +159,37 @@ public class PullRequestMergedEventsStream {
                     publish(genericRecord);
                   }
                 } catch (Exception e) {
-                  printStatus(Quickstart.Color.YELLOW,
-                      "Exception in publishing generic record. Skipping." + e.getMessage());
                   LOGGER.error("Exception in publishing generic record. Skipping", e);
                 }
               }
               break;
-            case 304:
-              // Not Modified - check again in 10 seconds
-              printStatus(Quickstart.Color.YELLOW, "Not modified. Check again in 10s.");
+            case 304: // Not Modified
+              printStatus(Quickstart.Color.YELLOW, "Not modified. Checking again in 10s.");
               Thread.sleep(10_000L);
               break;
-            case 408:
-              // Timeout - try again in 10 seconds
-              printStatus(Quickstart.Color.YELLOW, "Timeout. Try again in 10s.");
+            case 408: // Timeout
+              printStatus(Quickstart.Color.YELLOW, "Timeout. Trying again in 10s.");
               Thread.sleep(10_000L);
               break;
-            case 403:
-              // Rate Limit exceeded
-              printStatus(Quickstart.Color.YELLOW, "Rate limit exceeded, retry after 1 minute");
-              // TODO: get renewal time from header. Github won't allow retry until 60 minutes
-              Thread.sleep(60_000L);
+            case 403: // Rate Limit exceeded
+              printStatus(Quickstart.Color.YELLOW, "Rate limit exceeded, sleeping until " + githubAPIResponse.resetTimeMs);
+              long sleepMs = Math.max(60_000L, githubAPIResponse.resetTimeMs - System.currentTimeMillis());
+              Thread.sleep(sleepMs);
               break;
-            case 401:
-              printStatus(Quickstart.Color.YELLOW, "Unauthorized call. Exiting");
+            case 401: // Unauthorized
               throw new IllegalStateException(
-                  "StatusCode: " + statusCode + ", statusMessage: " + githubAPIResponse.statusMessage
-                      + ", from events API. Exiting.");
-            default:
+                  "Unauthorized call to Github events API. Status message: " + githubAPIResponse.statusMessage
+                      + ". Exiting.");
+            default: // Unknown status code
               printStatus(Quickstart.Color.YELLOW,
-                  "Unknown status code " + statusCode + " statusMessage " + githubAPIResponse.statusMessage);
+                  "Unknown status code " + githubAPIResponse.statusCode + " statusMessage "
+                      + githubAPIResponse.statusMessage + ". Retry in 10s");
               Thread.sleep(10_000);
           }
         } catch (Exception e) {
-          printStatus(Quickstart.Color.YELLOW, "Exception in reading events data");
           LOGGER.error("Exception in reading events data", e);
           return;
         }
-        printStatus(Quickstart.Color.YELLOW, "Continuing.." + _keepStreaming);
       }
     });
   }
@@ -212,7 +207,6 @@ public class PullRequestMergedEventsStream {
     String type = event.get("type").getAsString();
 
     if ("PullRequestEvent".equals(type)) {
-      printStatus(Quickstart.Color.YELLOW, "PR event");
       JsonObject payload = event.get("payload").getAsJsonObject();
       if (payload != null) {
         String action = payload.get("action").getAsString();
@@ -220,66 +214,36 @@ public class PullRequestMergedEventsStream {
         String merged = pullRequest.get("merged").getAsString();
         if ("closed".equals(action) && "true".equals(merged)) { // valid pull request merge event
 
-          printStatus(Quickstart.Color.YELLOW, "Closed and merged");
           JsonArray commits = null;
-          try {
-            // get commits
-            printStatus(Quickstart.Color.YELLOW, "Get commits");
-            String commitsURL = pullRequest.get("commits_url").getAsString();
-            GithubAPICaller.GithubAPIResponse commitsResponse = _githubAPICaller.callAPI(commitsURL);
+          String commitsURL = pullRequest.get("commits_url").getAsString();
+          GithubAPICaller.GithubAPIResponse commitsResponse = _githubAPICaller.callAPI(commitsURL);
 
-            if (commitsResponse.responseString != null) {
-              commits = new JsonParser().parse(commitsResponse.responseString).getAsJsonArray();
-            }
-            printStatus(Quickstart.Color.YELLOW, "Got commits");
-          } catch (Exception e) {
-            printStatus(Quickstart.Color.YELLOW, "Exception in commits" + e.getMessage());
-            throw e;
+          if (commitsResponse.responseString != null) {
+            commits = new JsonParser().parse(commitsResponse.responseString).getAsJsonArray();
           }
 
           JsonArray reviewComments = null;
-          try {
-            // get review comments
-            printStatus(Quickstart.Color.YELLOW, "Get review comments");
-            String reviewCommentsURL = pullRequest.get("review_comments_url").getAsString();
-            GithubAPICaller.GithubAPIResponse reviewCommentsResponse = _githubAPICaller.callAPI(reviewCommentsURL);
-
-            if (reviewCommentsResponse.responseString != null) {
-              reviewComments = new JsonParser().parse(reviewCommentsResponse.responseString).getAsJsonArray();
-            }
-            printStatus(Quickstart.Color.YELLOW, "Got review comments");
-          } catch (Exception e) {
-            printStatus(Quickstart.Color.YELLOW, "Exception in review comments" + e.getMessage());
-            throw e;
+          String reviewCommentsURL = pullRequest.get("review_comments_url").getAsString();
+          GithubAPICaller.GithubAPIResponse reviewCommentsResponse = _githubAPICaller.callAPI(reviewCommentsURL);
+          if (reviewCommentsResponse.responseString != null) {
+            reviewComments = new JsonParser().parse(reviewCommentsResponse.responseString).getAsJsonArray();
           }
 
           JsonArray comments = null;
-          try {
-            // get comments
-            printStatus(Quickstart.Color.YELLOW, "Get comments");
-            String commentsURL = pullRequest.get("comments_url").getAsString();
-            GithubAPICaller.GithubAPIResponse commentsResponse = _githubAPICaller.callAPI(commentsURL);
-
-            if (commentsResponse.responseString != null) {
-              comments = new JsonParser().parse(commentsResponse.responseString).getAsJsonArray();
-            }
-            printStatus(Quickstart.Color.YELLOW, "Got comments");
-          } catch (Exception e) {
-            printStatus(Quickstart.Color.YELLOW, "Exception in comments" + e.getMessage());
-            throw e;
+          String commentsURL = pullRequest.get("comments_url").getAsString();
+          GithubAPICaller.GithubAPIResponse commentsResponse = _githubAPICaller.callAPI(commentsURL);
+          if (commentsResponse.responseString != null) {
+            comments = new JsonParser().parse(commentsResponse.responseString).getAsJsonArray();
           }
 
           // get PullRequestMergeEvent
           PullRequestMergedEvent pullRequestMergedEvent =
               new PullRequestMergedEvent(event, commits, reviewComments, comments);
-          printStatus(Quickstart.Color.YELLOW, "Made pr event");
           // make generic record
           genericRecord = convertToGenericRecord(pullRequestMergedEvent);
-          printStatus(Quickstart.Color.YELLOW, "made generic record");
         }
       }
     }
-    printStatus(Quickstart.Color.YELLOW, "Return from conversion");
     return genericRecord;
   }
 

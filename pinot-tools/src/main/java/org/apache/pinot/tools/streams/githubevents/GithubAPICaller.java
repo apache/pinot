@@ -49,6 +49,7 @@ public class GithubAPICaller {
   private static final String RATE_LIMIT_RESET_HEADER = "X-RateLimit-Reset";
   private static final String ETAG_HEADER = "ETag";
   private static final String TOKEN_PREFIX = "token ";
+  private static final String TIMEOUT_MESSAGE = "Timeout";
 
   private final CloseableHttpClient _closeableHttpClient;
   private String _personalAccessToken;
@@ -59,18 +60,22 @@ public class GithubAPICaller {
     _closeableHttpClient = HttpClients.createDefault();
   }
 
+  /**
+   * Calls the events API
+   */
   public GithubAPIResponse callEventsAPI(String etag)
       throws IOException {
     HttpUriRequest request = buildRequest(EVENTS_API_URL, etag);
-    GithubAPIResponse githubAPIResponse = executeEventsRequest(request);
-    return githubAPIResponse;
+    return executeEventsRequest(request);
   }
 
+  /**
+   * Calls the given url
+   */
   public GithubAPIResponse callAPI(String url)
       throws IOException {
     HttpUriRequest request = buildRequest(url, null);
-    GithubAPIResponse githubAPIResponse = executeGet(request);
-    return githubAPIResponse;
+    return executeGet(request);
   }
 
   private void setTimeout(RequestBuilder requestBuilder) {
@@ -94,53 +99,46 @@ public class GithubAPICaller {
   private GithubAPIResponse executeEventsRequest(HttpUriRequest request)
       throws IOException {
     GithubAPIResponse githubAPIResponse = new GithubAPIResponse();
-    printStatus(Quickstart.Color.YELLOW, "Http call..");
+
     try (CloseableHttpResponse httpResponse = _closeableHttpClient.execute(request)) {
-
-      printStatus(Quickstart.Color.YELLOW, "Executed http call");
-
       StatusLine statusLine = httpResponse.getStatusLine();
       githubAPIResponse.setStatusCode(statusLine.getStatusCode());
       githubAPIResponse.setStatusMessage(statusLine.getReasonPhrase());
       String remainingLimit = httpResponse.getFirstHeader(RATE_LIMIT_REMAINING_HEADER).getValue();
-      if (remainingLimit != null) {
-        githubAPIResponse.setRemainingLimit(Integer.parseInt(remainingLimit));
+      String resetTimeSeconds = httpResponse.getFirstHeader(RATE_LIMIT_RESET_HEADER).getValue();
+      try {
+        if (remainingLimit != null) {
+          githubAPIResponse.setRemainingLimit(Integer.parseInt(remainingLimit));
+        }
+        if (resetTimeSeconds != null) {
+          githubAPIResponse.setResetTimeMs(Long.parseLong(resetTimeSeconds) * 1000);
+        }
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Could not parse remainingLimit: " + remainingLimit);
       }
       if (statusLine.getStatusCode() == 200) {
         githubAPIResponse.setEtag(httpResponse.getFirstHeader(ETAG_HEADER).getValue());
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
-      } else {
-        printStatus(Quickstart.Color.YELLOW,
-            "Status code " + githubAPIResponse.statusCode + " status message " + githubAPIResponse.statusMessage
-                + "Rate limit remaining: " + remainingLimit + " Rate limit reset: " + httpResponse
-                .getFirstHeader(RATE_LIMIT_RESET_HEADER).getValue());
       }
     } catch (SocketTimeoutException e) {
       githubAPIResponse.setStatusCode(408);
-      githubAPIResponse.setStatusMessage("Timeout");
-      printStatus(Quickstart.Color.YELLOW, "Timeout in call to GitHub API " + request.getURI() + " " + e.getMessage());
-      LOGGER.error("Timeout in call to GitHub API {}", request.getURI(), e);
+      githubAPIResponse.setStatusMessage(TIMEOUT_MESSAGE);
+      LOGGER.error("Timeout in call to GitHub events API.", e);
     } catch (IOException e) {
-      printStatus(Quickstart.Color.YELLOW,
-          "Exception in call to GitHub API " + request.getURI() + " " + e.getMessage());
-      LOGGER.error("Exception in call to GitHub API {}", request.getURI(), e);
+      LOGGER.error("Exception in call to GitHub events API.", e);
       throw e;
     }
-    printStatus(Quickstart.Color.YELLOW, "returning");
     return githubAPIResponse;
   }
 
   /**
    * Makes an Http GET call to the provided URL
    */
-  public GithubAPIResponse executeGet(HttpUriRequest request)
+  private GithubAPIResponse executeGet(HttpUriRequest request)
       throws IOException {
-    printStatus(Quickstart.Color.YELLOW, "Execute get");
     GithubAPIResponse githubAPIResponse = new GithubAPIResponse();
+
     try (CloseableHttpResponse httpResponse = _closeableHttpClient.execute(request)) {
-
-      printStatus(Quickstart.Color.YELLOW, "Executed get");
-
       StatusLine statusLine = httpResponse.getStatusLine();
       githubAPIResponse.setStatusCode(statusLine.getStatusCode());
       githubAPIResponse.setStatusMessage(statusLine.getReasonPhrase());
@@ -154,17 +152,12 @@ public class GithubAPICaller {
       }
     } catch (SocketTimeoutException e) {
       githubAPIResponse.setStatusCode(408);
-      githubAPIResponse.setStatusMessage("Timeout");
-      printStatus(Quickstart.Color.YELLOW, "Timeout in call to GitHub API " + request.getURI() + " " + e.getMessage());
+      githubAPIResponse.setStatusMessage(TIMEOUT_MESSAGE);
       LOGGER.error("Timeout in call to GitHub API {}", request.getURI(), e);
     } catch (IOException e) {
-      printStatus(Quickstart.Color.YELLOW,
-          "Exception in call to GitHub API " + request.getURI() + " " + e.getMessage());
       LOGGER.error("Exception in call to GitHub API {}", request.getURI(), e);
       throw e;
     }
-    printStatus(Quickstart.Color.YELLOW, "returning");
-
     return githubAPIResponse;
   }
 
@@ -182,7 +175,8 @@ public class GithubAPICaller {
     int statusCode = 0;
     String statusMessage;
     String etag;
-    int remainingLimit;
+    int remainingLimit = 0;
+    long resetTimeMs = 0;
 
     public void setResponseString(String responseString) {
       this.responseString = responseString;
@@ -202,6 +196,10 @@ public class GithubAPICaller {
 
     public void setRemainingLimit(int remainingLimit) {
       this.remainingLimit = remainingLimit;
+    }
+
+    public void setResetTimeMs(long resetTimeMs) {
+      this.resetTimeMs = resetTimeMs;
     }
   }
 }
