@@ -21,4 +21,5 @@ docs/_build
 .*.swp
 **/.docker/
 **/.env
+**/.factorypath
 kubernetes/examples/helm/charts/
