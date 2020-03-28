@@ -5,6 +5,7 @@ import NavBar from "./components/NavBar";
 import Cluster from "./components/Cluster";
 import Servers from "./components/Instance";
 import Tables from "./components/Tables";
+import Tenants from "./components/Tenants";
 
 class App extends React.Component {
 
@@ -68,6 +69,9 @@ class App extends React.Component {
         let displayTile;
         if(this.state.currentState === 'cluster') {
             displayTile = <Cluster></Cluster>
+        }
+        if(this.state.currentState === 'post1') {
+            displayTile = <Tenants></Tenants>
         }
         if(this.state.currentState === 'servers') {
             const inss = this.instances.filter(ins => ins.name.startsWith('Server'))
