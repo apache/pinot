@@ -9,7 +9,6 @@ import withStyles from "@material-ui/core/styles/withStyles";
 import TableBody from "@material-ui/core/TableBody";
 import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
-import TypoGraphy from "@material-ui/core/Typography";
 import App from "../App";
 
 const useStyles = theme => ({
@@ -23,16 +22,12 @@ const useStyles = theme => ({
 class Cluster extends Component {
 
     classes = useStyles();
-    instances = new Array();
+    instances = [];
 
     constructor(props) {
         super(props);
         this.state = {instances:[]};
-
-
-
     }
-
 
 
     populateDisplayData(data) {

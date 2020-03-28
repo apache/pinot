@@ -14,11 +14,16 @@ class NavBar extends Component {
         this.displayTables = this.displayTables.bind(this);
         this.displayBrokers = this.displayBrokers.bind(this);
         this.displayControllers = this.displayControllers.bind(this);
+        this.dsiplayCluster = this.dsiplayCluster.bind(this);
     }
 
 
     dsiplayPage() {
         this.props.mutateState('post1');
+    };
+
+    dsiplayCluster() {
+        this.props.mutateState('cluster');
     };
 
     displayServers() {
@@ -41,7 +46,7 @@ class NavBar extends Component {
         return (
             <List component="nav">
                 <ListItem component="div" >
-                    <ListItemText inset >
+                    <ListItemText inset onClick={this.dsiplayCluster}>
                         <TypoGraphy color="inherit" variant="title" >
                             Cluster
                         </TypoGraphy>

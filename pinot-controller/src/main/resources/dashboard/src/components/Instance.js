@@ -10,8 +10,6 @@ import TableBody from "@material-ui/core/TableBody";
 import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
 import TypoGraphy from "@material-ui/core/Typography";
-import ListItemText from "@material-ui/core/ListItemText";
-import App from "../App";
 
 const useStyles = theme => ({
     table: {
@@ -24,7 +22,7 @@ const useStyles = theme => ({
 class Instance extends Component {
 
     classes = useStyles();
-    instances = new Array();
+    instances = [];
 
     constructor(props) {
         super(props);

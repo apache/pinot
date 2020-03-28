@@ -10,8 +10,12 @@ import TableBody from "@material-ui/core/TableBody";
 import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
 import TypoGraphy from "@material-ui/core/Typography";
-import ListItemText from "@material-ui/core/ListItemText";
+import TreeView from '@material-ui/lab/TreeView';
 import App from "../App";
+import TreeItem from "@material-ui/lab/TreeItem";
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import ChevronRightIcon from '@material-ui/icons/ChevronRight';
+
 
 const useStyles = theme => ({
     table: {
@@ -24,11 +28,11 @@ const useStyles = theme => ({
 class Tables extends Component {
 
     classes = useStyles();
-    tables = new Array();
+    tables = [];
 
     constructor(props) {
         super(props);
-        this.state = {instances:[]};
+        this.state = {instances:[], treeData:{}};
     }
 
     componentDidMount() {
@@ -57,10 +61,87 @@ class Tables extends Component {
             .then(res => res.json())
             .then((data) => {
                 this.populateDisplayData(data, table);
+                this.populatePropTree(table);
             })
             .catch(console.log)
     }
 
+    populatePropTree(table) {
+        fetch(App.serverAddress + '/tables/' + table)
+            .then(res => res.json())
+            .then((data) => {
+                console.log(JSON.stringify(data));
+                this.treeData = this.populateNode(data,1, 'properties');
+                this.setState({instances: this.tables, treeData: this.treeData})
+            })
+            .catch(console.log)
+    }
+
+    populateNode(data, i, name) {
+        const node = {};
+        node.id = i;
+        node.name = name;
+        node.children =  [];
+        for (const prop in data) {
+            let value = data[prop];
+
+            if(typeof value === 'object') {
+                node.children.push(this.populateNode(value,++i, prop));
+            } else {
+                const child = {id: ++i, name: prop + ':'  +  value};
+                node.children.push(child);
+            }
+        }
+        return node;
+    }
+
+    treeData = {
+        id: '1',
+        name: 'Parent',
+        children: [
+            {
+                id: '2',
+                name: 'Child - 1',
+            },
+            {
+                id: '3',
+                name: 'Child - 3',
+                children: [
+                    {
+                        id: '4',
+                        name: 'Child - 4',
+                    },
+                ],
+            },
+        ],
+    };
+
+    treeData1 = {
+        id: '1',
+        name: 'Parent1',
+        children: [
+            {
+                id: '2',
+                name: 'Child - 1',
+            },
+            {
+                id: '3',
+                name: 'Child - 3',
+                children: [
+                    {
+                        id: '4',
+                        name: 'Child - 4',
+                    },
+                ],
+            },
+        ],
+    };
+
+    renderTree(nodes) {
+        return <TreeItem key={nodes.id} nodeId={nodes.id} label={nodes.name}>
+            {Array.isArray(nodes.children) ? nodes.children.map(node => this.renderTree(node)) : null}
+        </TreeItem>
+    };
 
 
     render() {
@@ -92,7 +173,7 @@ class Tables extends Component {
                                         <TableCell>Table Name</TableCell>
                                         <TableCell align="right">Reported Size</TableCell>
                                         <TableCell align="right">Estimated Size</TableCell>
-                                        <TableCell align="right">Table Type</TableCell>
+                                        <TableCell align="center">Table Properties</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -103,7 +184,14 @@ class Tables extends Component {
                                             </TableCell>
                                             <TableCell align="right">{instance.reportedSizeInBytes}</TableCell>
                                             <TableCell align="right">{instance.estimatedSizeInBytes}</TableCell>
-                                            <TableCell align="right">{instance.port}</TableCell>
+                                            <TableCell align="left" style={{border:"10px"}}>
+                                                <TreeView
+                                                    defaultCollapseIcon={<ExpandMoreIcon />}
+                                                    defaultExpandIcon={<ChevronRightIcon />}
+                                                    defaultExpanded={['1']}>
+                                                    {this.renderTree(this.state.treeData)}
+                                                </TreeView>
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -116,5 +204,6 @@ class Tables extends Component {
     }
 
 }
+
 
 export default withStyles(useStyles) (Tables);
