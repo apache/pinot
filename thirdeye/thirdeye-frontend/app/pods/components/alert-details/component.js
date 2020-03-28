@@ -236,7 +236,7 @@ export default Component.extend({
         granularity,
         dimensionExploration
       } = this.getProperties('isPreviewMode', 'granularity', 'dimensionExploration');
-      return (isPreviewMode || (!dimensionExploration && (granularity || '').includes('DAYS')));
+      return (isPreviewMode || (!dimensionExploration && ((granularity || '').includes('MINUTES') || (granularity || '').includes('DAYS'))));
     }
   ),
 
@@ -889,7 +889,7 @@ export default Component.extend({
         duration: (timeWindowSize === 172800000) ? '48h' : 'custom',
         selectedDimension: 'Choose a dimension',
         // For now, we will only show predicted and bounds on daily and minutely metrics with no dimensions, for the Alert Overview page
-        selectedBaseline: (!dimensionExploration && (granularity || '').includes('DAYS')) ? 'predicted' : 'wo1w',
+        selectedBaseline: (!dimensionExploration && ((granularity || '').includes('MINUTES') || (granularity || '').includes('DAYS'))) ? 'predicted' : 'wo1w',
         // We distinguish these because it only needs the route's info on init.  After that, component manages state
         metricUrnList: this.get('metricUrnListRoute'),
         metricUrn: this.get('metricUrnRoute')
