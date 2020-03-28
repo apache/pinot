@@ -10,6 +10,7 @@ import TableBody from "@material-ui/core/TableBody";
 import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
 import TypoGraphy from "@material-ui/core/Typography";
+import App from "../App";
 
 const useStyles = theme => ({
     table: {
@@ -22,124 +23,123 @@ const useStyles = theme => ({
 class Cluster extends Component {
 
     classes = useStyles();
+    instances = new Array();
 
     constructor(props) {
         super(props);
+        this.state = {instances:[]};
+
+
+
     }
 
-    createData(name, calories, fat, carbs, protein) {
-        return { name, calories, fat, carbs, protein };
+
+
+    populateDisplayData(data) {
+        this.instances['tents_name']=data.tenantName
+        this.instances['numServers']=data.ServerInstances.length
+        this.instances['numBrokers']=data.BrokerInstances.length
+
+
+        this.setState({instances: this.instances})
     }
 
-    rows = [
-        this.createData('Frozen yoghurt', 159, 6.0, 24, 4.0),
-        this.createData('Ice cream sandwich', 237, 9.0, 37, 4.3),
-        this.createData('Eclair', 262, 16.0, 24, 6.0),
-        this.createData('Cupcake', 305, 3.7, 67, 4.3),
-        this.createData('Gingerbread', 356, 16.0, 49, 3.9),
-    ];
+    populateTblDisplayData(data) {
+        this.instances['numTables']=data.tables.length
+        this.setState({instances: this.instances})
+    }
+
+    populateInstance(instance) {
+
+        fetch(App.serverAddress + '/tenants/' + instance +'/metadata')
+            .then(res => res.json())
+            .then((data) => {
+                this.populateDisplayData(data);
+            })
+            .catch(console.log)
+    }
+
+    populateInstanceTbl(instance) {
+        fetch(App.serverAddress + '/tenants/' + instance +'/tables')
+            .then(res => res.json())
+            .then((data) => {
+                this.populateTblDisplayData(data);
+            })
+            .catch(console.log)
+    }
+
+
 
     render() {
-        return (
-            <div style={{width:"90%", margin: "0 auto"}}>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>
-                                            <TypoGraphy color="inherit" variant="h5" align= "center">
-                                                Summary Table
-                                            </TypoGraphy>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHead>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Dessert (100g serving)</TableCell>
-                                        <TableCell align="right">Calories</TableCell>
-                                        <TableCell align="right">Fat&nbsp;(g)</TableCell>
-                                        <TableCell align="right">Carbs&nbsp;(g)</TableCell>
-                                        <TableCell align="right">Protein&nbsp;(g)</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {this.rows.map(row => (
-                                        <TableRow key={row.name}>
-                                            <TableCell component="th" scope="row">
-                                                {row.name}
-                                            </TableCell>
-                                            <TableCell align="right">{row.calories}</TableCell>
-                                            <TableCell align="right">{row.fat}</TableCell>
-                                            <TableCell align="right">{row.carbs}</TableCell>
-                                            <TableCell align="right">{row.protein}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>
-                                            <TypoGraphy color="inherit" variant="h5" align= "center">
-                                                Tenant Details Table
-                                            </TypoGraphy>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHead>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Dessert (100g serving)</TableCell>
-                                        <TableCell align="right">Calories</TableCell>
-                                        <TableCell align="right">Fat&nbsp;(g)</TableCell>
-                                        <TableCell align="right">Carbs&nbsp;(g)</TableCell>
-                                        <TableCell align="right">Protein&nbsp;(g)</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {this.rows.map(row => (
-                                        <TableRow key={row.name}>
-                                            <TableCell component="th" scope="row">
-                                                {row.name}
-                                            </TableCell>
-                                            <TableCell align="right">{row.calories}</TableCell>
-                                            <TableCell align="right">{row.fat}</TableCell>
-                                            <TableCell align="right">{row.carbs}</TableCell>
-                                            <TableCell align="right">{row.protein}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
 
+
+        return (
+
+
+            <div>
+
+
+                <Card style={{background:"#f5f5f5"}}>
+                    <CardContent >
+                        <TableContainer component={Paper} >
+                            <Table  aria-label="simple table">
+                                <TableHead>
+                                    <TableRow>
+
+                                        <TableCell> TENANT NAME</TableCell>
+                                        <TableCell align="right"> Number of Servers</TableCell>
+                                        <TableCell align="right"> Number of Brokers</TableCell>
+                                        <TableCell align="right"> Number of Tables</TableCell>
+
+
+
+                                   </TableRow>
+                                </TableHead>
+                                <TableBody>
+
+                                    {/*{this.state.instances.map(instance => (*/}
+                                        <TableRow>
+                                            <TableCell component="th" scope="row">
+                                                {this.state.instances.tents_name}
+                                            </TableCell>
+                                            <TableCell align="right">{this.state.instances.numServers}</TableCell>
+                                            <TableCell align="right">{this.state.instances.numBrokers}</TableCell>
+                                            <TableCell align="right">{this.state.instances.numTables}</TableCell>
+
+                                        </TableRow>
+                                        {/*))}*/}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
-}
+    componentDidMount() {
+        fetch(App.serverAddress+'/tenants ')
+            .then(res => res.json())
+            .then((data) => {
+                data.SERVER_TENANTS.forEach((ins) => {
+                    this.populateInstance(ins);
+                    this.populateInstanceTbl(ins);
+
+
+                });
+
+            })
+
+
+            .catch(console.log)
+
+
+
+            };
+
+
+
+
+    }
+
 
 export default withStyles(useStyles) (Cluster);
