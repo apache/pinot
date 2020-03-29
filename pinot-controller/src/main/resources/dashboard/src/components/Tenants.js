@@ -12,16 +12,14 @@ import Card from "@material-ui/core/Card";
 import App from "../App";
 import TypoGraphy from "@material-ui/core/Typography";
 
+
 const useStyles = theme => ({
     table: {
         minWidth: 650,
         maxWidth:1000,
     },
 });
-
-
-class Cluster extends Component {
-
+class Tenants extends Component {
     classes = useStyles();
     instances = [];
 
@@ -32,9 +30,9 @@ class Cluster extends Component {
 
 
     populateDisplayData(data) {
-        this.instances['allowParticipantAutoJoin']=data['allowParticipantAutoJoin']
-        this.instances['pinot.broker.enable.query.limit.override']=data['pinot.broker.enable.query.limit.override']
-        this.instances['enable.case.insensitive.pql']=data['enable.case.insensitive.pql']
+        this.instances['tents_name']=data.tenantName
+        this.instances['numServers']=data.ServerInstances.length
+        this.instances['numBrokers']=data.BrokerInstances.length
 
 
         this.setState({instances: this.instances})
@@ -46,7 +44,7 @@ class Cluster extends Component {
     }
 
     populateInstance(instance) {
-    alert(instance['enable.case.insensitive.pql'])
+
         fetch(App.serverAddress + '/tenants/' + instance +'/metadata')
             .then(res => res.json())
             .then((data) => {
@@ -81,7 +79,7 @@ class Cluster extends Component {
                                     <TableRow>
                                         <TableCell>
                                             <TypoGraphy color="inherit" variant="h5" align= "center">
-                                                Cluster Summary Table
+                                                Tenants Summary Table
                                             </TypoGraphy>
                                         </TableCell>
                                     </TableRow>
@@ -99,26 +97,28 @@ class Cluster extends Component {
                                 <TableHead>
                                     <TableRow>
 
-                                        <TableCell>Participant-AutoJoin</TableCell>
-                                        <TableCell align="right"> Querylimit-override</TableCell>
-                                        <TableCell align="right"> Case-insensitive</TableCell>
+                                        <TableCell> TENANT NAME</TableCell>
+                                        <TableCell align="right"> Number of Servers</TableCell>
+                                        <TableCell align="right"> Number of Brokers</TableCell>
+                                        <TableCell align="right"> Number of Tables</TableCell>
 
 
 
-
-                                   </TableRow>
+                                    </TableRow>
                                 </TableHead>
                                 <TableBody>
 
                                     {/*{this.state.instances.map(instance => (*/}
-                                        <TableRow>
+                                    <TableRow>
+                                        <TableCell component="th" scope="row">
+                                            {this.state.instances.tents_name}
+                                        </TableCell>
+                                        <TableCell align="right">{this.state.instances.numServers}</TableCell>
+                                        <TableCell align="right">{this.state.instances.numBrokers}</TableCell>
+                                        <TableCell align="right">{this.state.instances.numTables}</TableCell>
 
-                                            <TableCell >{this.state.instances['allowParticipantAutoJoin']}</TableCell>
-                                            <TableCell align="right" >{this.state.instances['pinot.broker.enable.query.limit.override']}</TableCell>
-                                            <TableCell align="right">{this.state.instances['enable.case.insensitive.pql']}</TableCell>
-
-                                        </TableRow>
-                                        {/*))}*/}
+                                    </TableRow>
+                                    {/*))}*/}
                                 </TableBody>
                             </Table>
                         </TableContainer>
@@ -128,10 +128,15 @@ class Cluster extends Component {
         );
     }
     componentDidMount() {
-        fetch(App.serverAddress+'/cluster/configs ')
+        fetch(App.serverAddress+'/tenants ')
             .then(res => res.json())
             .then((data) => {
-                    this.populateDisplayData(data);
+                data.SERVER_TENANTS.forEach((ins) => {
+                    this.populateInstance(ins);
+                    this.populateInstanceTbl(ins);
+
+
+                });
 
             })
 
@@ -140,12 +145,9 @@ class Cluster extends Component {
 
 
 
-            };
+    };
 
 
+}
 
-
-    }
-
-
-export default withStyles(useStyles) (Cluster);
+export default Tenants;
