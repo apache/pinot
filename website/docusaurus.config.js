@@ -17,7 +17,6 @@ module.exports = {
       links: [
         {to: 'https://apache-pinot.gitbook.io/apache-pinot-cookbook/', label: 'Docs', position: 'right'},
         {to: 'https://issues.apache.org/jira/projects/PINOT/issues', label: 'Jira', position: 'right'},
-        {to: 'https://cwiki.apache.org/confluence/display/PINOT/Blogs+and+Talks', label: 'Blog', position: 'right'},
         {to: 'https://cwiki.apache.org/confluence/display/PINOT', label: 'Wiki', position: 'right'},
         {
           href: 'https://github.com/apache/incubator-pinot',

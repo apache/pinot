@@ -8,7 +8,6 @@
 import React, { useState, useEffect } from 'react';
 
 import CodeBlock from '@theme/CodeBlock';
-import Diagram from '@site/src/components/Diagram';
 import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
 import Layout from '@theme/Layout';
@@ -18,12 +17,7 @@ import TabItem from '@theme/TabItem';
 import Tabs from '@theme/Tabs';
 
 import classnames from 'classnames';
-import {fetchNewPost} from '@site/src/exports/newPost';
-import {fetchNewRelease} from '@site/src/exports/newRelease';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import useBaseUrl from '@docusaurus/useBaseUrl';
-import repoUrl from '@site/src/exports/repoUrl';
-import cloudify from '@site/src/exports/cloudify';
 
 import styles from './index.module.css';
 import './index.css';
@@ -157,7 +151,7 @@ function WhoUses() {
   return (
     <section className="topologies">
       <div className="container">
-        <AnchoredH2 id="installation">Who Uses?</AnchoredH2>
+        <AnchoredH2 id="who-uses">Who Uses?</AnchoredH2>
         <div className="sub-title">Pinot powers several big players, including LinkedIn, Uber, Microsoft, Factual, Weibo, Slack and more</div>
 
         <div className={styles.installationPlatforms}>
@@ -166,8 +160,8 @@ function WhoUses() {
           <Link to="https://teams.microsoft.com"><SVG src="/img/companies/microsoft-teams.svg" /></Link>
           <Link to="https://slack.com"><SVG src="/img/companies/slack.svg" /></Link>
           <Link to="https://www.factual.com"><SVG src="/img/companies/factual.svg" /></Link>
-          <Link to="https://www.weibo.com"><SVG src="/img/companies/weibo.svg" /></Link>
-        </div>          
+          <Link to="https://www.weibo.com"><SVG src="/img/companies/weibo.svg" /></Link>          
+        </div>  
 
       </div>
     </section>
@@ -179,7 +173,7 @@ function Usage() {
   return (
     <section className="topologies">
       <div className="container">
-        <AnchoredH2 id="installation">Ingest and Query Options</AnchoredH2>
+        <AnchoredH2 id="ingest-query">Ingest and Query Options</AnchoredH2>
         
         <div className="sub-title">Ingest with Kafka, Spark, HDFS or Cloud Storages</div>
         <div className="sub-title">Query using PQL(Pinot Query Language ), SQL or Presto(supports Joins)</div>
