@@ -100,11 +100,8 @@ class Cluster extends Component {
                                     <TableRow>
 
                                         <TableCell>Participant-AutoJoin</TableCell>
-                                        <TableCell align="right"> Querylimit-override</TableCell>
-                                        <TableCell align="right"> Case-insensitive</TableCell>
-
-
-
+                                        <TableCell align="right">Broker Querylimit-override</TableCell>
+                                        <TableCell align="right"> Case-insensitive pql</TableCell>
 
                                    </TableRow>
                                 </TableHead>

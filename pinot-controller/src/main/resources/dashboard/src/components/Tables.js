@@ -15,6 +15,8 @@ import App from "../App";
 import TreeItem from "@material-ui/lab/TreeItem";
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
+import RealTimeOffline from "./RealTimeOffline";
+import Utils from "./Utils";
 
 
 const useStyles = theme => ({
@@ -71,78 +73,11 @@ class Tables extends Component {
             .then(res => res.json())
             .then((data) => {
                 console.log(JSON.stringify(data));
-                this.treeData = this.populateNode(data,1, 'properties');
+                this.treeData = Utils.populateNode(data,1, 'properties');
                 this.setState({instances: this.tables, treeData: this.treeData})
             })
             .catch(console.log)
     }
-
-    populateNode(data, i, name) {
-        const node = {};
-        node.id = i;
-        node.name = name;
-        node.children =  [];
-        for (const prop in data) {
-            let value = data[prop];
-
-            if(typeof value === 'object') {
-                node.children.push(this.populateNode(value,++i, prop));
-            } else {
-                const child = {id: ++i, name: prop + ':'  +  value};
-                node.children.push(child);
-            }
-        }
-        return node;
-    }
-
-    treeData = {
-        id: '1',
-        name: 'Parent',
-        children: [
-            {
-                id: '2',
-                name: 'Child - 1',
-            },
-            {
-                id: '3',
-                name: 'Child - 3',
-                children: [
-                    {
-                        id: '4',
-                        name: 'Child - 4',
-                    },
-                ],
-            },
-        ],
-    };
-
-    treeData1 = {
-        id: '1',
-        name: 'Parent1',
-        children: [
-            {
-                id: '2',
-                name: 'Child - 1',
-            },
-            {
-                id: '3',
-                name: 'Child - 3',
-                children: [
-                    {
-                        id: '4',
-                        name: 'Child - 4',
-                    },
-                ],
-            },
-        ],
-    };
-
-    renderTree(nodes) {
-        return <TreeItem key={nodes.id} nodeId={nodes.id} label={nodes.name}>
-            {Array.isArray(nodes.children) ? nodes.children.map(node => this.renderTree(node)) : null}
-        </TreeItem>
-    };
-
 
     render() {
         return (
@@ -188,8 +123,8 @@ class Tables extends Component {
                                                 <TreeView
                                                     defaultCollapseIcon={<ExpandMoreIcon />}
                                                     defaultExpandIcon={<ChevronRightIcon />}
-                                                    defaultExpanded={['1']}>
-                                                    {this.renderTree(this.state.treeData)}
+                                                    defaultExpanded={['2']}>
+                                                    {Utils.renderTree(this.state.treeData)}
                                                 </TreeView>
                                             </TableCell>
                                         </TableRow>
@@ -197,6 +132,11 @@ class Tables extends Component {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                    </CardContent>
+                </Card>
+                <Card style={{background:"#f5f5f5"}}>
+                    <CardContent >
+                        <RealTimeOffline></RealTimeOffline>
                     </CardContent>
                 </Card>
             </div>
