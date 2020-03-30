@@ -36,7 +36,7 @@
               type: 'category',
               label: 'Cloud',
               items: [
-                  "administration/installation/cloud/on-premises",
+                  "administration/installation/cloud/on-premise",
                   "administration/installation/cloud/aws",
                   "administration/installation/cloud/gcp",
                   "administration/installation/cloud/azure"
