@@ -24,6 +24,68 @@ function Download() {
         <section>
           <div className="container">
             <div className="row">
+
+              <div className="col">
+                <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz" className="panel panel--link text--center">
+                  <div className="panel--icon">
+                    <i className="feather icon-download"></i>
+                  </div>
+                 
+                  <div className="panel--title">0.3.0</div>
+                  
+                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-src.tar.gz" >
+                  <div className="panel--title">Official source release</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-src.tar.gz.sha512" >
+                  <div className="panel--subtitle">SHA512</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-src.tar.gz.asc" >
+                  <div className="panel--subtitle">ASC</div>
+                  </a>
+                  
+                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz" >
+                  <div className="panel--title">Official binary release</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz.sha512" >
+                  <div className="panel--subtitle">SHA512</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz.asc" >
+                  <div className="panel--subtitle">ASC </div>
+                  </a>
+                  
+                </a>
+              </div>    
+
+              <div className="col">
+                <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-bin.tar.gz" className="panel panel--link text--center">
+                  <div className="panel--icon">
+                    <i className="feather icon-download"></i>
+                  </div>
+                 
+                  <div className="panel--title">0.2.0</div>
+
+                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-src.tar.gz" >
+                  <div className="panel--title">Official source release</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-src.tar.gz.sha512" >
+                  <div className="panel--subtitle">SHA512</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-src.tar.gz.asc" >
+                  <div className="panel--subtitle">ASC</div>
+                  </a>
+                  
+                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-bin.tar.gz" >
+                  <div className="panel--title">Official binary release</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-bin.tar.gz.sha512" >
+                  <div className="panel--subtitle">SHA512</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-bin.tar.gz.asc" >
+                  <div className="panel--subtitle">ASC </div>
+                  </a>
+                </a>
+              </div>
+
               <div className="col">
                 <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-bin.tar.gz" className="panel panel--link text--center">
                   <div className="panel--icon">
@@ -31,8 +93,19 @@ function Download() {
                   </div>
                  
                   <div className="panel--title">0.1.0</div>
-                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-bin.tar.gz" >
+
+                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-src.tar.gz" >
                   <div className="panel--title">Official source release</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-src.tar.gz.sha512" >
+                  <div className="panel--subtitle">SHA512</div>
+                  </a>
+                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-src.tar.gz.asc" >
+                  <div className="panel--subtitle">ASC</div>
+                  </a>
+
+                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-bin.tar.gz" >
+                  <div className="panel--title">Official binary release</div>
                   </a>
                   <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-bin.tar.gz.sha512" >
                   <div className="panel--subtitle">SHA512</div>
@@ -43,108 +116,10 @@ function Download() {
                   
                 </a>
               </div>
-
-              <div className="col">
-                <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-bin.tar.gz" className="panel panel--link text--center">
-                  <div className="panel--icon">
-                    <i className="feather icon-download"></i>
-                  </div>
-                 
-                  <div className="panel--title">0.1.0</div>
-                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-bin.tar.gz" >
-                  <div className="panel--title">Official source release</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-bin.tar.gz.sha512" >
-                  <div className="panel--subtitle">SHA512</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-bin.tar.gz.asc" >
-                  <div className="panel--subtitle">ASC </div>
-                  </a>
-                  
-                </a>
-              </div>
-
-              <div className="col">
-                <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz" className="panel panel--link text--center">
-                  <div className="panel--icon">
-                    <i className="feather icon-download"></i>
-                  </div>
-                 
-                  <div className="panel--title">0.1.0</div>
-                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz" >
-                  <div className="panel--title">Official source release</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz.sha512" >
-                  <div className="panel--subtitle">SHA512</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz.asc" >
-                  <div className="panel--subtitle">ASC </div>
-                  </a>
-                  
-                </a>
-              </div>
               
             </div>
           </div>
-
-          <div className="container">
-            <div className="row">
-              <div className="col">
-                <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-src.tar.gz" className="panel panel--link text--center">
-                  <div className="panel--icon">
-                    <i className="feather icon-code"></i>
-                  </div>
-                  <div className="panel--title">0.1.0</div>
-                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-src.tar.gz" >
-                  <div className="panel--title">Official source release</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-src.tar.gz.sha512" >
-                  <div className="panel--subtitle">SHA512</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.1.0/apache-pinot-incubating-0.1.0-src.tar.gz.asc" >
-                  <div className="panel--subtitle">ASC</div>
-                  </a>
-                </a>
-              </div>
-
-              <div className="col">
-                <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-src.tar.gz" className="panel panel--link text--center">
-                  <div className="panel--icon">
-                    <i className="feather icon-code"></i>
-                  </div>
-                  <div className="panel--title">0.2.0</div>
-                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-src.tar.gz" >
-                  <div className="panel--title">Official source release</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-src.tar.gz.sha512" >
-                  <div className="panel--subtitle">SHA512</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.2.0/apache-pinot-incubating-0.2.0-src.tar.gz.asc" >
-                  <div className="panel--subtitle">ASC</div>
-                  </a>
-                </a>
-              </div>
-
-              <div className="col">
-                <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-src.tar.gz" className="panel panel--link text--center">
-                  <div className="panel--icon">
-                    <i className="feather icon-code"></i>
-                  </div>
-                  <div className="panel--title">0.3.0</div>
-                  <a href="https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-src.tar.gz" >
-                  <div className="panel--title">Official source release</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-src.tar.gz.sha512" >
-                  <div className="panel--subtitle">SHA512</div>
-                  </a>
-                  <a href="https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-src.tar.gz.asc" >
-                  <div className="panel--subtitle">ASC</div>
-                  </a>
-                </a>
-              </div>
-
-              </div>
-          </div>
+          
         </section>
       </main>
     </Layout>
