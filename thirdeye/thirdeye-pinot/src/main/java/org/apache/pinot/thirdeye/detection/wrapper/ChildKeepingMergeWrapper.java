@@ -26,11 +26,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 
@@ -48,9 +50,23 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
   }
 
   @Override
-  // does not fetch any anomalies from database
+  // retrieve the anomalies that are detected by multiple detectors
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
-    return Collections.emptyList();
+    AnomalySlice effectiveSlice = this.slice.withDetectionId(this.config.getId())
+        .withStart(this.getStartTime(generated) - this.maxGap - 1)
+        .withEnd(this.getEndTime(generated) + this.maxGap + 1);
+
+    Collection<MergedAnomalyResultDTO> anomalies =
+        this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice);
+
+    return anomalies.stream()
+        .filter(anomaly -> !anomaly.isChild() && isDetectedByMultipleComponents(anomaly))
+        .collect(Collectors.toList());
+  }
+
+  private boolean isDetectedByMultipleComponents(MergedAnomalyResultDTO anomaly) {
+    String componentName = anomaly.getProperties().getOrDefault(PROP_DETECTOR_COMPONENT_NAME, "");
+    return componentName.contains(",");
   }
 
   @Override
@@ -59,7 +75,7 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
     Map<Long, MergedAnomalyResultDTO> existingParentAnomalies = new HashMap<>();
     for (MergedAnomalyResultDTO anomaly : input) {
       if (anomaly.getId() != null && !anomaly.getChildren().isEmpty()) {
-        existingParentAnomalies.put(anomaly.getId(), anomaly);
+        existingParentAnomalies.put(anomaly.getId(), copyAnomalyInfo(anomaly, new MergedAnomalyResultDTO()));
       }
     }
 
