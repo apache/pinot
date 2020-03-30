@@ -9,7 +9,7 @@ before_install:
   - export PATH=$PATH:~/bin
   - jq --version
   - curl -sSL -o ~/bin/install-jdk.sh https://raw.githubusercontent.com/sormuras/bach/master/install-jdk.sh && chmod +x ~/bin/install-jdk.sh
-  - source ./.travis_set_deploy_build_opts.sh
+  - source ./.travis/.travis_set_deploy_build_opts.sh
 
 cache:
   directories:
@@ -20,7 +20,7 @@ addons:
   firefox: latest
 
 install:
-  - ./.travis_install.sh
+  - ./.travis/.travis_install.sh
 
 branches:
   only:
@@ -36,35 +36,35 @@ jobs:
     - name: "Integration Tests - OracleJDK 8"
       jdk: oraclejdk8
       script:
-        - ./.travis_test.sh
+        - ./.travis/.travis_test.sh
       env:
         - RUN_INTEGRATION_TESTS=true
     - name: "Unit Tests - OracleJDK 8"
       jdk: oraclejdk8
       script:
-        - ./.travis_test.sh
+        - ./.travis/.travis_test.sh
       env:
         - RUN_INTEGRATION_TESTS=false
     - name: "QuickStart - Java 8 & OpenJDK 14-15"
       jdk: oraclejdk8
       script:
-        - ./.travis_quickstart.sh
+        - ./.travis/.travis_quickstart.sh
         - jdk_switcher use openjdk8
-        - ./.travis_install.sh
-        - ./.travis_quickstart.sh
-        - ./.travis_quickstart_openjdk.sh 14
-        - ./.travis_quickstart_openjdk.sh 15
+        - ./.travis/.travis_install.sh
+        - ./.travis/.travis_quickstart.sh
+        - ./.travis/.travis_quickstart_openjdk.sh 14
+        - ./.travis/.travis_quickstart_openjdk.sh 15
     - name: "QuickStart - OpenJDK 10-13"
       jdk: openjdk10
       script:
         - java -version
-        - ./.travis_quickstart.sh
-        - ./.travis_quickstart_openjdk.sh 11
-        - ./.travis_quickstart_openjdk.sh 12
-        - ./.travis_quickstart_openjdk.sh 13
+        - ./.travis/.travis_quickstart.sh
+        - ./.travis/.travis_quickstart_openjdk.sh 11
+        - ./.travis/.travis_quickstart_openjdk.sh 12
+        - ./.travis/.travis_quickstart_openjdk.sh 13
     - stage: deploy
       script:
-        - travis_wait 40 ./.travis_nightly_build.sh
+        - travis_wait 40 ./.travis/.travis_nightly_build.sh
 
 env:
   global:

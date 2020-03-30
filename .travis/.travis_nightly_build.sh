@@ -18,15 +18,14 @@
 # under the License.
 #
 
-JDK_VERSION=$1
-JAVA_HOME=$HOME/openjdk${JDK_VERSION}
-rm -rf "${JAVA_HOME}"
-. ~/bin/install-jdk.sh --feature "${JDK_VERSION}" --cacerts --target "${JAVA_HOME}"
-gdb --batch-silent --pid=$$ --eval-command='call unbind_variable("script_name")'
-gdb --batch-silent --pid=$$ --eval-command='call unbind_variable("script_version")'
-rm -rf jdk.tar.gz
-echo "${JAVA_HOME}"
-java -version
-./.travis_install.sh
-./.travis_quickstart.sh
-rm -rf "${JAVA_HOME}"
+if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
+  echo "Deploying to bintray"
+
+  BUILD_VERSION=$(grep -E "<revision>(.*)</revision>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1)
+  echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
+  mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}" -q -B
+  mvn versions:commit -q -B
+
+  # Deploy to bintray
+  mvn deploy -s .travis/.ci.settings.xml -DskipTests -q -DretryFailedDeploymentCount=5
+fi
