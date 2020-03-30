@@ -17,6 +17,7 @@ module.exports = {
       links: [
         {to: 'https://docs.pinot.apache.org/', label: 'Docs', position: 'right'},
         {to: '/download', label: 'Download', position: 'right'},
+        {to: 'https://docs.pinot.apache.org/community-1/blogs', label: 'Blog', position: 'right'},
         {
           href: 'https://github.com/apache/incubator-pinot',
           label: 'GitHub',
@@ -66,11 +67,7 @@ module.exports = {
             {
               label: 'ThirdEye',
               to: 'https://docs.pinot.apache.org/integrations/thirdeye',
-            },
-            {
-              label: 'PowerBI',
-              to: 'docs/components/sinks',
-            },
+            }
           ],
         },
         {
