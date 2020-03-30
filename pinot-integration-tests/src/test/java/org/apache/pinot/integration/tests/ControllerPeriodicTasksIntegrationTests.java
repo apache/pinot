@@ -34,22 +34,23 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.TagOverrideConfig;
-import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.TagOverrideConfig;
+import org.apache.pinot.spi.config.TenantConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
@@ -429,8 +430,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.
     String table1 = (String) context.getAttribute("testTableOne");
     String table2 = (String) context.getAttribute("testTableTwo");
-    TableConfig tableConfigOne =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(table1).build();
+    TableConfig tableConfigOne = new TableConfigBuilder(TableType.OFFLINE).setTableName(table1).build();
     String partitionNameOne = tableConfigOne.getTableName();
 
     // Ensure that the broker resource is not rebuilt.
@@ -442,8 +442,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     // Add another table that needs to be rebuilt
     TableConfig offlineTableConfigTwo =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(table2)
-            .setBrokerTenant(TENANT_NAME).setServerTenant(TENANT_NAME).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(table2).setBrokerTenant(TENANT_NAME)
+            .setServerTenant(TENANT_NAME).build();
     _helixResourceManager.addTable(offlineTableConfigTwo);
     String partitionNameTwo = offlineTableConfigTwo.getTableName();
 

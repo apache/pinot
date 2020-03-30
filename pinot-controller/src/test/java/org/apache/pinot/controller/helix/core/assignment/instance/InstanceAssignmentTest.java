@@ -23,20 +23,21 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
-import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.config.Instance;
-import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
-import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
-import org.apache.pinot.common.config.instance.InstanceReplicaGroupPartitionConfig;
-import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.spi.config.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -54,7 +55,7 @@ public class InstanceAssignmentTest {
   public void testDefaultOfflineReplicaGroup() {
     int numReplicas = 3;
     TableConfig tableConfig =
-        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setServerTenant(TENANT_NAME)
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setServerTenant(TENANT_NAME)
             .setNumReplicas(numReplicas)
             .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
     int numInstancesPerPartition = 2;
@@ -136,7 +137,7 @@ public class InstanceAssignmentTest {
       instanceConfig.addTag(OFFLINE_TAG);
       int pool = i / numInstancesPerPool;
       instanceConfig.getRecord()
-          .setMapField(Instance.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, Integer.toString(pool)));
+          .setMapField(InstanceUtils.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, Integer.toString(pool)));
       instanceConfigs.add(instanceConfig);
     }
 
@@ -146,7 +147,7 @@ public class InstanceAssignmentTest {
     int numReplicaGroups = numPools;
     InstanceReplicaGroupPartitionConfig replicaPartitionConfig =
         new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, 0, 0);
-    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE,
             new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig))).build();
     InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
@@ -172,7 +173,7 @@ public class InstanceAssignmentTest {
       instanceConfig.addTag(OFFLINE_TAG);
       int pool = numPools - 1;
       instanceConfig.getRecord()
-          .setMapField(Instance.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, Integer.toString(pool)));
+          .setMapField(InstanceUtils.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, Integer.toString(pool)));
       instanceConfigs.add(instanceConfig);
     }
 
@@ -256,7 +257,7 @@ public class InstanceAssignmentTest {
 
   @Test
   public void testIllegalConfig() {
-    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
 
     int numInstances = 10;
@@ -319,9 +320,9 @@ public class InstanceAssignmentTest {
     for (int i = 0; i < numInstances; i++) {
       InstanceConfig instanceConfig = instanceConfigs.get(i);
       if (i < numInstances / 2) {
-        instanceConfig.getRecord().setMapField(Instance.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, "0"));
+        instanceConfig.getRecord().setMapField(InstanceUtils.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, "0"));
       } else {
-        instanceConfig.getRecord().setMapField(Instance.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, "1"));
+        instanceConfig.getRecord().setMapField(InstanceUtils.POOL_KEY, Collections.singletonMap(OFFLINE_TAG, "1"));
       }
     }
 

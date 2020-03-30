@@ -25,14 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableTaskConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +64,7 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
     for (TableConfig tableConfig : tableConfigs) {
       // Only generate tasks for OFFLINE tables
       String offlineTableName = tableConfig.getTableName();
-      if (tableConfig.getTableType() != CommonConstants.Helix.TableType.OFFLINE) {
+      if (tableConfig.getTableType() != TableType.OFFLINE) {
         LOGGER.warn("Skip generating ConvertToRawIndexTask for non-OFFLINE table: {}", offlineTableName);
         continue;
       }

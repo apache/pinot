@@ -23,7 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.minion.segment.DefaultRecordPartitioner;
@@ -33,6 +33,7 @@ import org.apache.pinot.core.minion.segment.RecordPartitioner;
 import org.apache.pinot.core.minion.segment.RecordTransformer;
 import org.apache.pinot.core.minion.segment.ReducerRecordReader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.config.IndexingConfig;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
 
@@ -119,7 +120,7 @@ public class SegmentConverter {
         List<String> invertedIndexColumns = _indexingConfig.getInvertedIndexColumns();
 
         // Check if the table config has any index configured
-        if ((sortedColumn != null && !sortedColumn.isEmpty()) || invertedIndexColumns != null) {
+        if (CollectionUtils.isNotEmpty(sortedColumn) || CollectionUtils.isNotEmpty(invertedIndexColumns)) {
           String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
           try (
               PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(outputSegment, null, sortedColumn)) {

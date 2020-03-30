@@ -27,10 +27,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class SegmentGenerationUtils {
@@ -121,7 +122,7 @@ public class SegmentGenerationUtils {
       tableJsonNode = tableJsonNode.get(OFFLINE);
     }
     try {
-      return TableConfig.fromJsonConfig(tableJsonNode);
+      return JsonUtils.jsonNodeToObject(tableJsonNode, TableConfig.class);
     } catch (IOException e) {
       throw new RuntimeException("Failed to decode table config from JSON - '" + tableJsonNode + "'", e);
     }
@@ -146,5 +147,4 @@ public class SegmentGenerationUtils {
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
     return relativeOutputURI;
   }
-
 }

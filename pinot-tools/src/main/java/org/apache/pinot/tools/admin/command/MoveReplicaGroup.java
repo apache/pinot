@@ -42,10 +42,11 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.PinotZKChanger;
@@ -388,13 +389,12 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       LOGGER.error("Table name is required and can not be empty");
       System.exit(1);
     }
-    if (tableName.endsWith(CommonConstants.Helix.TableType.REALTIME.toString())) {
+    if (TableNameBuilder.isRealtimeTableResource(tableName)) {
       LOGGER.error("This operation is not supported for realtime table. table: {}", tableName);
       System.exit(1);
     }
 
-    tableName =
-        tableName.endsWith(CommonConstants.Helix.TableType.OFFLINE.toString()) ? tableName : tableName + "_OFFLINE";
+    tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     if (zkHost.isEmpty() || zkPath.isEmpty()) {
       LOGGER.error("zkHost or zkPath should not be empty");
       System.exit(1);
@@ -423,7 +423,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, zkPath);
     ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<>(zkHost, serializer, path);
     ZNRecord tcZnRecord = propertyStore.get("/CONFIGS/TABLE/" + tableName, null, 0);
-    TableConfig tableConfig = TableConfig.fromZnRecord(tcZnRecord);
+    TableConfig tableConfig = TableConfigUtils.fromZNRecord(tcZnRecord);
     LOGGER.debug("Loaded table config");
     return tableConfig;
   }

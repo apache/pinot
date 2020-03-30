@@ -22,7 +22,7 @@ import java.io.File;
 import java.util.concurrent.Executor;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.pinot.common.config.TableConfig;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -32,6 +32,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
@@ -114,7 +115,7 @@ public class SegmentValidator {
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
     StorageQuotaChecker quotaChecker =
         new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _isLeaderForTable);
-    return quotaChecker.isSegmentStorageWithinQuota(segmentFile, metadata.getName(),
+    return quotaChecker.isSegmentStorageWithinQuota(metadata.getName(), FileUtils.sizeOfDirectory(segmentFile),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 }

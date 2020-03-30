@@ -29,8 +29,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.partition.ModuloPartitionFunction;
@@ -41,10 +39,13 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.SegmentPartitionConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -137,7 +138,8 @@ public class SegmentPartitionTest {
     }
 
     SegmentPartitionConfig expectedConfig = new SegmentPartitionConfig(expectedMap);
-    SegmentPartitionConfig actualConfig = SegmentPartitionConfig.fromJsonString(expectedConfig.toJsonString());
+    SegmentPartitionConfig actualConfig =
+        JsonUtils.stringToObject(expectedConfig.toJsonString(), SegmentPartitionConfig.class);
 
     for (Map.Entry<String, ColumnPartitionConfig> entry : actualConfig.getColumnPartitionMap().entrySet()) {
       String partitionColumn = entry.getKey();
@@ -156,7 +158,7 @@ public class SegmentPartitionTest {
         "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function\",\"numPartitions\":10}}}";
 
     assertEquals(jsonStringWithoutNewField,
-        SegmentPartitionConfig.fromJsonString(jsonStringWithNewField).toJsonString());
+        JsonUtils.stringToObject(jsonStringWithNewField, SegmentPartitionConfig.class).toJsonString());
   }
 
   private String buildQuery(String tableName, String columnName, int predicateValue) {

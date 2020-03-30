@@ -34,9 +34,9 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**

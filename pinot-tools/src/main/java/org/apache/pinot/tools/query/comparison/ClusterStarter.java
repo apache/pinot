@@ -27,11 +27,12 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
@@ -197,11 +198,11 @@ public class ClusterStarter {
     }
 
     String controllerAddress = "http://" + _localhost + ":" + _controllerPort;
-    String tableJSONConfigString =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(_tableName)
-            .setTimeColumnName(_timeColumnName).setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker")
-            .setServerTenant("server").build().toJsonConfigString();
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(), tableJSONConfigString);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(_tableName).setTimeColumnName(_timeColumnName)
+            .setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker").setServerTenant("server").build();
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
+        tableConfig.toJsonString());
   }
 
   private void uploadData()
