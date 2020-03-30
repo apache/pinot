@@ -114,10 +114,10 @@ public class SegmentAssignmentUtils {
    */
   static Map<String, Map<String, String>> rebalanceReplicaGroupBasedTable(
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions,
-      Map<Integer, Set<String>> partitionIdToSegmentsMap) {
+      Map<Integer, List<String>> partitionIdToSegmentsMap) {
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
     int numPartitions = instancePartitions.getNumPartitions();
-    for (Map.Entry<Integer, Set<String>> entry : partitionIdToSegmentsMap.entrySet()) {
+    for (Map.Entry<Integer, List<String>> entry : partitionIdToSegmentsMap.entrySet()) {
       // Uniformly spray the segment partitions over the instance partitions
       int partitionId = entry.getKey() % numPartitions;
       SegmentAssignmentUtils
@@ -147,7 +147,7 @@ public class SegmentAssignmentUtils {
    * </ul>
    */
   static void rebalanceReplicaGroupBasedPartition(Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions, int partitionId, Set<String> segments,
+      InstancePartitions instancePartitions, int partitionId, List<String> segments,
       Map<String, Map<String, String>> newAssignment) {
     // Fetch instances in replica-group 0
     List<String> instances = instancePartitions.getInstances(partitionId, 0);
@@ -162,14 +162,9 @@ public class SegmentAssignmentUtils {
     // Do not move segment if target number of segments is not reached, track the segments need to be moved
     int[] numSegmentsAssignedPerInstance = new int[numInstances];
     List<String> segmentsNotAssigned = new ArrayList<>();
-    for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      // Skip segments not in the partition
-      if (!segments.contains(segmentName)) {
-        continue;
-      }
+    for (String segmentName : segments) {
       boolean segmentAssigned = false;
-      for (String instanceName : entry.getValue().keySet()) {
+      for (String instanceName : currentAssignment.get(segmentName).keySet()) {
         Integer instanceId = instanceNameToIdMap.get(instanceName);
         if (instanceId != null && numSegmentsAssignedPerInstance[instanceId] < targetNumSegmentsPerInstance) {
           newAssignment
@@ -261,9 +256,9 @@ public class SegmentAssignmentUtils {
       for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> instanceStateMap = entry.getValue();
-        if (instanceStateMap.values().contains(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+        if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
           _completedSegmentAssignment.put(segmentName, instanceStateMap);
-        } else if (instanceStateMap.values().contains(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+        } else if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
           _consumingSegmentAssignment.put(segmentName, instanceStateMap);
         } else {
           _offlineSegmentAssignment.put(segmentName, instanceStateMap);
