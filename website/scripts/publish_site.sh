@@ -37,7 +37,7 @@ SITE_TMP=/tmp/pinot-site
 
   git clone "https://$GH_TOKEN@$ORIGIN_REPO" .
   git config user.name "Pinot Site Updater"
-  git config user.email "dev@pinot.incubator.apache.org"
+  git config user.email "dev@pinot.apache.org"
   git checkout asf-master
 
   # Clean content directory

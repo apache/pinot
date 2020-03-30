@@ -60,8 +60,8 @@ module.exports = {
               to: 'https://docs.pinot.apache.org/integrations/presto',
             },
             {
-              label: 'PQL',
-              to: 'docs/components/sources',
+              label: 'Superset',
+              to: 'https://docs.pinot.apache.org/integrations/superset',
             },
             {
               label: 'ThirdEye',
@@ -124,8 +124,7 @@ module.exports = {
       copyright: `Copyright © ${new Date().getFullYear()} The Apache Software Foundation.`,
     },
     googleAnalytics: {
-      // TODO
-      trackingID: 'TEMP',
+      trackingID: 'UA-157446650-1',
     },
     algolia: {
       apiKey: 'f3cde09979e469ad62eaea4e115c21ea',
