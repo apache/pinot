@@ -39,6 +39,10 @@ data:
       "tenants": {},
       "tableIndexConfig": {
         "loadMode": "MMAP",
+        "invertedIndexColumns": [
+          "organization",
+          "repo"
+        ],
         "streamConfigs": {
           "streamType": "kafka",
           "stream.kafka.consumer.type": "simple",

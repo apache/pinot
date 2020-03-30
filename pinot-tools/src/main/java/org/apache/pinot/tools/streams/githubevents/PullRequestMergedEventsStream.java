@@ -52,6 +52,7 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
  */
 public class PullRequestMergedEventsStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
+  private static final long SLEEP_MILLIS = 10_000;
 
   private ExecutorService _service;
   private boolean _keepStreaming = true;
@@ -165,30 +166,36 @@ public class PullRequestMergedEventsStream {
               break;
             case 304: // Not Modified
               printStatus(Quickstart.Color.YELLOW, "Not modified. Checking again in 10s.");
-              Thread.sleep(10_000L);
+              Thread.sleep(SLEEP_MILLIS);
               break;
             case 408: // Timeout
               printStatus(Quickstart.Color.YELLOW, "Timeout. Trying again in 10s.");
-              Thread.sleep(10_000L);
+              Thread.sleep(SLEEP_MILLIS);
               break;
             case 403: // Rate Limit exceeded
-              printStatus(Quickstart.Color.YELLOW, "Rate limit exceeded, sleeping until " + githubAPIResponse.resetTimeMs);
+              printStatus(Quickstart.Color.YELLOW,
+                  "Rate limit exceeded, sleeping until " + githubAPIResponse.resetTimeMs);
               long sleepMs = Math.max(60_000L, githubAPIResponse.resetTimeMs - System.currentTimeMillis());
               Thread.sleep(sleepMs);
               break;
             case 401: // Unauthorized
-              throw new IllegalStateException(
+              printStatus(Quickstart.Color.YELLOW,
                   "Unauthorized call to Github events API. Status message: " + githubAPIResponse.statusMessage
                       + ". Exiting.");
+              return;
             default: // Unknown status code
               printStatus(Quickstart.Color.YELLOW,
                   "Unknown status code " + githubAPIResponse.statusCode + " statusMessage "
                       + githubAPIResponse.statusMessage + ". Retry in 10s");
-              Thread.sleep(10_000);
+              Thread.sleep(SLEEP_MILLIS);
           }
         } catch (Exception e) {
           LOGGER.error("Exception in reading events data", e);
-          return;
+          try {
+            Thread.sleep(SLEEP_MILLIS);
+          } catch (InterruptedException ex) {
+            LOGGER.error("Caught exception in retry", ex);
+          }
         }
       }
     });
