@@ -15,7 +15,7 @@ module.exports = {
         src: 'img/logo.svg',
       },
       links: [
-        {to: 'https://apache-pinot.gitbook.io/apache-pinot-cookbook/', label: 'Docs', position: 'right'},
+        {to: 'https://docs.pinot.apache.org/apache-pinot-cookbook/', label: 'Docs', position: 'right'},
         {to: 'https://issues.apache.org/jira/projects/PINOT/issues', label: 'Jira', position: 'right'},
         {to: 'https://cwiki.apache.org/confluence/display/PINOT', label: 'Wiki', position: 'right'},
         {
