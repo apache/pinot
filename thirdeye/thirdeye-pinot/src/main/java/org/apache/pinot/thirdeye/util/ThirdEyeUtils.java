@@ -63,6 +63,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -703,6 +704,16 @@ public abstract class ThirdEyeUtils {
         period = DEFAULT_CACHING_PERIOD_LOOKBACK;
     }
     return period;
+  }
+
+  /**
+   * Check if the anomaly is detected by multiple components
+   * @param anomaly the anomaly
+   * @return if the anomaly is detected by multiple components
+   */
+  public static boolean isDetectedByMultipleComponents(MergedAnomalyResultDTO anomaly) {
+    String componentName = anomaly.getProperties().getOrDefault(PROP_DETECTOR_COMPONENT_NAME, "");
+    return componentName.contains(",");
   }
 
   /**

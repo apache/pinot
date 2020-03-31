@@ -60,13 +60,8 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
         this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice);
 
     return anomalies.stream()
-        .filter(anomaly -> !anomaly.isChild() && isDetectedByMultipleComponents(anomaly))
+        .filter(anomaly -> !anomaly.isChild() && ThirdEyeUtils.isDetectedByMultipleComponents(anomaly))
         .collect(Collectors.toList());
-  }
-
-  private boolean isDetectedByMultipleComponents(MergedAnomalyResultDTO anomaly) {
-    String componentName = anomaly.getProperties().getOrDefault(PROP_DETECTOR_COMPONENT_NAME, "");
-    return componentName.contains(",");
   }
 
   @Override
