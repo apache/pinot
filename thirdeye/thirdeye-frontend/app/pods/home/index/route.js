@@ -79,10 +79,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
     // if there are no selections made, set to tier0-tier1 application by default
     if (!appName && !subGroup) {
       appName = 'tier0-tier1';
-      startDate = moment().startOf('day').subtract(1, 'week').utc().valueOf();
-      endDate = moment().startOf('day').utc().valueOf();
       duration = '1w';
     }
+
+    [startDate, endDate] = this.get('setDatesFromDuration')(duration, startDate, endDate); // if there's a duration param, override dates.
 
     // Update props
     this.setProperties({
@@ -169,6 +169,34 @@ export default Route.extend(AuthenticatedRouteMixin, {
       }
     });
     return metricsObj;
+  },
+
+  /**
+   * Overrides startDate and endDate params if duration present
+   * @return {Undefined}
+   */
+  setDatesFromDuration(duration, start, end) {
+    if (duration) {
+      switch(duration) {
+        case 'today':
+          start = moment().startOf('day').valueOf();
+          end = moment().startOf('day').add(1, 'days').valueOf();
+          break;
+        case '2d':
+          start = moment().subtract(1, 'day').startOf('day').valueOf();
+          end = moment().startOf('day').valueOf();
+          break;
+        case '1d':
+          start = moment().subtract(24, 'hour').startOf('hour').valueOf();
+          end = moment().startOf('hour').valueOf();
+          break;
+        case '1w':
+          start = moment().subtract(1, 'week').startOf('day').valueOf();
+          end = moment().startOf('day').add(1, 'days').valueOf();
+          break;
+      }
+    }
+    return [start, end];
   },
 
   /**
