@@ -126,12 +126,12 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
   @Override
   public MutableRoaringBitmap getDocIds(Object value) {
     String searchQuery = (String) value;
-    MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
-    Collector docIDCollector = new LuceneDocIdCollector(docIDs, _docIdTranslator);
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
       Query query = _queryParser.parse(searchQuery);
       _indexSearcher.search(query, docIDCollector);
-      return docIDs;
+      return docIds;
     } catch (Exception e) {
       String msg = "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
       throw new RuntimeException(msg, e);

@@ -35,10 +35,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public class RealtimeLuceneDocIdCollector implements Collector {
 
-  private final MutableRoaringBitmap _docIDs;
+  private final MutableRoaringBitmap _docIds;
 
-  public RealtimeLuceneDocIdCollector(MutableRoaringBitmap docIDs) {
-    _docIDs = docIDs;
+  public RealtimeLuceneDocIdCollector(MutableRoaringBitmap docIds) {
+    _docIds = docIds;
   }
 
   @Override
@@ -57,7 +57,7 @@ public class RealtimeLuceneDocIdCollector implements Collector {
 
       @Override
       public void collect(int doc) throws IOException {
-        _docIDs.add(doc);
+        _docIds.add(doc);
       }
     };
   }
