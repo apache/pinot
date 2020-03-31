@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -36,6 +35,7 @@ import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.BaseTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 /**
  * This serves the following purposes:
@@ -188,6 +188,7 @@ public class DistinctTable extends BaseTable {
             break;
           case BYTES:
             columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
+            break;
           default:
             throw new IllegalStateException(
                 "Unexpected column data type " + columnDataType + " while deserializing data table for DISTINCT query");
