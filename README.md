@@ -54,7 +54,7 @@ Because of the design choices we made to achieve these goals, there are certain 
 Pinot works very well for querying time series data with lots of Dimensions and Metrics. Example - Query (profile views, ad campaign performance, etc.) in an analytical fashion (who viewed this profile in the last weeks, how many ads were clicked per campaign). 
 
 ## Instructions to build Pinot
-More detailed instructions can be found at [Quick Demo](https://apache-pinot.gitbook.io/apache-pinot-cookbook/getting-started) section in the documentation.
+More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/getting-started) section in the documentation.
 ```
 # Clone a repo
 $ git clone https://github.com/apache/incubator-pinot.git
@@ -83,10 +83,10 @@ Pinot also provides k8s integration with interactive query engine [Presto](kuber
  - Apache Pinot Meetup Group: https://www.meetup.com/apache-pinot/
 
 ## Documentation
-Check out [Pinot documentation](https://apache-pinot.gitbook.io/apache-pinot-cookbook/) for a complete description of Pinot's features.
-- [Quick Demo](https://apache-pinot.gitbook.io/apache-pinot-cookbook/getting-started/running-pinot-locally)
-- [Pinot Architecture](https://apache-pinot.gitbook.io/apache-pinot-cookbook/concepts/architecture)
-- [Pinot Query Language](https://apache-pinot.gitbook.io/apache-pinot-cookbook/pinot-user-guide/pinot-query-language)
+Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete description of Pinot's features.
+- [Quick Demo](https://docs.pinot.apache.org/getting-started/running-pinot-locally)
+- [Pinot Architecture](https://docs.pinot.apache.org/concepts/architecture)
+- [Pinot Query Language](https://docs.pinot.apache.org/pinot-user-guide/pinot-query-language)
 
 ## Pinot Query Clients
 

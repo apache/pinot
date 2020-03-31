@@ -26,7 +26,7 @@
 Pinot
 #####
 
-.. note::  The documentation has moved to `Apache Pinot Cookbook <https://apache-pinot.gitbook.io/apache-pinot-cookbook/>`_.
+.. note::  The documentation has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
 
 .. toctree::
    :maxdepth: 1
