@@ -18,15 +18,9 @@
 # under the License.
 #
 
-JDK_VERSION=$1
-JAVA_HOME=$HOME/openjdk${JDK_VERSION}
-rm -rf "${JAVA_HOME}"
-. ~/bin/install-jdk.sh --feature "${JDK_VERSION}" --cacerts --target "${JAVA_HOME}"
-gdb --batch-silent --pid=$$ --eval-command='call unbind_variable("script_name")'
-gdb --batch-silent --pid=$$ --eval-command='call unbind_variable("script_version")'
-rm -rf jdk.tar.gz
-echo "${JAVA_HOME}"
-java -version
-./.travis_install.sh
-./.travis_quickstart.sh
-rm -rf "${JAVA_HOME}"
+if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
+  export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
+  export DEPLOY_BUILD_OPTS="-Dsha1=-dev-${TRAVIS_BUILD_NUMBER}"
+else
+  export DEPLOY_BUILD_OPTS=""
+fi
