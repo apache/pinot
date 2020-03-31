@@ -43,14 +43,12 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Period;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-import static org.apache.pinot.thirdeye.detection.datasla.DatasetSlaTaskRunner.*;
 
 
 public class DatasetSlaTaskRunnerTest {
@@ -100,7 +98,7 @@ public class DatasetSlaTaskRunnerTest {
     detectionConfigDTO.setDescription("myDescription");
     detectionConfigDTO.setCron("myCron");
     Map<String, Object> metricSla = new HashMap<>();
-    metricSla.put("sla", "0_DAYS");
+    metricSla.put("sla", "1_DAYS");
     Map<String, Object> props = new HashMap<>();
     props.put("thirdeye:metric:123", metricSla);
     detectionConfigDTO.setDataSLAProperties(props);
@@ -179,6 +177,10 @@ public class DatasetSlaTaskRunnerTest {
     Assert.assertEquals(anomalies.get(0).getStartTime(), startTime + 4 * period);
     Assert.assertEquals(anomalies.get(0).getEndTime(), startTime + 6 * period);
     Assert.assertEquals(anomalies.get(0).getType(), AnomalyType.DATA_MISSING);
+    Map<String, String> anomalyProps = new HashMap<>();
+    anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 4 * period - 1));
+    anomalyProps.put("sla", "2_DAYS");
+    Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
     anomalyDAO.delete(anomalies.get(0));  // clean up
 
 
@@ -214,6 +216,9 @@ public class DatasetSlaTaskRunnerTest {
     Assert.assertEquals(anomalies.get(0).getStartTime(), startTime + 4 * period);
     Assert.assertEquals(anomalies.get(0).getEndTime(), startTime + 7 * period);
     Assert.assertEquals(anomalies.get(0).getType(), AnomalyType.DATA_MISSING);
+    anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 4 * period - 1));
+    anomalyProps.put("sla", "3_DAYS");
+    Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
     anomalyDAO.delete(anomalies.get(0));  // clean up
 
 
@@ -232,6 +237,9 @@ public class DatasetSlaTaskRunnerTest {
     Assert.assertEquals(anomalies.get(0).getStartTime(), startTime + 4 * period);
     Assert.assertEquals(anomalies.get(0).getEndTime(), startTime + 6 * period);
     Assert.assertEquals(anomalies.get(0).getType(), AnomalyType.DATA_MISSING);
+    anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 4 * period - 1));
+    anomalyProps.put("sla", "1_DAYS");
+    Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
     anomalyDAO.delete(anomalies.get(0));  // clean up
   }
 
@@ -267,6 +275,10 @@ public class DatasetSlaTaskRunnerTest {
     Assert.assertEquals(anomalies.get(0).getStartTime(), startTime + 4 * period);
     Assert.assertEquals(anomalies.get(0).getEndTime(), startTime + 10 * period);
     Assert.assertEquals(anomalies.get(0).getType(), AnomalyType.DATA_MISSING);
+    Map<String, String> anomalyProps = new HashMap<>();
+    anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 3 * period));
+    anomalyProps.put("sla", "1_DAYS");
+    Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
     anomalyDAO.delete(anomalies.get(0));  // clean up
 
     this.info.setStart(sliceOverlapAboveThreshold.getStart());
@@ -330,7 +342,7 @@ public class DatasetSlaTaskRunnerTest {
     DatasetSlaTaskRunner runner = new DatasetSlaTaskRunner(detectionDAO, anomalyDAO, evaluationDAO, mockDataProvider);
 
     Map<String, Object> metricSla = new HashMap<>();
-    metricSla.put("sla", "0_DAYS");
+    metricSla.put("sla", "1_DAYS");
     Map<String, Object> props = new HashMap<>();
     props.put("thirdeye:metric:123:dim1%3D1", metricSla);
     detectionConfigDTO.setDataSLAProperties(props);
@@ -358,6 +370,10 @@ public class DatasetSlaTaskRunnerTest {
     Assert.assertEquals(anomalies.get(0).getStartTime(), startTime + 4 * period);
     Assert.assertEquals(anomalies.get(0).getEndTime(), startTime + 5 * period);
     Assert.assertEquals(anomalies.get(0).getType(), AnomalyType.DATA_MISSING);
+    Map<String, String> anomalyProps = new HashMap<>();
+    anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 4 * period - 1));
+    anomalyProps.put("sla", "1_DAYS");
+    Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
   }
 
   /**
@@ -385,6 +401,10 @@ public class DatasetSlaTaskRunnerTest {
     Assert.assertEquals(slaAnomaly.getStartTime(), startTime + 4 * period);
     Assert.assertEquals(slaAnomaly.getEndTime(), startTime + 5 * period);
     Assert.assertEquals(slaAnomaly.getType(), AnomalyType.DATA_MISSING);
+    Map<String, String> anomalyProps = new HashMap<>();
+    anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 4 * period - 1));
+    anomalyProps.put("sla", "1_DAYS");
+    Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
 
     // 2nd scan
     //  time:    3____4    5    6    // Data for 4th still hasn't arrived
@@ -405,12 +425,18 @@ public class DatasetSlaTaskRunnerTest {
         Assert.assertEquals(anomalyDTO.getEndTime(), startTime + 6 * period);
         Assert.assertEquals(anomalyDTO.getType(), AnomalyType.DATA_MISSING);
         Assert.assertTrue(anomalyDTO.getChildIds().contains(slaAnomaly.getId()));
+        anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 4 * period - 1));
+        anomalyProps.put("sla", "1_DAYS");
+        Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
       } else {
         // Child anomaly
         Assert.assertEquals(anomalyDTO.getStartTime(), startTime + 4 * period);
         Assert.assertEquals(anomalyDTO.getEndTime(), startTime + 5 * period);
         Assert.assertEquals(anomalyDTO.getType(), AnomalyType.DATA_MISSING);
         Assert.assertTrue(anomalyDTO.isChild());
+        anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 4 * period - 1));
+        anomalyProps.put("sla", "1_DAYS");
+        Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
       }
     }
 
@@ -442,6 +468,9 @@ public class DatasetSlaTaskRunnerTest {
     anomalyDTO.setType(AnomalyType.DATA_MISSING);
     anomalyDTO.setDetectionConfigId(this.detectorId);
     anomalyDTO.setChildIds(Collections.emptySet());
+    anomalyProps.put("datasetLastRefreshTime", String.valueOf(startTime + 4 * period - 1));
+    anomalyProps.put("sla", "1_DAYS");
+    Assert.assertEquals(anomalies.get(0).getProperties(), anomalyProps);
     expectedAnomalies.add(anomalyDTO);
 
     Assert.assertTrue(anomalies.containsAll(expectedAnomalies));

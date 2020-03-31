@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.datasla;
 
 import com.google.common.collect.ArrayListMultimap;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
@@ -177,13 +178,13 @@ public class DatasetSlaTaskRunner implements TaskRunner {
         if (dataFrame == null || dataFrame.isEmpty()) {
           // no data
           if (hasMissedSLA(datasetLastRefreshTime, slaProps, info.getEnd())) {
-            createDataSLAAnomaly(datasetLastRefreshTime + 1, info.getEnd(), info.getConfigId(), datasetConfig);
+            createDataSLAAnomaly(datasetLastRefreshTime + 1, info.getEnd(), info.getConfigId(), datasetConfig, slaProps);
           }
         } else {
           datasetLastRefreshTime = dataFrame.getDoubles("timestamp").max().longValue();
           if (isPartialData(datasetLastRefreshTime, info, datasetConfig)) {
             if (hasMissedSLA(datasetLastRefreshTime, slaProps, info.getEnd())) {
-              createDataSLAAnomaly(datasetLastRefreshTime + 1, info.getEnd(), info.getConfigId(), datasetConfig);
+              createDataSLAAnomaly(datasetLastRefreshTime + 1, info.getEnd(), info.getConfigId(), datasetConfig, slaProps);
             }
           }
         }
@@ -191,7 +192,7 @@ public class DatasetSlaTaskRunner implements TaskRunner {
         // Optimize for the common case - the common case is that the data availability events are arriving
         // correctly and we need not re-fetch the data to double check.
         if (hasMissedSLA(datasetLastRefreshTime, slaProps, info.getEnd())) {
-          createDataSLAAnomaly(datasetLastRefreshTime + 1, info.getEnd(), info.getConfigId(), datasetConfig);
+          createDataSLAAnomaly(datasetLastRefreshTime + 1, info.getEnd(), info.getConfigId(), datasetConfig, slaProps);
         }
       }
     } catch (Exception e) {
@@ -269,12 +270,21 @@ public class DatasetSlaTaskRunner implements TaskRunner {
    * Creates a DATA_MISSING anomaly from ceiling(start) to ceiling(end) for the detection id.
    * If existing DATA_MISSING anomalies are present, then it will be merged accordingly.
    */
-  private void createDataSLAAnomaly(long start, long end, long detectionId, DatasetConfigDTO datasetConfig) {
+  private void createDataSLAAnomaly(long start, long end, long detectionId, DatasetConfigDTO datasetConfig,
+      Map<String, Object> slaProps) {
     MergedAnomalyResultDTO anomaly = DetectionUtils.makeAnomaly(
         alignToUpperBoundary(start, datasetConfig),
         alignToUpperBoundary(end, datasetConfig),
         detectionId);
     anomaly.setType(AnomalyType.DATA_MISSING);
+
+    // Store the metadata in the anomaly
+    Map<String, String> properties = new HashMap<>();
+    properties.put("datasetLastRefreshTime", String.valueOf(start - 1));
+    slaProps.forEach((k, v) -> {
+      properties.put(k, v.toString());
+    });
+    anomaly.setProperties(properties);
 
     List<MergedAnomalyResultDTO> existingAnomalies = anomalyDAO.findAnomaliesWithinBoundary(start, end, detectionId);
     if (!existingAnomalies.isEmpty()) {
