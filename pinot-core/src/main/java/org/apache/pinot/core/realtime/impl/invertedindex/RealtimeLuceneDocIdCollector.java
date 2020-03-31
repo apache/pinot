@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.readers.text;
+package org.apache.pinot.core.realtime.impl.invertedindex;
 
 import java.io.IOException;
 import org.apache.lucene.index.LeafReaderContext;
@@ -26,29 +26,19 @@ import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.ScoreMode;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-
 /**
- * A simple collector created to bypass all the heap heavy process
- * of collecting the results in Lucene. Lucene by default will
- * create a {@link org.apache.lucene.search.TopScoreDocCollector}
- * which internally uses a {@link org.apache.lucene.search.TopDocsCollector}
- * and uses a PriorityQueue to maintain the top results. From the heap usage
- * experiments (please see the design doc), we found out that this was
- * substantially contributing to heap whereas we currently don't need any
- * scoring or top doc collecting.
- * Every time Lucene finds a matching document for the text search query,
- * a callback is invoked into this collector that simply collects the
- * matching doc's docID. We store the docID in a bitmap to be traversed later
- * as part of doc id iteration etc.
+ * DocID collector for Lucene search query. We have optimized
+ * the lucene search on offline segments by maintaining
+ * a pre-built luceneDocId -> pinotDocId mapping. Since that solution
+ * is not directly applicable to realtime, we will separate the collector
+ * for the time-being. Once we have optimized the realtime, we can
  */
-public class LuceneDocIdCollector implements Collector {
+public class RealtimeLuceneDocIdCollector implements Collector {
 
   private final MutableRoaringBitmap _docIds;
-  private final LuceneTextIndexReader.DocIdTranslator _docIdTranslator;
 
-  public LuceneDocIdCollector(MutableRoaringBitmap docIds, LuceneTextIndexReader.DocIdTranslator docIdTranslator) {
+  public RealtimeLuceneDocIdCollector(MutableRoaringBitmap docIds) {
     _docIds = docIds;
-    _docIdTranslator = docIdTranslator;
   }
 
   @Override
@@ -67,7 +57,7 @@ public class LuceneDocIdCollector implements Collector {
 
       @Override
       public void collect(int doc) throws IOException {
-        _docIds.add(_docIdTranslator.getPinotDocId(doc));
+        _docIds.add(doc);
       }
     };
   }

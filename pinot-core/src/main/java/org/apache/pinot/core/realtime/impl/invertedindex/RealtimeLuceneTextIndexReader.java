@@ -99,7 +99,7 @@ public class RealtimeLuceneTextIndexReader implements InvertedIndexReader<Mutabl
   public MutableRoaringBitmap getDocIds(Object value) {
     String searchQuery = (String) value;
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
-    Collector docIDCollector = new LuceneDocIdCollector(docIDs);
+    Collector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
     IndexSearcher indexSearcher = null;
     try {
       Query query = _queryParser.parse(searchQuery);
@@ -123,6 +123,9 @@ public class RealtimeLuceneTextIndexReader implements InvertedIndexReader<Mutabl
     }
   }
 
+  // TODO: Optimize this similar to how we have done for offline/completed segments.
+  // Pre-built mapping will not work for realtime. We need to build an on-the-fly cache
+  // as queries are coming in.
   private MutableRoaringBitmap getPinotDocIds(IndexSearcher indexSearcher, MutableRoaringBitmap luceneDocIds) {
     IntIterator luceneDocIDIterator = luceneDocIds.getIntIterator();
     MutableRoaringBitmap actualDocIDs = new MutableRoaringBitmap();
