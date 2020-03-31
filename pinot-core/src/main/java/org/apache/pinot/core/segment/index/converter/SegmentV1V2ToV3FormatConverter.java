@@ -35,6 +35,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -225,6 +226,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
   private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
+    // TODO: see if this can be done by reusing some existing methods
     String suffix = LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
     File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
@@ -240,6 +242,22 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         File v3LuceneIndexFile = new File(v3LuceneIndexDir, indexFile.getName());
         Files.copy(indexFile.toPath(), v3LuceneIndexFile.toPath());
       }
+    }
+    // if segment reload is issued asking for up-conversion of
+    // on-disk segment format from v1/v2 to v3, then in addition
+    // to moving the lucene text index files, we need to move the
+    // docID mapping/cache file created by us in v1/v2 during an earlier
+    // load of the segment.
+    String docIDFileSuffix = LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    File[] textIndexDocIdMappingFiles = segmentDirectory.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(docIDFileSuffix);
+      }
+    });
+    for (File docIdMappingFile : textIndexDocIdMappingFiles) {
+      File v3DocIdMappingFile = new File(v3Dir, docIdMappingFile.getName());
+      Files.copy(docIdMappingFile.toPath(), v3DocIdMappingFile.toPath());
     }
   }
 

@@ -56,7 +56,6 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -75,7 +74,7 @@ import org.testng.annotations.Test;
  * The test table has a SKILLS column and QUERY_LOG column. Text index is created
  * on each of these columns.
  */
-public class TestTextSearchQueries extends BaseQueriesTest {
+public class TextSearchQueriesTest extends BaseQueriesTest {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueries");
   private static final String TABLE_NAME = "MyTable";

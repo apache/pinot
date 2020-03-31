@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.core.segment.store;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 
 
 public class SegmentDirectoryPaths {
@@ -81,6 +83,13 @@ public class SegmentDirectoryPaths {
   public static File findTextIndexIndexFile(File indexDir, String column) {
     String luceneIndexDirectory = column + LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
     return findFormatFile(indexDir, luceneIndexDirectory);
+  }
+
+  @Nullable
+  @VisibleForTesting
+  public static File findTextIndexDocIdMappingFile(File indexDir, String column) {
+    String file = column + LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    return findFormatFile(indexDir, file);
   }
 
   /**
