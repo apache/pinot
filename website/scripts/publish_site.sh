@@ -47,10 +47,3 @@ SITE_TMP=/tmp/pinot-site
   # Copy the generated directory to asf folder
   cp -r $WORK_DIR/* $SITE_TMP/content
 )
-
- 
-  
-
-  
-
-

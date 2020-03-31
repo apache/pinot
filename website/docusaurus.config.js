@@ -74,15 +74,15 @@ module.exports = {
           title: 'Docs',
           items: [
             {
-              label: 'GettingStarted',
+              label: 'Getting Started',
               to: 'https://docs.pinot.apache.org/getting-started',
             },
             {
-              label: 'PinotComponents',
+              label: 'Pinot Components',
               to: 'https://docs.pinot.apache.org/pinot-components',
             },
             {
-              label: 'UserGuide',
+              label: 'User Guide',
               to: 'https://docs.pinot.apache.org/pinot-user-guide',
             },
             {

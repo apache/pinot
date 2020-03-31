@@ -26,7 +26,7 @@ const AnchoredH2 = Heading('h2');
 
 const features = [
   {
-    title: 'Blistering Fast',
+    title: 'Blazing Fast',
     icon: 'zap',
     description: (
       <>
@@ -193,20 +193,12 @@ function Installation() {
         <AnchoredH2 id="installation">Installs Everywhere</AnchoredH2>
         <div className="sub-title">Pinot can be installed using docker with presto</div>
 
-        <div className={styles.installationPlatforms}>
-          <Link to="/docs/setup/installation/containers/docker"><SVG src="/img/docker.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/linux.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems/raspbian"><SVG src="/img/raspbian.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems/windows"><SVG src="/img/windows.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems/macos"><SVG src="/img/apple.svg" /></Link>
-        </div>
-
         <div className={styles.installationChecks}>
           <div>
             <i className="feather icon-package"></i> Helm or K8s crds
           </div>
           <div>
-            <i className="feather icon-cpu"></i> On-Premesis
+            <i className="feather icon-cpu"></i> On-Premise
           </div>
           <div>
             <i className="feather icon-zap"></i> Public Cloud
@@ -284,7 +276,7 @@ function Home() {
           <SVG src="/img/pinot-overview.svg" className="svg image-overview figure" />
           </p>
           <div className="hero--buttons">
-            <Link to="docs/about/what_is_pinot" className="button button--primary button--highlight">Get Started</Link>
+            <Link to="https://docs.pinot.apache.org/getting-started" className="button button--primary button--highlight">Getting Started</Link>
             <Link to="https://communityinviter.com/apps/apache-pinot/apache-pinot" className="button button--primary button--highlight">Join our Slack</Link>
           </div>
           <p className="hero--subsubtitle">
