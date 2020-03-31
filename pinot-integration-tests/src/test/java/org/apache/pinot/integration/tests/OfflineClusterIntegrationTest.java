@@ -886,15 +886,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     queries.add("SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch);
     queries
         .add("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch);
-    queries.add("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + 16138);
+    queries.add("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch);
     queries.add("SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable");
     queries.add(
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+    queries.replaceAll(query -> query.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch"));
 
-    for (String query : queries) {
-      query = query.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch");
-      JsonNode response = postQuery(query);
-      Assert.assertTrue(response.get("numSegmentsProcessed").asLong() >= 1, query + " failed");
-    }
+    // Wait for at most 10 seconds for broker to get the ZK callback of the schema change
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        for (String query : queries) {
+          JsonNode response = postQuery(query);
+          // NOTE: When table does not exist, we will get 'BrokerResourceMissingError'.
+          //       When column does not exist, all segments will be pruned and 'numSegmentsProcessed' will be 0.
+          return response.get("exceptions").size() == 0 && response.get("numSegmentsProcessed").asInt() > 0;
+        }
+      } catch (Exception e) {
+        // Fail the test when exception caught
+        throw new RuntimeException(e);
+      }
+      return true;
+    }, 10_000L, "Failed to get results for case-insensitive queries");
   }
 }
