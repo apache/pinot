@@ -34,6 +34,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.ArrayList;
@@ -50,6 +51,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -145,11 +147,16 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
 
     String feedbackVal = getFeedbackValue(feedback);
 
+    Properties props = new Properties();
+    props.putAll(anomaly.getProperties());
+    double lift = BaseNotificationContent.getLift(anomaly.getAvgCurrentVal(), anomaly.getAvgBaselineVal());
     AnomalyReportEntity
         anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
         getAnomalyURL(anomaly, dashboardHost),
-        anomaly.getAvgBaselineVal(),
-        anomaly.getAvgCurrentVal(),
+        getPredictedValue(anomaly),
+        getCurrentValue(anomaly),
+        getFormattedLiftValue(anomaly, lift),
+        getLiftDirection(lift),
         anomaly.getImpactToGlobal(),
         getDimensionsList(anomaly.getDimensionMap()),
         getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
@@ -160,7 +167,10 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
         getDateString(anomaly.getStartTime(), dateTimeZone),
         getDateString(anomaly.getEndTime(), dateTimeZone),
         getTimezoneString(dateTimeZone),
-        getIssueType(anomaly)
+        getIssueType(anomaly),
+        anomaly.getType().getLabel(),
+        ThirdEyeStringUtils.encodeCompactedProperties(props)
+
     );
 
     List<String> affectedCountries = getMatchedFilterValues(anomaly, "country");

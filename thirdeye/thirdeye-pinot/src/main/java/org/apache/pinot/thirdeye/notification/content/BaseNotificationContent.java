@@ -35,8 +35,11 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
+import joptsimple.internal.Strings;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.DataReportHelper;
 import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
@@ -45,7 +48,6 @@ import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -91,6 +93,9 @@ public abstract class BaseNotificationContent implements NotificationContent {
   private static final String DEFAULT_EVENT_CRAWL_OFFSET = "P2D";
 
   protected static final String EVENT_FILTER_COUNTRY = "countryCode";
+
+  private static final String RAW_VALUE_FORMAT = "%.0f";
+  private static final String PERCENTAGE_FORMAT = "%.2f %%";
 
   protected boolean includeSentAnomaliesOnly;
   protected DateTimeZone dateTimeZone;
@@ -307,6 +312,89 @@ public abstract class BaseNotificationContent implements NotificationContent {
   }
 
   /**
+   * Returns a human readable lift value to be displayed in the notification templates
+   */
+  protected static String getFormattedLiftValue(MergedAnomalyResultDTO anomaly, double lift) {
+    String liftValue = String.format(PERCENTAGE_FORMAT, lift * 100);
+
+    // Fetch the lift value for a SLA anomaly
+    if (anomaly.getType().equals(AnomalyType.DATA_MISSING)) {
+      liftValue = getFormattedSLALiftValue(anomaly);
+    }
+
+    return liftValue;
+   }
+
+  /**
+   * The lift value for an SLA anomaly is delay from the configured sla. (Ex: 2 days & 3 hours)
+   */
+  protected static String getFormattedSLALiftValue(MergedAnomalyResultDTO anomaly) {
+    if (!anomaly.getType().equals(AnomalyType.DATA_MISSING)
+        || anomaly.getProperties() == null || anomaly.getProperties().isEmpty()
+        || !anomaly.getProperties().containsKey("sla")
+        || !anomaly.getProperties().containsKey("datasetLastRefreshTime")) {
+      return Strings.EMPTY;
+    }
+
+    long delayInMillis = anomaly.getEndTime() - Long.parseLong(anomaly.getProperties().get("datasetLastRefreshTime"));
+    long days = TimeUnit.MILLISECONDS.toDays(delayInMillis);
+    long hours = TimeUnit.MILLISECONDS.toHours(delayInMillis) % TimeUnit.DAYS.toHours(1);
+    long minutes = TimeUnit.MILLISECONDS.toMinutes(delayInMillis) % TimeUnit.HOURS.toMinutes(1);
+
+    String liftValue;
+    if (days > 0) {
+      liftValue = String.format("%d days & %d hours", days, hours);
+    } else if (hours > 0) {
+      liftValue = String.format("%d hours & %d mins", hours, minutes);
+    } else {
+      liftValue = String.format("%d mins", minutes);
+    }
+
+    return liftValue;
+  }
+
+  /**
+   * The predicted value for an SLA anomaly is the configured sla. (Ex: 2_DAYS)
+   */
+  protected static String getSLAPredictedValue(MergedAnomalyResultDTO anomaly) {
+    if (!anomaly.getType().equals(AnomalyType.DATA_MISSING)
+        || anomaly.getProperties() == null || anomaly.getProperties().isEmpty()
+        || !anomaly.getProperties().containsKey("sla")) {
+      return "-";
+    }
+
+    return anomaly.getProperties().get("sla");
+  }
+
+  /**
+   * Retrieve the predicted value for the anomaly
+   */
+  protected static String getPredictedValue(MergedAnomalyResultDTO anomaly) {
+    String predicted = ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal());
+
+    // For SLA anomalies, we use the sla as the predicted value
+    if (anomaly.getType().equals(AnomalyType.DATA_MISSING)) {
+      predicted = getSLAPredictedValue(anomaly);
+    }
+
+    if (predicted.equalsIgnoreCase(String.valueOf(Double.NaN))) {
+      predicted = "-";
+    }
+    return predicted;
+  }
+
+  /**
+   * Retrieve the current value for the anomaly
+   */
+  protected static String getCurrentValue(MergedAnomalyResultDTO anomaly) {
+    String current = ThirdEyeUtils.getRoundedValue(anomaly.getAvgCurrentVal());
+
+    if (current.equalsIgnoreCase(String.valueOf(Double.NaN))) {
+      current = "-";
+    }
+    return current;
+  }
+  /**
    * Convert Feedback value to user readable values
    */
   protected static String getFeedbackValue(AnomalyFeedback feedback) {
@@ -436,17 +524,17 @@ public abstract class BaseNotificationContent implements NotificationContent {
     Double weight;
     String groupKey;
     String entityName;
+    String anomalyType;
+    String properties;
 
-    private static String RAW_VALUE_FORMAT = "%.0f";
-    private static String PERCENTAGE_FORMAT = "%.2f %%";
-
-    public AnomalyReportEntity(String anomalyId, String anomalyURL, double baselineVal, double currentVal, Double swi,
-        List<String> dimensions, String duration, String feedback, String function, String funcDescription,
-        String metric, String startTime, String endTime, String timezone, String issueType) {
+    public AnomalyReportEntity(String anomalyId, String anomalyURL, String baselineVal, String currentVal, String lift,
+        boolean positiveLift, Double swi, List<String> dimensions, String duration, String feedback, String function,
+        String funcDescription, String metric, String startTime, String endTime, String timezone, String issueType,
+        String anomalyType, String properties) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
-      this.baselineVal = ThirdEyeUtils.getRoundedValue(baselineVal);
-      this.currentVal = ThirdEyeUtils.getRoundedValue(currentVal);
+      this.baselineVal = baselineVal;
+      this.currentVal = currentVal;
       this.dimensions = dimensions;
       this.duration = duration;
       this.feedback = feedback;
@@ -456,14 +544,19 @@ public abstract class BaseNotificationContent implements NotificationContent {
       if (swi != null) {
         this.swi = String.format(PERCENTAGE_FORMAT, swi * 100);
       }
-      double lift = BaseNotificationContent.getLift(currentVal, baselineVal);
-      this.lift = String.format(PERCENTAGE_FORMAT, lift * 100);
-      this.positiveLift = getLiftDirection(lift);
+      if (baselineVal.equals("-")) {
+        this.lift = Strings.EMPTY;
+      } else {
+        this.lift = lift;
+      }
+      this.positiveLift = positiveLift;
       this.metric = metric;
       this.startDateTime = startTime;
       this.endTime = endTime;
       this.timezone = timezone;
       this.issueType = issueType;
+      this.anomalyType = anomalyType;
+      this.properties = properties;
     }
 
     public void setSeasonalValues(COMPARE_MODE compareMode, double seasonalValue, double current) {
@@ -635,6 +728,22 @@ public abstract class BaseNotificationContent implements NotificationContent {
 
     public void setIssueType(String issueType) {
       this.issueType = issueType;
+    }
+
+    public String getAnomalyType() {
+      return anomalyType;
+    }
+
+    public void setAnomalyType(String anomalyType) {
+      this.anomalyType = anomalyType;
+    }
+
+    public String getProperties() {
+      return properties;
+    }
+
+    public void setProperties(String properties) {
+      this.properties = properties;
     }
 
     public void setWeight(Double weight) {

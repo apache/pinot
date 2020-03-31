@@ -1,4 +1,4 @@
-ThirdEye has detected *[an anomaly|test/app/#/anomalies?anomalyIds=4]* on the metric *test_metric* between *Dec 31, 16:00* and *Dec 31, 16:00* (PDT)
+ThirdEye has detected [*2 anomalies*|test/app/#/anomalies?anomalyIds=4,5] on the metrics listed below between *Jan 01, 10:05* and *Jan 02, 10:05* (PDT)
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 *Metric:*&nbsp;_test_metric_
@@ -7,8 +7,9 @@ ThirdEye has detected *[an anomaly|test/app/#/anomalies?anomalyIds=4]* on the me
 *Alert Name:*&nbsp;_test detection_ ([edit|test/app/#/manage/explore/2])
 *Description:*
 
-||Start||Duration||Dimensions||Current||Predicted||Change||
-|[Dec 31, 16:00 PDT|test/app/#/rootcause?anomalyId=4]|0.00028 hours|key:value\\|_0_|_0_|_+100.00 %_|
+||Start||Duration||Type||Dimensions||Current||Predicted||Change||
+|[Jan 01, 10:05 PDT|test/app/#/rootcause?anomalyId=4]|24 hours   |Deviation   |key:value\\|_0_|_0_      |_+100.00 %_|
+|[Jan 01, 10:05 PDT|test/app/#/rootcause?anomalyId=5]|12.75 hours|Data Missing|-|_0_|_2_HOURS_|_+12 hours & 45mins_|
 
 =======================================================================================
 

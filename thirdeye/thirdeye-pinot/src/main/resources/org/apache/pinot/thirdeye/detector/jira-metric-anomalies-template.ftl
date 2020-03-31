@@ -25,10 +25,10 @@
     <#list detectionToAnomalyDetailsMap[detectionName] as anomaly>
       <#if anomaly.metric==metric>
         <#if newTable>
-          ||Start||Duration||Dimensions||Current||Predicted||Change||
+          ||Start||Duration||Type||Dimensions||Current||Predicted||Change||
         </#if>
         <#assign newTable = false>
-        |[${anomaly.startDateTime} ${anomaly.timezone}|${anomaly.anomalyURL}${anomaly.anomalyId}]|${anomaly.duration}|<#if anomaly.dimensions?has_content><#list anomaly.dimensions as dimension>${dimension}\\ </#list><#else>-</#if>|_${anomaly.currentVal}_|_${anomaly.baselineVal}_|_${anomaly.positiveLift?string('+','')}${anomaly.lift}_|
+        |[${anomaly.startDateTime} ${anomaly.timezone}|${anomaly.anomalyURL}${anomaly.anomalyId}]|${anomaly.duration}|${anomaly.anomalyType}|<#if anomaly.dimensions?has_content><#list anomaly.dimensions as dimension>${dimension}\\ </#list><#else>-</#if>|_${anomaly.currentVal}_|_${anomaly.baselineVal}_|_${anomaly.positiveLift?string('+','')}${anomaly.lift}_|
       </#if>
     </#list>
   </#list>
