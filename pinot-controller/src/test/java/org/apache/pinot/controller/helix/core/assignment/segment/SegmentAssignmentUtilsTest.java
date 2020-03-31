@@ -21,10 +21,8 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
@@ -207,7 +205,7 @@ public class SegmentAssignmentUtilsTest {
 
     int numSegments = 90;
     List<String> segments = SegmentAssignmentTestUtils.getNameList(SEGMENT_NAME_PREFIX, numSegments);
-    Map<Integer, Set<String>> partitionIdToSegmentsMap = Collections.singletonMap(0, new HashSet<>(segments));
+    Map<Integer, List<String>> partitionIdToSegmentsMap = Collections.singletonMap(0, segments);
     int numInstances = 9;
     List<String> instances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, numInstances);
 
