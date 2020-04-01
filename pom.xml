@@ -1273,6 +1273,7 @@
 
             <!-- Top level directories -->
             <exclude>thirdeye/**</exclude>
+            <exclude>website/**</exclude>
 
             <!-- Docker image configs -->
             <exclude>docker/images/pinot-thirdeye/**</exclude>
@@ -1373,6 +1374,9 @@
 
             <!-- Top level -->
             <exclude>.codecov*</exclude>
+
+            <!-- Top level Directory -->
+            <exclude>website/**</exclude>
 
             <!-- Test Resources -->
             <exclude>**/test/resources/**</exclude>
