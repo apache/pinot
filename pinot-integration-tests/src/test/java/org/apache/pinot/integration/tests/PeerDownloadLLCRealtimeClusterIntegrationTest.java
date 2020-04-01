@@ -30,23 +30,23 @@ import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.config.CompletionConfig;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.spi.config.CompletionConfig;
+import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableTaskConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -136,7 +136,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     streamConfigs.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
 
-    _tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(tableName).setLLC(useLlc)
+    _tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setLLC(useLlc)
         .setTimeColumnName(timeColumnName).setTimeType(timeType).setSchemaName(schemaName).setBrokerTenant(brokerTenant)
         .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
@@ -150,7 +150,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     segmentsValidationAndRetentionConfig.setReplicasPerPartition(String.valueOf(numReplicas));
     _tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
 
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), _tableConfig.toJsonConfigString());
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), _tableConfig.toJsonString());
   }
 
   @Override
@@ -230,7 +230,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
       config.setBloomFilterColumns(null);
 
       sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()),
-          _tableConfig.toJsonConfigString());
+          _tableConfig.toJsonString());
     }
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(getTableName(), "realtime"), null);
 
@@ -252,8 +252,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   @Test(expectedExceptions = IOException.class)
   public void testAddHLCTableShouldFail()
       throws IOException {
-    TableConfig tableConfig = new TableConfig.Builder(TableType.REALTIME).setTableName("testTable")
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setStreamConfigs(Collections.singletonMap("stream.kafka.consumer.type", "HIGHLEVEL")).build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 }
