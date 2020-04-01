@@ -28,11 +28,13 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+
 
 // This segment fetcher downloads the segment from peer Pinot servers discovered through external view of a pinot
 // table. The format fo expected segment address uris is
@@ -74,8 +76,8 @@ public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
   //  http://hostname:port/segments/tablenameWithType/segmentName
   private String getPeerServerURI(String segmentName) {
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    String tableNameWithType = TableNameBuilder.forType(CommonConstants.Helix.TableType.REALTIME).
-        tableNameWithType(llcSegmentName.getTableName());
+    String tableNameWithType =
+        TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(llcSegmentName.getTableName());
 
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
     ExternalView externalViewForResource =
