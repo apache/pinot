@@ -44,6 +44,16 @@ function populateNode(data, i, name) {
 }
 
 
+const test4 = [
+    {name: 'rohit'},
+    {name: 'abc'},
+    {name: 'test'}
+    ];
+console.log('test'-'rohit');
+console.log(test4.sort((a,b) => {
+    if(a.name < b.name ) {return -1 }else return 1;
+}));
+
 function testing() {
     let value = null;
     console.log(value? value='test':value = 'ee');

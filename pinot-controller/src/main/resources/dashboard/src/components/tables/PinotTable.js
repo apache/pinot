@@ -49,10 +49,41 @@ export default class PinotTable extends Component {
                 .then(res => res.json())
                 .then((data) => {
                     this.offlineSegments.push(data);
-                    this.setState({offlineSegments:this.offlineSegments, realTimeSegments:this.realTimeSegments})
+                    this.setState({offlineSegments:this.offlineSegments, realTimeSegments:this.realTimeSegments});
+                    this.populateSegmentState(this.props.table, this.offlineSegments, 'OFFLINE');
                 })
                 .catch(console.log)
         });
+    }
+
+    populateSegmentState(table, segmentList,segmentType) {
+        fetch(App.serverAddress + '/tables/' + table + '/externalview')
+            .then(res => res.json())
+            .then((data) => {
+                if(data[segmentType]) {
+                    const segmentDetails = data[segmentType];
+                    for (const key in segmentDetails) {
+                        if (segmentDetails.hasOwnProperty(key)) {
+                            const segValue = segmentDetails[key];
+                            if(segmentList.length >0 ) {
+                                const segStats = segmentList.filter(segm => segm['segment.name'] === key)[0];
+                                for(const key1 in segValue) {
+                                    segStats.server = key1;
+                                    segStats.state = segValue[key1];
+                                }
+                            }
+                        }
+                    }
+                }
+                this.offlineSegments = this.offlineSegments.sort((seg1,seg2) => {
+                    if(seg1.name < seg2.name) {return -1} else return 1;
+                });
+                this.offlineSegments = this.realTimeSegments.sort((seg1,seg2) => {
+                    if(seg1.name < seg2.name) {return -1} else return 1;
+                });
+                this.setState({offlineSegments:this.offlineSegments, realTimeSegments:this.realTimeSegments})
+            })
+            .catch(console.log)
     }
 
     populateRealtimeSegment(seg) {
@@ -63,12 +94,12 @@ export default class PinotTable extends Component {
                 .then(res => res.json())
                 .then((data) => {
                     this.realTimeSegments.push(data);
-                    this.setState({offlineSegments:this.offlineSegments, realTimeSegments:this.realTimeSegments})
+                    this.setState({offlineSegments:this.offlineSegments, realTimeSegments:this.realTimeSegments});
+                    this.populateSegmentState(this.props.table, this.realTimeSegments, 'REALTIME');
                 })
                 .catch(console.log)
         });
     }
-
 
     render() {
         return (
@@ -100,6 +131,7 @@ export default class PinotTable extends Component {
                                 <TableHead>
                                     <TableRow>
                                         <TableCell> Name</TableCell>
+                                        <TableCell align="right">Server</TableCell>
                                         <TableCell align="right">State</TableCell>
                                         <TableCell align="right"># Documents</TableCell>
                                         <TableCell align="center">Size</TableCell>
@@ -114,7 +146,8 @@ export default class PinotTable extends Component {
                                             <TableCell component="th" scope="row">
                                                 {segment['segment.name']}
                                             </TableCell>
-                                            <TableCell align="right">{segment['segment.type']}</TableCell>
+                                            <TableCell align="right">{segment.server}</TableCell>
+                                            <TableCell align="right">{segment.state}</TableCell>
                                             <TableCell align="right">{segment['segment.total.docs']}</TableCell>
                                             <TableCell align="right">{segment['segment.crc']}</TableCell>
                                             <TableCell align="right">{segment['segment.creation.time']}</TableCell>
@@ -135,6 +168,7 @@ export default class PinotTable extends Component {
                                 <TableHead>
                                     <TableRow>
                                         <TableCell> Name</TableCell>
+                                        <TableCell align="right">Server</TableCell>
                                         <TableCell align="right">State</TableCell>
                                         <TableCell align="right"># Documents</TableCell>
                                         <TableCell align="center">Size</TableCell>
@@ -149,7 +183,8 @@ export default class PinotTable extends Component {
                                             <TableCell component="th" scope="row">
                                                 {segment['segment.name']}
                                             </TableCell>
-                                            <TableCell align="right">{segment['segment.type']}</TableCell>
+                                            <TableCell align="right">{segment.server}</TableCell>
+                                            <TableCell align="right">{segment.state}</TableCell>
                                             <TableCell align="right">{segment['segment.total.docs']}</TableCell>
                                             <TableCell align="right">{segment['segment.crc']}</TableCell>
                                             <TableCell align="right">{segment['segment.creation.time']}</TableCell>
