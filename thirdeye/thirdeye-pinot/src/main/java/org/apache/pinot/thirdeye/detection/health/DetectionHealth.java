@@ -83,6 +83,10 @@ public class DetectionHealth {
     return detectionTaskStatus;
   }
 
+  public void setLastSuccessTaskExecutionTime(long lastSuccessTaskExecutionTime) {
+    detectionTaskStatus.setLastSuccessTaskExecutionTime(lastSuccessTaskExecutionTime);
+  }
+
   /**
    * Builder for the detection health
    */

@@ -162,6 +162,12 @@ public class DetectionConfigBean extends AbstractBean {
   }
 
   public void setHealth(DetectionHealth health) {
+    // If there is no success execution in the current window then the last success task execution time would be -1L.
+    // We should keep the original last success task execution time if we have.
+    long lastSuccessTaskExecutionTime = this.health.getDetectionTaskStatus().getLastSuccessTaskExecutionTime();
+   if (health.getDetectionTaskStatus().getLastSuccessTaskExecutionTime() == -1L) {
+      health.setLastSuccessTaskExecutionTime(lastSuccessTaskExecutionTime);
+    }
     this.health = health;
   }
 
