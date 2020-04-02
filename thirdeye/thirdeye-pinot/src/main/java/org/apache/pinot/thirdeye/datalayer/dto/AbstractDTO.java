@@ -20,14 +20,24 @@
 package org.apache.pinot.thirdeye.datalayer.dto;
 
 import java.io.Serializable;
+import java.sql.Timestamp;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 public abstract class AbstractDTO implements Serializable {
   private Long id;
   private int version;
+  protected Long updateTime;
   protected String createdBy;
   protected String updatedBy;
+
+  public Long getUpdateTime() {
+    return updateTime;
+  }
+
+  public void setUpdateTime(Timestamp updateTime) {
+    this.updateTime = updateTime.getTime();
+  }
 
   public Long getId() {
     return id;

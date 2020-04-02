@@ -48,6 +48,7 @@ public class MonitorTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobRunner.class);
   private static final long MAX_TASK_TIME = TimeUnit.HOURS.toMillis(6);
+  private static final long MAX_FAILED_DISABLE_DAYS = 30;
 
   private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -120,8 +121,35 @@ public class MonitorTaskRunner implements TaskRunner {
 
       // update detection health
       updateDetectionHealth();
+
+      // disable alerts that failed consecutively for a long time
+      disableLongFailedAlerts();
+
     } catch (Exception e) {
       LOG.error("Exception in monitor update task", e);
+    }
+  }
+
+  /**
+   * Disable the alert if it was updated before {@MAX_TASK_FAIL_DAYS} but there is no success run since then.
+   */
+  private void disableLongFailedAlerts() {
+    DetectionConfigManager detectionDAO = DAO_REGISTRY.getDetectionConfigManager();
+    List<DetectionConfigDTO> detectionConfigs = detectionDAO.findAllActive();
+    long currentTimeMills = System.currentTimeMillis();
+    long maxTaskFailMills = TimeUnit.DAYS.toMillis(MAX_FAILED_DISABLE_DAYS);
+    for (DetectionConfigDTO config : detectionConfigs) {
+      if (config.getHealth() != null && config.getHealth().getDetectionTaskStatus() != null) {
+        long lastTaskExecutionTime = config.getHealth().getDetectionTaskStatus().getLastTaskExecutionTime();
+        if (config.getUpdateTime() <= currentTimeMills - maxTaskFailMills &&
+            (lastTaskExecutionTime == -1L || lastTaskExecutionTime <= currentTimeMills - maxTaskFailMills)) {
+          config.setActive(false);
+          detectionDAO.update(config);
+          LOG.info("Disable alert " + config.getId() + " since it failed more than " + MAX_FAILED_DISABLE_DAYS + " days");
+          LOG.info("Task last update time: " + config.getUpdateTime());
+          LOG.info("Last success task execution time: " + lastTaskExecutionTime);
+        }
+      }
     }
   }
 
