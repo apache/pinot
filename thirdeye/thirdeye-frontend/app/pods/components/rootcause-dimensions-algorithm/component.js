@@ -228,7 +228,8 @@ export default Component.extend({
             dimensionArr, // Generate array of cell-specific objects for each dimension
             dimensionUrn // Generate URN for each record from dimension names/values
           } = this._generateDimensionMeta(dimensionNames, record);
-
+          let nodeSize = (record.sizeFactor || 0) * 100;
+          nodeSize = `${nodeSize.toFixed(4)}%`;
           // New records of template-ready data
           newDimensionRows.push({
             id: index + 1,
@@ -238,9 +239,10 @@ export default Component.extend({
             dimensions: dimensionNames,
             isSelected: selectedUrns.has(dimensionUrn),
             percentageChange: record.percentageChange,
-            nodeSize: record.sizeFactor,
-            cost: record.cost,
-            boc: `${toFixedIfDecimal(record.baselineValue) || 0} / ${toFixedIfDecimal(record.currentValue) || 0}`,
+            nodeSize,
+            cost: record.cost.toFixed(4),
+            baseline: `${toFixedIfDecimal(record.baselineValue) || 0}`,
+            current: `${toFixedIfDecimal(record.currentValue) || 0}`,
             elementWidth: this._calculateContributionBarWidth(dimensionRows, record)
           });
         });
@@ -481,7 +483,7 @@ export default Component.extend({
    * @private
    */
   _calculateContributionBarWidth(dimensionRows, record) {
-    const overallChangeValues = dimensionRows.map(row => row.percentageChange ? toWidthNumber(row.percentageChange) : 0);
+    const overallChangeValues = dimensionRows.map(row => row.cost ? row.cost : 0);
     const allValuesPositive = overallChangeValues.every(val => val > 0);
     const allValuesNegative = overallChangeValues.every(val => val < 0);
     const widthAdditivePositive = allValuesPositive ? EXTRA_WIDTH : 0;
@@ -489,7 +491,7 @@ export default Component.extend({
 
     // Find the largest change value across all rows
     const maxChange = d3.max(dimensionRows.map((row) => {
-      return Math.abs(row.percentageChange ? toWidthNumber(row.percentageChange) : 0);
+      return Math.abs(row.cost ? row.cost : 0);
     }));
 
     // Generate a scale mapping the change value span to a specific range
@@ -497,14 +499,18 @@ export default Component.extend({
       .domain([0, maxChange])
       .range([0, 100]);
 
+    // Get sign of percentageChange
+    const percentageValue = record.percentageChange ? toWidthNumber(record.percentageChange) : 0;
+
     // Convert contribution value to a width based on our scale
-    const contributionValue = record.percentageChange ? toWidthNumber(record.percentageChange) : 0;
+    const contributionValue = record.cost ? record.cost : 0;
+    const signCarrier = percentageValue * contributionValue;
     const widthPercent = Math.round(widthScale(Math.abs(contributionValue)));
 
     // These will be used to set our bar widths/classes in dimensions-table/change-bars component
     return {
-      positive: (contributionValue > 0) ? `${widthPercent + widthAdditivePositive}%` : '0%',
-      negative: (contributionValue > 0) ? '0%' : `${widthPercent + widthAdditiveNegative}%`
+      positive: (signCarrier > 0) ? `${widthPercent + widthAdditivePositive}%` : '0%',
+      negative: (signCarrier > 0) ? '0%' : `${widthPercent + widthAdditiveNegative}%`
     };
   },
 
