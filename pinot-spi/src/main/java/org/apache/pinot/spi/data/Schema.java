@@ -123,7 +123,9 @@ public final class Schema {
   @JsonIgnore
   public String getPrimaryKey() {
     if (_ingestionModeConfig != null) {
-      return _ingestionModeConfig.getPrimaryKey();
+      List<String> primaryKeys = _ingestionModeConfig.getPrimaryKeys();
+      Preconditions.checkState(primaryKeys.size() == 1, "expect primary keys count to be 1");
+      return primaryKeys.get(0);
     } else {
       return StringUtils.EMPTY;
     }

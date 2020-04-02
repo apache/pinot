@@ -84,7 +84,7 @@ public class SchemaTest {
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
         + "    \"defaultNullValue\":12345}, \"dateTimeFieldSpecs\":["
         + "    {\"name\":\"Date\", \"dataType\":\"LONG\", \"format\":\"1:MILLISECONDS:EPOCH\", \"granularity\":\"5:MINUTES\", \"dateTimeType\":\"PRIMARY\"}],"
-        + "  \"ingestionModeConfig\": {\"ingestionMode\": \"%s\", \"primaryKey\": \"%s\", \"offsetKey\": \"%s\"}"
+        + "  \"ingestionModeConfig\": {\"ingestionMode\": \"%s\", \"primaryKeys\": [\"%s\"], \"offsetKey\": \"%s\"}"
         + "}", metricType, dimensionType, isSingleValue, ingestionMode, primaryKey, offsetKey);
   }
 
@@ -477,11 +477,11 @@ public class SchemaTest {
     Assert.assertEquals(FieldSpec.DataType.STRING, primaryKeyFieldSpec.getDataType());
     Assert.assertEquals(true, primaryKeyFieldSpec.isSingleValueField());
 
-    DimensionFieldSpec offsetField = upsertSchema.getPrimaryKeyFieldSpec();
+    DimensionFieldSpec offsetField = upsertSchema.getOffsetKeyFieldSpec();
     Assert.assertNotNull(offsetField);
     Assert.assertEquals("offset", offsetField.getName());
-    Assert.assertEquals(FieldSpec.DataType.LONG, primaryKeyFieldSpec.getDataType());
-    Assert.assertEquals(true, primaryKeyFieldSpec.isSingleValueField());
+    Assert.assertEquals(FieldSpec.DataType.LONG, offsetField.getDataType());
+    Assert.assertEquals(true, offsetField.isSingleValueField());
   }
 
   @Test
@@ -503,7 +503,4 @@ public class SchemaTest {
     Assert.assertEquals("primary", oldSchema.getPrimaryKey());
     Assert.assertEquals("offset", oldSchema.getOffsetKey());
   }
-
-  @Test
-  public void test
 }

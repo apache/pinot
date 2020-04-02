@@ -25,10 +25,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 import javax.annotation.Nullable;
+import java.util.List;
 
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -37,7 +39,7 @@ public class IngestionModeConfig {
   // for other value it would be append value for now
   private String _ingestionMode;
   // primary key refers to the column name that is the primary key of this upsert table
-  private String _primaryKey;
+  private List<String> _primaryKeys;
   // offset key refers to the column name that we are going to store the offset value to
   private String _offsetKey;
 
@@ -47,15 +49,26 @@ public class IngestionModeConfig {
   @JsonCreator
   public IngestionModeConfig(
       @JsonProperty(value="ingestionMode") @Nullable String ingestionMode,
-      @JsonProperty(value="primaryKey") @Nullable String primaryKey,
+      @JsonProperty(value="primaryKeys") @Nullable List<String> primaryKeys,
       @JsonProperty(value="offsetKey") @Nullable String offsetKey) {
     if (StringUtils.isEmpty(ingestionMode)) {
       _ingestionMode = APPEND_TABLE_CONFIG_VALUE;
     } else {
-      _ingestionMode = ingestionMode;
+      _ingestionMode = ingestionMode.toLowerCase();
     }
-    _primaryKey = primaryKey;
+    if (primaryKeys == null) {
+      _primaryKeys = ImmutableList.of();
+    } else {
+      _primaryKeys = primaryKeys;
+    }
     _offsetKey = offsetKey;
+    if (UPSERT_TABLE_CONFIG_VALUE.equals(_ingestionMode)) {
+      Preconditions.checkState(_primaryKeys.size() == 1,
+          "pinot upsert require one and only one primary key");
+      Preconditions.checkState(StringUtils.isNotEmpty(_offsetKey),
+          "pinot upsert require one offset key");
+
+    }
   }
 
   public IngestionModeConfig(String ingestionMode) {
@@ -73,9 +86,8 @@ public class IngestionModeConfig {
     return _ingestionMode;
   }
 
-  @Nullable
-  public String getPrimaryKey() {
-    return _primaryKey;
+  public List<String> getPrimaryKeys() {
+    return _primaryKeys;
   }
 
   @Nullable
