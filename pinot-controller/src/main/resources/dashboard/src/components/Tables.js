@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 import React, {Component} from 'react';
 import Table from '@material-ui/core/Table';
 import TableCell from '@material-ui/core/TableCell';
@@ -12,11 +30,11 @@ import Card from "@material-ui/core/Card";
 import TypoGraphy from "@material-ui/core/Typography";
 import TreeView from '@material-ui/lab/TreeView';
 import App from "../App";
-import TreeItem from "@material-ui/lab/TreeItem";
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
-import RealTimeOffline from "./RealTimeOffline";
 import Utils from "./Utils";
+import PinotTable from "./tables/PinotTable";
+import Link from '@material-ui/core/Link';
 
 
 const useStyles = theme => ({
@@ -31,10 +49,13 @@ class Tables extends Component {
 
     classes = useStyles();
     tables = [];
+    currentTable =  '';
+    tableDisplay = '';
+
 
     constructor(props) {
         super(props);
-        this.state = {instances:[], treeData:{}};
+        this.state = {instances:[], treeData:{}, currentTable:''};
     }
 
     componentDidMount() {
@@ -45,10 +66,13 @@ class Tables extends Component {
         fetch(App.serverAddress + '/tables')
             .then(res => res.json())
             .then((data) => {
+                if(data && data.tables) {
+                    this.currentTable = data.tables[0];
+                    this.setState({currentTable: this.currentTable});
+                }
                 data.tables.forEach((ins) => {
                     this.populateTable(ins);
                 });
-
             })
             .catch(console.log)
     }
@@ -79,9 +103,18 @@ class Tables extends Component {
             .catch(console.log)
     }
 
+    displayTable(table) {
+        this.currentTable  = table;
+        return () =>  {
+            this.tableDisplay = <PinotTable table = {this.currentTable}></PinotTable>;
+            this.setState({currentTable: this.currentTable });
+
+        }
+    }
+
     render() {
         return (
-            <div style={{width:"90%", margin: "0 auto"}}>
+            <div>
                 <Card style={{background:"#f5f5f5"}}>
                     <CardContent >
                         <TableContainer component={Paper} >
@@ -113,9 +146,9 @@ class Tables extends Component {
                                 </TableHead>
                                 <TableBody>
                                     {this.state.instances.map(instance => (
-                                        <TableRow key={instance.name}>
-                                            <TableCell component="th" scope="row">
-                                                {instance.name}
+                                        <TableRow key={instance.name} onClick={this.displayTable(instance.name)}>
+                                            <TableCell component="th" scope="row" >
+                                                <TypoGraphy><Link>{instance.name}</Link> </TypoGraphy>
                                             </TableCell>
                                             <TableCell align="right">{instance.reportedSizeInBytes}</TableCell>
                                             <TableCell align="right">{instance.estimatedSizeInBytes}</TableCell>
@@ -134,11 +167,7 @@ class Tables extends Component {
                         </TableContainer>
                     </CardContent>
                 </Card>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <RealTimeOffline></RealTimeOffline>
-                    </CardContent>
-                </Card>
+                {this.tableDisplay}
             </div>
         );
     }
