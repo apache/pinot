@@ -60,6 +60,9 @@ public class IndexLoadingConfig {
   private boolean _isDirectRealtimeOffheapAllocation;
   private boolean _enableSplitCommitEndWithMetadata;
 
+  // constructed from FieldConfig
+  private Map<String, Map<String, String>> _columnsWithProperties;
+
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
       @Nonnull TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
@@ -93,6 +96,7 @@ public class IndexLoadingConfig {
       _noDictionaryColumns.addAll(noDictionaryColumns);
     }
 
+    _columnsWithProperties = new HashMap<>();
     extractTextIndexColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
@@ -136,11 +140,12 @@ public class IndexLoadingConfig {
       for (FieldConfig fieldConfig : fieldConfigList) {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !_noDictionaryColumns.contains(fieldConfig.getName())) {
+          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !_noDictionaryColumns.contains(column)) {
             throw new UnsupportedOperationException("Text index is currently not supported on dictionary encoded column: " + column);
           }
-          _textIndexColumns.add(fieldConfig.getName());
+          _textIndexColumns.add(column);
         }
+        _columnsWithProperties.put(column, fieldConfig.getProperties());
       }
     }
   }
@@ -194,6 +199,11 @@ public class IndexLoadingConfig {
   @Nonnull
   public Set<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
+  }
+
+  @Nonnull
+  public Map<String, Map<String, String>> getColumnsWithProperties() {
+    return _columnsWithProperties;
   }
 
   /**

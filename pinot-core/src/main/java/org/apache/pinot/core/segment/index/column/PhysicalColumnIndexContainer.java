@@ -132,7 +132,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _dictionary = null;
       _bloomFilterReader = null;
       if (loadTextIndex) {
-        _invertedIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs());
+        _invertedIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs(),
+            indexLoadingConfig.getColumnsWithProperties().get(columnName));
       } else {
         _invertedIndex = null;
       }
