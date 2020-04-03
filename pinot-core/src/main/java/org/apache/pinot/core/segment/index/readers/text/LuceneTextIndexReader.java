@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
