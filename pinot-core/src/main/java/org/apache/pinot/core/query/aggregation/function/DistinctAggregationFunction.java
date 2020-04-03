@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
@@ -43,15 +44,15 @@ import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 public class DistinctAggregationFunction implements AggregationFunction<DistinctTable, Comparable> {
   private final String[] _columns;
   private final List<SelectionSort> _orderBy;
-  private final int _limit;
+  private final int _capacity;
 
   public DistinctAggregationFunction(String multiColumnExpression, List<SelectionSort> orderBy, int limit) {
     _columns = multiColumnExpression.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
     _orderBy = orderBy;
-    // use a multiplier for trim size when DISTINCT queries have ORDER BY. This logic
-    // is similar to what we have in GROUP BY with ORDER BY
-    // this does not guarantee 100% accuracy but still takes closer to it
-    _limit = CollectionUtils.isNotEmpty(_orderBy) ? limit * 5 : limit;
+    // NOTE: DISTINCT with order-by is similar to group-by with order-by, where we limit the maximum number of unique
+    //       records (groups) for each query to reduce the memory footprint. The result might not be 100% accurate in
+    //       certain scenarios, but should give a good enough approximation.
+    _capacity = CollectionUtils.isNotEmpty(_orderBy) ? GroupByUtils.getTableCapacity(limit) : limit;
   }
 
   @Override
@@ -82,7 +83,7 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
         columnDataTypes[i] = ColumnDataType.fromDataTypeSV(blockValSets[i].getValueType());
       }
       DataSchema dataSchema = new DataSchema(_columns, columnDataTypes);
-      distinctTable = new DistinctTable(dataSchema, _orderBy, _limit);
+      distinctTable = new DistinctTable(dataSchema, _orderBy, _capacity);
       aggregationResultHolder.setValue(distinctTable);
     }
 
@@ -114,7 +115,7 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
       ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
       // NOTE: Use STRING for unknown type
       Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-      return new DistinctTable(new DataSchema(_columns, columnDataTypes), _orderBy, _limit);
+      return new DistinctTable(new DataSchema(_columns, columnDataTypes), _orderBy, _capacity);
     }
   }
 
