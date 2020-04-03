@@ -27,16 +27,16 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 public abstract class AbstractDTO implements Serializable {
   private Long id;
   private int version;
-  protected Long updateTime;
+  protected Timestamp updateTime;
   protected String createdBy;
   protected String updatedBy;
 
-  public Long getUpdateTime() {
+  public Timestamp getUpdateTime() {
     return updateTime;
   }
 
   public void setUpdateTime(Timestamp updateTime) {
-    this.updateTime = updateTime.getTime();
+    this.updateTime = updateTime;
   }
 
   public Long getId() {

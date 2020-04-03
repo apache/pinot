@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.anomaly.monitor;
 
+import java.sql.Timestamp;
 import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
@@ -139,9 +140,10 @@ public class MonitorTaskRunner implements TaskRunner {
     long currentTimeMills = System.currentTimeMillis();
     long maxTaskFailMills = TimeUnit.DAYS.toMillis(MAX_FAILED_DISABLE_DAYS);
     for (DetectionConfigDTO config : detectionConfigs) {
-      if (config.getHealth() != null && config.getHealth().getDetectionTaskStatus() != null) {
+      Timestamp updateTime = config.getUpdateTime();
+      if (updateTime != null && config.getHealth() != null && config.getHealth().getDetectionTaskStatus() != null) {
         long lastTaskExecutionTime = config.getHealth().getDetectionTaskStatus().getLastTaskExecutionTime();
-        if (config.getUpdateTime() <= currentTimeMills - maxTaskFailMills &&
+        if (updateTime.getTime() <= currentTimeMills - maxTaskFailMills &&
             (lastTaskExecutionTime == -1L || lastTaskExecutionTime <= currentTimeMills - maxTaskFailMills)) {
           config.setActive(false);
           detectionDAO.update(config);
