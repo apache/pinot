@@ -111,7 +111,7 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * After step 1 of segment completion is done,
    * this is the max time until which step 3 is allowed to complete.
-   * See {@link #commitSegmentMetadataInternal(String, CommittingSegmentDescriptor, String)} for explanation of steps 1 2 3
+   * See {@link #commitSegmentMetadataInternal(String, CommittingSegmentDescriptor)} for explanation of steps 1 2 3
    * This includes any backoffs and retries for the steps 2 and 3
    * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
    */
@@ -394,20 +394,19 @@ public class PinotLLCRealtimeSegmentManager {
    * It updates the propertystore segment metadata from IN_PROGRESS to DONE, and also creates new propertystore
    * records for new segments, and puts them in idealstate in CONSUMING state.
    */
-  public void commitSegmentMetadata(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor,
-      String segmentFinalLocation) {
+  public void commitSegmentMetadata(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     try {
       _numCompletingSegments.addAndGet(1);
-      commitSegmentMetadataInternal(realtimeTableName, committingSegmentDescriptor, segmentFinalLocation);
+      commitSegmentMetadataInternal(realtimeTableName, committingSegmentDescriptor);
     } finally {
       _numCompletingSegments.addAndGet(-1);
     }
   }
 
   private void commitSegmentMetadataInternal(String realtimeTableName,
-      CommittingSegmentDescriptor committingSegmentDescriptor, String segmentFinalLocation) {
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
     String committingSegmentName = committingSegmentDescriptor.getSegmentName();
     LOGGER.info("Committing segment metadata for segment: {}", committingSegmentName);
 
@@ -430,7 +429,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Step-1
     LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata =
-        updateCommittingSegmentZKMetadata(realtimeTableName, committingSegmentDescriptor, segmentFinalLocation);
+        updateCommittingSegmentZKMetadata(realtimeTableName, committingSegmentDescriptor);
 
     // Step-2
     long newSegmentCreationTimeMs = getCurrentTimeMs();
@@ -469,7 +468,7 @@ public class PinotLLCRealtimeSegmentManager {
    * Updates segment ZK metadata for the committing segment.
    */
   private LLCRealtimeSegmentZKMetadata updateCommittingSegmentZKMetadata(String realtimeTableName,
-      CommittingSegmentDescriptor committingSegmentDescriptor, String segmentFinalLocation) {
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
     String segmentName = committingSegmentDescriptor.getSegmentName();
     LOGGER.info("Updating segment ZK metadata for committing segment: {}", segmentName);
 
@@ -485,7 +484,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
     committingSegmentZKMetadata.setStatus(Status.DONE);
-    committingSegmentZKMetadata.setDownloadUrl(segmentFinalLocation);
+    committingSegmentZKMetadata.setDownloadUrl(committingSegmentDescriptor.getSegmentLocation());
     committingSegmentZKMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     committingSegmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());

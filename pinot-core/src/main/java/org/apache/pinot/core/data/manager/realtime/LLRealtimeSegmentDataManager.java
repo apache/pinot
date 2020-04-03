@@ -629,7 +629,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  // Upload the tar file of the committed segment to the configure segment store.
+  // Upload the tar file of the committed segment to the configured segment store.
   private boolean uploadSegmentToSegmentStore(File segmentTarFile) {
     if (segmentTarFile == null) {
       return false;

@@ -1028,10 +1028,11 @@ public class SegmentCompletionManager {
       _state = State.COMMITTING;
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
-      String segmentFinalLocation = committingSegmentDescriptor.getSegmentLocation();
       if (isSplitCommit && reqParams.getSegmentUploadToControllerEnabled()) {
         try {
-          segmentFinalLocation = _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
+          // Update the segmentDescriptor's segment location to the segment's permanent location.
+          committingSegmentDescriptor
+              .setSegmentLocation(_segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor));
         } catch (Exception e) {
           LOGGER.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
               e);
@@ -1039,7 +1040,7 @@ public class SegmentCompletionManager {
         }
       }
       try {
-        _segmentManager.commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor, segmentFinalLocation);
+        _segmentManager.commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
       } catch (Exception e) {
         LOGGER
             .error("Caught exception while committing segment metadata for segment: {}", _segmentName.getSegmentName(),
