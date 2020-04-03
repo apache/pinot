@@ -16,27 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.dociditerators;
+package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 
 
-/**
- * All scan based filter iterators must implement this interface. This allows intersection to be
- * optimized.
- * For example, if the we have two iterators one index based and another scan based, instead of
- * iterating on both iterators while doing intersection, we iterate of index based and simply look
- * up on scan based iterator to check if docId matches
- */
-public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
+public interface ScanBasedDocIdSet extends FilterBlockDocIdSet {
 
-  MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer);
-
-  /**
-   * Get number of entries scanned.
-   *
-   * @return number of entries scanned.
-   */
-  int getNumEntriesScanned();
+  @Override
+  ScanBasedDocIdIterator iterator();
 }

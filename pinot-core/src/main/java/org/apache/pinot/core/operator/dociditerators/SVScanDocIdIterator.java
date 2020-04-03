@@ -83,16 +83,6 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
-  public boolean isMatch(int docId) {
-    if (_currentDocId == Constants.EOF) {
-      return false;
-    }
-    _valueIterator.skipTo(docId);
-    _numEntriesScanned++;
-    return _valueMatcher.doesCurrentEntryMatch(_valueIterator);
-  }
-
-  @Override
   public int advance(int targetDocId) {
     if (_currentDocId == Constants.EOF) {
       return _currentDocId;

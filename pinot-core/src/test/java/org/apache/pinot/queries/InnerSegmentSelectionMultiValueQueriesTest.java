@@ -225,7 +225,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 272276L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 275416L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 62480L);
     Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();

@@ -22,14 +22,13 @@ import java.util.Collections;
 import java.util.Random;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.NotEqualsPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -39,7 +38,6 @@ import org.testng.annotations.Test;
  * Unit test for no-dictionary based Eq and NEq predicate evaluators.
  */
 public class NoDictionaryEqualsPredicateEvaluatorsTest {
-
   private static final String COLUMN_NAME = "column";
   private static final int NUM_MULTI_VALUES = 100;
   private static final int MAX_STRING_LENGTH = 100;
@@ -68,8 +66,8 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
     PredicateEvaluatorTestUtils.fillRandom(randomInts);
     randomInts[_random.nextInt(NUM_MULTI_VALUES)] = intValue;
 
-    Assert.assertTrue(eqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES, new MutableInt(0)));
-    Assert.assertFalse(neqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES, new MutableInt(0)));
+    Assert.assertTrue(eqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES));
+    Assert.assertFalse(neqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES));
 
     for (int i = 0; i < 100; i++) {
       int random = _random.nextInt();
@@ -77,9 +75,9 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
       Assert.assertEquals(neqPredicateEvaluator.applySV(random), (random != intValue));
 
       PredicateEvaluatorTestUtils.fillRandom(randomInts);
-      Assert.assertEquals(eqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES, new MutableInt(0)),
+      Assert.assertEquals(eqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES),
           ArrayUtils.contains(randomInts, intValue));
-      Assert.assertEquals(neqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES, new MutableInt(0)),
+      Assert.assertEquals(neqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES),
           !ArrayUtils.contains(randomInts, intValue));
     }
   }

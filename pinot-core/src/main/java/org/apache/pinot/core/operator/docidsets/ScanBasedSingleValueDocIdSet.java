@@ -25,7 +25,7 @@ import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 
-public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
+public class ScanBasedSingleValueDocIdSet implements ScanBasedDocIdSet {
   private final BlockValSet blockValSet;
   private SVScanDocIdIterator blockValSetBlockDocIdIterator;
   private String datasourceName;
