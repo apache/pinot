@@ -22,7 +22,8 @@ import ListItem from '@material-ui/core/ListItem';
 import ListItemText from '@material-ui/core/ListItemText';
 import TypoGraphy from '@material-ui/core/Typography'
 import {
-    withRouter
+    withRouter,
+    NavLink
 } from 'react-router-dom'
 
 class NavBar extends Component {
@@ -33,37 +34,83 @@ class NavBar extends Component {
                 <ListItem component="div" >
                     <ListItemText inset onClick={() => this.props.history.push('/cluster')}>
                         <TypoGraphy color="inherit" variant="title" >
+                        <NavLink
+                        to="/cluster"
+                        activeStyle={{
+                            fontWeight: "bold",
+                            color: "red"
+                        }}>
                             Cluster
+                            </NavLink>
+                            
                         </TypoGraphy>
                     </ListItemText>
 
                     <ListItemText inset onClick={() => this.props.history.push('/tenants')}>
                         <TypoGraphy color="inherit" variant="title">
+                        <NavLink
+                        to="/tenants"
+                        activeStyle={{
+                            fontWeight: "bold",
+                            color: "red"
+                        }}>
                             Tenants
+                            </NavLink>
+                            
                         </TypoGraphy>
                     </ListItemText>
 
                     <ListItemText inset onClick={() => this.props.history.push('/tables')}>
                         <TypoGraphy color="inherit" variant="title">
+                        <NavLink
+                        to="/tables"
+                        activeStyle={{
+                            fontWeight: "bold",
+                            color: "red"
+                        }}>
                             Tables
+                            </NavLink>
+                            
                         </TypoGraphy>
                     </ListItemText>
 
                     <ListItemText inset onClick={() => this.props.history.push('/controllers')}>
                         <TypoGraphy color="inherit" variant="title">
+                        <NavLink
+                        to="/controllers"
+                        activeStyle={{
+                            fontWeight: "bold",
+                            color: "red"
+                        }}>
                             Controllers
+                            </NavLink>
                         </TypoGraphy>
                     </ListItemText>
 
                     <ListItemText inset onClick={() => this.props.history.push('/servers')}>
                         <TypoGraphy color="inherit" variant="title">
-                            Servers
+                        <NavLink
+                        to="/servers"
+                        activeStyle={{
+                            fontWeight: "bold",
+                            color: "red"
+                        }}>
+                             Servers
+                            </NavLink>
+                           
                         </TypoGraphy>
                     </ListItemText>
-
-                    <ListItemText inset onClick={() => this.props.history.push('/brokers')}>
+                    {/* onClick={() => this.props.history.push('/brokers')} */}
+                    <ListItemText inset  onClick={() => this.props.history.push('/brokers')} >
                         <TypoGraphy color="inherit" variant="title">
+                        <NavLink
+                        to="/brokers"
+                        activeStyle={{
+                            fontWeight: "bold",
+                            color: "red"
+                        }}>
                             Brokers
+                            </NavLink>
                         </TypoGraphy>
                     </ListItemText>
                 </ListItem>
