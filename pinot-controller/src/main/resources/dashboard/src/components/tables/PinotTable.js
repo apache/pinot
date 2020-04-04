@@ -78,7 +78,7 @@ export default class PinotTable extends Component {
                 this.offlineSegments = this.offlineSegments.sort((seg1,seg2) => {
                     if(seg1.name < seg2.name) {return -1} else return 1;
                 });
-                this.offlineSegments = this.realTimeSegments.sort((seg1,seg2) => {
+                this.realTimeSegments = this.realTimeSegments.sort((seg1,seg2) => {
                     if(seg1.name < seg2.name) {return -1} else return 1;
                 });
                 this.setState({offlineSegments:this.offlineSegments, realTimeSegments:this.realTimeSegments})

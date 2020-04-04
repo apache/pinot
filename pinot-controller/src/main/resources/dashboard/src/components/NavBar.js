@@ -21,89 +21,55 @@ import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import ListItemText from '@material-ui/core/ListItemText';
 import TypoGraphy from '@material-ui/core/Typography'
-
+import {
+    withRouter
+} from 'react-router-dom'
 
 class NavBar extends Component {
 
-    constructor(props) {
-        super(props);
-        this.dsiplayPage = this.dsiplayPage.bind(this);
-        this.displayServers = this.displayServers.bind(this);
-        this.displayTables = this.displayTables.bind(this);
-        this.displayBrokers = this.displayBrokers.bind(this);
-        this.displayControllers = this.displayControllers.bind(this);
-        this.dsiplayCluster = this.dsiplayCluster.bind(this);
-    }
-
-
-    dsiplayPage() {
-        this.props.mutateState('post1');
-    };
-
-    dsiplayCluster() {
-        this.props.mutateState('cluster');
-    };
-
-    displayServers() {
-        this.props.mutateState('servers');
-    };
-
-    displayBrokers() {
-        this.props.mutateState('brokers');
-    };
-
-    displayControllers() {
-        this.props.mutateState('controllers');
-    };
-
-    displayTables() {
-        this.props.mutateState('tables');
-    };
-
-    render() {
+   render() {
         return (
             <List component="nav">
                 <ListItem component="div" >
-                    <ListItemText inset onClick={this.dsiplayCluster}>
+                    <ListItemText inset onClick={() => this.props.history.push('/cluster')}>
                         <TypoGraphy color="inherit" variant="title" >
                             Cluster
                         </TypoGraphy>
                     </ListItemText>
 
-                    <ListItemText inset onClick={this.dsiplayPage}>
+                    <ListItemText inset onClick={() => this.props.history.push('/tenants')}>
                         <TypoGraphy color="inherit" variant="title">
                             Tenants
                         </TypoGraphy>
                     </ListItemText>
 
-                    <ListItemText inset onClick={this.displayTables}>
+                    <ListItemText inset onClick={() => this.props.history.push('/tables')}>
                         <TypoGraphy color="inherit" variant="title">
                             Tables
                         </TypoGraphy>
                     </ListItemText>
 
-                    <ListItemText inset onClick={this.displayControllers}>
+                    <ListItemText inset onClick={() => this.props.history.push('/controllers')}>
                         <TypoGraphy color="inherit" variant="title">
                             Controllers
                         </TypoGraphy>
                     </ListItemText>
 
-                    <ListItemText inset onClick={this.displayServers}>
+                    <ListItemText inset onClick={() => this.props.history.push('/servers')}>
                         <TypoGraphy color="inherit" variant="title">
                             Servers
                         </TypoGraphy>
                     </ListItemText>
 
-                    <ListItemText inset onClick={this.displayBrokers}>
+                    <ListItemText inset onClick={() => this.props.history.push('/brokers')}>
                         <TypoGraphy color="inherit" variant="title">
                             Brokers
                         </TypoGraphy>
                     </ListItemText>
                 </ListItem>
-
             </List>)
     }
 }
 
 
-export default NavBar;
+export default withRouter(NavBar);

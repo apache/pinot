@@ -47,7 +47,9 @@ class Instance extends Component {
         this.state = {instances:[]};
     }
 
-
+    componentDidMount() {
+        this.setState({instances:this.props.instances.filter(ins => ins.name.startsWith(this.props.instanceName))});
+    }
 
     render() {
         return (
@@ -82,7 +84,7 @@ class Instance extends Component {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {this.props.instances.map(instance => (
+                                    {this.state.instances.map(instance => (
                                         <TableRow key={instance.name}>
                                             <TableCell component="th" scope="row">
                                                 {instance.name}
