@@ -25,6 +25,7 @@ import {
     withRouter,
     NavLink
 } from 'react-router-dom'
+import Utils from "./Utils";
 
 class NavBar extends Component {
 
@@ -37,8 +38,7 @@ class NavBar extends Component {
                         <NavLink
                         to="/cluster"
                         activeStyle={{
-                            fontWeight: "bold",
-                            color: "red"
+                            color: "white"
                         }}>
                             Cluster
                             </NavLink>

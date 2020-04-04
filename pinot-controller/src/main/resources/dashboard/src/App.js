@@ -20,6 +20,8 @@ import React from 'react'
 import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
 import NavBar from "./components/NavBar";
+import Utils from "./components/Utils";
+import List from "@material-ui/core/List";
 
 class App extends React.Component {
 
@@ -29,7 +31,7 @@ class App extends React.Component {
         return (
             <div>
                 <AppBar color="primary" position="static">
-                    <Toolbar>
+                    <Toolbar  style={Utils.getTableHeaderStyles()}>
                         <NavBar></NavBar>
                     </Toolbar>
                 </AppBar>

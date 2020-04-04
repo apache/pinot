@@ -27,6 +27,13 @@ export default class Utils {
         </TreeItem>
     };
 
+    static getTableHeaderStyles() {
+        return {
+            backgroundColor: '#01579b',
+            color: '#FFF'
+        }
+    }
+
     static populateNode(data, i, name) {
         const node = {};
         node.id = i;

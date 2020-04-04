@@ -17,18 +17,10 @@
  * under the License.
  */
 import React, {Component} from 'react';
-import Table from '@material-ui/core/Table';
-import TableCell from '@material-ui/core/TableCell';
-import TableContainer from '@material-ui/core/TableContainer';
-import TableHead from '@material-ui/core/TableHead';
-import TableRow from '@material-ui/core/TableRow';
-import Paper from '@material-ui/core/Paper';
 import withStyles from "@material-ui/core/styles/withStyles";
-import TableBody from "@material-ui/core/TableBody";
-import CardContent from "@material-ui/core/CardContent";
-import Card from "@material-ui/core/Card";
 import App from "../App";
-import TypoGraphy from "@material-ui/core/Typography";
+import MaterialTable from "material-table";
+import Utils from "./Utils";
 
 const useStyles = theme => ({
     table: {
@@ -47,24 +39,21 @@ class Cluster extends Component {
         super(props);
         this.state = {instances:[]};
     }
-
-
     populateDisplayData(data) {
-        this.instances['allowParticipantAutoJoin']=data['allowParticipantAutoJoin']
-        this.instances['pinot.broker.enable.query.limit.override']=data['pinot.broker.enable.query.limit.override']
-        this.instances['enable.case.insensitive.pql']=data['enable.case.insensitive.pql']
-
-
+        const join = data['allowParticipantAutoJoin'];
+        const override = data['pinot.broker.enable.query.limit.override'];
+        const pql = data['enable.case.insensitive.pql'];
+        this.instances.push({join: join, override: override, pql: pql});
         this.setState({instances: this.instances})
     }
 
     populateTblDisplayData(data) {
-        this.instances['numTables']=data.tables.length
+        this.instances['numTables']=data.tables.length;
         this.setState({instances: this.instances})
     }
 
     populateInstance(instance) {
-    alert(instance['enable.case.insensitive.pql'])
+        alert(instance['enable.case.insensitive.pql'])
         fetch(App.serverAddress + '/tenants/' + instance +'/metadata')
             .then(res => res.json())
             .then((data) => {
@@ -85,60 +74,21 @@ class Cluster extends Component {
 
 
     render() {
-
-
         return (
-
-
             <div style={{width:"90%", margin: "0 auto"}}>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>
-                                            <TypoGraphy color="inherit" variant="h5" align= "center">
-                                                Cluster Summary Table
-                                            </TypoGraphy>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHead>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
-
-
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-
-                                        <TableCell>Participant-AutoJoin</TableCell>
-                                        <TableCell align="right">Broker Querylimit-override</TableCell>
-                                        <TableCell align="right"> Case-insensitive pql</TableCell>
-
-                                   </TableRow>
-                                </TableHead>
-                                <TableBody>
-
-                                    {/*{this.state.instances.map(instance => (*/}
-                                        <TableRow>
-
-                                            <TableCell >{this.state.instances['allowParticipantAutoJoin']}</TableCell>
-                                            <TableCell align="right" >{this.state.instances['pinot.broker.enable.query.limit.override']}</TableCell>
-                                            <TableCell align="right">{this.state.instances['enable.case.insensitive.pql']}</TableCell>
-
-                                        </TableRow>
-                                        {/*))}*/}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
+                <MaterialTable
+                    title="Cluster Details"
+                    columns={[
+                        { title: 'Participant-AutoJoin', field: 'join' },
+                        { title: 'Broker Querylimit-override', field: 'override' },
+                        { title: 'Case-insensitive pql', field: 'pql'},
+                    ]}
+                    data={this.instances}
+                    options={{
+                        headerStyle: Utils.getTableHeaderStyles(),
+                        search: true
+                    }}
+                />
             </div>
         );
     }
@@ -146,21 +96,12 @@ class Cluster extends Component {
         fetch(App.serverAddress+'/cluster/configs ')
             .then(res => res.json())
             .then((data) => {
-                    this.populateDisplayData(data);
+                this.populateDisplayData(data);
 
             })
-
-
             .catch(console.log)
-
-
-
-            };
-
-
-
-
-    }
+    };
+}
 
 
 export default withStyles(useStyles) (Cluster);
