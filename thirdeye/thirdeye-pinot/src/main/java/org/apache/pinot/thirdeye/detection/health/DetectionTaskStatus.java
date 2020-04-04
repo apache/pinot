@@ -46,14 +46,10 @@ public class DetectionTaskStatus {
 
   // the time stamp of last successfully finishing task
   @JsonProperty
-  private Long lastSuccessTaskExecutionTime;
+  private final Long lastTaskExecutionTime;
 
-  public Long getLastSuccessTaskExecutionTime() {
-    return lastSuccessTaskExecutionTime;
-  }
-
-  public void setLastSuccessTaskExecutionTime(long lastSuccessTaskExecutionTime) {
-    this.lastSuccessTaskExecutionTime = lastSuccessTaskExecutionTime;
+  public Long getLastTaskExecutionTime() {
+    return lastTaskExecutionTime;
   }
 
   // the counting for detection task status
@@ -72,12 +68,12 @@ public class DetectionTaskStatus {
   private static final double TASK_SUCCESS_RATE_BAD_THRESHOLD = 0.2;
   private static final double TASK_SUCCESS_RATE_MODERATE_THRESHOLD = 0.8;
 
-  public DetectionTaskStatus(double taskSuccessRate, HealthStatus healthStatus, Map<TaskConstants.TaskStatus, Long> counts, List<TaskDTO> tasks, long lastSuccessTaskExecutionTime) {
+  public DetectionTaskStatus(double taskSuccessRate, HealthStatus healthStatus, Map<TaskConstants.TaskStatus, Long> counts, List<TaskDTO> tasks, long lastTaskExecutionTime) {
     this.taskSuccessRate = taskSuccessRate;
     this.healthStatus = healthStatus;
     this.tasks = tasks;
     this.taskCounts.putAll(counts);
-    this.lastSuccessTaskExecutionTime = lastSuccessTaskExecutionTime;
+    this.lastTaskExecutionTime = lastTaskExecutionTime;
   }
 
   // default constructor for deserialization
@@ -85,7 +81,7 @@ public class DetectionTaskStatus {
     this.taskSuccessRate = Double.NaN;
     this.healthStatus = HealthStatus.UNKNOWN;
     this.tasks = Collections.emptyList();
-    this.lastSuccessTaskExecutionTime = -1L;
+    this.lastTaskExecutionTime = -1L;
   }
 
   public double getTaskSuccessRate() {
@@ -110,8 +106,8 @@ public class DetectionTaskStatus {
     Map<TaskConstants.TaskStatus, Long> counts =
         tasks.stream().collect(Collectors.groupingBy(TaskBean::getStatus, Collectors.counting()));
     double taskSuccessRate = getTaskSuccessRate(counts);
-    long lastSuccessTaskExecutionTime = getLastSuccessTaskExecutionTime(tasks);
-    return new DetectionTaskStatus(taskSuccessRate, classifyTaskStatus(taskSuccessRate), counts, tasks, lastSuccessTaskExecutionTime);
+    long lastTaskExecutionTime = getLastSuccessTaskExecutionTime(tasks);
+    return new DetectionTaskStatus(taskSuccessRate, classifyTaskStatus(taskSuccessRate), counts, tasks, lastTaskExecutionTime);
   }
 
   /**
