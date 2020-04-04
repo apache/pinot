@@ -27,7 +27,7 @@ import {
 
 class NavBar extends Component {
 
-   render() {
+    render() {
         return (
             <List component="nav">
                 <ListItem component="div" >
