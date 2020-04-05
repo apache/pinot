@@ -53,7 +53,7 @@ class Cluster extends Component {
     }
 
     populateInstance(instance) {
-        alert(instance['enable.case.insensitive.pql'])
+        
         fetch(App.serverAddress + '/tenants/' + instance +'/metadata')
             .then(res => res.json())
             .then((data) => {

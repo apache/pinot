@@ -23,7 +23,8 @@ import ListItemText from '@material-ui/core/ListItemText';
 import TypoGraphy from '@material-ui/core/Typography'
 import {
     withRouter,
-    NavLink
+    NavLink 
+    
 } from 'react-router-dom'
 import Utils from "./Utils";
 
@@ -35,14 +36,16 @@ class NavBar extends Component {
                 <ListItem component="div" >
                     <ListItemText inset onClick={() => this.props.history.push('/cluster')}>
                         <TypoGraphy color="inherit" variant="title" >
-                        <NavLink
+                        <NavLink 
                         to="/cluster"
                         activeStyle={{
+                            
+                            fontWeight: "bold",
+                            
                             color: "white"
                         }}>
                             Cluster
-                            </NavLink>
-                            
+                            </NavLink>  
                         </TypoGraphy>
                     </ListItemText>
 
@@ -51,8 +54,10 @@ class NavBar extends Component {
                         <NavLink
                         to="/tenants"
                         activeStyle={{
+                            
                             fontWeight: "bold",
-                            color: "red"
+                            
+                            color: "white"
                         }}>
                             Tenants
                             </NavLink>
@@ -65,8 +70,10 @@ class NavBar extends Component {
                         <NavLink
                         to="/tables"
                         activeStyle={{
+                            
                             fontWeight: "bold",
-                            color: "red"
+                            
+                            color: "white"
                         }}>
                             Tables
                             </NavLink>
@@ -79,8 +86,10 @@ class NavBar extends Component {
                         <NavLink
                         to="/controllers"
                         activeStyle={{
+                            
                             fontWeight: "bold",
-                            color: "red"
+                            
+                            color: "white"
                         }}>
                             Controllers
                             </NavLink>
@@ -92,8 +101,10 @@ class NavBar extends Component {
                         <NavLink
                         to="/servers"
                         activeStyle={{
+                            
                             fontWeight: "bold",
-                            color: "red"
+                            
+                            color: "white"
                         }}>
                              Servers
                             </NavLink>
@@ -106,9 +117,12 @@ class NavBar extends Component {
                         <NavLink
                         to="/brokers"
                         activeStyle={{
+                            
                             fontWeight: "bold",
-                            color: "red"
-                        }}>
+                            
+                            color: "white"
+                        }}
+                        >
                             Brokers
                             </NavLink>
                         </TypoGraphy>

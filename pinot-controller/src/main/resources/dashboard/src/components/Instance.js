@@ -28,6 +28,8 @@ import TableBody from "@material-ui/core/TableBody";
 import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
 import TypoGraphy from "@material-ui/core/Typography";
+import MaterialTable from "material-table";
+import Utils from "./Utils";
 
 const useStyles = theme => ({
     table: {
@@ -48,57 +50,30 @@ class Instance extends Component {
     }
 
     componentDidMount() {
+        
         this.setState({instances:this.props.instances.filter(ins => ins.name.startsWith(this.props.instanceName))});
+        
     }
 
     render() {
         return (
             <div style={{width:"90%", margin: "0 auto"}}>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>
-                                            <TypoGraphy color="inherit" variant="h5" align= "center">
-                                                {this.props.instanceName} Summary Table
-                                            </TypoGraphy>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHead>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Instance Name</TableCell>
-                                        <TableCell align="right">Enabled</TableCell>
-                                        <TableCell align="right">Hostname</TableCell>
-                                        <TableCell align="right">Port</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {this.state.instances.map(instance => (
-                                        <TableRow key={instance.name}>
-                                            <TableCell component="th" scope="row">
-                                                {instance.name}
-                                            </TableCell>
-                                            <TableCell align="right">{instance.enabled}</TableCell>
-                                            <TableCell align="right">{instance.hostName}</TableCell>
-                                            <TableCell align="right">{instance.port}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
+                 <MaterialTable
+                    title={this.props.instanceName+' Details'}
+                    columns={[
+                        { title: 'Instance Name', field: 'name' },
+                        { title: 'Enabled', field: 'enabled' },
+                        { title: 'Hostname', field: 'hostName'},
+                        { title: 'Port', field: 'port'},
+                    ]}
+                    data={this.props.instances.filter(ins => ins.name.startsWith(this.props.instanceName))}
+                    options={{
+                        headerStyle: Utils.getTableHeaderStyles(),
+                        search: true
+                    }}
+                />
+                
+                
             </div>
         );
     }

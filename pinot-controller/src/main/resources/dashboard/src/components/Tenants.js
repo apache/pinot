@@ -28,6 +28,8 @@ import CardContent from "@material-ui/core/CardContent";
 import Card from "@material-ui/core/Card";
 import App from "../App";
 import TypoGraphy from "@material-ui/core/Typography";
+import MaterialTable from "material-table";
+import Utils from "./Utils";
 
 
 const useStyles = theme => ({
@@ -46,36 +48,30 @@ class Tenants extends Component {
     }
 
 
-    populateDisplayData(data) {
-        this.instances['tents_name']=data.tenantName
-        this.instances['numServers']=data.ServerInstances.length
-        this.instances['numBrokers']=data.BrokerInstances.length
+    populateDisplayData(data1,data2) {
+  
+    
+        const tents_name = data1['tenantName'];
+        const numServers = data1['ServerInstances'].length;
+        const numBrokers = data1['BrokerInstances'].length;
+        const numTables = data2['tables'].length
+        this.instances.push({tents_name: tents_name, numServers: numServers, numBrokers: numBrokers,numTables: numTables});
+
 
 
         this.setState({instances: this.instances})
     }
 
-    populateTblDisplayData(data) {
-        this.instances['numTables']=data.tables.length
-        this.setState({instances: this.instances})
-    }
 
     populateInstance(instance) {
-
-        fetch(App.serverAddress + '/tenants/' + instance +'/metadata')
-            .then(res => res.json())
-            .then((data) => {
-                this.populateDisplayData(data);
-            })
-            .catch(console.log)
-    }
-
-    populateInstanceTbl(instance) {
-        fetch(App.serverAddress + '/tenants/' + instance +'/tables')
-            .then(res => res.json())
-            .then((data) => {
-                this.populateTblDisplayData(data);
-            })
+        const meta = fetch(App.serverAddress + '/tenants/' + instance +'/metadata');
+        const tbl = fetch(App.serverAddress + '/tenants/' + instance +'/tables');
+        Promise.all([meta,tbl])
+        .then(([res1, res2]) => Promise.all([res1.json(), res2.json()]))
+        .then(([data1, data2]) => {
+            this.populateDisplayData(data1,data2);
+        })
+            
             .catch(console.log)
     }
 
@@ -88,59 +84,20 @@ class Tenants extends Component {
 
 
             <div style={{width:"90%", margin: "0 auto"}}>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>
-                                            <TypoGraphy color="inherit" variant="h5" align= "center">
-                                                Tenants Summary Table
-                                            </TypoGraphy>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHead>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
-
-
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-
-                                        <TableCell> TENANT NAME</TableCell>
-                                        <TableCell align="right"> Number of Servers</TableCell>
-                                        <TableCell align="right"> Number of Brokers</TableCell>
-                                        <TableCell align="right"> Number of Tables</TableCell>
-
-
-
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-
-                                    {/*{this.state.instances.map(instance => (*/}
-                                    <TableRow>
-                                        <TableCell component="th" scope="row">
-                                            {this.state.instances.tents_name}
-                                        </TableCell>
-                                        <TableCell align="right">{this.state.instances.numServers}</TableCell>
-                                        <TableCell align="right">{this.state.instances.numBrokers}</TableCell>
-                                        <TableCell align="right">{this.state.instances.numTables}</TableCell>
-
-                                    </TableRow>
-                                    {/*))}*/}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
+                <MaterialTable
+                    title="Tenants Details"
+                    columns={[
+                        { title: 'Tenant name', field: 'tents_name' },
+                        { title: 'Number of Servers', field: 'numServers' },
+                        { title: 'Number of Brokers	', field: 'numBrokers'},
+                        { title: 'Number of Tables	', field: 'numTables'},
+                    ]}
+                    data={this.instances}
+                    options={{
+                        headerStyle: Utils.getTableHeaderStyles(),
+                        search: true
+                    }}
+                />
             </div>
         );
     }
@@ -150,7 +107,7 @@ class Tenants extends Component {
             .then((data) => {
                 data.SERVER_TENANTS.forEach((ins) => {
                     this.populateInstance(ins);
-                    this.populateInstanceTbl(ins);
+                    
 
 
                 });
