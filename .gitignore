@@ -6,6 +6,7 @@ target/
 bin/
 */bin/
 .idea
+.vscode
 *.iml
 .settings/
 out/
