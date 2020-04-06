@@ -37,7 +37,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
@@ -47,11 +47,11 @@ import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
  * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
  */
 public class DistinctDataTableReducer implements DataTableReducer {
-
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction _aggregationFunction;
-  private boolean _responseFormatSql;
+  private final boolean _responseFormatSql;
 
+  // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
   DistinctDataTableReducer(BrokerRequest brokerRequest, AggregationFunction aggregationFunction,
       QueryOptions queryOptions) {
     _brokerRequest = brokerRequest;
@@ -129,30 +129,37 @@ public class DistinctDataTableReducer implements DataTableReducer {
   }
 
   private SelectionResults reduceToSelectionResult(DistinctTable distinctTable) {
-    List<Serializable[]> resultSet = new ArrayList<>(distinctTable.size());
-    String[] columnNames = distinctTable.getDataSchema().getColumnNames();
+    List<Serializable[]> rows = new ArrayList<>(distinctTable.size());
+    DataSchema dataSchema = distinctTable.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
     Iterator<Record> iterator = distinctTable.iterator();
     while (iterator.hasNext()) {
-      Record record = iterator.next();
-      Object[] columns = record.getValues();
-      Serializable[] distinctRow = new Serializable[columns.length];
-      for (int col = 0; col < columns.length; col++) {
-        final Serializable columnValue = AggregationFunctionUtils.getSerializableValue(columns[col]);
-        distinctRow[col] = columnValue;
+      Object[] values = iterator.next().getValues();
+      Serializable[] row = new Serializable[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        row[i] = SelectionOperatorUtils.convertValueToType(values[i], columnDataTypes[i]);
       }
-      resultSet.add(distinctRow);
+      rows.add(row);
     }
-    return new SelectionResults(Arrays.asList(columnNames), resultSet);
+    return new SelectionResults(Arrays.asList(dataSchema.getColumnNames()), rows);
   }
 
   private ResultTable reduceToResultTable(DistinctTable distinctTable) {
-    List<Object[]> resultSet = new ArrayList<>(distinctTable.size());
+    List<Object[]> rows = new ArrayList<>(distinctTable.size());
+    DataSchema dataSchema = distinctTable.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
     Iterator<Record> iterator = distinctTable.iterator();
     while (iterator.hasNext()) {
-      Record record = iterator.next();
-      resultSet.add(record.getValues());
+      Object[] values = iterator.next().getValues();
+      Object[] row = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        row[i] = SelectionOperatorUtils.convertValueToType(values[i], columnDataTypes[i]);
+      }
+      rows.add(row);
     }
-    return new ResultTable(distinctTable.getDataSchema(), resultSet);
+    return new ResultTable(dataSchema, rows);
   }
 
   private String[] getDistinctColumns() {

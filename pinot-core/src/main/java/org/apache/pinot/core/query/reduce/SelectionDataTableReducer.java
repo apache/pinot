@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -48,12 +47,11 @@ import org.slf4j.LoggerFactory;
  * Helper class to reduce and set Selection results into the BrokerResponseNative
  */
 public class SelectionDataTableReducer implements DataTableReducer {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionDataTableReducer.class);
 
   private final Selection _selection;
-  private boolean _preserveType;
-  private boolean _responseFormatSql;
+  private final boolean _preserveType;
+  private final boolean _responseFormatSql;
 
   SelectionDataTableReducer(BrokerRequest brokerRequest, QueryOptions queryOptions) {
     _selection = brokerRequest.getSelections();
@@ -103,8 +101,6 @@ public class SelectionDataTableReducer implements DataTableReducer {
         SelectionOperatorService selectionService = new SelectionOperatorService(_selection, dataSchema);
         selectionService.reduceWithOrdering(dataTableMap.values());
         if (_responseFormatSql) {
-          // TODO: Selection uses Serializable[] in all its operations
-          //   Converting that to Object[] end to end would be a big change, and will be done in future PRs
           brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
         } else {
           brokerResponseNative.setSelectionResults(selectionService.renderSelectionResultsWithOrdering(_preserveType));
@@ -113,11 +109,8 @@ public class SelectionDataTableReducer implements DataTableReducer {
         // Selection only
         List<String> selectionColumns =
             SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
-        List<Serializable[]> reducedRows =
-            SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), selectionSize);
+        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), selectionSize);
         if (_responseFormatSql) {
-          // TODO: Selection uses Serializable[] in all its operations
-          //   Converting that to Object[] end to end would be a big change, and will be done in future PRs
           brokerResponseNative
               .setResultTable(SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema));
         } else {

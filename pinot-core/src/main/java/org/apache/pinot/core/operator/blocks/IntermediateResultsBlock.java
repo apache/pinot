@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -43,6 +42,7 @@ import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -50,7 +50,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  */
 public class IntermediateResultsBlock implements Block {
   private DataSchema _dataSchema;
-  private Collection<Serializable[]> _selectionResult;
+  private Collection<Object[]> _selectionResult;
   private AggregationFunctionContext[] _aggregationFunctionContexts;
   private List<Object> _aggregationResult;
   private AggregationGroupByResult _aggregationGroupByResult;
@@ -69,7 +69,7 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for selection result.
    */
-  public IntermediateResultsBlock(DataSchema dataSchema, Collection<Serializable[]> selectionResult) {
+  public IntermediateResultsBlock(DataSchema dataSchema, Collection<Object[]> selectionResult) {
     _dataSchema = dataSchema;
     _selectionResult = selectionResult;
   }
@@ -139,11 +139,11 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nullable
-  public Collection<Serializable[]> getSelectionResult() {
+  public Collection<Object[]> getSelectionResult() {
     return _selectionResult;
   }
 
-  public void setSelectionResult(@Nullable Collection<Serializable[]> rowEventsSet) {
+  public void setSelectionResult(@Nullable Collection<Object[]> rowEventsSet) {
     _selectionResult = rowEventsSet;
   }
 
@@ -274,29 +274,44 @@ public class IntermediateResultsBlock implements Block {
       Object value)
       throws IOException {
     switch (columnDataType) {
-
       case INT:
-        dataTableBuilder.setColumn(columnIndex, ((Number) value).intValue());
+        dataTableBuilder.setColumn(columnIndex, (int) value);
         break;
       case LONG:
-        dataTableBuilder.setColumn(columnIndex, ((Number) value).longValue());
+        dataTableBuilder.setColumn(columnIndex, (long) value);
         break;
       case FLOAT:
-        dataTableBuilder.setColumn(columnIndex, ((Number) value).floatValue());
+        dataTableBuilder.setColumn(columnIndex, (float) value);
         break;
       case DOUBLE:
-        dataTableBuilder.setColumn(columnIndex, ((Number) value).doubleValue());
+        dataTableBuilder.setColumn(columnIndex, (double) value);
         break;
       case STRING:
         dataTableBuilder.setColumn(columnIndex, (String) value);
         break;
       case BYTES:
-        // FIXME: support BYTES in DataTable instead of converting to string
-        dataTableBuilder.setColumn(columnIndex, value.toString()); // ByteArray::toString
+        dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
         break;
-      default:
+      case OBJECT:
         dataTableBuilder.setColumn(columnIndex, value);
         break;
+      case INT_ARRAY:
+        dataTableBuilder.setColumn(columnIndex, (int[]) value);
+        break;
+      case LONG_ARRAY:
+        dataTableBuilder.setColumn(columnIndex, (long[]) value);
+        break;
+      case FLOAT_ARRAY:
+        dataTableBuilder.setColumn(columnIndex, (float[]) value);
+        break;
+      case DOUBLE_ARRAY:
+        dataTableBuilder.setColumn(columnIndex, (double[]) value);
+        break;
+      case STRING_ARRAY:
+        dataTableBuilder.setColumn(columnIndex, (String[]) value);
+        break;
+      default:
+        throw new IllegalStateException();
     }
   }
 

@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.queries;
 
-import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
+import java.util.PriorityQueue;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -103,9 +102,9 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")),
         DataSchema.ColumnDataType.STRING);
-    List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
+    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
-    Serializable[] firstRow = selectionResult.get(0);
+    Object[] firstRow = selectionResult.get(0);
     Assert.assertEquals(firstRow.length, 11);
     Assert.assertEquals(((Integer) firstRow[columnIndexMap.get("column1")]).intValue(), 1578964907);
     Assert.assertEquals((String) firstRow[columnIndexMap.get("column11")], "P");
@@ -128,7 +127,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")),
         DataSchema.ColumnDataType.STRING);
-    selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
+    selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
     Assert.assertEquals(firstRow.length, 11);
@@ -158,9 +157,9 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")),
         DataSchema.ColumnDataType.STRING);
-    List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
+    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
-    Serializable[] firstRow = selectionResult.get(0);
+    Object[] firstRow = selectionResult.get(0);
     Assert.assertEquals(firstRow.length, 3);
     Assert.assertEquals(((Integer) firstRow[0]).intValue(), 1578964907);
     Assert.assertEquals((String) firstRow[2], "P");
@@ -182,7 +181,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")),
         DataSchema.ColumnDataType.STRING);
-    selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
+    selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
     Assert.assertEquals(firstRow.length, 3);
@@ -212,9 +211,9 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
         DataSchema.ColumnDataType.INT);
-    Queue<Serializable[]> selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
-    Serializable[] lastRow = selectionResult.peek();
+    Object[] lastRow = selectionResult.peek();
     Assert.assertEquals(lastRow.length, 4);
     Assert.assertEquals(((Integer) lastRow[columnIndexMap.get("column6")]).intValue(), 6043515);
     Assert.assertEquals(((Integer) lastRow[columnIndexMap.get("column1")]).intValue(), 10542595);
@@ -237,7 +236,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
         DataSchema.ColumnDataType.INT);
-    selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();
     Assert.assertEquals(lastRow.length, 4);
@@ -268,9 +267,9 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
         DataSchema.ColumnDataType.INT);
-    Queue<Serializable[]> selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
-    Serializable[] lastRow = selectionResult.peek();
+    Object[] lastRow = selectionResult.peek();
     Assert.assertEquals(lastRow.length, 11);
     Assert.assertEquals(((Integer) lastRow[columnIndexMap.get("column6")]).intValue(), 6043515);
     Assert.assertEquals(((Integer) lastRow[columnIndexMap.get("column1")]).intValue(), 10542595);
@@ -294,7 +293,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         DataSchema.ColumnDataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
         DataSchema.ColumnDataType.INT);
-    selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();
     Assert.assertEquals(lastRow.length, 11);

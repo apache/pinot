@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.Selection;
@@ -45,7 +44,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
-  private final List<Serializable[]> _rows;
+  private final List<Object[]> _rows;
 
   private int _numDocsScanned = 0;
 
