@@ -19,7 +19,9 @@
 package org.apache.pinot.queries;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
@@ -28,6 +30,7 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -57,6 +60,44 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, new String[]{"199896"});
+
+    query = "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000)";
+    brokerResponse = getBrokerResponseForPqlQuery(query);
+    List<String[]> groupKeys = new ArrayList<>();
+    groupKeys.add(new String[]{"363"});
+    groupKeys.add(new String[]{"469"});
+    groupKeys.add(new String[]{"246"});
+    List<String[]> aggregations = new ArrayList<>();
+    aggregations.add(new String[]{"35436"});
+    aggregations.add(new String[]{"33576"});
+    aggregations.add(new String[]{"24300"});
+    QueriesTestUtils
+        .testInterSegmentAggregationGroupByResult(brokerResponse, 400000L, 0L, 800000L, 400000L,
+            groupKeys, aggregations);
+
+    query = "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000)";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    DataSchema expectedDataSchema =
+        new DataSchema(new String[]{"valuein(column7,'363','469','246','100000')", "countmv(column6)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        Lists.newArrayList(new Object[]{469, (long)33576}, new Object[]{246, (long)24300}, new Object[]{363, (long)35436}), 3, expectedDataSchema);
+
+    query = "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000) ORDER BY COUNTMV(column6)";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        Lists.newArrayList(new Object[]{246, (long)24300}, new Object[]{469, (long)33576}, new Object[]{363, (long)35436}), 3, expectedDataSchema);
+
+    query = "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000) ORDER BY COUNTMV(column6) DESC";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        Lists.newArrayList(new Object[]{363, (long)35436}, new Object[]{469, (long)33576}, new Object[]{246, (long)24300}), 3, expectedDataSchema);
+
+    query = "SELECT VALUEIN(column7, 363, 469, 246, 100000) AS value_in_col, COUNTMV(column6) FROM testTable GROUP BY value_in_col ORDER BY COUNTMV(column6) DESC";
+    expectedDataSchema =
+        new DataSchema(new String[]{"value_in_col", "countmv(column6)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        Lists.newArrayList(new Object[]{363, (long)35436}, new Object[]{469, (long)33576}, new Object[]{246, (long)24300}), 3, expectedDataSchema);
   }
 
   @Test
