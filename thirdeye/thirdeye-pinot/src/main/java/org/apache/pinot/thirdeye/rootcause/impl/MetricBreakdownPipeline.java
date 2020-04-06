@@ -85,6 +85,10 @@ public class MetricBreakdownPipeline extends Pipeline {
   public static final String PROP_INCLUDE_DIMENSIONS = "includeDimensions";
   public static final String PROP_EXCLUDE_DIMENSIONS = "excludeDimensions";
 
+  public static final String PROP_IGNORE_SCORE = "ignoreScore";
+  public static final boolean PROP_IGNORE_SCORE_TRUE = true;
+  public static final boolean PROP_IGNORE_SCORE_FALSE = false;
+
   public static final long TIMEOUT = 120000;
 
   private final QueryCache cache;
@@ -94,6 +98,7 @@ public class MetricBreakdownPipeline extends Pipeline {
   private final Set<String> includeDimensions;
   private final Set<String> excludeDimensions;
   private final int k;
+  private final boolean ignoreScore;
 
   /**
    * Constructor for dependency injection
@@ -107,9 +112,11 @@ public class MetricBreakdownPipeline extends Pipeline {
    * @param includeDimensions dimensions to break down on (all if empty)
    * @param excludeDimensions dimensions not to break down on
    * @param k number of top-ranking elements to emit
+   * @param ignoreScore flag to include all breakdowns, even if score is zero (only set if ignoring wanted)
    */
   public MetricBreakdownPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
-      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor, Set<String> includeDimensions, Set<String> excludeDimensions, int k) {
+      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor, Set<String> includeDimensions,
+      Set<String> excludeDimensions, int k, boolean ignoreScore) {
     super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
@@ -118,11 +125,11 @@ public class MetricBreakdownPipeline extends Pipeline {
     this.includeDimensions = includeDimensions;
     this.excludeDimensions = excludeDimensions;
     this.k = k;
+    this.ignoreScore = ignoreScore;
   }
 
   /**
    * Alternate constructor for use by RCAFrameworkLoader
-   *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_K}, {@code PROP_PARALLELISM})
@@ -145,6 +152,12 @@ public class MetricBreakdownPipeline extends Pipeline {
       this.excludeDimensions = new HashSet<>((Collection<String>) properties.get(PROP_EXCLUDE_DIMENSIONS));
     } else {
       this.excludeDimensions = new HashSet<>();
+    }
+
+    if (properties.containsKey(PROP_IGNORE_SCORE)) {
+      this.ignoreScore = PROP_IGNORE_SCORE_TRUE;
+    } else {
+      this.ignoreScore = PROP_IGNORE_SCORE_FALSE;
     }
   }
 
@@ -169,7 +182,7 @@ public class MetricBreakdownPipeline extends Pipeline {
           String value = dfScores.getString(COL_DIM_VALUE, i);
           double score = dfScores.getDouble(COL_SCORE, i);
 
-          if (score <= 0)
+          if (!this.ignoreScore && score <= 0)
             continue;
 
           Multimap<String, String> newFilters = TreeMultimap.create(me.getFilters());
