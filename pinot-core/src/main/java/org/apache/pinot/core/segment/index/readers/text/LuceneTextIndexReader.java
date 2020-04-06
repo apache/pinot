@@ -77,8 +77,7 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      if (textIndexProperties == null || textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE) == null
-          || !textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE).equalsIgnoreCase("true")) {
+      if (textIndexProperties == null || !Boolean.parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it cause heap issues.
         _indexSearcher.setQueryCache(null);

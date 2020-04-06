@@ -61,7 +61,7 @@ public class IndexLoadingConfig {
   private boolean _enableSplitCommitEndWithMetadata;
 
   // constructed from FieldConfig
-  private Map<String, Map<String, String>> _columnsWithProperties;
+  private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
       @Nonnull TableConfig tableConfig) {
@@ -96,7 +96,13 @@ public class IndexLoadingConfig {
       _noDictionaryColumns.addAll(noDictionaryColumns);
     }
 
-    _columnsWithProperties = new HashMap<>();
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        _columnProperties.put(fieldConfig.getName(), fieldConfig.getProperties());
+      }
+    }
+
     extractTextIndexColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
@@ -145,7 +151,6 @@ public class IndexLoadingConfig {
           }
           _textIndexColumns.add(column);
         }
-        _columnsWithProperties.put(column, fieldConfig.getProperties());
       }
     }
   }
@@ -202,8 +207,8 @@ public class IndexLoadingConfig {
   }
 
   @Nonnull
-  public Map<String, Map<String, String>> getColumnsWithProperties() {
-    return _columnsWithProperties;
+  public Map<String, Map<String, String>> getColumnProperties() {
+    return _columnProperties;
   }
 
   /**
