@@ -97,6 +97,8 @@ public class DetectionHealth {
     private long taskLimit;
     private boolean provideOverallHealth;
 
+    private DetectionHealth lastDetectionHealth;
+
     // database column name constants
     private static String COL_NAME_START_TIME = "startTime";
     private static String COL_NAME_END_TIME = "endTime";
@@ -162,6 +164,15 @@ public class DetectionHealth {
      */
     public Builder addOverallHealth() {
       this.provideOverallHealth = true;
+      return this;
+    }
+
+    /**
+     * Add the original detection health. This is needed since we need to keep the last task success time.
+     * @return the builder
+     */
+    public Builder addOriginalDetectionHealth(DetectionHealth lastDetectionHealth) {
+      this.lastDetectionHealth = lastDetectionHealth;
       return this;
     }
 
@@ -244,7 +255,11 @@ public class DetectionHealth {
               Predicate.IN(COL_NAME_TASK_STATUS, new String[]{TaskConstants.TaskStatus.COMPLETED.toString(),
                   TaskConstants.TaskStatus.FAILED.toString(), TaskConstants.TaskStatus.TIMEOUT.toString(),
                   TaskConstants.TaskStatus.WAITING.toString()})));
-      return DetectionTaskStatus.fromTasks(tasks, this.taskLimit);
+      long lastTaskExecutionTime = -1L;
+      if (lastDetectionHealth != null && lastDetectionHealth.getDetectionTaskStatus() != null) {
+        lastTaskExecutionTime = lastDetectionHealth.getDetectionTaskStatus().getLastTaskExecutionTime();
+      }
+      return DetectionTaskStatus.fromTasks(tasks, lastTaskExecutionTime, this.taskLimit);
     }
 
     private static HealthStatus classifyOverallHealth(DetectionHealth health) {
@@ -277,7 +292,7 @@ public class DetectionHealth {
   public static DetectionHealth unknown() {
     DetectionHealth health = new DetectionHealth();
     health.anomalyCoverageStatus = AnomalyCoverageStatus.fromCoverageRatio(Double.NaN);
-    health.detectionTaskStatus = DetectionTaskStatus.fromTasks(Collections.emptyList());
+    health.detectionTaskStatus = DetectionTaskStatus.fromTasks(Collections.emptyList(), -1L);
     health.regressionStatus = RegressionStatus.fromDetectorMapes(Collections.emptyMap());
     health.overallHealth = HealthStatus.UNKNOWN;
     return health;

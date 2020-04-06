@@ -137,6 +137,7 @@ public class MonitorTaskRunner implements TaskRunner {
             .addAnomalyCoverageStatus(DAO_REGISTRY.getMergedAnomalyResultDAO())
             .addDetectionTaskStatus(DAO_REGISTRY.getTaskDAO())
             .addOverallHealth()
+            .addOriginalDetectionHealth(config.getHealth())
             .build();
         // fetch the config again before saving to DB to avoid overriding config that is updated by other threads
         config = detectionDAO.findById(config.getId());
