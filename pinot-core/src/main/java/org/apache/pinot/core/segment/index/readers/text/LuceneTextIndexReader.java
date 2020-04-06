@@ -22,6 +22,8 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
@@ -36,7 +38,7 @@ import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreato
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
-import org.roaringbitmap.IntIterator;
+import org.apache.pinot.spi.config.FieldConfig;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 
@@ -67,16 +69,19 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
    * @param indexDir segment index directory
    * @param numDocs number of documents in the segment
    */
-  public LuceneTextIndexReader(String column, File indexDir, int numDocs) {
+  public LuceneTextIndexReader(String column, File indexDir, int numDocs,
+      @Nullable Map<String, String> textIndexProperties) {
     _column = column;
     try {
       File indexFile = getTextIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      // Disable Lucene query result cache. While it helps a lot with performance for
-      // repeated queries, on the downside it cause heap issues.
-      _indexSearcher.setQueryCache(null);
+      if (textIndexProperties == null || !Boolean.parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
+        // Disable Lucene query result cache. While it helps a lot with performance for
+        // repeated queries, on the downside it cause heap issues.
+        _indexSearcher.setQueryCache(null);
+      }
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
@@ -85,8 +90,7 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
           .error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());
       throw new RuntimeException(e);
     }
-    StandardAnalyzer analyzer = new StandardAnalyzer();
-    _queryParser = new QueryParser(column, analyzer);
+    _queryParser = new QueryParser(column, new StandardAnalyzer());
   }
 
   /**

@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.index.column;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
@@ -132,7 +133,9 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _dictionary = null;
       _bloomFilterReader = null;
       if (loadTextIndex) {
-        _invertedIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs());
+        Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
+        _invertedIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs(),
+            columnProperties.get(columnName));
       } else {
         _invertedIndex = null;
       }

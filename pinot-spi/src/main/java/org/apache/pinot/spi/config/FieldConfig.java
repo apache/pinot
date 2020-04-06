@@ -31,10 +31,14 @@ public class FieldConfig extends BaseJsonConfig {
   private final IndexType _indexType;
   private final Map<String, String> _properties;
 
-  public static String BLOOM_FILTER_COLUMN_KEY = "field.config.bloom.filter";
-  public static String ON_HEAP_DICTIONARY_COLUMN_KEY = "field.config.onheap.dictionary";
-  public static String TEXT_INDEX_REALTIME_READER_REFRESH_KEY = "field.config.realtime.reader.refresh";
-  public static String VAR_LENGTH_DICTIONARY_COLUMN_KEY = "field.config.var.length.dictionary";
+  public static String BLOOM_FILTER_COLUMN_KEY = "bloom.filter";
+  public static String ON_HEAP_DICTIONARY_COLUMN_KEY = "onheap.dictionary";
+  public static String VAR_LENGTH_DICTIONARY_COLUMN_KEY = "var.length.dictionary";
+
+  public static String TEXT_INDEX_REALTIME_READER_REFRESH_KEY = "text.index.realtime.reader.refresh";
+  // Lucene creates a query result cache if this option is enabled
+  // the cache improves performance of repeatable queries
+  public static String TEXT_INDEX_ENABLE_QUERY_CACHE = "text.index.enable.query.cache";
 
   @JsonCreator
   public FieldConfig(@JsonProperty(value = "name", required = true) String name,
