@@ -10,6 +10,8 @@ import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import Card from "@material-ui/core/Card";
 import App from "../../App";
+import MaterialTable from "material-table";
+import Utils from "../Utils";
 
 export default class ServerTable extends Component {
 
@@ -95,38 +97,27 @@ export default class ServerTable extends Component {
     }
 
     render() {
-        return <Card style={{background:"#f5f5f5"}}>
-            <CardContent >
-                <TypoGraphy color="inherit" variant="body1" align= "center">
-                    Server Details
-                </TypoGraphy>
-                <TableContainer component={Paper} >
-                    <Table  aria-label="simple table">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell> Name</TableCell>
-                                <TableCell align="right">Real Time Segments</TableCell>
-                                <TableCell align="right">Real Time Docs</TableCell>
-                                <TableCell align="right">Offline Segments</TableCell>
-                                <TableCell align="right">Offline docs</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {this.state.servers.map(server => (
-                                <TableRow key={server['name']}>
-                                    <TableCell component="th" scope="row">
-                                        {server.name}
-                                    </TableCell>
-                                    <TableCell align="right">{server.realTimeSegmentCount}</TableCell>
-                                    <TableCell align="right">{server.realtimeDocs}</TableCell>
-                                    <TableCell align="right">{server.offlineSegmentCount}</TableCell>
-                                    <TableCell align="right">{server.offLineDocs}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </CardContent>
-        </Card>
+        return (
+        <div>
+        <MaterialTable
+        title="Server Details"
+        columns={[
+            { title: 'Name', field: 'name' },
+            { title: 'Real Time Segments', field: 'realTimeSegmentCount' },
+            { title: 'Real Time Docs	', field: 'realtimeDocs'},
+            { title: 'Offline Segments', field: 'offlineSegmentCount'},
+            { title: 'Offline docs', field: 'offLineDocs'},
+
+        ]}
+        data={this.servers}
+        options={{
+            headerStyle: Utils.getTableHeaderStyles(),
+            search: true
+        }}
+    />
+    
+    </div>
+        )
+    
     }
 }

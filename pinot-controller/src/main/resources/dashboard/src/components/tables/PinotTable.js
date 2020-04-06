@@ -12,6 +12,8 @@ import RealTimeOffline from "../RealTimeOffline";
 import App from "../../App";
 import Table from "@material-ui/core/Table";
 import ServerTable from "./ServerTable";
+import MaterialTable from "material-table";
+import Utils from "../Utils";
 
 export default class PinotTable extends Component {
 
@@ -104,105 +106,46 @@ export default class PinotTable extends Component {
     render() {
         return (
             <div style={{width:"90%", margin: "0 auto"}}>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>
-                                            <TypoGraphy color="inherit" variant="body1" align= "center">
-                                                Table {this.props.table}
-                                            </TypoGraphy>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHead>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent >
-                        <TypoGraphy color="inherit" variant="body1" align= "center">
-                            OFFLINE Segment Details
-                        </TypoGraphy>
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell> Name</TableCell>
-                                        <TableCell align="right">Server</TableCell>
-                                        <TableCell align="right">State</TableCell>
-                                        <TableCell align="right"># Documents</TableCell>
-                                        <TableCell align="center">Size</TableCell>
-                                        <TableCell align="center">Created Time</TableCell>
-                                        <TableCell align="center">Min Data Time</TableCell>
-                                        <TableCell align="center">Max Data Time</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {this.state.offlineSegments.map(segment => (
-                                        <TableRow key={segment['segment.name']}>
-                                            <TableCell component="th" scope="row">
-                                                {segment['segment.name']}
-                                            </TableCell>
-                                            <TableCell align="right">{segment.server}</TableCell>
-                                            <TableCell align="right">{segment.state}</TableCell>
-                                            <TableCell align="right">{segment['segment.total.docs']}</TableCell>
-                                            <TableCell align="right">{segment['segment.crc']}</TableCell>
-                                            <TableCell align="right">{segment['segment.creation.time']}</TableCell>
-                                            <TableCell align="right">??</TableCell>
-                                            <TableCell align="right">??</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                    <CardContent >
-                        <TypoGraphy color="inherit" variant="body1" align= "center">
-                            REALTIME Segment Details
-                        </TypoGraphy>
-                        <TableContainer component={Paper} >
-                            <Table  aria-label="simple table">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell> Name</TableCell>
-                                        <TableCell align="right">Server</TableCell>
-                                        <TableCell align="right">State</TableCell>
-                                        <TableCell align="right"># Documents</TableCell>
-                                        <TableCell align="center">Size</TableCell>
-                                        <TableCell align="center">Created Time</TableCell>
-                                        <TableCell align="center">Min Data Time</TableCell>
-                                        <TableCell align="center">Max Data Time</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {this.state.realTimeSegments.map(segment => (
-                                        <TableRow key={segment['segment.name']}>
-                                            <TableCell component="th" scope="row">
-                                                {segment['segment.name']}
-                                            </TableCell>
-                                            <TableCell align="right">{segment.server}</TableCell>
-                                            <TableCell align="right">{segment.state}</TableCell>
-                                            <TableCell align="right">{segment['segment.total.docs']}</TableCell>
-                                            <TableCell align="right">{segment['segment.crc']}</TableCell>
-                                            <TableCell align="right">{segment['segment.creation.time']}</TableCell>
-                                            <TableCell align="right">??</TableCell>
-                                            <TableCell align="right">??</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </CardContent>
-                </Card>
+                
+                <MaterialTable
+                    title="OFFLINE Segment Details"
+                    columns={[
+                        { title: 'Name', field: 'segment.name' },
+                        { title: 'Server', field: 'server' },
+                        { title: 'State	', field: 'state'},
+                        { title: '# Documents', field: 'segment.total.docs'},
+                        { title: 'Size', field: 'segment.crc'},
+                        { title: 'Created Time', field: 'segment.creation.time'},
+                        { title: 'Min Data Time', label: '??'},
+                        { title: 'Max Data Time	', field: '??'},
+                    ]}
+                    data={this.offlineSegments}
+                    options={{
+                        headerStyle: Utils.getTableHeaderStyles(),
+                        search: true
+                    }}
+                />
+               <MaterialTable
+                    title="REALTIME Segment Details"
+                    columns={[
+                        { title: 'Name', field: 'segment.name' },
+                        { title: 'Server', field: 'server' },
+                        { title: 'State	', field: 'state'},
+                        { title: '# Documents', field: 'segment.total.docs'},
+                        { title: 'Size', field: 'segment.crc'},
+                        { title: 'Created Time', field: 'segment.creation.time'},
+                        { title: 'Min Data Time', label: '??'},
+                        { title: 'Max Data Time	', field: '??'},
+                    ]}
+                    data={this.realTimeSegments}
+                    options={{
+                        headerStyle: Utils.getTableHeaderStyles(),
+                        search: true
+                    }}
+                />
                 <ServerTable table = {this.props.table}></ServerTable>
-                <Card style={{background:"#f5f5f5"}}>
-                    <CardContent>
-                        <RealTimeOffline table = {this.props.table}></RealTimeOffline>
-                    </CardContent>
-                </Card>
+                
+               
             </div>
         );
     }
