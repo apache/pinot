@@ -817,14 +817,6 @@ select COUNT(*) from baseballStats where DIV(numberOfGames,10) = 100
 select mapKeys(mapField) from baseballStats where DIV(numberOfGames,10) = 100
 select mapKey(mapField,k1) from baseballStats where DIV(numberOfGames,10) = 100
 select mapKey(mapField,k1) from baseballStats where mapKey(mapField,k1) = 'v1'
-SELECT count(*) FROM Foo GROUP BY VALUEIN(mv_col, 10790, 16344) LIMIT 10
-SELECT count(*) FROM Foo GROUP BY TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS') LIMIT 10
-SELECT count(*) FROM Foo GROUP BY DATETIMECONVERT(timeCol, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES') LIMIT 10
-SELECT MAX(DIV(col1, col2)) FROM Foo GROUP BY TIMECONVERT(timeCol, 'MILLISECONDS', 'SECONDS')
-SELECT count(*) FROM Foo GROUP BY VALUEIN(time, 10790, 16344) LIMIT 10
-SELECT count(*) FROM Foo GROUP BY TIMECONVERT(time, 'MILLISECONDS', 'SECONDS') LIMIT 10
-SELECT count(*) FROM Foo GROUP BY DATETIMECONVERT(time, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES') LIMIT 10
-SELECT MAX(DIV(col1, col2)) FROM Foo GROUP BY TIMECONVERT(time, 'MILLISECONDS', 'SECONDS')
 SELECT count(c1), sum(c1), min(c1), max(c1), avg(c1), minmaxrange(c1), distinctcount(c1), distinctcounthll(c1) FROM foo
 SELECT distinctcountrawhll(c1), fasthll(c1), percentile(c1), percentileest(c1), percentiletdigest(c1) FROM foo
 SELECT countmv(c1), summv(c1), minmv(c1), maxmv(c1), avgmv(c1), minmaxrangemv(c1), distinctcountmv(c1), distinctcounthllmv(c1) FROM foo

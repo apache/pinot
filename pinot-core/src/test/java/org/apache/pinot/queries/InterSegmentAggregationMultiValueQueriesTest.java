@@ -61,7 +61,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, new String[]{"199896"});
 
-    query = "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000)";
+    query = "SELECT COUNTMV(column6) FROM testTable GROUP BY VALUEIN(column7, 363, 469, 246, 100000)";
     brokerResponse = getBrokerResponseForPqlQuery(query);
     List<String[]> groupKeys = new ArrayList<>();
     groupKeys.add(new String[]{"363"});
@@ -98,6 +98,44 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     brokerResponse = getBrokerResponseForSqlQuery(query);
     QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
         Lists.newArrayList(new Object[]{363, (long)35436}, new Object[]{469, (long)33576}, new Object[]{246, (long)24300}), 3, expectedDataSchema);
+
+    query = "SELECT COUNTMV(column6) FROM testTable GROUP BY daysSinceEpoch";
+    brokerResponse = getBrokerResponseForPqlQuery(query);
+    groupKeys = new ArrayList<>();
+    groupKeys.add(new String[]{"1756015683"});
+    aggregations = new ArrayList<>();
+    aggregations.add(new String[]{"426752"});
+    QueriesTestUtils
+        .testInterSegmentAggregationGroupByResult(brokerResponse, 400000L, 0L, 800000L, 400000L,
+            groupKeys, aggregations);
+
+    query = "SELECT daysSinceEpoch, COUNTMV(column6) FROM testTable GROUP BY daysSinceEpoch ORDER BY COUNTMV(column6) DESC";
+    expectedDataSchema =
+        new DataSchema(new String[]{"daysSinceEpoch", "countmv(column6)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{1756015683, (long)426752});
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        result, 1, expectedDataSchema);
+
+    query = "SELECT COUNTMV(column6) FROM testTable GROUP BY timeconvert(daysSinceEpoch, 'DAYS', 'HOURS')";
+    brokerResponse = getBrokerResponseForPqlQuery(query);
+    groupKeys = new ArrayList<>();
+    groupKeys.add(new String[]{"42144376392"});
+    aggregations = new ArrayList<>();
+    aggregations.add(new String[]{"426752"});
+    QueriesTestUtils
+        .testInterSegmentAggregationGroupByResult(brokerResponse, 400000L, 0L, 800000L, 400000L,
+            groupKeys, aggregations);
+
+    query = "SELECT timeconvert(daysSinceEpoch, 'DAYS', 'HOURS'), COUNTMV(column6) FROM testTable GROUP BY timeconvert(daysSinceEpoch, 'DAYS', 'HOURS') ORDER BY COUNTMV(column6) DESC";
+    expectedDataSchema =
+        new DataSchema(new String[]{"timeconvert(daysSinceEpoch,'DAYS','HOURS')", "countmv(column6)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    result = new ArrayList<>();
+    result.add(new Object[]{42144376392L, (long)426752});
+    QueriesTestUtils.testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        result, 1, expectedDataSchema);
   }
 
   @Test
