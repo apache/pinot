@@ -249,15 +249,15 @@ public class YamlResource {
   private Response processServerErrorResponse(String type, String operation, String payload, Exception e) {
     Map<String, String> responseMessage = new HashMap<>();
     LOG.error("Error {} {} with payload {}", operation, type, payload, e);
-    responseMessage.put("error", "Failed to create the " + type);
+    responseMessage.put("message", "Failed to create the " + type + ". Reach out to the ThirdEye team.");
     responseMessage.put("more-info", "Error = " + e.getMessage());
     return Response.serverError().entity(responseMessage).build();
   }
 
   private Response processBadAuthorizationResponse(String type, String operation, String payload, NotAuthorizedException e) {
     Map<String, String> responseMessage = new HashMap<>();
-    LOG.error("Authorization error while {} {} with payload {}", operation, type, payload, e);
-    responseMessage.put("error", "Authorization error! You do not have permissions to " + operation + " this " + type + " config");
+    LOG.warn("Authorization error while {} {} with payload {}", operation, type, payload, e);
+    responseMessage.put("message", "Authorization error! You do not have permissions to " + operation + " this " + type + " config");
     responseMessage.put("more-info", "Configure owners property in " + type + " config");
     return Response.status(Response.Status.UNAUTHORIZED).entity(responseMessage).build();
   }
@@ -857,8 +857,8 @@ public class YamlResource {
       StringBuilder sb = new StringBuilder();
       // show more stack message to frontend for debugging
       getErrorMessage(0, 5, e, sb);
-      responseMessage.put("error", "Failed to run the preview.");
-      responseMessage.put("more-info", "Error stack " + sb.toString());
+      responseMessage.put("message", "Failed to run the preview.");
+      responseMessage.put("more-info", "Error stack: " + sb.toString());
       return Response.serverError().entity(responseMessage).build();
     } finally {
       // stop the preview
@@ -1090,7 +1090,7 @@ public class YamlResource {
       yamls = queryDetectionConfigurations(dataset, metric);
     } catch (Exception e) {
       LOG.warn("Error while fetching detection yaml configs.", e.getMessage());
-      responseMessage.put("error", "Failed to fetch all the detection configurations.");
+      responseMessage.put("message", "Failed to fetch all the detection configurations.");
       responseMessage.put("more-info", "Error = " + e.getMessage());
       return Response.serverError().entity(responseMessage).build();
     }
