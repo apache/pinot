@@ -117,6 +117,44 @@ public class QueriesTestUtils {
     }
   }
 
+  public static void testInterSegmentAggregationGroupByResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
+      List<String[]>expectedGroupKeys, List<String[]> expectedAggregationResults) {
+    testInterSegmentAggregationGroupByResult(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
+        expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, Serializable::toString, expectedGroupKeys, expectedAggregationResults);
+  }
+
+  private static void testInterSegmentAggregationGroupByResult(BrokerResponseNative brokerResponse,
+      long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
+      long expectedNumTotalDocs, Function<Serializable, String> responseMapper, List<String[]> expectedGroupKeys,
+      List<String[]> expectedAggregationResults) {
+    Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), expectedNumEntriesScannedInFilter);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
+    // size of this array will be equal to number of aggregation functions since
+    // we return each aggregation function separately
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    int numAggregationColumns = aggregationResults.size();
+    Assert.assertEquals(numAggregationColumns, expectedAggregationResults.get(0).length);
+    int numKeyColumns = expectedGroupKeys.get(0).length;
+    for (int i = 0; i < numAggregationColumns; i++) {
+      AggregationResult aggregationResult = aggregationResults.get(i);
+      Assert.assertNull(aggregationResult.getValue());
+      List<GroupByResult> groupByResults = aggregationResult.getGroupByResult();
+      int numGroups = groupByResults.size();
+      for (int j = 0; j < numGroups; j++) {
+        GroupByResult groupByResult = groupByResults.get(j);
+        Assert.assertEquals(responseMapper.apply(groupByResult.getValue()), expectedAggregationResults.get(j)[i]);
+        List<String> groupValues = groupByResult.getGroup();
+        Assert.assertEquals(groupValues.size(), numKeyColumns);
+        for (int k = 0; k < numKeyColumns; k++) {
+          Assert.assertEquals(expectedGroupKeys.get(j)[k], groupValues.get(k));
+        }
+      }
+    }
+  }
+
   static void testInterSegmentResultTable(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
       List<Object[]> expectedResults, int expectedResultsSize, DataSchema expectedDataSchema) {

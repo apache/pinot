@@ -35,6 +35,10 @@ public class BrokerRequestComparisonUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestComparisonUtils.class);
 
   public static boolean validate(BrokerRequest br1, BrokerRequest br2) {
+    return validate(br1, br2, false);
+  }
+
+  public static boolean validate(BrokerRequest br1, BrokerRequest br2, boolean ignoreOrderBy) {
     boolean result = br1.equals(br2);
     if (!result) {
       StringBuilder sb = new StringBuilder();
@@ -101,17 +105,19 @@ public class BrokerRequestComparisonUtils {
             br2.getAggregationsInfo());
         return false;
       }
-      if (br1.getOrderBy() != null) {
-        if (!validateOrderBys(br1.getOrderBy(), br2.getOrderBy())) {
-          sb.append("br1.getOrderBy() = ").append(br1.getOrderBy()).append("\n").append("br2.getOrderBy() = ")
-              .append(br2.getOrderBy());
-          LOGGER.error("Order By did not match conversion:{}", sb);
+      if (!ignoreOrderBy) {
+        if (br1.getOrderBy() != null) {
+          if (!validateOrderBys(br1.getOrderBy(), br2.getOrderBy())) {
+            sb.append("br1.getOrderBy() = ").append(br1.getOrderBy()).append("\n").append("br2.getOrderBy() = ")
+                .append(br2.getOrderBy());
+            LOGGER.error("Order By did not match conversion:{}", sb);
+            return false;
+          }
+        } else if (br2.getOrderBy() != null) {
+          LOGGER.error("OrderBy did not match, br1.getOrderBy() = null, br2.getOrderBy() = {}",
+              br2.getOrderBy());
           return false;
         }
-      } else if (br2.getOrderBy() != null) {
-        LOGGER.error("OrderBy did not match, br1.getOrderBy() = null, br2.getOrderBy() = {}",
-            br2.getOrderBy());
-        return false;
       }
     }
     return true;
