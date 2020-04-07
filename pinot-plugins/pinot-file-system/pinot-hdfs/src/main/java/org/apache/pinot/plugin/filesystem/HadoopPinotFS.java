@@ -172,7 +172,7 @@ public class HadoopPinotFS extends PinotFS {
       LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath, dstFile.length(),
           System.currentTimeMillis() - startMs);
     } catch (IOException e) {
-      LOGGER.warn("failed to fetch segment {} from hdfs, might retry", srcUri, e);
+      LOGGER.warn("failed to fetch segment {} from hdfs to {}, might retry", srcUri, dstFile, e);
       throw e;
     }
   }

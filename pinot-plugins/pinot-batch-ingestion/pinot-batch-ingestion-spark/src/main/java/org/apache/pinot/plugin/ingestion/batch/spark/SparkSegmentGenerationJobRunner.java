@@ -16,18 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.Serializable;
-import java.net.URI;
-import java.nio.file.FileSystems;
-import java.nio.file.PathMatcher;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -49,12 +40,22 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
+import java.net.URI;
+import java.nio.file.FileSystems;
+import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
 import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.getFileName;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
-
 
 public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Serializable {
 
@@ -203,13 +204,20 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
       JavaRDD<String> pathRDD = sparkContext.parallelize(pathAndIdxList, pathAndIdxList.size());
 
+      final String pluginsInclude =
+          (sparkContext.getConf().contains(PLUGINS_INCLUDE_PROPERTY_NAME)) ? sparkContext.getConf()
+              .get(PLUGINS_INCLUDE_PROPERTY_NAME) : null;
       final URI finalInputDirURI = inputDirURI;
       final URI finalOutputDirURI = (stagingDirURI == null) ? outputDirURI : stagingDirURI;
       pathRDD.foreach(pathAndIdx -> {
+        for (PinotFSSpec pinotFSSpec : _spec.getPinotFSSpecs()) {
+          Configuration config = new MapConfiguration(pinotFSSpec.getConfigs());
+          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), config);
+        }
+        PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());
         String[] splits = pathAndIdx.split(" ");
         String path = splits[0];
         int idx = Integer.valueOf(splits[1]);
-
         // Load Pinot Plugins copied from Distributed cache.
         File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);
         if (localPluginsTarFile.exists()) {
@@ -223,11 +231,9 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_DIR_PROPERTY_NAME,
               pluginsDirFile.getAbsolutePath());
           System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.getAbsolutePath());
-
-          final String pluginsIncludes = sparkContext.getConf().get(PLUGINS_INCLUDE_PROPERTY_NAME);
-          if (pluginsIncludes != null) {
-            LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
-            System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+          if (pluginsInclude != null) {
+            LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_INCLUDE_PROPERTY_NAME, pluginsInclude);
+            System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsInclude);
           }
           LOGGER.info("Pinot plugins System Properties are set at [{}], plugins includes [{}]",
               System.getProperty(PLUGINS_DIR_PROPERTY_NAME), System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME));
@@ -248,7 +254,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         FileUtils.forceMkdir(localOutputTempDir);
 
         //copy input path to local
-        File localInputDataFile = new File(localInputTempDir, new File(inputFileURI).getName());
+        File localInputDataFile = new File(localInputTempDir, getFileName(inputFileURI));
+        LOGGER.info("Trying to copy input file from {} to {}", inputFileURI, localInputDataFile);
         PinotFSFactory.create(inputFileURI.getScheme()).copyToLocalFile(inputFileURI, localInputDataFile);
 
         //create task spec
@@ -282,9 +289,10 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         LOGGER.info("Trying to move segment tar file from: [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
         if (!_spec.isOverwriteOutput() && PinotFSFactory.create(outputSegmentTarURI.getScheme())
             .exists(outputSegmentTarURI)) {
-          LOGGER.warn("Not overwrite existing output segment tar file: {}", outputDirFS.exists(outputSegmentTarURI));
+          LOGGER
+              .warn("Not overwrite existing output segment tar file: {}", finalOutputDirFS.exists(outputSegmentTarURI));
         } else {
-          outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
+          finalOutputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
         }
         FileUtils.deleteQuietly(localSegmentDir);
         FileUtils.deleteQuietly(localSegmentTarFile);
@@ -325,6 +333,10 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
   protected void packPluginsToDistributedCache(JavaSparkContext sparkContext) {
     String pluginsRootDir = PluginManager.get().getPluginsRootDir();
+    if (pluginsRootDir == null) {
+      LOGGER.warn("Local Pinot plugins directory is null, skip packaging...");
+      return;
+    }
     if (new File(pluginsRootDir).exists()) {
       File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
       try {
