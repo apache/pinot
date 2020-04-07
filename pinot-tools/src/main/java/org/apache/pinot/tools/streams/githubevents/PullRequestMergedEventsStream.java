@@ -59,7 +59,7 @@ public class PullRequestMergedEventsStream {
 
   private Schema _avroSchema;
   private String _topicName;
-  private GithubAPICaller _githubAPICaller;
+  private GitHubAPICaller _gitHubAPICaller;
 
   private StreamDataProducer _producer;
 
@@ -84,7 +84,7 @@ public class PullRequestMergedEventsStream {
       throw e;
     }
     _topicName = topicName;
-    _githubAPICaller = new GithubAPICaller(personalAccessToken);
+    _gitHubAPICaller = new GitHubAPICaller(personalAccessToken);
 
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBrokerList);
@@ -117,7 +117,7 @@ public class PullRequestMergedEventsStream {
     printStatus(Quickstart.Color.GREEN, "***** Shutting down pullRequestMergedEvents Stream *****");
     _keepStreaming = false;
     Thread.sleep(3000L);
-    _githubAPICaller.shutdown();
+    _gitHubAPICaller.shutdown();
     _producer.close();
     _producer = null;
     _service.shutdown();
@@ -146,7 +146,7 @@ public class PullRequestMergedEventsStream {
           return;
         }
         try {
-          GithubAPICaller.GithubAPIResponse githubAPIResponse = _githubAPICaller.callEventsAPI(etag);
+          GitHubAPICaller.GitHubAPIResponse githubAPIResponse = _gitHubAPICaller.callEventsAPI(etag);
           switch (githubAPIResponse.statusCode) {
             case 200: // Read new events
               etag = githubAPIResponse.etag;
@@ -180,7 +180,7 @@ public class PullRequestMergedEventsStream {
               break;
             case 401: // Unauthorized
               printStatus(Quickstart.Color.YELLOW,
-                  "Unauthorized call to Github events API. Status message: " + githubAPIResponse.statusMessage
+                  "Unauthorized call to GitHub events API. Status message: " + githubAPIResponse.statusMessage
                       + ". Exiting.");
               return;
             default: // Unknown status code
@@ -223,7 +223,7 @@ public class PullRequestMergedEventsStream {
 
           JsonArray commits = null;
           String commitsURL = pullRequest.get("commits_url").getAsString();
-          GithubAPICaller.GithubAPIResponse commitsResponse = _githubAPICaller.callAPI(commitsURL);
+          GitHubAPICaller.GitHubAPIResponse commitsResponse = _gitHubAPICaller.callAPI(commitsURL);
 
           if (commitsResponse.responseString != null) {
             commits = new JsonParser().parse(commitsResponse.responseString).getAsJsonArray();
@@ -231,14 +231,14 @@ public class PullRequestMergedEventsStream {
 
           JsonArray reviewComments = null;
           String reviewCommentsURL = pullRequest.get("review_comments_url").getAsString();
-          GithubAPICaller.GithubAPIResponse reviewCommentsResponse = _githubAPICaller.callAPI(reviewCommentsURL);
+          GitHubAPICaller.GitHubAPIResponse reviewCommentsResponse = _gitHubAPICaller.callAPI(reviewCommentsURL);
           if (reviewCommentsResponse.responseString != null) {
             reviewComments = new JsonParser().parse(reviewCommentsResponse.responseString).getAsJsonArray();
           }
 
           JsonArray comments = null;
           String commentsURL = pullRequest.get("comments_url").getAsString();
-          GithubAPICaller.GithubAPIResponse commentsResponse = _githubAPICaller.callAPI(commentsURL);
+          GitHubAPICaller.GitHubAPIResponse commentsResponse = _gitHubAPICaller.callAPI(commentsURL);
           if (commentsResponse.responseString != null) {
             comments = new JsonParser().parse(commentsResponse.responseString).getAsJsonArray();
           }

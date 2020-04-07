@@ -20,15 +20,15 @@ package org.apache.pinot.tools.admin.command;
 
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.GithubEventsQuickstart;
+import org.apache.pinot.tools.GitHubEventsQuickstart;
 import org.kohsuke.args4j.Option;
 
 /**
- * Command to run GithubEventsQuickStart
+ * Command to run GitHubEventsQuickStart
  */
-public class GithubEventsQuickStartCommand extends AbstractBaseAdminCommand implements Command {
+public class GitHubEventsQuickStartCommand extends AbstractBaseAdminCommand implements Command {
 
-  @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "Github personal access token.")
+  @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "GitHub personal access token.")
   private String _personalAccessToken;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -45,12 +45,12 @@ public class GithubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
 
   @Override
   public String getName() {
-    return "GithubEventsQuickStart";
+    return "GitHubEventsQuickStart";
   }
 
   @Override
   public String toString() {
-    return ("GithubEventsQuickStart -personalAccessToken " + _personalAccessToken);
+    return ("GitHubEventsQuickStart -personalAccessToken " + _personalAccessToken);
   }
 
   @Override
@@ -59,14 +59,14 @@ public class GithubEventsQuickStartCommand extends AbstractBaseAdminCommand impl
 
   @Override
   public String description() {
-    return "Runs the GithubEventsQuickstart";
+    return "Runs the GitHubEventsQuickstart";
   }
 
   @Override
   public boolean execute()
       throws Exception {
     PluginManager.get().init();
-    new GithubEventsQuickstart().execute(_personalAccessToken);
+    new GitHubEventsQuickstart().execute(_personalAccessToken);
     return true;
   }
 }

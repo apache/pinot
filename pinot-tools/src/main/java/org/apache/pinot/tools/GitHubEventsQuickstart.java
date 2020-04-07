@@ -24,13 +24,14 @@ import java.io.File;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
@@ -42,7 +43,8 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
  * Creates a realtime table pullRequestMergedEvents
  * Starts the {@link PullRequestMergedEventsStream} to publish pullRequestMergedEvents into the topic
  */
-public class GithubEventsQuickstart {
+public class GitHubEventsQuickstart {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GitHubEventsQuickstart.class);
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
@@ -78,7 +80,7 @@ public class GithubEventsQuickstart {
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
+    File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request = new QuickstartTableRequest("pullRequestMergedEvents", schemaFile, tableConfigFile);
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
@@ -102,13 +104,13 @@ public class GithubEventsQuickstart {
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
-        printStatus(Color.GREEN, "***** Shutting down GithubEventsQuickStart *****");
+        printStatus(Color.GREEN, "***** Shutting down GitHubEventsQuickStart *****");
         runner.stop();
         _kafkaStarter.stop();
         ZkStarter.stopLocalZkServer(_zookeeperInstance);
         FileUtils.deleteDirectory(quickStartDataDir);
       } catch (Exception e) {
-        e.printStackTrace();
+        LOGGER.error("Caught exception in shutting down GitHubEvents QuickStart", e);
       }
     }));
 

@@ -26,13 +26,13 @@ import org.kohsuke.args4j.Option;
 
 
 /**
- * Command to stream Github events into a kafka topic
+ * Command to stream GitHub events into a kafka topic
  */
-public class StreamGithubEventsCommand extends AbstractBaseAdminCommand implements Command {
+public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final String PULL_REQUEST_MERGED_EVENT_TYPE = "pullRequestMergedEvent";
 
-  @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "Github personal access token.")
+  @Option(name = "-personalAccessToken", required = true, metaVar = "<String>", usage = "GitHub personal access token.")
   private String _personalAccessToken;
 
   @Option(name = "-kafkaBrokerList", metaVar = "<String>", usage = "Kafka broker list of the kafka cluster to produce events.")
@@ -41,7 +41,7 @@ public class StreamGithubEventsCommand extends AbstractBaseAdminCommand implemen
   @Option(name = "-topic", required = true, metaVar = "<String>", usage = "Name of kafka topic to publish events.")
   private String _topic;
 
-  @Option(name = "-eventType", metaVar = "<String>", usage = "Type of Github event. Supported types - pullRequestMergedEvent")
+  @Option(name = "-eventType", metaVar = "<String>", usage = "Type of GitHub event. Supported types - pullRequestMergedEvent")
   private String _eventType = PULL_REQUEST_MERGED_EVENT_TYPE;
 
   @Option(name = "-schemaFile", metaVar = "<String>", usage = "Path to schema file. By default uses examples/stream/githubEvents/pullRequestMergedEvents_schema.json")
@@ -77,12 +77,12 @@ public class StreamGithubEventsCommand extends AbstractBaseAdminCommand implemen
 
   @Override
   public String getName() {
-    return "StreamGithubEvents";
+    return "StreamGitHubEvents";
   }
 
   @Override
   public String toString() {
-    return ("StreamGithubEvents -personalAccessToken " + _personalAccessToken + " -kafkaBrokerList " + _kafkaBrokerList
+    return ("StreamGitHubEvents -personalAccessToken " + _personalAccessToken + " -kafkaBrokerList " + _kafkaBrokerList
         + " -topic " + _topic + " eventType " + _eventType + " schemaFile " + _schemaFile);
   }
 
@@ -92,7 +92,7 @@ public class StreamGithubEventsCommand extends AbstractBaseAdminCommand implemen
 
   @Override
   public String description() {
-    return "Streams GithubEvents into a Kafka topic";
+    return "Streams GitHubEvents into a Kafka topic";
   }
 
   @Override

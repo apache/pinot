@@ -37,11 +37,11 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 /**
- * Helper class to make http calls to Github API
+ * Helper class to make http calls to GitHub API
  */
-public class GithubAPICaller {
+public class GitHubAPICaller {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(GithubAPICaller.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(GitHubAPICaller.class);
   private static final String EVENTS_API_URL = "https://api.github.com/events";
   private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String IF_NONE_MATCH_HEADER = "If-None-Match";
@@ -54,8 +54,8 @@ public class GithubAPICaller {
   private final CloseableHttpClient _closeableHttpClient;
   private String _personalAccessToken;
 
-  GithubAPICaller(String personalAccessToken) {
-    printStatus(Quickstart.Color.CYAN, "***** Initializing GithubAPICaller *****");
+  GitHubAPICaller(String personalAccessToken) {
+    printStatus(Quickstart.Color.CYAN, "***** Initializing GitHubAPICaller *****");
     _personalAccessToken = personalAccessToken;
     _closeableHttpClient = HttpClients.createDefault();
   }
@@ -63,7 +63,7 @@ public class GithubAPICaller {
   /**
    * Calls the events API
    */
-  public GithubAPIResponse callEventsAPI(String etag)
+  public GitHubAPIResponse callEventsAPI(String etag)
       throws IOException {
     HttpUriRequest request = buildRequest(EVENTS_API_URL, etag);
     return executeEventsRequest(request);
@@ -72,7 +72,7 @@ public class GithubAPICaller {
   /**
    * Calls the given url
    */
-  public GithubAPIResponse callAPI(String url)
+  public GitHubAPIResponse callAPI(String url)
       throws IOException {
     HttpUriRequest request = buildRequest(url, null);
     return executeGet(request);
@@ -96,9 +96,9 @@ public class GithubAPICaller {
   /**
    * Make an Http GET call to the /events API
    */
-  private GithubAPIResponse executeEventsRequest(HttpUriRequest request)
+  private GitHubAPIResponse executeEventsRequest(HttpUriRequest request)
       throws IOException {
-    GithubAPIResponse githubAPIResponse = new GithubAPIResponse();
+    GitHubAPIResponse githubAPIResponse = new GitHubAPIResponse();
 
     try (CloseableHttpResponse httpResponse = _closeableHttpClient.execute(request)) {
       StatusLine statusLine = httpResponse.getStatusLine();
@@ -134,9 +134,9 @@ public class GithubAPICaller {
   /**
    * Makes an Http GET call to the provided URL
    */
-  private GithubAPIResponse executeGet(HttpUriRequest request)
+  private GitHubAPIResponse executeGet(HttpUriRequest request)
       throws IOException {
-    GithubAPIResponse githubAPIResponse = new GithubAPIResponse();
+    GitHubAPIResponse githubAPIResponse = new GitHubAPIResponse();
 
     try (CloseableHttpResponse httpResponse = _closeableHttpClient.execute(request)) {
       StatusLine statusLine = httpResponse.getStatusLine();
@@ -163,14 +163,14 @@ public class GithubAPICaller {
 
   public void shutdown()
       throws IOException {
-    printStatus(Quickstart.Color.GREEN, "***** Shutting down GithubAPICaller *****");
+    printStatus(Quickstart.Color.GREEN, "***** Shutting down GitHubAPICaller *****");
     _closeableHttpClient.close();
   }
 
   /**
-   * Represents a response from the Github API
+   * Represents a response from the GitHub API
    */
-  static class GithubAPIResponse {
+  static class GitHubAPIResponse {
     String responseString = null;
     int statusCode = 0;
     String statusMessage;

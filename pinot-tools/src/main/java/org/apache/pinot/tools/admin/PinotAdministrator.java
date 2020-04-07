@@ -32,7 +32,7 @@ import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
-import org.apache.pinot.tools.admin.command.GithubEventsQuickStartCommand;
+import org.apache.pinot.tools.admin.command.GitHubEventsQuickStartCommand;
 import org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
 import org.apache.pinot.tools.admin.command.OfflineSegmentIntervalCheckerCommand;
@@ -44,7 +44,7 @@ import org.apache.pinot.tools.admin.command.RebalanceTableCommand;
 import org.apache.pinot.tools.admin.command.ShowClusterInfoCommand;
 import org.apache.pinot.tools.admin.command.StartBrokerCommand;
 import org.apache.pinot.tools.admin.command.StartControllerCommand;
-import org.apache.pinot.tools.admin.command.StreamGithubEventsCommand;
+import org.apache.pinot.tools.admin.command.StreamGitHubEventsCommand;
 import org.apache.pinot.tools.admin.command.StartKafkaCommand;
 import org.apache.pinot.tools.admin.command.StartServerCommand;
 import org.apache.pinot.tools.admin.command.StartZookeeperCommand;
@@ -128,8 +128,8 @@ public class PinotAdministrator {
       @SubCommand(name = "EntriesScannedQuantileReport", impl = EntriesScannedQuantileReport.class),
       @SubCommand(name = "IndexTuner", impl = IndexTunerCommand.class),
       @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class),
-      @SubCommand(name = "GithubEventsQuickStart", impl = GithubEventsQuickStartCommand.class),
-      @SubCommand(name = "StreamGithubEvents", impl = StreamGithubEventsCommand.class)
+      @SubCommand(name = "GitHubEventsQuickStart", impl = GitHubEventsQuickStartCommand.class),
+      @SubCommand(name = "StreamGitHubEvents", impl = StreamGitHubEventsCommand.class)
   })
   Command _subCommand;
   //@formatter:on
