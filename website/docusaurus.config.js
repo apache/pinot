@@ -19,7 +19,7 @@
 module.exports = {
   title: 'Apache Pinot™ (Incubating)',
   tagline: 'Realtime distributed OLAP datastore',
-  url: 'https://pinot.apache.com',
+  url: 'https://pinot.apache.org',
   baseUrl: '/',
   favicon: 'img/favicon.ico',
   organizationName: 'apache',
@@ -27,10 +27,9 @@ module.exports = {
   themeConfig: {
     navbar: {
       hideOnScroll: true,
-      title: 'Pinot™ (Incubating)',
       logo: {
         alt: 'Pinot',
-        src: 'img/logo.svg',
+        src: 'img/pinot-navbar-logo.svg',
       },
       links: [
         {to: 'https://docs.pinot.apache.org/', label: 'Docs', position: 'right'},
