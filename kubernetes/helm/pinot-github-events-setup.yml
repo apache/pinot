@@ -49,7 +49,6 @@ data:
           "stream.kafka.topic.name": "pullRequestMergedEvents",
           "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
           "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-          "stream.kafka.hlc.zk.connect.string": "kafka-zookeeper:2181",
           "stream.kafka.zk.broker.url": "kafka-zookeeper:2181",
           "stream.kafka.broker.list": "kafka:9092",
           "realtime.segment.flush.threshold.time": "12h",
@@ -226,7 +225,7 @@ spec:
     spec:
       containers:
         - name: pinot-add-github-events-realtime-table-json
-          image: apachepinot/pinot:stream_github_events
+          image: apachepinot/pinot:latest
           args: [ "AddTable", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json", "-tableConfigFile", "/var/pinot/examples/pullRequestMergedEvents_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
           env:
             - name: JAVA_OPTS
@@ -260,7 +259,7 @@ spec:
         app: pinot-github-events-data-into-kafka
     spec:
       containers:
-        - image: apachepinot/pinot:stream_github_events
+        - image: apachepinot/pinot:latest
           imagePullPolicy: Always
           name: pinot-github-events-data-into-kafka
           args: [ "StreamGitHubEvents", "-topic", "pullRequestMergedEvents", "-personalAccessToken", "token_value", "-kafkaBrokerList", "kafka:9092", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json" ]
