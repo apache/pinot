@@ -857,7 +857,8 @@ public class YamlResource {
       StringBuilder sb = new StringBuilder();
       // show more stack message to frontend for debugging
       getErrorMessage(0, 5, e, sb);
-      responseMessage.put("message", "Failed to run the preview. Error stack: " + sb.toString());
+      responseMessage.put("message", "Failed to run the preview.");
+      responseMessage.put("more-info", "Error stack: " + sb.toString());
       return Response.serverError().entity(responseMessage).build();
     } finally {
       // stop the preview
