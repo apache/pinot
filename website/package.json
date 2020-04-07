@@ -35,6 +35,9 @@
     "svg.js": "^2.6.2",
     "yarn": "^1.22.4"
   },
+  "resolutions": {
+    "**/sharp": "^0.25.2"
+  },
   "browserslist": {
     "production": [
       ">0.2%",
