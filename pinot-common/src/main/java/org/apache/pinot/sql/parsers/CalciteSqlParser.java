@@ -56,7 +56,6 @@ import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class CalciteSqlParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
@@ -572,6 +571,10 @@ public class CalciteSqlParser {
         String funcName = funcSqlNode.getOperator().getKind().name();
         if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
           funcName = funcSqlNode.getOperator().getName();
+        }
+        if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null) && funcSqlNode
+            .getFunctionQuantifier().toValue().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+          funcName = AggregationFunctionType.DISTINCTCOUNT.getName();
         }
         final Expression funcExpr = RequestUtils.getFunctionExpression(funcName);
         for (SqlNode child : funcSqlNode.getOperands()) {
