@@ -42,7 +42,7 @@ jobs:
     - name: "Unit Tests - OracleJDK 8"
       jdk: oraclejdk8
       script:
-        - ./.travis/.travis_test.sh
+        - travis_wait 60 ./.travis/.travis_test.sh
       env:
         - RUN_INTEGRATION_TESTS=false
     - name: "QuickStart - Java 8 & OpenJDK 14-15"
