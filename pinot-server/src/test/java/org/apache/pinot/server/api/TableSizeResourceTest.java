@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
 
 
 public class TableSizeResourceTest extends BaseResourceTest {
-  private static final String TABLE_SIZE_PATH = "/tables/" + TABLE_NAME + "/size";
+  private static final String TABLE_SIZE_PATH = "/tables/" + REALTIME_TABLE_NAME + "/size";
 
   @Test
   public void testTableSizeNotFound() {
@@ -37,9 +37,9 @@ public class TableSizeResourceTest extends BaseResourceTest {
   @Test
   public void testTableSizeDetailed() {
     TableSizeInfo tableSizeInfo = _webTarget.path(TABLE_SIZE_PATH).request().get(TableSizeInfo.class);
-    ImmutableSegment defaultSegment = _indexSegments.get(0);
+    ImmutableSegment defaultSegment = _realtimeIndexSegments.get(0);
 
-    Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
+    Assert.assertEquals(tableSizeInfo.tableName, REALTIME_TABLE_NAME);
     Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 1);
     Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, defaultSegment.getSegmentName());
@@ -51,19 +51,19 @@ public class TableSizeResourceTest extends BaseResourceTest {
   public void testTableSizeNoDetails() {
     TableSizeInfo tableSizeInfo =
         _webTarget.path(TABLE_SIZE_PATH).queryParam("detailed", "false").request().get(TableSizeInfo.class);
-    ImmutableSegment defaultSegment = _indexSegments.get(0);
+    ImmutableSegment defaultSegment = _realtimeIndexSegments.get(0);
 
-    Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
+    Assert.assertEquals(tableSizeInfo.tableName, REALTIME_TABLE_NAME);
     Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 0);
   }
 
   @Test
   public void testTableSizeOld() {
-    TableSizeInfo tableSizeInfo = _webTarget.path("/table/" + TABLE_NAME + "/size").request().get(TableSizeInfo.class);
-    ImmutableSegment defaultSegment = _indexSegments.get(0);
+    TableSizeInfo tableSizeInfo = _webTarget.path("/table/" + REALTIME_TABLE_NAME + "/size").request().get(TableSizeInfo.class);
+    ImmutableSegment defaultSegment = _realtimeIndexSegments.get(0);
 
-    Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
+    Assert.assertEquals(tableSizeInfo.tableName, REALTIME_TABLE_NAME);
     Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 1);
     Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, defaultSegment.getSegmentName());
