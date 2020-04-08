@@ -25,21 +25,17 @@ if [ $? -eq 0 ]; then
 
   if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
     echo 'Skip ThirdEye tests for version other than oracle jdk8.'
-    rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
     exit 0
   fi
 
   if [ "RUN_INTEGRATION_TESTS" == 'false' ]; then
     echo 'Skip ThirdEye tests when integration tests off'
-    rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
     exit 0
   fi
 
   cd thirdeye
   mvn test -B ${DEPLOY_BUILD_OPTS}
   failed=$?
-  # Remove Pinot/ThirdEye files from local Maven repository to avoid a useless cache rebuild
-  rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
   if [ $failed -eq 0 ]; then
     exit 0
   else
@@ -50,8 +46,6 @@ fi
 # Only run tests for JDK 8
 if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
   echo 'Skip tests for version other than oracle jdk8.'
-  # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
-  rm -rf ~/.m2/repository/com/linkedin/pinot
   exit 0
 fi
 
@@ -74,9 +68,6 @@ else
     passed=1
   fi
 fi
-
-# Remove Pinot files from local Maven repository to avoid a useless cache rebuild
-rm -rf ~/.m2/repository/com/linkedin/pinot
 
 if [ $passed -eq 1 ]; then
   # Only send code coverage data if passed
