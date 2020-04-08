@@ -29,32 +29,31 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.partition.ModuloPartitionFunction;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.query.pruner.PartitionSegmentPruner;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.SegmentPartitionConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -77,7 +76,6 @@ public class SegmentPartitionTest {
   private static final String NON_PARTITIONED_COLUMN_NAME = "nonPartitionedColumn";
   private static final int NUM_PARTITIONS = 20; // For modulo function
   private static final int PARTITION_DIVISOR = 5; // Allowed partition values
-  private static final int MAX_PARTITION_VALUE = (PARTITION_DIVISOR - 1);
   private static final String PARTITION_FUNCTION_NAME = "MoDuLo";
 
   private final Set<Integer> _expectedPartitions = new HashSet<>();
@@ -121,58 +119,6 @@ public class SegmentPartitionTest {
   }
 
   /**
-   * Unit test for {@link PartitionSegmentPruner}.
-   * <ul>
-   *   <li> Generates queries with equality predicate on partitioned column with random values. </li>
-   *   <li> Ensures that column values that are in partition range ([0 5]) do not prune the segment,
-   *        whereas other values do. </li>
-   *   <li> Ensures that predicates on non-partitioned columns do not prune the segment. </li>
-   * </ul>
-   */
-  @Test
-  public void testPruner() {
-    Pql2Compiler compiler = new Pql2Compiler();
-    PartitionSegmentPruner pruner = new PartitionSegmentPruner();
-
-    Random random = new Random(System.nanoTime());
-    for (int i = 0; i < 1000; i++) {
-      int columnValue = Math.abs(random.nextInt());
-
-      // Test for partitioned column.
-      String query = buildQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, columnValue);
-      BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
-      FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-
-      assertEquals(pruner.prune(_segment, filterQueryTree), (columnValue % NUM_PARTITIONS > MAX_PARTITION_VALUE),
-          "Failed for column value: " + columnValue);
-
-      // Test for non partitioned column.
-      query = buildQuery(TABLE_NAME, NON_PARTITIONED_COLUMN_NAME, columnValue);
-      brokerRequest = compiler.compileToBrokerRequest(query);
-      filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      assertFalse(pruner.prune(_segment, filterQueryTree));
-
-      // Test for AND query: Segment can be pruned out if partitioned column has value outside of range.
-      int partitionColumnValue = Math.abs(random.nextInt());
-      int nonPartitionColumnValue = random.nextInt();
-      query = buildAndQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, partitionColumnValue, NON_PARTITIONED_COLUMN_NAME,
-          nonPartitionColumnValue, FilterOperator.AND);
-
-      brokerRequest = compiler.compileToBrokerRequest(query);
-      filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      assertEquals(pruner.prune(_segment, filterQueryTree),
-          (partitionColumnValue % NUM_PARTITIONS) > MAX_PARTITION_VALUE);
-
-      // Test for OR query: Segment should never be pruned as there's an OR with non partitioned column.
-      query = buildAndQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, partitionColumnValue, NON_PARTITIONED_COLUMN_NAME,
-          nonPartitionColumnValue, FilterOperator.OR);
-      brokerRequest = compiler.compileToBrokerRequest(query);
-      filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      assertFalse(pruner.prune(_segment, filterQueryTree));
-    }
-  }
-
-  /**
    * Unit test for {@link SegmentPartitionConfig} that tests the following:
    * <ul>
    *   <li> Conversion from/to JSON string. </li>
@@ -192,7 +138,8 @@ public class SegmentPartitionTest {
     }
 
     SegmentPartitionConfig expectedConfig = new SegmentPartitionConfig(expectedMap);
-    SegmentPartitionConfig actualConfig = SegmentPartitionConfig.fromJsonString(expectedConfig.toJsonString());
+    SegmentPartitionConfig actualConfig =
+        JsonUtils.stringToObject(expectedConfig.toJsonString(), SegmentPartitionConfig.class);
 
     for (Map.Entry<String, ColumnPartitionConfig> entry : actualConfig.getColumnPartitionMap().entrySet()) {
       String partitionColumn = entry.getKey();
@@ -211,7 +158,7 @@ public class SegmentPartitionTest {
         "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function\",\"numPartitions\":10}}}";
 
     assertEquals(jsonStringWithoutNewField,
-        SegmentPartitionConfig.fromJsonString(jsonStringWithNewField).toJsonString());
+        JsonUtils.stringToObject(jsonStringWithNewField, SegmentPartitionConfig.class).toJsonString());
   }
 
   private String buildQuery(String tableName, String columnName, int predicateValue) {

@@ -24,14 +24,14 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.core.minion.SegmentConverter;
 import org.apache.pinot.core.minion.segment.RecordAggregator;
 import org.apache.pinot.core.minion.segment.RecordTransformer;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**

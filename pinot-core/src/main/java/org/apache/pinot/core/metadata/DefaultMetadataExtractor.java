@@ -20,9 +20,9 @@ package org.apache.pinot.core.metadata;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 
 
 /**

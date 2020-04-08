@@ -22,6 +22,7 @@ import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String READ_MODE = "readMode";
   // Key of the segment format this server can read
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
+  // Key of whether to enable reloading consuming segments
+  public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
 
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
@@ -170,6 +173,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean isDirectRealtimeOffheapAllocation() {
     return _instanceDataManagerConfiguration.getBoolean(DIRECT_REALTIME_OFFHEAP_ALLOCATION, false);
+  }
+
+  public boolean shouldReloadConsumingSegment() {
+    return _instanceDataManagerConfiguration
+        .getBoolean(INSTANCE_RELOAD_CONSUMING_SEGMENT, Server.DEFAULT_RELOAD_CONSUMING_SEGMENT);
   }
 
   @Override

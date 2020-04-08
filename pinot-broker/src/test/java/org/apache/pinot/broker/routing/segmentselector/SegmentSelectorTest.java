@@ -23,11 +23,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.broker.routing.segmentselector.RealtimeSegmentSelector.FORCE_HLC;
@@ -62,6 +62,12 @@ public class SegmentSelectorTest {
     Map<String, String> consumingInstanceStateMap = Collections.singletonMap("server", CONSUMING);
     Set<String> onlineSegments = new HashSet<>();
 
+    // Should return an empty list when there is no segment
+    RealtimeSegmentSelector segmentSelector = new RealtimeSegmentSelector();
+    segmentSelector.init(externalView, onlineSegments);
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    assertTrue(segmentSelector.select(brokerRequest).isEmpty());
+
     // For HLC segments, only one group of segments should be selected
     int numHLCGroups = 3;
     int numHLCSegmentsPerGroup = 5;
@@ -77,12 +83,9 @@ public class SegmentSelectorTest {
       }
       hlcSegments[i] = hlcSegmentsForGroup;
     }
-
-    RealtimeSegmentSelector segmentSelector = new RealtimeSegmentSelector();
-    segmentSelector.init(externalView, onlineSegments);
+    segmentSelector.onExternalViewChange(externalView, onlineSegments);
 
     // Only HLC segments exist, should select the HLC segments from the first group
-    BrokerRequest brokerRequest = mock(BrokerRequest.class);
     assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), hlcSegments[0]);
 
     // For LLC segments, only the first CONSUMING segment for each partition should be selected
@@ -104,7 +107,6 @@ public class SegmentSelectorTest {
         }
       }
     }
-
     segmentSelector.onExternalViewChange(externalView, onlineSegments);
 
     // Both HLC and LLC segments exist, should select the LLC segments

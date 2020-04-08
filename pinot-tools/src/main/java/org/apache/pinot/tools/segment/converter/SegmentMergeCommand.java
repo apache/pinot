@@ -28,17 +28,18 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.minion.rollup.MergeRollupSegmentConverter;
 import org.apache.pinot.core.minion.rollup.MergeType;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.kohsuke.args4j.Option;
@@ -146,7 +147,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       // Read table config
       String tableConfigString =
           new String(Files.readAllBytes(Paths.get(_tableConfigFilePath)), StandardCharsets.UTF_8);
-      TableConfig tableConfig = TableConfig.fromJsonString(tableConfigString);
+      TableConfig tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
 
       // Read schema
       Schema schema = Schema.fromFile(new File(_schemaFilePath));

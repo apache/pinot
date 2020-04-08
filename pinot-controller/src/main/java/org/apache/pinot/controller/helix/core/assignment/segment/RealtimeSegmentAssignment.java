@@ -20,20 +20,20 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Random;
 import java.util.TreeMap;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,11 +202,20 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
               _realtimeTableName, numReplicaGroups);
         }
 
-        Map<Integer, Set<String>> partitionIdToSegmentsMap = new HashMap<>();
+        Map<Integer, List<String>> partitionIdToSegmentsMap = new HashMap<>();
         for (String segmentName : completedSegmentAssignment.keySet()) {
           int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-          partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new HashSet<>()).add(segmentName);
+          partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
         }
+
+        // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
+        //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the table
+        //       name hash as the random seed for the shuffle so that the result is deterministic.
+        Random random = new Random(_realtimeTableName.hashCode());
+        for (List<String> segments : partitionIdToSegmentsMap.values()) {
+          Collections.shuffle(segments, random);
+        }
+
         newAssignment = SegmentAssignmentUtils
             .rebalanceReplicaGroupBasedTable(completedSegmentAssignment, completedInstancePartitions,
                 partitionIdToSegmentsMap);

@@ -21,8 +21,8 @@ package org.apache.pinot.controller.helix.core.minion.generator;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.JobConfig;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.TableConfig;
 
 
 /**

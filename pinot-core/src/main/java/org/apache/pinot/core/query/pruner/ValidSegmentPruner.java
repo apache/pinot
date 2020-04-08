@@ -19,9 +19,9 @@
 package org.apache.pinot.core.query.pruner;
 
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 
 
 /**

@@ -43,6 +43,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,7 +109,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, null);
+        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest);
     int numAggregationFunctions = aggregationFunctionContexts.length;
     AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
@@ -176,6 +177,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
                 });
               }
             }
+          } catch (EarlyTerminationException e) {
+            // Early-terminated because query times out or is already satisfied
           } catch (Exception e) {
             LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}", index,
                 _operators.get(index).getClass().getName(), e);
@@ -213,10 +216,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       // Set the execution statistics.
       ExecutionStatistics executionStatistics = new ExecutionStatistics();
       for (Operator operator : _operators) {
-        ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
-        if (executionStatisticsToMerge != null) {
-          executionStatistics.merge(executionStatisticsToMerge);
-        }
+        executionStatistics.merge(operator.getExecutionStatistics());
       }
       mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
       mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());

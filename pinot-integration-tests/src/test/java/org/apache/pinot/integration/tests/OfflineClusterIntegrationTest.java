@@ -34,14 +34,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.config.QueryConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -58,6 +62,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_SEGMENTS = 12;
+
+  // For table config refresh test, make an expensive query to ensure the query won't finish in 5ms
+  private static final String TEST_TIMEOUT_QUERY =
+      "SELECT DISTINCTCOUNT(AirlineID) FROM mytable GROUP BY Carrier TOP 10000";
 
   // For inverted index triggering test
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
@@ -171,18 +179,70 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   public void testInvalidTableConfig() {
-    TableConfig tableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName("badTable").build();
-    ObjectNode jsonConfig = tableConfig.toJsonConfig();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("badTable").build();
+    ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
     // Remove a mandatory field
-    jsonConfig.remove(TableConfig.VALIDATION_CONFIG_KEY);
+    tableConfigJson.remove(TableConfig.VALIDATION_CONFIG_KEY);
     try {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), jsonConfig.toString());
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfigJson.toString());
       fail();
     } catch (IOException e) {
       // Should get response code 400 (BAD_REQUEST)
       assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
+  }
+
+  @Test
+  public void testRefreshTableConfigAndQueryTimeout()
+      throws Exception {
+    TableConfig tableConfig = _helixResourceManager.getOfflineTableConfig(getTableName());
+    assertNotNull(tableConfig);
+
+    // Set timeout as 5ms so that query will timeout
+    tableConfig.setQueryConfig(new QueryConfig(5L));
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Wait for at most 1 minute for broker to receive and process the table config refresh message
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
+        JsonNode exceptions = queryResponse.get("exceptions");
+        if (exceptions.size() != 0) {
+          // Timed out on broker side
+          return exceptions.get(0).get("errorCode").asInt() == QueryException.BROKER_TIMEOUT_ERROR_CODE;
+        } else {
+          // Timed out on server side
+          int numServersQueried = queryResponse.get("numServersQueried").asInt();
+          int numServersResponded = queryResponse.get("numServersResponded").asInt();
+          int numDocsScanned = queryResponse.get("numDocsScanned").asInt();
+          return numServersQueried == getNumServers() && numServersResponded == 0 && numDocsScanned == 0;
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to refresh table config");
+
+    // Remove timeout so that query will finish
+    tableConfig.setQueryConfig(null);
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Wait for at most 1 minute for broker to receive and process the table config refresh message
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_TIMEOUT_QUERY);
+        JsonNode exceptions = queryResponse.get("exceptions");
+        if (exceptions.size() != 0) {
+          return false;
+        }
+        int numServersQueried = queryResponse.get("numServersQueried").asInt();
+        int numServersResponded = queryResponse.get("numServersResponded").asInt();
+        int numDocsScanned = queryResponse.get("numDocsScanned").asInt();
+        return numServersQueried == getNumServers() && numServersResponded == getNumServers()
+            && numDocsScanned == getCountStarResult();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to refresh table config");
   }
 
   @Test
@@ -826,15 +886,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     queries.add("SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch);
     queries
         .add("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch);
-    queries.add("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + 16138);
+    queries.add("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch);
     queries.add("SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable");
     queries.add(
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+    queries.replaceAll(query -> query.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch"));
 
-    for (String query : queries) {
-      query = query.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch");
-      JsonNode response = postQuery(query);
-      Assert.assertTrue(response.get("numSegmentsProcessed").asLong() >= 1, query + " failed");
-    }
+    // Wait for at most 10 seconds for broker to get the ZK callback of the schema change
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        for (String query : queries) {
+          JsonNode response = postQuery(query);
+          // NOTE: When table does not exist, we will get 'BrokerResourceMissingError'.
+          //       When column does not exist, all segments will be pruned and 'numSegmentsProcessed' will be 0.
+          return response.get("exceptions").size() == 0 && response.get("numSegmentsProcessed").asInt() > 0;
+        }
+      } catch (Exception e) {
+        // Fail the test when exception caught
+        throw new RuntimeException(e);
+      }
+      return true;
+    }, 10_000L, "Failed to get results for case-insensitive queries");
   }
 }

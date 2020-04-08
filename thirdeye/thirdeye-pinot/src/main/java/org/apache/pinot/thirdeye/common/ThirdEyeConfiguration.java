@@ -28,6 +28,7 @@ import java.util.List;
 
 import io.dropwizard.Configuration;
 import java.util.Map;
+import org.apache.pinot.thirdeye.model.download.ModelDownloaderConfiguration;
 
 
 public class ThirdEyeConfiguration extends Configuration {
@@ -50,6 +51,8 @@ public class ThirdEyeConfiguration extends Configuration {
   private String phantomJsPath = "";
   private String failureFromAddress;
   private String failureToAddress;
+
+  private List<ModelDownloaderConfiguration> modelDownloaderConfig;
 
   /**
    * allow cross request for local development
@@ -189,5 +192,13 @@ public class ThirdEyeConfiguration extends Configuration {
 
   public void setAlerterConfiguration(Map<String, Map<String, Object>> alerterConfigurations) {
     this.alerterConfigurations = alerterConfigurations;
+  }
+
+  public List<ModelDownloaderConfiguration> getModelDownloaderConfig() {
+    return modelDownloaderConfig;
+  }
+
+  public void setModelDownloaderConfig(List<ModelDownloaderConfiguration> modelDownloaderConfig) {
+    this.modelDownloaderConfig = modelDownloaderConfig;
   }
 }

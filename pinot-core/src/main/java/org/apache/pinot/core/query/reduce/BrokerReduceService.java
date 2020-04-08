@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
@@ -38,6 +37,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -179,6 +179,12 @@ public class BrokerReduceService {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
       }
+    }
+
+    // NOTE: When there is no cached data schema, that means all servers encountered exception. In such case, return the
+    //       response with metadata only.
+    if (cachedDataSchema == null) {
+      return brokerResponseNative;
     }
 
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(brokerRequest);

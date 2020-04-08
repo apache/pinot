@@ -23,11 +23,11 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 public class TaskGeneratorUtils {

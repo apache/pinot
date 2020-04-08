@@ -43,12 +43,11 @@ import org.apache.pinot.core.util.QueryOptions;
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
 public class AggregationDataTableReducer implements DataTableReducer {
-
   private final AggregationFunction[] _aggregationFunctions;
   private final List<AggregationInfo> _aggregationInfos;
   private final int _numAggregationFunctions;
   private final boolean _preserveType;
-  private boolean _responseFormatSql;
+  private final boolean _responseFormatSql;
 
   AggregationDataTableReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
       QueryOptions queryOptions) {
@@ -112,8 +111,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     if (_responseFormatSql) {
       brokerResponseNative.setResultTable(reduceToResultTable(intermediateResults));
     } else {
-      brokerResponseNative
-          .setAggregationResults(reduceToAggregationResult(intermediateResults, dataSchema));
+      brokerResponseNative.setAggregationResults(reduceToAggregationResult(intermediateResults, dataSchema));
     }
   }
 
@@ -135,8 +133,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
   /**
    * Sets aggregation results into AggregationResults
    */
-  private List<AggregationResult> reduceToAggregationResult(Object[] intermediateResults,
-      DataSchema dataSchema) {
+  private List<AggregationResult> reduceToAggregationResult(Object[] intermediateResults, DataSchema dataSchema) {
     // Extract final results and set them into the broker response.
     List<AggregationResult> reducedAggregationResults = new ArrayList<>(_numAggregationFunctions);
     for (int i = 0; i < _numAggregationFunctions; i++) {

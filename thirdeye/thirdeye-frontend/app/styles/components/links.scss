@@ -99,6 +99,31 @@
   }
 }
 
+.thirdeye-link-secondary-grey {
+  color: grey;
+  font-weight: 600;
+  letter-spacing: .1px;
+  font-size: 16px;
+
+  &--inside {
+    font-size: 15px;
+  }
+
+  &--warning {
+    color: #a94442;
+    text-decoration: underline;
+
+    &:hover {
+      color: #711c1a;
+    }
+  }
+
+  &:hover {
+    color: grey;
+    cursor: pointer;
+  }
+}
+
 .thirdeye-link--settings {
   padding: 0;
   line-height: 28px;

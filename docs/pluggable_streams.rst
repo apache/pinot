@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 .. _pluggable-streams:
 
 Pluggable Streams
@@ -229,6 +231,42 @@ Please note:
 1. Config ``replicasPerPartition`` under ``segmentsConfig`` is required to specify table replication.
 #. Config ``stream.kafka.consumer.type`` should be specified as ``LowLevel`` to use partition level consumer. (The use of ``simple`` instead of ``LowLevel`` is deprecated)
 #. Configs ``stream.kafka.zk.broker.url`` and ``stream.kafka.broker.list`` are required under ``tableIndexConfig.streamConfigs`` to provide kafka related information.
+
+Here is another example which is used to read avro messages using the schema id from confluent schema registry.
+The only difference between this and the KafkaAvroMessageDecoder is that the KafkaConfluentSchemaRegistryAvroMessageDecoder uses
+confluent schema registry:
+
+.. code-block:: none
+
+  {
+    "tableName": "meetupRsvp",
+    "tableType": "REALTIME",
+    "segmentsConfig": {
+      "timeColumnName": "mtime",
+      "timeType": "MILLISECONDS",
+      "segmentPushType": "APPEND",
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+      "schemaName": "meetupRsvp",
+      "replication": "1",
+      "replicasPerPartition": "1"
+    },
+    "tenants": {},
+    "tableIndexConfig": {
+      "loadMode": "MMAP",
+      "streamConfigs": {
+        "streamType": "kafka",
+        "stream.kafka.consumer.type": "LowLevel",
+        "stream.kafka.topic.name": "meetupRSVPEvents",
+        "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder",
+        "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+        "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+        "stream.kafka.broker.list": "localhost:19092"
+      }
+    },
+    "metadata": {
+      "customConfigs": {}
+    }
+  }
 
 Upgrade from Kafka 0.9 connector to Kafka 2.x connector
 -------------------------------------------------------

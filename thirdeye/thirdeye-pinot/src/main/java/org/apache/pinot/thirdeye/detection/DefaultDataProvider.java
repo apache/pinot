@@ -145,6 +145,9 @@ public class DefaultDataProvider implements DataProvider {
     }
   }
 
+  /**
+   * Fetch all anomalies based on the request Anomaly Slices (overlap with slice window)
+   */
   @Override
   public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();

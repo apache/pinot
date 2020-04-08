@@ -25,14 +25,14 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.core.segment.index.converter.SegmentFormatConverter;
 import org.apache.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
@@ -123,9 +123,8 @@ public class ImmutableSegmentLoader {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (fieldSpec.isVirtualColumn()) {
         String columnName = fieldSpec.getName();
-        VirtualColumnProvider provider =
-            VirtualColumnProviderFactory.buildProvider(fieldSpec.getVirtualColumnProvider());
         VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
+        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
         indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
         segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
       }

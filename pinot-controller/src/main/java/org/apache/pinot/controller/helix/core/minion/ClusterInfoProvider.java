@@ -22,15 +22,15 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**

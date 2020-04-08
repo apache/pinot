@@ -31,6 +31,7 @@ import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 
 
@@ -51,6 +52,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(brokerMetrics).to(BrokerMetrics.class);
       }
     });
+    register(JacksonFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }

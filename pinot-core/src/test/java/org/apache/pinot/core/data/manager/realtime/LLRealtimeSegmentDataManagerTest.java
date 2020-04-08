@@ -30,8 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -43,16 +41,21 @@ import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 // TODO Write more tests for other parts of the class
@@ -85,8 +88,7 @@ public class LLRealtimeSegmentDataManagerTest {
           + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": [" + "    ], \n"
           + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
           + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
-          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + String
-          .valueOf(maxRowsInSegment) + "\", \n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME
+          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + maxRowsInSegment + "\", \n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME
           + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
           + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
           + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\": \"smallest\", \n"
@@ -113,7 +115,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private TableConfig createTableConfig()
       throws Exception {
-    return TableConfig.fromJsonString(_tableConfigJson);
+    return JsonUtils.stringToObject(_tableConfigJson, TableConfig.class);
   }
 
   private RealtimeTableDataManager createTableDataManager() {

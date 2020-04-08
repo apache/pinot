@@ -47,9 +47,8 @@ import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -62,8 +61,26 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKey
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.getKeyFor;
 
 
+/**
+ * Helper class for text indexes used by {@link org.apache.pinot.core.segment.index.loader.SegmentPreProcessor}.
+ * to create text index for column during segment load time. Currently text index is always
+ * created (if enabled on a column) during segment generation
+ *
+ * (1) A new segment with text index is created/refreshed. Server loads the segment. The handler
+ * detects the existence of text index and returns.
+ *
+ * (2) A reload is issued on an existing segment with existing text index. The handler
+ * detects the existence of text index and returns.
+ *
+ * (3) A reload is issued on an existing segment after text index is enabled on an existing
+ * column. Read the forward index to create text index.
+ *
+ * (4) A reload is issued on an existing segment after text index is enabled on a newly
+ * added column. In this case, the default column handler would have taken care of adding
+ * forward index for the new column. Read the forward index to create text index.
+ */
 public class TextIndexHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InvertedIndexHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
   private final File _indexDir;
   private final SegmentDirectory.Writer _segmentWriter;
@@ -86,26 +103,6 @@ public class TextIndexHandler {
     }
   }
 
-  /**
-   * Create text index for column during segment load time. Currently text index is always
-   * created (if enabled on a column) during segment generation (true for both offline
-   * and realtime segments). So this function is a NO-OP for case when a new segment is loaded
-   * after creation. However, when segment reload is issued in the following scenarios, we generate
-   * text index.
-   *
-   * SCENARIO 1: user enables text index on an existing column (table config change)
-   * SCENARIO 2: user adds a new column and enables text index (both schema and table config change)
-   *
-   * This function is a NO-OP for the above two cases. Later we can also add a segment generator
-   * config option to not necessarily generate text index during segment generation. When we do
-   * so, this function should be able to take care of that scenario too.
-   *
-   * For scenario 2, {@link org.apache.pinot.core.segment.index.loader.defaultcolumn.V3DefaultColumnHandler}
-   * would have already added the forward index for the column with default value. We use the forward
-   * index here to get the raw data and build text index.
-   *
-   * @throws IOException
-   */
   public void createTextIndexesOnSegmentLoad()
       throws Exception {
     for (ColumnMetadata columnMetadata : _textIndexColumns) {
@@ -126,21 +123,23 @@ public class TextIndexHandler {
   private void checkUnsupportedOperationsForTextIndex(ColumnMetadata columnMetadata) {
     String column = columnMetadata.getColumnName();
     if (columnMetadata.hasDictionary()) {
-      throw new UnsupportedOperationException("Text index is currently not supported on dictionary encoded column: "+column);
+      throw new UnsupportedOperationException(
+          "Text index is currently not supported on dictionary encoded column: " + column);
     }
 
     if (columnMetadata.isSorted()) {
       // since Pinot's current implementation doesn't support raw sorted columns,
       // we need to check for this too
-      throw new UnsupportedOperationException("Text index is currently not supported on sorted columns: "+column);
+      throw new UnsupportedOperationException("Text index is currently not supported on sorted columns: " + column);
     }
 
     if (!columnMetadata.isSingleValue()) {
-      throw new UnsupportedOperationException("Text index is currently not supported on multi-value columns: "+column);
+      throw new UnsupportedOperationException(
+          "Text index is currently not supported on multi-value columns: " + column);
     }
 
     if (columnMetadata.getDataType() != FieldSpec.DataType.STRING) {
-      throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: "+column);
+      throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
     }
   }
 
@@ -154,8 +153,13 @@ public class TextIndexHandler {
     }
     int numDocs = columnMetadata.getTotalDocs();
     LOGGER.info("Creating new text index for column: {} in segment: {}", column, _segmentName);
-    File segmentIndexDir = SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, _segmentVersion);
-    try (LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentIndexDir, true)) {
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, _segmentVersion);
+    // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
+    // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
+    // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
+    // further need to move around the lucene index directory since it is created with correct directory structure
+    // based on segmentVersion.
+    try (LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true)) {
       try (DataFileReader forwardIndexReader = getForwardIndexReader(columnMetadata)) {
         VarByteChunkSingleValueReader forwardIndex = (VarByteChunkSingleValueReader) forwardIndexReader;
         for (int docID = 0; docID < numDocs; docID++) {

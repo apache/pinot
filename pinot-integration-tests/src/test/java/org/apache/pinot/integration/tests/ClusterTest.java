@@ -45,13 +45,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
-import org.apache.pinot.common.config.FieldConfig;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TableTaskConfig;
-import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Minion;
@@ -68,6 +61,13 @@ import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.spi.config.FieldConfig;
+import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.config.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableTaskConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.TenantConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
@@ -75,6 +75,8 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -308,7 +310,7 @@ public abstract class ClusterTest extends ControllerTest {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig, sortedColumn, "daily");
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
@@ -319,14 +321,14 @@ public abstract class ClusterTest extends ControllerTest {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig, sortedColumn, "daily");
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonConfigString());
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonString());
   }
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig,
       SegmentPartitionConfig segmentPartitionConfig, String sortedColumn, String segmentPushFrequency) {
-    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
         .setTimeType(timeType).setSegmentPushFrequency(segmentPushFrequency).setNumReplicas(1)
         .setBrokerTenant(brokerTenant).setServerTenant(serverTenant).setLoadMode(loadMode)
         .setSegmentVersion(segmentVersion.toString()).setInvertedIndexColumns(invertedIndexColumns)
@@ -405,7 +407,8 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas, List<FieldConfig> fieldConfigListForTextColumns)
+      TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas,
+      List<FieldConfig> fieldConfigListForTextColumns)
       throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
@@ -443,7 +446,7 @@ public abstract class ClusterTest extends ControllerTest {
     streamConfigs.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
 
-    TableConfig tableConfig = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName).setLLC(useLlc)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setLLC(useLlc)
         .setTimeColumnName(timeColumnName).setTimeType(timeType).setSchemaName(schemaName).setBrokerTenant(brokerTenant)
         .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
@@ -453,7 +456,7 @@ public abstract class ClusterTest extends ControllerTest {
     // save the realtime table config
     _realtimeTableConfig = tableConfig;
 
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
   protected void updateRealtimeTableConfig(String tablename, List<String> invertedIndexCols,
@@ -464,8 +467,7 @@ public abstract class ClusterTest extends ControllerTest {
     config.setInvertedIndexColumns(invertedIndexCols);
     config.setBloomFilterColumns(bloomFilterCols);
 
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename),
-        _realtimeTableConfig.toJsonConfigString());
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename), _realtimeTableConfig.toJsonString());
   }
 
   protected void updateRealtimeTableTenant(String tableName, TenantConfig tenantConfig)
@@ -473,8 +475,7 @@ public abstract class ClusterTest extends ControllerTest {
 
     _realtimeTableConfig.setTenantConfig(tenantConfig);
 
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName),
-        _realtimeTableConfig.toJsonConfigString());
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), _realtimeTableConfig.toJsonString());
   }
 
   protected void dropRealtimeTable(String tableName)
@@ -532,12 +533,12 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/sql)
    */
-  static JsonNode postSqlQuery(String query, String brokerBaseApiUrl) throws Exception {
+  static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
 
     return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
   }
-
 }

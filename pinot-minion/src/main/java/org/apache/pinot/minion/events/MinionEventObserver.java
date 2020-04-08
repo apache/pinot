@@ -20,7 +20,7 @@ package org.apache.pinot.minion.events;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**

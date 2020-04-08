@@ -41,6 +41,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.EmailResource;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
+import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.scheduler.DetectionCronScheduler;
 import org.apache.pinot.thirdeye.scheduler.SubscriptionCronScheduler;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -77,6 +78,7 @@ public class ThirdEyeAnomalyApplication
   private DataAvailabilityTaskScheduler dataAvailabilityTaskScheduler = null;
   private DetectionCronScheduler detectionScheduler = null;
   private SubscriptionCronScheduler subscriptionScheduler = null;
+  private ModelDownloaderManager modelDownloaderManager = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -199,6 +201,10 @@ public class ThirdEyeAnomalyApplication
               config.getDataAvailabilitySchedulingConfiguration().getScheduleDelayInSec());
           dataAvailabilityTaskScheduler.start();
         }
+        if (config.getModelDownloaderConfig() != null) {
+          modelDownloaderManager = new ModelDownloaderManager(config.getModelDownloaderConfig());
+          modelDownloaderManager.start();
+        }
       }
 
       @Override
@@ -235,6 +241,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (dataAvailabilityEventListenerDriver != null) {
           dataAvailabilityEventListenerDriver.shutdown();
+        }
+        if (modelDownloaderManager != null) {
+          modelDownloaderManager.shutdown();
         }
       }
     });

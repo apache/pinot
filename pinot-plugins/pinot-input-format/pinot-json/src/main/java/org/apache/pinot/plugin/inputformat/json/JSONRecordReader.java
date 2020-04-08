@@ -53,7 +53,9 @@ public class JSONRecordReader implements RecordReader {
       _iterator = JsonUtils.DEFAULT_READER.forType(new TypeReference<Map<String, Object>>() {
       }).readValues(_dataFile);
     } catch (Exception e) {
-      _iterator.close();
+      if (_iterator != null) {
+        _iterator.close();
+      }
       throw e;
     }
   }

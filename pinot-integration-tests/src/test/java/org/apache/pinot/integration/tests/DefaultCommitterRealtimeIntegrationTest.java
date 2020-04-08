@@ -24,29 +24,30 @@ import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCommitter;
 import org.apache.pinot.core.data.manager.realtime.SegmentCommitterFactory;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentUtil;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -92,15 +93,16 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
   }
 
   @Test
-  public void testDefaultCommitter() throws Exception {
+  public void testDefaultCommitter()
+      throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     ServerMetrics serverMetrics = new ServerMetrics(new MetricsRegistry());
-    ServerSegmentCompletionProtocolHandler
-        protocolHandler = new ServerSegmentCompletionProtocolHandler(serverMetrics, getTableName());
+    ServerSegmentCompletionProtocolHandler protocolHandler =
+        new ServerSegmentCompletionProtocolHandler(serverMetrics, getTableName());
 
     SegmentCompletionProtocol.Response prevResponse = new SegmentCompletionProtocol.Response();
-    LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor = mock(
-        LLRealtimeSegmentDataManager.SegmentBuildDescriptor.class);
+    LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
+        mock(LLRealtimeSegmentDataManager.SegmentBuildDescriptor.class);
 
     RealtimeSegmentZKMetadata metadata = _helixResourceManager.getRealtimeSegmentMetadata(getTableName()).get(0);
 
@@ -122,17 +124,17 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
     when(segmentBuildDescriptor.getWaitTimeMillis()).thenReturn(0L);
 
     // Get realtime segment name
-    String segmentList = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPIWithTableType(getTableName(), "REALTIME"));
-    JsonNode realtimeSegmentsList =
-        getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.REALTIME.toString());
+    String segmentList =
+        sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPIWithTableType(getTableName(), "REALTIME"));
+    JsonNode realtimeSegmentsList = getSegmentsFromJsonSegmentAPI(segmentList, TableType.REALTIME.toString());
     String segmentName = realtimeSegmentsList.get(0).asText();
 
     // Send segmentConsumed request
-    sendGetRequest("http://localhost:" + DEFAULT_CONTROLLER_PORT +
-            "/segmentConsumed?instance=" + instanceId + "&name=" + segmentName + "&offset=" + END_OFFSET);
+    sendGetRequest("http://localhost:" + DEFAULT_CONTROLLER_PORT + "/segmentConsumed?instance=" + instanceId + "&name="
+        + segmentName + "&offset=" + END_OFFSET);
 
-    SegmentCommitterFactory
-        segmentCommitterFactory = new SegmentCommitterFactory(LOGGER, indexLoadingConfig, protocolHandler);
+    SegmentCommitterFactory segmentCommitterFactory =
+        new SegmentCommitterFactory(LOGGER, indexLoadingConfig, protocolHandler);
     SegmentCommitter segmentCommitter = segmentCommitterFactory.createDefaultSegmentCommitter(params);
     segmentCommitter.commit(END_OFFSET, 3, segmentBuildDescriptor);
   }
@@ -153,7 +155,8 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
   }
 
   @Override
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     super.tearDown();
     _indexDir.deleteOnExit();
     _realtimeSegmentUntarred.deleteOnExit();

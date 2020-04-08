@@ -36,10 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.config.CompletionConfig;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -49,6 +45,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -60,6 +57,11 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.CompletionConfig;
+import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.config.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -1159,13 +1161,33 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
     if (segmentPartitionConfig != null) {
-      try {
-        int nPartitions = _streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
-        segmentPartitionConfig.setNumPartitions(nPartitions);
-        realtimeSegmentConfigBuilder.setSegmentPartitionConfig(segmentPartitionConfig);
-      } catch (Exception e) {
-        segmentLogger.warn("Couldn't get number of partitions in 5s, not using partition config {}", e.getMessage());
-        makeStreamMetadataProvider("Timeout getting number of partitions");
+      Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+      if (columnPartitionMap.size() == 1) {
+        Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
+        String partitionColumn = entry.getKey();
+        ColumnPartitionConfig columnPartitionConfig = entry.getValue();
+        String partitionFunctionName = columnPartitionConfig.getFunctionName();
+        int numPartitions = columnPartitionConfig.getNumPartitions();
+        try {
+          int numStreamPartitions = _streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
+          if (numStreamPartitions != numPartitions) {
+            segmentLogger.warn(
+                "Number of stream partitions: {} does not match number of partitions in the partition config: {}, using number of stream partitions",
+                numStreamPartitions, numPartitions);
+            numPartitions = numStreamPartitions;
+          }
+        } catch (Exception e) {
+          segmentLogger.warn(
+              "Failed to get number of stream partitions in 5s, using number of partitions in the partition config: {}",
+              numPartitions, e);
+          makeStreamMetadataProvider("Timeout getting number of stream partitions");
+        }
+        realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
+        realtimeSegmentConfigBuilder
+            .setPartitionFunction(PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions));
+        realtimeSegmentConfigBuilder.setPartitionId(_streamPartitionId);
+      } else {
+        segmentLogger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());
       }
     }
 

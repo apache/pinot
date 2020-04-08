@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.detection.alert.filter;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
-import java.util.Collections;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -33,10 +32,7 @@ import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
-
-import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
 
 
 /**
@@ -50,28 +46,23 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
   public static final String PROP_CC = "cc";
   public static final String PROP_BCC = "bcc";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
-  private static final String PROP_SEND_ONCE = "sendOnce";
 
   final SetMultimap<String, String> recipients;
   List<Long> detectionConfigIds;
-  boolean sendOnce;
 
   public ToAllRecipientsDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
 
     this.recipients = HashMultimap.create(ConfigUtils.<String, String>getMultimap(this.config.getProperties().get(PROP_RECIPIENTS)));
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
-    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
-  public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark) {
+  public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks) {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
 
-    final long minId = getMinId(highWaterMark);
-
     // Fetch all the anomalies to be notified to the recipients
-    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
+    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds));
 
     // Handle legacy recipients yaml syntax
     if (SubscriptionUtils.isEmptyEmailRecipients(this.config) && CollectionUtils.isNotEmpty(this.recipients.get(PROP_TO))) {
@@ -85,13 +76,4 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
 
     return result.addMapping(new DetectionAlertFilterNotification(this.config), anomalies);
   }
-
-  private long getMinId(long highWaterMark) {
-    if (this.sendOnce) {
-      return highWaterMark + 1;
-    } else {
-      return 0;
-    }
-  }
-
 }

@@ -70,7 +70,7 @@ public class AirlineDataStream {
 
     service = Executors.newFixedThreadPool(1);
     Quickstart.printStatus(Quickstart.Color.YELLOW,
-        "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time every 3000 events *****");
+        "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time every 60 events (which is approximately 60 seconds) *****");
   }
 
   public void shutdown() {
@@ -82,10 +82,9 @@ public class AirlineDataStream {
   }
 
   private void createStream()
-      throws FileNotFoundException, IOException {
+      throws IOException {
     if (keepIndexing) {
-      avroDataStream =
-          new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+      avroDataStream = new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<>());
       return;
     }
     avroDataStream = null;
@@ -109,7 +108,7 @@ public class AirlineDataStream {
       public void run() {
         while (true) {
           while (avroDataStream.hasNext()) {
-            if (keepIndexing == false) {
+            if (!keepIndexing) {
               return;
             }
 
@@ -132,9 +131,10 @@ public class AirlineDataStream {
             try {
               publish(message);
               counter++;
-              if (counter % 3000 == 0) {
+              if (counter % 60 == 0) {
                 currentTimeValue = currentTimeValue + 1;
               }
+              Thread.sleep(1000);
             } catch (Exception e) {
               logger.error(e.getMessage());
             }

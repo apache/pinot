@@ -29,14 +29,14 @@ import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentCreationJob;
 import org.apache.pinot.ingestion.utils.JobPreparationHelper;
 import org.apache.pinot.spark.utils.PinotSparkJobPreparationHelper;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -109,7 +109,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
     TableConfig tableConfig = getTableConfig();
     if (tableConfig != null) {
       validateTableConfig(tableConfig);
-      _properties.put(JobConfigConstants.TABLE_CONFIG, tableConfig.toJsonConfigString());
+      _properties.put(JobConfigConstants.TABLE_CONFIG, tableConfig.toJsonString());
     }
     _properties.put(JobConfigConstants.SCHEMA, getSchema().toSingleLineJsonString());
 

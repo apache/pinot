@@ -19,32 +19,32 @@ export const groupedHeaders = (advDimensionCount, overallChange) => [
  */
 export const baseColumns = [
   {
-    propertyName: 'cob',
-    title: 'Current/Baseline',
+    propertyName: 'boc',
+    title: 'Baseline/Current',
     className: `${COLUMN_CLASS} ${COLUMN_CLASS}--large-width`,
     disableSorting: true,
     disableFiltering: true
   },
   {
-    propertyName: 'contributionToOverallChange',
+    propertyName: 'percentageChange',
     component: 'custom/dimensions-table/change-bars',
-    title: 'Contribution to Overall Change',
+    title: '% Change',
     className: `${COLUMN_CLASS} ${COLUMN_CLASS}--bar-cell`,
     disableSorting: true,
     disableFiltering: true
   },
   {
-    propertyName: 'percentageChange',
-    title: '% Change',
-    component: 'custom/dimensions-table/percent-change',
+    propertyName: 'nodeSize',
+    title: 'Node Size',
+    component: 'custom/dimensions-table/node-size',
     className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width`,
     disableSorting: true,
     disableFiltering: true
   },
   {
-    propertyName: 'contributionChange',
-    title: 'Change in Contribution',
-    component: 'custom/dimensions-table/contribution-change',
+    propertyName: 'cost',
+    title: 'Cost',
+    component: 'custom/dimensions-table/cost',
     className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width`,
     disableSorting: true,
     disableFiltering: true

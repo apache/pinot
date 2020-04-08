@@ -23,7 +23,6 @@ import java.net.URL;
 import java.util.Collections;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.common.BlockSingleValIterator;
@@ -34,6 +33,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
@@ -116,8 +116,8 @@ public class MutableSegmentImplTest {
       Assert.assertEquals(actualDataSourceMetadata.isSingleValue(), expectedDataSourceMetadata.isSingleValue());
       Assert.assertEquals(actualDataSourceMetadata.getNumDocs(), expectedDataSourceMetadata.getNumDocs());
       if (!expectedDataSourceMetadata.isSingleValue()) {
-        Assert.assertEquals(actualDataSourceMetadata.getMaxNumMultiValues(),
-            expectedDataSourceMetadata.getMaxNumMultiValues());
+        Assert.assertEquals(actualDataSourceMetadata.getMaxNumValuesPerMVEntry(),
+            expectedDataSourceMetadata.getMaxNumValuesPerMVEntry());
       }
     }
   }
@@ -171,9 +171,9 @@ public class MutableSegmentImplTest {
         BlockMultiValIterator expectedMVIterator =
             (BlockMultiValIterator) expectedDataSource.nextBlock().getBlockValueSet().iterator();
 
-        int numMaxMultiValues = expectedDataSource.getDataSourceMetadata().getMaxNumMultiValues();
-        int[] actualDictIds = new int[numMaxMultiValues];
-        int[] expectedDictIds = new int[numMaxMultiValues];
+        int maxNumValuesPerMVEntry = expectedDataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
+        int[] actualDictIds = new int[maxNumValuesPerMVEntry];
+        int[] expectedDictIds = new int[maxNumValuesPerMVEntry];
 
         while (expectedMVIterator.hasNext()) {
           Assert.assertTrue(actualMVIterator.hasNext());

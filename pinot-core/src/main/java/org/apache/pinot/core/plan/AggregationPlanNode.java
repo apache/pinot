@@ -51,11 +51,10 @@ public class AggregationPlanNode implements PlanNode {
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
 
-  public AggregationPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
+  public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _functionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest, indexSegment.getSegmentMetadata());
+    _functionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest);
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {

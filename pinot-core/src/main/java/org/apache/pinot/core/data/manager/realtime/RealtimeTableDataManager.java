@@ -31,10 +31,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -52,6 +51,8 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
@@ -340,7 +341,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // 1. Make sure that the sorted column is not a multi-value field.
     List<String> sortedColumns = indexingConfig.getSortedColumn();
     boolean isValid = true;
-    if (!sortedColumns.isEmpty()) {
+    if (CollectionUtils.isNotEmpty(sortedColumns)) {
       final String sortedColumn = sortedColumns.get(0);
       if (sortedColumns.size() > 1) {
         _logger.warn("More than one sorted column configured. Using {}", sortedColumn);

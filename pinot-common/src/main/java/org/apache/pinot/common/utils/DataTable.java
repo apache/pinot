@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -62,6 +63,8 @@ public interface DataTable {
   double getDouble(int rowId, int colId);
 
   String getString(int rowId, int colId);
+
+  ByteArray getBytes(int rowId, int colId);
 
   <T> T getObject(int rowId, int colId);
 

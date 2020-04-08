@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -44,20 +45,20 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.util.ReplicationUtils;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.LoggerFactory;
 
 
@@ -109,13 +110,13 @@ public class PinotTableRestletResource {
   public SuccessResponse addTable(String tableConfigStr) {
     // TODO introduce a table config ctor with json string.
     TableConfig tableConfig;
-    String tableName;
     try {
-      tableConfig = TableConfig.fromJsonString(tableConfigStr);
-      tableName = tableConfig.getTableName();
+      tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      TableConfigUtils.validate(tableConfig);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
+    String tableName = tableConfig.getTableName();
     try {
       ensureMinReplicas(tableConfig);
       verifyTableConfigs(tableConfig);
@@ -143,15 +144,15 @@ public class PinotTableRestletResource {
   public String listTableConfigs(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
       List<String> tableNames;
-      CommonConstants.Helix.TableType tableType = null;
+      TableType tableType = null;
       if (tableTypeStr != null) {
-        tableType = CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
+        tableType = TableType.valueOf(tableTypeStr.toUpperCase());
       }
 
       if (tableType == null) {
         tableNames = _pinotHelixResourceManager.getAllRawTables();
       } else {
-        if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+        if (tableType == TableType.REALTIME) {
           tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
         } else {
           tableNames = _pinotHelixResourceManager.getAllOfflineTables();
@@ -169,18 +170,18 @@ public class PinotTableRestletResource {
     try {
       ObjectNode ret = JsonUtils.newObjectNode();
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
+      if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
-        ret.set(CommonConstants.Helix.TableType.OFFLINE.name(), tableConfig.toJsonConfig());
+        ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       }
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
+      if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
-        ret.set(CommonConstants.Helix.TableType.REALTIME.name(), tableConfig.toJsonConfig());
+        ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
       return ret.toString();
     } catch (Exception e) {
@@ -302,13 +303,14 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      String tableConfigStr)
+      String tableConfigString)
       throws Exception {
     TableConfig tableConfig;
     try {
-      tableConfig = TableConfig.fromJsonString(tableConfigStr);
+      tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
+      TableConfigUtils.validate(tableConfig);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
     }
 
     try {
@@ -348,16 +350,17 @@ public class PinotTableRestletResource {
           + " This allows us to validate table config before apply.")
   public String checkTableConfig(String tableConfigStr) {
     try {
+      TableConfig tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      TableConfigUtils.validate(tableConfig);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
-      TableConfig tableConfig = TableConfig.fromJsonString(tableConfigStr);
-      if (tableConfig.getTableType() == CommonConstants.Helix.TableType.OFFLINE) {
-        tableConfigValidateStr.set(CommonConstants.Helix.TableType.OFFLINE.name(), tableConfig.toJsonConfig());
+      if (tableConfig.getTableType() == TableType.OFFLINE) {
+        tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       } else {
-        tableConfigValidateStr.set(CommonConstants.Helix.TableType.REALTIME.name(), tableConfig.toJsonConfig());
+        tableConfigValidateStr.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
     }
   }
 
@@ -420,7 +423,7 @@ public class PinotTableRestletResource {
     LOGGER.info("Validating table configs for Table: {}", rawTableName);
 
     TableConfig tableConfigToCompare = null;
-    if (newTableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
+    if (newTableConfig.getTableType() == TableType.REALTIME) {
       if (_pinotHelixResourceManager.hasOfflineTable(rawTableName)) {
         tableConfigToCompare = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       }
@@ -443,7 +446,7 @@ public class PinotTableRestletResource {
 
     String newTimeColumnName = newSegmentConfig.getTimeColumnName();
     String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
-    if (!existingTimeColumnName.equals(newTimeColumnName)) {
+    if (!Objects.equal(existingTimeColumnName, newTimeColumnName)) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(String
           .format("Time column names are different! Existing time column name: %s. New time column name: %s",
               existingTimeColumnName, newTimeColumnName));

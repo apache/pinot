@@ -90,10 +90,6 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
    */
   @Override
   public void validateYaml(Map<String, Object> config) throws IllegalArgumentException {
-    // Make sure recipients are configured at the right place
-    Preconditions.checkArgument(!config.containsKey(PROP_RECIPIENTS),
-        "Recipients should be configured under the EMAIL alertScheme within params");
-
     // Subscription group must subscribe to at least one alert
     List<String> detectionNames = ConfigUtils.getList(config.get(PROP_DETECTION_NAMES));
     Preconditions.checkArgument(!detectionNames.isEmpty(),
@@ -120,11 +116,6 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
     Preconditions.checkNotNull(oldAlertConfig);
 
     Preconditions.checkArgument(updatedAlertConfig.getId().equals(oldAlertConfig.getId()));
-    Long newHighWatermark = updatedAlertConfig.getHighWaterMark();
-    Long oldHighWatermark = oldAlertConfig.getHighWaterMark();
-    if (newHighWatermark != null && oldHighWatermark != null && newHighWatermark.longValue() != oldHighWatermark) {
-      throw new IllegalArgumentException("HighWaterMark has been modified. This is not allowed");
-    }
     if (updatedAlertConfig.getVectorClocks() != null) {
       for (Map.Entry<Long, Long> vectorClock : updatedAlertConfig.getVectorClocks().entrySet()) {
         if (!oldAlertConfig.getVectorClocks().containsKey(vectorClock.getKey())

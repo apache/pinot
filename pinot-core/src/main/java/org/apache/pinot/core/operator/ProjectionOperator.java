@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
@@ -34,11 +33,10 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
 
   private final Map<String, DataSource> _dataSourceMap;
   private final Map<String, Block> _dataBlockMap;
-  private final DocIdSetOperator _docIdSetOperator;
+  private final BaseOperator<DocIdSetBlock> _docIdSetOperator;
   private final DataBlockCache _dataBlockCache;
 
-  public ProjectionOperator(@Nonnull Map<String, DataSource> dataSourceMap,
-      @Nonnull DocIdSetOperator docIdSetOperator) {
+  public ProjectionOperator(Map<String, DataSource> dataSourceMap, BaseOperator<DocIdSetBlock> docIdSetOperator) {
     _dataSourceMap = dataSourceMap;
     _dataBlockMap = new HashMap<>(dataSourceMap.size());
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
@@ -46,15 +44,6 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
     }
     _docIdSetOperator = docIdSetOperator;
     _dataBlockCache = new DataBlockCache(new DataFetcher(dataSourceMap));
-  }
-
-  /**
-   * Returns the number of columns projected.
-   *
-   * @return Number of columns projected
-   */
-  public int getNumColumnsProjected() {
-    return _dataSourceMap.size();
   }
 
   /**

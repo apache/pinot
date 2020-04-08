@@ -30,7 +30,7 @@ cluster:
 controller:
   name: controller
   port: 9000
-  replicaCount: 2
+  replicaCount: 1
 
   persistence:
     enabled: true
@@ -47,7 +47,7 @@ controller:
     host: pinot-controller
     port: 9000
 
-  jvmOpts: "-Xms4G -Xmx4G"
+  jvmOpts: "-Xms256M -Xmx1G"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-controller-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -85,9 +85,9 @@ broker:
 
   port: 8099
 
-  replicaCount: 2
+  replicaCount: 1
 
-  jvmOpts: "-Xms4G -Xmx4G"
+  jvmOpts: "-Xms256M -Xmx1G"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-broker-log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -130,7 +130,7 @@ server:
     netty: 8098
     admin: 8097
 
-  replicaCount: 2
+  replicaCount: 1
 
   dataDir: /var/pinot/server/data/index
   segmentTarDir: /var/pinot/server/data/segment
@@ -143,8 +143,8 @@ server:
     storageClass: ""
     #storageClass: "ssd"
 
-  jvmOpts: "-Xms4G -Xmx4G"
-
+  jvmOpts: "-Xms512M -Xmx1G"
+  
   log4j2ConfFile: /opt/pinot/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
@@ -182,12 +182,15 @@ zookeeper:
 
   ## Configure Zookeeper resource requests and limits
   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
-  resources: ~
+  resources: {}
+
+  ## Replicas
+  replicaCount: 1
 
   ## Environmental variables to set in Zookeeper
   env:
     ## The JVM heap size to allocate to Zookeeper
-    ZK_HEAP_SIZE: "1G"
+    ZK_HEAP_SIZE: "256M"
 
   persistence:
     enabled: true

@@ -25,7 +25,8 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.3.0-SNAPSHOT</version>
+    <version>${revision}${sha1}</version>
+    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-tools</artifactId>
   <name>Pinot Tools</name>

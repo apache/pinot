@@ -55,17 +55,12 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmin
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
-import org.apache.pinot.spi.utils.BytesUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Helper class to reduce data tables and set group by results into the BrokerResponseNative
  */
 public class GroupByDataTableReducer implements DataTableReducer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByDataTableReducer.class);
-
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction[] _aggregationFunctions;
   private final List<AggregationInfo> _aggregationInfos;
@@ -86,7 +81,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     _brokerRequest = brokerRequest;
     _aggregationFunctions = aggregationFunctions;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _aggregationFunctionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, null);
+    _aggregationFunctionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest);
     _numAggregationFunctions = aggregationFunctions.length;
     _groupBy = brokerRequest.getGroupBy();
     _numGroupBy = _groupBy.getExpressionsSize();
@@ -112,10 +107,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
       BrokerMetrics brokerMetrics) {
-    if (dataTableMap.isEmpty() && !_responseFormatSql) {
-      return;
-    }
-
     assert dataSchema != null;
     int resultSize = 0;
     Collection<DataTable> dataTables = dataTableMap.values();
@@ -323,7 +314,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
         DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         BiFunction<Integer, Integer, Object> function;
         switch (columnDataType) {
-
           case INT:
             function = dataTable::getInt;
             break;
@@ -340,11 +330,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
             function = dataTable::getString;
             break;
           case BYTES:
-            // FIXME: support BYTES in DataTable instead of converting to string
-            function = (row, col) -> BytesUtils.toByteArray(dataTable.getString(row, col));
+            function = dataTable::getBytes;
             break;
-          default:
+          case OBJECT:
             function = dataTable::getObject;
+            break;
+          // Add other aggregation intermediate result / group-by column type supports here
+          default:
+            throw new IllegalStateException();
         }
         functions[i] = function;
       }

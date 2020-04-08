@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -36,12 +35,8 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private static final String OPERATOR_NAME = "DocIdSetOperator";
 
-  private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS = new ThreadLocal<int[]>() {
-    @Override
-    protected int[] initialValue() {
-      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-  };
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
+      ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
 
   private final BaseFilterOperator _filterOperator;
   private final int _maxSizeOfDocIdSet;
@@ -49,17 +44,11 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private FilterBlockDocIdSet _filterBlockDocIdSet;
   private BlockDocIdIterator _blockDocIdIterator;
   private int _currentDocId = 0;
-  private boolean _threadLocal = true;
 
-  public DocIdSetOperator(@Nonnull BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
-    this(filterOperator, maxSizeOfDocIdSet, true);
-  }
-
-  public DocIdSetOperator(@Nonnull BaseFilterOperator filterOperator, int maxSizeOfDocIdSet, boolean threadLocal) {
+  public DocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
     Preconditions.checkArgument(maxSizeOfDocIdSet > 0 && maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _filterOperator = filterOperator;
     _maxSizeOfDocIdSet = maxSizeOfDocIdSet;
-    _threadLocal = threadLocal;
   }
 
   @Override
@@ -70,12 +59,12 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
     // Initialize filter block document Id set
     if (_filterBlockDocIdSet == null) {
-      _filterBlockDocIdSet = (FilterBlockDocIdSet) _filterOperator.nextBlock().getBlockDocIdSet();
+      _filterBlockDocIdSet = _filterOperator.nextBlock().getBlockDocIdSet();
       _blockDocIdIterator = _filterBlockDocIdSet.iterator();
     }
 
     int pos = 0;
-    int[] docIds = _threadLocal? THREAD_LOCAL_DOC_IDS.get(): new int[_maxSizeOfDocIdSet];
+    int[] docIds = THREAD_LOCAL_DOC_IDS.get();
     for (int i = 0; i < _maxSizeOfDocIdSet; i++) {
       _currentDocId = _blockDocIdIterator.next();
       if (_currentDocId == Constants.EOF) {
@@ -97,6 +86,8 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return new ExecutionStatistics(0L, _filterBlockDocIdSet.getNumEntriesScannedInFilter(), 0L, 0L);
+    long numEntriesScannedInFilter =
+        _filterBlockDocIdSet != null ? _filterBlockDocIdSet.getNumEntriesScannedInFilter() : 0;
+    return new ExecutionStatistics(0, numEntriesScannedInFilter, 0, 0);
   }
 }

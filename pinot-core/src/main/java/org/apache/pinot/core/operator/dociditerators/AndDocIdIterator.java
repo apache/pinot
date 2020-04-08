@@ -21,13 +21,10 @@ package org.apache.pinot.core.operator.dociditerators;
 import java.util.Arrays;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
+// TODO: Optimize this
 public final class AndDocIdIterator implements BlockDocIdIterator {
-
-  static final Logger LOGGER = LoggerFactory.getLogger(AndDocIdIterator.class);
   public final BlockDocIdIterator[] docIdIterators;
   public ScanBasedDocIdIterator[] scanBasedDocIdIterators;
   public final int[] docIdPointers;
@@ -103,17 +100,6 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
         if (i > 0) {
           // we need to advance all pointer since we found a new max
           i = -1;
-        }
-      }
-      if (hasScanBasedIterators && i == docIdIterators.length - 1) {
-        // this means we found the docId common to all nonScanBased iterators, now we need to ensure
-        // that its also found in scanBasedIterator, if not matched, we restart the intersection
-        for (ScanBasedDocIdIterator iterator : scanBasedDocIdIterators) {
-          if (!iterator.isMatch(currentMax)) {
-            i = -1;
-            currentMax = currentMax + 1;
-            break;
-          }
         }
       }
     }

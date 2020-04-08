@@ -26,12 +26,14 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -137,6 +139,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
         getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(), getSegmentPartitionConfig());
   }
 
+  @Override
+  protected void overrideServerConf(Configuration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
+  }
+
   protected List<File> getAllAvroFiles()
       throws Exception {
     // Unpack the Avro files
@@ -175,7 +182,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       throws Exception {
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-          forSegmentListAPIWithTableType(getTableName(), CommonConstants.Helix.TableType.OFFLINE.toString()));
+          forSegmentListAPIWithTableType(getTableName(), TableType.OFFLINE.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -184,7 +191,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     }
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
-          forSegmentListAPIWithTableType(getTableName(), CommonConstants.Helix.TableType.REALTIME.toString()));
+          forSegmentListAPIWithTableType(getTableName(), TableType.REALTIME.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -211,6 +218,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       JsonNode offlineSegments = offlineElement.get("OFFLINE");
       Assert.assertEquals(offlineSegments.size(), 8);
     }
+  }
+
+  @Test
+  public void testReload()
+      throws Exception {
+    super.testReload(true);
   }
 
   @Test

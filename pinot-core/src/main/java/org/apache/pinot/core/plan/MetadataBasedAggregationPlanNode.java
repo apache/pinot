@@ -24,13 +24,13 @@ import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +61,7 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
   public Operator run() {
     SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
     AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, segmentMetadata);
+        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest);
 
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {

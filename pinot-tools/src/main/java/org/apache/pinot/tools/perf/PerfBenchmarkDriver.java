@@ -44,18 +44,20 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.Tenant;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.api.Tenant;
+import org.apache.pinot.spi.config.api.TenantRole;
+import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -307,7 +309,7 @@ public class PerfBenchmarkDriver {
 
   public void configureTable(String tableName, List<String> invertedIndexColumns, List<String> bloomFilterColumns)
       throws Exception {
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
         .setSegmentAssignmentStrategy(_segmentAssignmentStrategy).setNumReplicas(_numReplicas)
         .setBrokerTenant(_brokerTenantName).setServerTenant(_serverTenantName).setLoadMode(_loadMode)
         .setSegmentVersion(_segmentFormatVersion).setInvertedIndexColumns(invertedIndexColumns)

@@ -31,28 +31,29 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.utils.DataSize;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
-import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
+import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spark.jobs.SparkSegmentCreationJob.getRelativeOutputPath;
+
 
 public class SparkSegmentCreationFunction implements Serializable {
   protected static final String LOCAL_TEMP_DIR = "pinot_spark_tmp";
@@ -95,7 +96,7 @@ public class SparkSegmentCreationFunction implements Serializable {
     // Optional
     String tableConfigString = _jobConf.get(JobConfigConstants.TABLE_CONFIG);
     if (tableConfigString != null) {
-      _tableConfig = TableConfig.fromJsonString(tableConfigString);
+      _tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
     }
     String readerConfigFile = _jobConf.get(JobConfigConstants.PATH_TO_READER_CONFIG);
     if (readerConfigFile != null) {
@@ -237,7 +238,7 @@ public class SparkSegmentCreationFunction implements Serializable {
     long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
     long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
     _logger.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
-        DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize));
+        DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     if (_useRelativePath) {

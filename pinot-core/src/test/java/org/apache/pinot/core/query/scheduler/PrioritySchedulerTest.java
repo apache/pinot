@@ -235,7 +235,8 @@ public class PrioritySchedulerTest {
       ResourceManager rm = new PolicyBasedResourceManager(config);
       QueryExecutor qe = new TestQueryExecutor();
       groupFactory = new TestSchedulerGroupFactory();
-      MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
+      MultiLevelPriorityQueue queue =
+          new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
       latestQueryTime = new LongAccumulator(Long::max, 0);
       return new TestPriorityScheduler(config, rm, qe, queue, metrics, latestQueryTime);
     }
@@ -314,10 +315,6 @@ public class PrioritySchedulerTest {
       }
       numQueries.countDown();
       return result;
-    }
-
-    @Override
-    public void setTableTimeoutMs(@Nonnull String tableNameWithType, long timeOutMs) {
     }
   }
 }

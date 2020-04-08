@@ -9,6 +9,7 @@
  * @property {String} submitButtonText  - text for the submit button
  * @property {Boolean} isCancellable    - whether the modal can be exited
  * @property {Boolean} isInvalid        - whether the modal is blocked from being submitted
+ * @property {Boolean} hideSubmit       - set to true to hide submit button
  * @property {Boolean} hasFooter        - toggles the footer view
  * @property {Boolean} hasHeader        - toggles the header view
  * @property {Function} submitAction    - closure action that handles the submit button click

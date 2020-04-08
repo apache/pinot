@@ -46,17 +46,17 @@ public class DetectionAlertTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertTaskRunner.class);
 
   private final DetectionAlertTaskFactory detAlertTaskFactory;
-  private DetectionAlertConfigManager alertConfigDAO;
+  private DetectionAlertConfigManager subscriptionConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyDAO;
 
   public DetectionAlertTaskRunner() {
     this.detAlertTaskFactory = new DetectionAlertTaskFactory();
-    this.alertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
+    this.subscriptionConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
   }
 
   private DetectionAlertConfigDTO loadDetectionAlertConfig(long detectionAlertConfigId) {
-    DetectionAlertConfigDTO detectionAlertConfig = this.alertConfigDAO.findById(detectionAlertConfigId);
+    DetectionAlertConfigDTO detectionAlertConfig = this.subscriptionConfigDAO.findById(detectionAlertConfigId);
     if (detectionAlertConfig == null) {
       throw new RuntimeException("Cannot find detection alert config id " + detectionAlertConfigId);
     }
@@ -67,18 +67,14 @@ public class DetectionAlertTaskRunner implements TaskRunner {
     return detectionAlertConfig;
   }
 
-  private void updateAlertConfigWatermarks(DetectionAlertFilterResult result, DetectionAlertConfigDTO alertConfig) {
+  private void updateSubscriptionWatermarks(DetectionAlertFilterResult result, DetectionAlertConfigDTO subscriptionConfig) {
     if (!result.getAllAnomalies().isEmpty()) {
-      long highWaterMark = AlertUtils.getHighWaterMark(result.getAllAnomalies());
-      if (alertConfig.getHighWaterMark() != null) {
-        highWaterMark = Math.max(alertConfig.getHighWaterMark(), highWaterMark);
-      }
+      subscriptionConfig.setVectorClocks(
+          AlertUtils.mergeVectorClock(subscriptionConfig.getVectorClocks(),
+          AlertUtils.makeVectorClock(result.getAllAnomalies())));
 
-      alertConfig.setHighWaterMark(highWaterMark);
-      alertConfig.setVectorClocks(AlertUtils.mergeVectorClock(alertConfig.getVectorClocks(), AlertUtils.makeVectorClock(result.getAllAnomalies())));
-
-      LOG.info("Updating watermarks for alertConfigDAO : {}", alertConfig.getId());
-      this.alertConfigDAO.save(alertConfig);
+      LOG.info("Updating watermarks for subscription config : {}", subscriptionConfig.getId());
+      this.subscriptionConfigDAO.save(subscriptionConfig);
     }
   }
 
@@ -115,7 +111,7 @@ public class DetectionAlertTaskRunner implements TaskRunner {
         alertScheme.destroy();
       }
 
-      updateAlertConfigWatermarks(result, alertConfig);
+      updateSubscriptionWatermarks(result, alertConfig);
       return new ArrayList<>();
     } finally {
       ThirdeyeMetricsUtil.alertTaskSuccessCounter.inc();

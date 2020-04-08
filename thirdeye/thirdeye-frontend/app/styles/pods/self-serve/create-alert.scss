@@ -52,6 +52,10 @@
   }
 }
 
+.error-tooltip {
+  word-break: break-all;
+}
+
 .te-label {
   &--flush {
     margin-left: 10px;

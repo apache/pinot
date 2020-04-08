@@ -25,13 +25,10 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -40,6 +37,11 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.mockito.ArgumentMatchers;
@@ -153,14 +155,13 @@ public class RetentionManagerTest {
     testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp);
   }
 
-  private TableConfig createOfflineTableConfig()
-      throws Exception {
-    return new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TEST_TABLE_NAME)
-        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("365").setNumReplicas(2).build();
+  private TableConfig createOfflineTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("365").setNumReplicas(2).build();
   }
 
   private TableConfig createRealtimeTableConfig1(int replicaCount) {
-    return new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(TEST_TABLE_NAME).setLLC(true)
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_TABLE_NAME).setLLC(true)
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setNumReplicas(replicaCount).build();
   }
 
@@ -197,7 +198,7 @@ public class RetentionManagerTest {
         }
         return null;
       }
-    }).when(resourceManager).deleteSegments(anyString(), ArgumentMatchers.<String>anyList());
+    }).when(resourceManager).deleteSegments(anyString(), ArgumentMatchers.anyList());
   }
 
   // This test makes sure that we clean up the segments marked OFFLINE in realtime for more than 7 days

@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.utils.DataSize;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -141,8 +141,8 @@ public class StreamConfig {
       try {
         connectionTimeoutMillis = Long.parseLong(connectionTimeoutValue);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while parsing the connection timeout, defaulting to {} ms",
-            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS, e);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", connectionTimeoutKey, connectionTimeoutValue,
+            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
       }
     }
     _connectionTimeoutMillis = connectionTimeoutMillis;
@@ -155,8 +155,8 @@ public class StreamConfig {
       try {
         fetchTimeoutMillis = Integer.parseInt(fetchTimeoutValue);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while parsing the fetch timeout, defaulting to {} ms",
-            DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS, e);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", fetchTimeoutKey, fetchTimeoutValue,
+            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
       }
     }
     _fetchTimeoutMillis = fetchTimeoutMillis;
@@ -167,7 +167,12 @@ public class StreamConfig {
     long flushDesiredSize = -1;
     String flushSegmentDesiredSizeValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE);
     if (flushSegmentDesiredSizeValue != null) {
-      flushDesiredSize = DataSize.toBytes(flushSegmentDesiredSizeValue);
+      try {
+        flushDesiredSize = DataSizeUtils.toBytes(flushSegmentDesiredSizeValue);
+      } catch (Exception e) {
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE,
+            flushSegmentDesiredSizeValue, DataSizeUtils.fromBytes(DEFAULT_FLUSH_SEGMENT_DESIRED_SIZE_BYTES));
+      }
     }
     if (flushDesiredSize > 0) {
       _flushSegmentDesiredSizeBytes = flushDesiredSize;
@@ -181,9 +186,9 @@ public class StreamConfig {
       try {
         autotuneInitialRows = Integer.parseInt(initialRowsValue);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while parsing {}:{}, defaulting to {}",
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}",
             StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS, initialRowsValue,
-            DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS, e);
+            DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS);
       }
     }
     _flushAutotuneInitialRows = autotuneInitialRows > 0 ? autotuneInitialRows : DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS;

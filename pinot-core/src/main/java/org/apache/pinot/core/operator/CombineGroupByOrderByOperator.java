@@ -43,6 +43,7 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -181,6 +182,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
                 _indexedTable.upsert(key, record);
               }
             }
+          } catch (EarlyTerminationException e) {
+            // Early-terminated because query times out or is already satisfied
           } catch (Exception e) {
             LOGGER.error("Exception processing CombineGroupByOrderBy for index {}, operator {}", index,
                 _operators.get(index).getClass().getName(), e);
@@ -213,10 +216,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
       // Set the execution statistics.
       ExecutionStatistics executionStatistics = new ExecutionStatistics();
       for (Operator operator : _operators) {
-        ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
-        if (executionStatisticsToMerge != null) {
-          executionStatistics.merge(executionStatisticsToMerge);
-        }
+        executionStatistics.merge(operator.getExecutionStatistics());
       }
       mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
       mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
@@ -245,30 +245,23 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   }
 
   private Function<String, Object> getConverterFunction(DataSchema.ColumnDataType columnDataType) {
-    Function<String, Object> function;
     switch (columnDataType) {
-
       case INT:
-        function = Integer::valueOf;
-        break;
+        return Integer::valueOf;
       case LONG:
-        function = Long::valueOf;
-        break;
+        return Long::valueOf;
       case FLOAT:
-        function = Float::valueOf;
-        break;
+        return Float::valueOf;
       case DOUBLE:
-        function = Double::valueOf;
-        break;
-      case BYTES:
-        function = BytesUtils::toByteArray;
-        break;
+        return Double::valueOf;
       case STRING:
+        return s -> s;
+      case BYTES:
+        return BytesUtils::toByteArray;
+      // Add other group-by column type supports here
       default:
-        function = s -> s;
-        break;
+        throw new IllegalStateException();
     }
-    return function;
   }
 
   @Override

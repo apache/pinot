@@ -29,6 +29,7 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -83,7 +84,11 @@ public class CombineSlowOperatorsTest {
     testCombineOperator(operators, combineGroupByOrderByOperator);
   }
 
-  public void testCombineOperator(List<Operator> operators, BaseOperator combineOperator) {
+  /**
+   * NOTE: It is hard to test the logger behavior, but only one error message about the query timeout should be logged
+   *       for each query.
+   */
+  private void testCombineOperator(List<Operator> operators, BaseOperator combineOperator) {
     IntermediateResultsBlock intermediateResultsBlock = (IntermediateResultsBlock) combineOperator.nextBlock();
     List<ProcessingException> processingExceptions = intermediateResultsBlock.getProcessingExceptions();
     assertNotNull(processingExceptions);
@@ -122,8 +127,8 @@ public class CombineSlowOperatorsTest {
       try {
         Thread.sleep(3_600_000L);
       } catch (InterruptedException e) {
-        // Thread should be interrupted
-        throw new RuntimeException(e);
+        // Thread should be interrupted for early-termination
+        throw new EarlyTerminationException();
       } finally {
         // Wait for 100 milliseconds before marking the operation done
         try {
@@ -144,7 +149,7 @@ public class CombineSlowOperatorsTest {
 
     @Override
     public ExecutionStatistics getExecutionStatistics() {
-      return null;
+      return new ExecutionStatistics();
     }
   }
 }

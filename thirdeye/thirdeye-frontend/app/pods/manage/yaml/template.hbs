@@ -32,6 +32,9 @@
           detectionYaml=detectionYaml
           setDetectionYaml=(action "updateDetectionYaml")
           disableYamlSave=disableYamlSave
+          previewError=previewError
+          previewErrorMsg=previewErrorMsg
+          previewErrorInfo=previewErrorInfo
         }}
         {{/detection-yaml}}
 
@@ -55,6 +58,7 @@
                   timeWindowSize=model.timeWindowSize
                   metricUrnRoute=model.metricUrn
                   metricUrnListRoute=model.metricUrnList
+                  sendPreviewError=(action "setPreviewError")
                 }}
                   {{yield}}
                 {{/alert-details}}
@@ -76,6 +80,9 @@
           subscriptionGroupNamesDisplay=subscriptionGroupNamesDisplay
           groupName=groupName
           createGroup=createGroup
+          subscriptionError=subscriptionError
+          subscriptionErrorMsg=subscriptionErrorMsg
+          subscriptionErrorInfo=subscriptionErrorInfo
         }}
         {{/subscription-yaml}}
 

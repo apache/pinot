@@ -100,32 +100,35 @@ public class DetectionTaskStatus {
     return taskCounts;
   }
 
-  public static DetectionTaskStatus fromTasks(List<TaskDTO> tasks) {
+  public static DetectionTaskStatus fromTasks(List<TaskDTO> tasks, long lastTaskExecutionTime) {
     // count the number of tasks by task status
     tasks.sort(Comparator.comparingLong(TaskBean::getStartTime).reversed());
     Map<TaskConstants.TaskStatus, Long> counts =
         tasks.stream().collect(Collectors.groupingBy(TaskBean::getStatus, Collectors.counting()));
     double taskSuccessRate = getTaskSuccessRate(counts);
-    long lastTaskExecutionTime = getLastSuccessTaskExecutionTime(tasks);
-    return new DetectionTaskStatus(taskSuccessRate, classifyTaskStatus(taskSuccessRate), counts, tasks, lastTaskExecutionTime);
+    long newTaskExecutionTime = getLastSuccessTaskExecutionTime(tasks);
+    newTaskExecutionTime = newTaskExecutionTime == -1L ? lastTaskExecutionTime : newTaskExecutionTime;
+    return new DetectionTaskStatus(taskSuccessRate, classifyTaskStatus(taskSuccessRate), counts, tasks, newTaskExecutionTime);
   }
 
   /**
    * Create a Detection task status from a list of tasks
    * @param tasks the list of tasks
+   * @param lastTaskExecutionTime the last task exeuction time
    * @param taskLimit the number of tasks should be returned in the task status
    * @return the DetectionTaskStatus
    */
-  public static DetectionTaskStatus fromTasks(List<TaskDTO> tasks, long taskLimit) {
+  public static DetectionTaskStatus fromTasks(List<TaskDTO> tasks, long lastTaskExecutionTime, long taskLimit) {
     // count the number of tasks by task status
     tasks.sort(Comparator.comparingLong(TaskBean::getStartTime).reversed());
     Map<TaskConstants.TaskStatus, Long> counts =
         tasks.stream().collect(Collectors.groupingBy(TaskBean::getStatus, Collectors.counting()));
     double taskSuccessRate = getTaskSuccessRate(counts);
-    long lastTaskExecutionTime = getLastSuccessTaskExecutionTime(tasks);
+    long newTaskExecutionTime = getLastSuccessTaskExecutionTime(tasks);
+    newTaskExecutionTime = newTaskExecutionTime == -1L ? lastTaskExecutionTime : newTaskExecutionTime;
     tasks = tasks.stream().limit(taskLimit).collect(Collectors.toList());
     return new DetectionTaskStatus(taskSuccessRate, classifyTaskStatus(taskSuccessRate), counts, tasks,
-        lastTaskExecutionTime);
+        newTaskExecutionTime);
   }
 
   private static Long getLastSuccessTaskExecutionTime(List<TaskDTO> tasks) {

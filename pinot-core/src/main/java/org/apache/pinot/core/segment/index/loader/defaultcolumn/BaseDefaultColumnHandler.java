@@ -41,10 +41,10 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -164,7 +164,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *
    * @return Action Map for each column.
    */
-  private Map<String, DefaultColumnAction> computeDefaultColumnActionMap() {
+  Map<String, DefaultColumnAction> computeDefaultColumnActionMap() {
     Map<String, DefaultColumnAction> defaultColumnActionMap = new HashMap<>();
 
     // Compute ADD and UPDATE actions.

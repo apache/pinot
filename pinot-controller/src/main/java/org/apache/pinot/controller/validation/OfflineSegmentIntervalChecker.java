@@ -22,19 +22,19 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.util.SegmentIntervalUtils;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.joda.time.base.BaseInterval;
@@ -62,8 +62,8 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
 
   @Override
   protected void processTable(String tableNameWithType) {
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == TableType.OFFLINE) {
 
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig == null) {
