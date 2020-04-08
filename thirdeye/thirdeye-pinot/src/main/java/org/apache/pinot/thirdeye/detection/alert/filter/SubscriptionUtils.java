@@ -52,6 +52,7 @@ public class SubscriptionUtils {
     subsConfig.setSubjectType(parentConfig.getSubjectType());
     subsConfig.setProperties(parentConfig.getProperties());
     subsConfig.setVectorClocks(parentConfig.getVectorClocks());
+    subsConfig.setHighWaterMark(parentConfig.getHighWaterMark());
 
     subsConfig.setAlertSchemes(alertSchemes);
     subsConfig.setReferenceLinks(refLinks);

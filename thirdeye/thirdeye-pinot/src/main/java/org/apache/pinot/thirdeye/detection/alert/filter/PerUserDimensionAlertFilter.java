@@ -59,10 +59,12 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
+  private static final String PROP_SEND_ONCE = "sendOnce";
 
   final String dimension;
   final SetMultimap<String, String> dimensionRecipients;
   final List<Long> detectionConfigIds;
+  final boolean sendOnce;
 
   public PerUserDimensionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
@@ -71,12 +73,16 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
     this.dimension = MapUtils.getString(this.config.getProperties(), PROP_DIMENSION);
     this.dimensionRecipients = HashMultimap.create(ConfigUtils.<String, String>getMultimap(this.config.getProperties().get(PROP_DIMENSION_RECIPIENTS)));
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
+    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
-  public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks) {
+  public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark) {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds));
+
+    final long minId = getMinId(highWaterMark);
+
+    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
     // group anomalies by dimensions value
     Multimap<String, MergedAnomalyResultDTO> grouped = Multimaps.index(anomalies, new Function<MergedAnomalyResultDTO, String>() {
@@ -136,5 +142,13 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
 
     recipients.add(newUser);
     return recipients;
+  }
+
+  private long getMinId(long highWaterMark) {
+    if (this.sendOnce) {
+      return highWaterMark + 1;
+    } else {
+      return 0;
+    }
   }
 }

@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
-import java.sql.Timestamp;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -270,11 +269,9 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findByCreatedTimeInRangeAndDetectionConfigId(long startTime, long endTime, long detectionConfigId) {
+  public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndDetectionConfigId(long startTime, long endTime, long detectionConfigId) {
     Predicate predicate =
-        Predicate.AND(
-            Predicate.GE("createTime", new Timestamp(startTime)),
-            Predicate.LT("createTime", new Timestamp(endTime)),
+        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LT("startTime", endTime),
             Predicate.EQ("detectionConfigId", detectionConfigId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return convertMergedAnomalyBean2DTO(list);

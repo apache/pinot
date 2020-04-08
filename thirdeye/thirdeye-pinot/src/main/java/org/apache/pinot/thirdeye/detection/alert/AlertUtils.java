@@ -82,10 +82,17 @@ public class AlertUtils {
         });
   }
 
+  public static long getHighWaterMark(Collection<MergedAnomalyResultDTO> anomalies) {
+    if (anomalies.isEmpty()) {
+      return 0;
+    }
+    return Collections.max(Collections2.transform(anomalies, mergedAnomalyResultDTO -> mergedAnomalyResultDTO.getId()));
+  }
+
   private static long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies, long startTime) {
     long lastTimeStamp = startTime;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      lastTimeStamp = Math.max(anomaly.getCreatedTime(), lastTimeStamp);
+      lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
     }
     return lastTimeStamp;
   }
