@@ -19,6 +19,7 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -325,6 +326,28 @@ public class TableConfigTest {
       toCompare = TableConfig.fromZnRecord(tableConfigWithoutFieldConfig.toZNRecord());
       assertNull(toCompare.getFieldConfigList());
     }
+    {
+      // with ingestionMode config
+      IngestionModeConfig ingestionModeConfig = new IngestionModeConfig(IngestionModeConfig.APPEND_TABLE_CONFIG_VALUE,
+          null, null);
+
+      TableConfig tableConfig = tableConfigBuilder.setIngestionModeConfig(
+          ingestionModeConfig).build();
+
+      // Serialize then de-serialize
+      checkTableConfigWithIngestionConfig(TableConfig.fromJsonConfig(tableConfig.toJsonConfig()), tableConfig);
+      checkTableConfigWithIngestionConfig(TableConfig.fromZnRecord(tableConfig.toZNRecord()), tableConfig);
+
+      ingestionModeConfig = new IngestionModeConfig(IngestionModeConfig.UPSERT_TABLE_CONFIG_VALUE,
+          ImmutableList.of("primaryKey"), "offsetKey");
+      tableConfig = tableConfigBuilder.setIngestionModeConfig(
+          ingestionModeConfig).build();
+
+      // Serialize then de-serialize
+      checkTableConfigWithIngestionConfig(TableConfig.fromJsonConfig(tableConfig.toJsonConfig()), tableConfig);
+      checkTableConfigWithIngestionConfig(TableConfig.fromZnRecord(tableConfig.toZNRecord()), tableConfig);
+
+    }
   }
 
   private void compareConfigHavingFieldConfig(TableConfig toCompare, Map<String, String> properties,
@@ -406,4 +429,14 @@ public class TableConfigTest {
     assertEquals(replicaGroupPartitionConfig.getNumPartitions(), 0);
     assertEquals(replicaGroupPartitionConfig.getNumInstancesPerPartition(), 0);
   }
+
+  private void checkTableConfigWithIngestionConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
+    // Check that the ingestion configuration does exist.
+    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    assertNotNull(tableConfigToCompare.getIngestionModeConfig());
+    assertEquals(tableConfigToCompare.getIngestionModeConfig(),
+        tableConfig.getIngestionModeConfig());
+
+  }
+
 }

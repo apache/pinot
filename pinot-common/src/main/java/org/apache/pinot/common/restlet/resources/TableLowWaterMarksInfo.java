@@ -25,10 +25,19 @@ import java.util.Collections;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * class to wrap around pinot upsert low-water-mark information that got pass between pinot server and broker
+ */
 public class TableLowWaterMarksInfo {
     // A mapping from table name to the table's partiton -> low_water_mark mappings.
     private Map<String, Map<Integer, Long>> tableLowWaterMarks;
 
+    /**
+     * @param tableLowWaterMarks mapping for {<table_name>: {<partition>: <low-water-mar>}}
+     * example would be
+     * {upsert_table_1: {0: 100, 1: 200},
+     *  upsert_table_2: {0: 500}}
+     */
     public TableLowWaterMarksInfo(@JsonProperty("lowWaterMarks") Map<String, Map<Integer, Long>> tableLowWaterMarks) {
         this.tableLowWaterMarks = tableLowWaterMarks;
     }

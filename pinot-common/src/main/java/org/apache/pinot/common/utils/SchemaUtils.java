@@ -18,12 +18,9 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -36,7 +33,6 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -200,30 +196,4 @@ public class SchemaUtils {
     System.out.println(equalsIgnoreVersion(schema, fetchedSchema));
     System.out.println(deleteSchema("localhost", 8100, "testSchema"));
   }
-
-  /**
-   * convert value of a pinot record column into its binary representation
-   * @param value the value we are trying to convert to binary
-   * @param fieldSpec the fieldspec for the corresponding value
-   * @return byte representation of this value with the given type
-   */
-  public static byte[] getByteArrayFromField(Object value, DimensionFieldSpec fieldSpec) {
-    switch (fieldSpec.getDataType()) {
-      case INT:
-        return ByteBuffer.allocate(4).putInt((int)value).array();
-      case LONG:
-        return ByteBuffer.allocate(8).putLong((long)value).array();
-      case FLOAT:
-        return ByteBuffer.allocate(4).putFloat((float)value).array();
-      case DOUBLE:
-        return ByteBuffer.allocate(8).putDouble((double)value).array();
-      case STRING:
-        return ((String) value).getBytes(StandardCharsets.UTF_8);
-      case BYTES:
-        return (byte[]) value;
-      default:
-        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
-    }
-  }
-
 }

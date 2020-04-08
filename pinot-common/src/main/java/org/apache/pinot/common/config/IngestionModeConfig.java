@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data;
+package org.apache.pinot.common.config;
 
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -43,8 +43,11 @@ public class IngestionModeConfig {
   // offset key refers to the column name that we are going to store the offset value to
   private String _offsetKey;
 
-  private static final String UPSERT_TABLE_CONFIG_VALUE = "upsert";
-  private static final String APPEND_TABLE_CONFIG_VALUE = "append";
+  public static final String UPSERT_TABLE_CONFIG_VALUE = "upsert";
+  public static final String APPEND_TABLE_CONFIG_VALUE = "append";
+
+  public static final IngestionModeConfig DEFAULT_APPEND_INGESTION_MODE =
+      new IngestionModeConfig(APPEND_TABLE_CONFIG_VALUE, null, null);
 
   @JsonCreator
   public IngestionModeConfig(
@@ -78,7 +81,7 @@ public class IngestionModeConfig {
   }
 
   @JsonIgnore
-  public boolean isSchemaForUpsert() {
+  public boolean isForUpsert() {
     return UPSERT_TABLE_CONFIG_VALUE.equals(_ingestionMode);
   }
 

@@ -24,12 +24,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +41,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -63,9 +61,6 @@ public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
   private String _schemaName;
-
-  private IngestionModeConfig _ingestionModeConfig;
-
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
@@ -78,13 +73,6 @@ public final class Schema {
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
 
-  // upsert related Json ignored fields
-  @JsonIgnore
-  private DimensionFieldSpec _primaryKeyFieldSpec = null;
-  @JsonIgnore
-  private DimensionFieldSpec _offsetKeyFieldSpec = null;
-  @JsonIgnore
-  private static final String INGESTION_MODE_CONFIG_KEY = "ingestionModeConfig";
 
   public static Schema fromFile(File schemaFile)
       throws IOException {
@@ -110,72 +98,6 @@ public final class Schema {
 
   public void setSchemaName(String schemaName) {
     _schemaName = schemaName;
-  }
-
-  public IngestionModeConfig getIngestionModeConfig() {
-    return _ingestionModeConfig;
-  }
-
-  public void setIngestionModeConfig(IngestionModeConfig ingestionModeConfig) {
-    _ingestionModeConfig = ingestionModeConfig;
-  }
-
-  @JsonIgnore
-  public String getPrimaryKey() {
-    if (_ingestionModeConfig != null) {
-      List<String> primaryKeys = _ingestionModeConfig.getPrimaryKeys();
-      Preconditions.checkState(primaryKeys.size() == 1, "expect primary keys count to be 1");
-      return primaryKeys.get(0);
-    } else {
-      return StringUtils.EMPTY;
-    }
-  }
-
-  @JsonIgnore
-  public String getOffsetKey() {
-    if (_ingestionModeConfig != null) {
-      return _ingestionModeConfig.getOffsetKey();
-    } else {
-      return StringUtils.EMPTY;
-    }
-  }
-
-  @JsonIgnore
-  public boolean isSchemaForUpsert() {
-    return _ingestionModeConfig != null && _ingestionModeConfig.isSchemaForUpsert();
-  }
-
-  @JsonIgnore
-  public DimensionFieldSpec getPrimaryKeyFieldSpec() {
-    String primaryKey = getPrimaryKey();
-    if (_primaryKeyFieldSpec == null) {
-      Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
-      Preconditions.checkState(StringUtils.isNotEmpty(primaryKey), "primary key should not be empty");
-      for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
-        if (dimensionFieldSpec._name.equals(primaryKey)) {
-          _primaryKeyFieldSpec = dimensionFieldSpec;
-          break;
-        }
-      }
-    }
-    return _primaryKeyFieldSpec;
-  }
-
-  @JsonIgnore
-  public DimensionFieldSpec getOffsetKeyFieldSpec() {
-    String offsetKey = getOffsetKey();
-    if (_offsetKeyFieldSpec == null) {
-      Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
-      Preconditions.checkState(StringUtils.isNotEmpty(offsetKey), "offset key should not be empty");
-      for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
-        if (dimensionFieldSpec._name.equals(offsetKey)) {
-          _offsetKeyFieldSpec = dimensionFieldSpec;
-          Preconditions.checkState(_offsetKeyFieldSpec.isSingleValueField(), "offset key should be single value");
-          Preconditions.checkState(_offsetKeyFieldSpec.getDataType() == DataType.LONG, "offset key should be long type");
-        }
-      }
-    }
-    return _offsetKeyFieldSpec;
   }
 
   public List<DimensionFieldSpec> getDimensionFieldSpecs() {
@@ -422,22 +344,6 @@ public final class Schema {
   }
 
   /**
-    * method to be used when loading immutable realtime segment to get the hints for upsert schema metrics as
-   * they cannot be found with physical copy of data
-   */
-  @JsonIgnore
-  public void withSchemaHint(@Nullable Schema upsertSchema) {
-    if (upsertSchema != null && upsertSchema.isSchemaForUpsert()) {
-      setIngestionModeConfig(upsertSchema._ingestionModeConfig);
-      for (FieldSpec fieldSpec: upsertSchema.getAllFieldSpecs()) {
-        if (fieldSpec.isVirtualColumnField()) {
-          _fieldSpecMap.putIfAbsent(fieldSpec._name, fieldSpec);
-        }
-      }
-    }
-  }
-
-  /**
    * Returns a json representation of the schema.
    */
   public ObjectNode toJsonObject() {
@@ -466,9 +372,6 @@ public final class Schema {
         jsonArray.add(dateTimeFieldSpec.toJsonObject());
       }
       jsonObject.set("dateTimeFieldSpecs", jsonArray);
-    }
-    if (_ingestionModeConfig != null) {
-      jsonObject.set(INGESTION_MODE_CONFIG_KEY, _ingestionModeConfig.toJsonNode());
     }
 
     return jsonObject;
@@ -550,6 +453,11 @@ public final class Schema {
     }
 
     return true;
+  }
+
+  public boolean isVirtualColumn(String columnName) {
+    return columnName.startsWith("$") || (getFieldSpecFor(columnName).getVirtualColumnProvider() != null
+        && !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
   }
 
   public static class SchemaBuilder {
@@ -709,8 +617,7 @@ public final class Schema {
         .isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) && EqualityUtils
         .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
         .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
-        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs) && EqualityUtils
-        .isEqual(_ingestionModeConfig, that._ingestionModeConfig);
+        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
 
   }
 
@@ -721,7 +628,6 @@ public final class Schema {
    * @param oldSchema old schema
    * @return
    */
-
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
     if (!EqualityUtils.isEqual(_timeFieldSpec, oldSchema.getTimeFieldSpec()) || !EqualityUtils
         .isEqual(_dateTimeFieldSpecs, oldSchema.getDateTimeFieldSpecs())) {
@@ -745,14 +651,6 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
-    result = EqualityUtils.hashCodeOf(result, _ingestionModeConfig);
     return result;
   }
-
-  public boolean isVirtualColumn(String columnName) {
-    return columnName.startsWith("$") || (getFieldSpecFor(columnName).getVirtualColumnProvider() != null
-        && !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
-  }
-
-
 }

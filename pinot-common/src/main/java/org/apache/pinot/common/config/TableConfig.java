@@ -36,14 +36,12 @@ import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.common.utils.CommonConstants.UpdateSemantic;
 
 
 @SuppressWarnings({"Duplicates", "unused"})
 public class TableConfig extends BaseJsonConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
-  private static final String UPDATE_SEMANTIC_CONFIG_KEY = "updateSemantic";
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
   public static final String TENANT_CONFIG_KEY = "tenants";
   public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
@@ -54,6 +52,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String QUERY_CONFIG_KEY = "query";
   public static final String INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY = "instanceAssignmentConfigMap";
   public static final String FIELD_CONFIG_LIST_KEY = "fieldConfigList";
+  public static final String INGESTION_MODE_CONFIG_KEY = "ingestionModeConfig";
 
   private static final String FIELD_MISSING_MESSAGE_TEMPLATE = "Mandatory field '%s' is missing";
 
@@ -78,8 +77,8 @@ public class TableConfig extends BaseJsonConfig {
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
 
-  @JsonPropertyDescription(value = "The update semantic of the table, either append or upsert, default as append")
-  private UpdateSemantic _updateSemantic;
+  @JsonPropertyDescription(value = "ingestion mode config, mostly related to upsert related configuration")
+  private IngestionModeConfig _ingestionModeConfig;
 
   /**
    * NOTE: DO NOT use this constructor, use builder instead. This constructor is for deserializer only.
@@ -97,7 +96,8 @@ public class TableConfig extends BaseJsonConfig {
       @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @Nullable List<FieldConfig> fieldConfigList) {
       this(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig, quotaConfig, taskConfig,
-              routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, UpdateSemantic.APPEND);
+              routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
+          IngestionModeConfig.DEFAULT_APPEND_INGESTION_MODE);
   }
 
   private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
@@ -105,7 +105,7 @@ public class TableConfig extends BaseJsonConfig {
             @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
             @Nullable QueryConfig queryConfig,
             @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
-            @Nullable List<FieldConfig> fieldConfigList, @Nullable UpdateSemantic updateSemantic) {
+            @Nullable List<FieldConfig> fieldConfigList, @Nullable IngestionModeConfig ingestionModeConfig) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -118,7 +118,7 @@ public class TableConfig extends BaseJsonConfig {
     _queryConfig = queryConfig;
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
     _fieldConfigList = fieldConfigList;
-    _updateSemantic = updateSemantic;
+    _ingestionModeConfig = ingestionModeConfig;
   }
 
   public static TableConfig fromJsonString(String jsonString)
@@ -173,15 +173,14 @@ public class TableConfig extends BaseJsonConfig {
         extractChildConfig(jsonConfig, FIELD_CONFIG_LIST_KEY, new TypeReference<List<FieldConfig>>() {
         });
 
-    // generate update schematic
-    UpdateSemantic updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
-    if (jsonConfig.has(UPDATE_SEMANTIC_CONFIG_KEY)) {
-      updateSemantic = UpdateSemantic.getUpdateSemantic(jsonConfig.get(UPDATE_SEMANTIC_CONFIG_KEY).asText());
+    IngestionModeConfig ingestionModeConfig = IngestionModeConfig.DEFAULT_APPEND_INGESTION_MODE;
+    if (jsonConfig.has(INGESTION_MODE_CONFIG_KEY)) {
+      ingestionModeConfig = extractChildConfig(jsonConfig, INGESTION_MODE_CONFIG_KEY, IngestionModeConfig.class);
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
-        updateSemantic);
+        ingestionModeConfig);
   }
 
   /**
@@ -255,11 +254,8 @@ public class TableConfig extends BaseJsonConfig {
     if (_fieldConfigList != null) {
       jsonConfig.put(FIELD_CONFIG_LIST_KEY, JsonUtils.objectToJsonNode(_fieldConfigList));
     }
-
-    if (_updateSemantic != null) {
-      jsonConfig.put(UPDATE_SEMANTIC_CONFIG_KEY, _updateSemantic.toString());
-    } else {
-      jsonConfig.put(UPDATE_SEMANTIC_CONFIG_KEY, UpdateSemantic.APPEND.toString());
+    if (_ingestionModeConfig != null) {
+      jsonConfig.set(INGESTION_MODE_CONFIG_KEY, JsonUtils.objectToJsonNode(_ingestionModeConfig));
     }
     return jsonConfig;
   }
@@ -344,11 +340,15 @@ public class TableConfig extends BaseJsonConfig {
       });
     }
 
-    UpdateSemantic updateSemantic = UpdateSemantic.getUpdateSemantic(simpleFields.get(UPDATE_SEMANTIC_CONFIG_KEY));
+    IngestionModeConfig ingestionModeConfig = null;
+    String ingestionModeConfigString = simpleFields.get(INGESTION_MODE_CONFIG_KEY);
+    if (ingestionModeConfigString != null) {
+      ingestionModeConfig = JsonUtils.stringToObject(ingestionModeConfigString, IngestionModeConfig.class);
+    }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
-        updateSemantic);
+        ingestionModeConfig);
   }
 
   public ZNRecord toZNRecord()
@@ -384,8 +384,8 @@ public class TableConfig extends BaseJsonConfig {
     if (_fieldConfigList != null) {
       simpleFields.put(FIELD_CONFIG_LIST_KEY, JsonUtils.objectToString(_fieldConfigList));
     }
-    if (_updateSemantic != null) {
-      simpleFields.put(UPDATE_SEMANTIC_CONFIG_KEY, _updateSemantic.toString());
+    if (_ingestionModeConfig != null) {
+      simpleFields.put(INGESTION_MODE_CONFIG_KEY, JsonUtils.objectToString(_ingestionModeConfig));
     }
 
     ZNRecord znRecord = new ZNRecord(_tableName);
@@ -505,16 +505,17 @@ public class TableConfig extends BaseJsonConfig {
     return _fieldConfigList;
   }
 
-  public UpdateSemantic getUpdateSemantic() {
-    return _updateSemantic;
+  @Nullable
+  public IngestionModeConfig getIngestionModeConfig() {
+    return _ingestionModeConfig;
   }
 
-  public void setUpdateSemantic(UpdateSemantic updateSemantic) {
-    _updateSemantic = updateSemantic;
+  public void setIngestionModeConfig(IngestionModeConfig ingestionModeConfig) {
+    _ingestionModeConfig = ingestionModeConfig;
   }
 
   public boolean isTableForUpsert() {
-    return _updateSemantic == UpdateSemantic.UPSERT;
+    return _ingestionModeConfig != null && _ingestionModeConfig.isForUpsert();
   }
 
   public static class Builder {
@@ -564,7 +565,7 @@ public class TableConfig extends BaseJsonConfig {
     private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
     private List<FieldConfig> _fieldConfigList;
 
-    private UpdateSemantic _updateSemantic;
+    private IngestionModeConfig _ingestionModeConfig;
 
     public Builder(TableType tableType) {
       _tableType = tableType;
@@ -732,8 +733,8 @@ public class TableConfig extends BaseJsonConfig {
       return this;
     }
 
-    public Builder setUpdateSemantic(UpdateSemantic updateSemantic) {
-      _updateSemantic = updateSemantic;
+    public Builder setIngestionModeConfig(IngestionModeConfig ingestionModeConfig) {
+      _ingestionModeConfig = ingestionModeConfig;
       return this;
     }
 
@@ -774,8 +775,8 @@ public class TableConfig extends BaseJsonConfig {
         _customConfig = new TableCustomConfig(null);
       }
 
-      if (_updateSemantic == null) {
-        _updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
+      if (_ingestionModeConfig == null) {
+        _ingestionModeConfig = IngestionModeConfig.DEFAULT_APPEND_INGESTION_MODE;
       }
 
       // eventually this validation will be generic but since we are initially
@@ -786,7 +787,7 @@ public class TableConfig extends BaseJsonConfig {
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
           _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap, _fieldConfigList,
-          _updateSemantic);
+          _ingestionModeConfig);
 
     }
   }

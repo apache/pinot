@@ -320,10 +320,10 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
   }
 
-  public static class Grigio {
-    // config for distributed grigio components
+  // config for distributed pinot upsert components
+  public static class Noir {
     public static final String CONFIG_OF_METRICS_PREFIX_KEY = "metrics.prefix";
-    public static final String DEFAULT_METRICS_PREFIX = "pinot.grigio.";
+    public static final String DEFAULT_METRICS_PREFIX = "pinot.noir.";
 
     // config for server related components
     public static final String PINOT_UPSERT_SERVER_COMPONENT_PREFIX = "upsert.";
@@ -407,23 +407,4 @@ public class CommonConstants {
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
   }
-
-  public enum UpdateSemantic {
-    APPEND,
-    UPSERT;
-
-    public static UpdateSemantic DEFAULT_SEMANTIC = APPEND;
-
-    public static UpdateSemantic getUpdateSemantic(String updateSemanticStr) {
-      if (StringUtils.isEmpty(updateSemanticStr)) {
-        return DEFAULT_SEMANTIC;
-      }
-      try {
-        return valueOf(updateSemanticStr.toUpperCase());
-      } catch (Exception ex) {
-        return DEFAULT_SEMANTIC;
-      }
-    }
-  }
-
 }
