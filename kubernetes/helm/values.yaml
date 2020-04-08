@@ -144,7 +144,7 @@ server:
     #storageClass: "ssd"
 
   jvmOpts: "-Xms512M -Xmx1G"
-  
+
   log4j2ConfFile: /opt/pinot/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
