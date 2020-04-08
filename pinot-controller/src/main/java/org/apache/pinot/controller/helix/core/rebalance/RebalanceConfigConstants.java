@@ -35,6 +35,11 @@ public class RebalanceConfigConstants {
   public static final String INCLUDE_CONSUMING = "includeConsuming";
   public static final boolean DEFAULT_INCLUDE_CONSUMING = false;
 
+  // Whether to rebalance table in bootstrap mode (starting from an empty table and reassign all the segments, where
+  // segments will be assigned in a round-robin fashion, but no minimum movement is guaranteed)
+  public static final String BOOTSTRAP = "bootstrap";
+  public static final boolean DEFAULT_BOOTSTRAP = false;
+
   // Whether to allow downtime for the rebalance
   public static final String DOWNTIME = "downtime";
   public static final boolean DEFAULT_DOWNTIME = false;

@@ -102,20 +102,37 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
             instancePartitions.getInstancePartitionsName());
     LOGGER.info("Assigning segment: {} with instance partitions: {} for table: {}", segmentName, instancePartitions,
         _realtimeTableName);
+    checkReplication(instancePartitions);
 
-    List<String> instancesAssigned = assignSegment(segmentName, instancePartitions);
+    List<String> instancesAssigned = assignConsumingSegment(segmentName, instancePartitions);
+
     LOGGER.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _realtimeTableName);
     return instancesAssigned;
   }
 
   /**
-   * Helper method to assign instances based on the segment partition id and instance partitions.
+   * Helper method to check whether the number of replica-groups matches the table replication for replica-group based
+   * instance partitions. Log a warning if they do not match.
    */
-  private List<String> assignSegment(String segmentName, InstancePartitions instancePartitions) {
+  private void checkReplication(InstancePartitions instancePartitions) {
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    if (numReplicaGroups != 1 && numReplicaGroups != _replication) {
+      LOGGER.warn(
+          "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
+          instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _realtimeTableName,
+          numReplicaGroups);
+    }
+  }
+
+  /**
+   * Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
+   */
+  private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
     int partitionId = new LLCSegmentName(segmentName).getPartitionId();
 
-    if (instancePartitions.getNumReplicaGroups() == 1) {
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    if (numReplicaGroups == 1) {
       // Non-replica-group based assignment:
       // Uniformly spray the partitions and replicas across the instances.
       // E.g. (6 instances, 3 partitions, 4 replicas)
@@ -139,14 +156,6 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       //         p0  p1  p2
       //         p3  p4  p5
 
-      int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-      if (numReplicaGroups != _replication) {
-        LOGGER.warn(
-            "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-            instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _realtimeTableName,
-            numReplicaGroups);
-      }
-
       List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
       for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
         List<String> instances = instancePartitions.getInstances(0, replicaGroupId);
@@ -167,9 +176,15 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
         "Instance partitions: %s should contain 1 partition", consumingInstancePartitions.getInstancePartitionsName());
     boolean includeConsuming = config
         .getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING);
+    boolean bootstrap =
+        config.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
     LOGGER.info(
-        "Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, includeConsuming: {}",
-        _realtimeTableName, completedInstancePartitions, consumingInstancePartitions, includeConsuming);
+        "Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, includeConsuming: {}, bootstrap: {}",
+        _realtimeTableName, completedInstancePartitions, consumingInstancePartitions, includeConsuming, bootstrap);
+    if (completedInstancePartitions != null) {
+      checkReplication(completedInstancePartitions);
+    }
+    checkReplication(consumingInstancePartitions);
 
     SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment completedConsumingOfflineSegmentAssignment =
         new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(currentAssignment);
@@ -184,41 +199,45 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       LOGGER
           .info("Reassigning COMPLETED segments with COMPLETED instance partitions for table: {}", _realtimeTableName);
 
-      if (completedInstancePartitions.getNumReplicaGroups() == 1) {
-        // Non-replica-group based assignment
+      if (bootstrap) {
+        LOGGER.info("Bootstrapping the COMPLETED segments for table: {}", _realtimeTableName);
 
-        List<String> instances = SegmentAssignmentUtils
-            .getInstancesForNonReplicaGroupBasedAssignment(completedInstancePartitions, _replication);
-        newAssignment = SegmentAssignmentUtils
-            .rebalanceTableWithHelixAutoRebalanceStrategy(completedSegmentAssignment, instances, _replication);
+        // When bootstrap is enabled, start with an empty table add reassign all segments
+        newAssignment = new TreeMap<>();
+        for (String segment : completedSegmentAssignment.keySet()) {
+          List<String> assignedInstances = assignCompletedSegment(segment, newAssignment, completedInstancePartitions);
+          newAssignment.put(segment, SegmentAssignmentUtils
+              .getInstanceStateMap(assignedInstances, RealtimeSegmentOnlineOfflineStateModel.ONLINE));
+        }
       } else {
-        // Replica-group based assignment
+        if (completedInstancePartitions.getNumReplicaGroups() == 1) {
+          // Non-replica-group based assignment
 
-        int numReplicaGroups = completedInstancePartitions.getNumReplicaGroups();
-        if (numReplicaGroups != _replication) {
-          LOGGER.warn(
-              "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-              completedInstancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication,
-              _realtimeTableName, numReplicaGroups);
+          List<String> instances = SegmentAssignmentUtils
+              .getInstancesForNonReplicaGroupBasedAssignment(completedInstancePartitions, _replication);
+          newAssignment = SegmentAssignmentUtils
+              .rebalanceTableWithHelixAutoRebalanceStrategy(completedSegmentAssignment, instances, _replication);
+        } else {
+          // Replica-group based assignment
+
+          Map<Integer, List<String>> partitionIdToSegmentsMap = new HashMap<>();
+          for (String segmentName : completedSegmentAssignment.keySet()) {
+            int partitionId = new LLCSegmentName(segmentName).getPartitionId();
+            partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
+          }
+
+          // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
+          //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the table
+          //       name hash as the random seed for the shuffle so that the result is deterministic.
+          Random random = new Random(_realtimeTableName.hashCode());
+          for (List<String> segments : partitionIdToSegmentsMap.values()) {
+            Collections.shuffle(segments, random);
+          }
+
+          newAssignment = SegmentAssignmentUtils
+              .rebalanceReplicaGroupBasedTable(completedSegmentAssignment, completedInstancePartitions,
+                  partitionIdToSegmentsMap);
         }
-
-        Map<Integer, List<String>> partitionIdToSegmentsMap = new HashMap<>();
-        for (String segmentName : completedSegmentAssignment.keySet()) {
-          int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-          partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
-        }
-
-        // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
-        //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the table
-        //       name hash as the random seed for the shuffle so that the result is deterministic.
-        Random random = new Random(_realtimeTableName.hashCode());
-        for (List<String> segments : partitionIdToSegmentsMap.values()) {
-          Collections.shuffle(segments, random);
-        }
-
-        newAssignment = SegmentAssignmentUtils
-            .rebalanceReplicaGroupBasedTable(completedSegmentAssignment, completedInstancePartitions,
-                partitionIdToSegmentsMap);
       }
     } else {
       // When COMPLETED instance partitions are not provided, reassign COMPLETED segments the same way as CONSUMING
@@ -230,7 +249,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
 
       newAssignment = new TreeMap<>();
       for (String segmentName : completedSegmentAssignment.keySet()) {
-        List<String> instancesAssigned = assignSegment(segmentName, consumingInstancePartitions);
+        List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
         Map<String, String> instanceStateMap = SegmentAssignmentUtils
             .getInstanceStateMap(instancesAssigned, RealtimeSegmentOnlineOfflineStateModel.ONLINE);
         newAssignment.put(segmentName, instanceStateMap);
@@ -245,7 +264,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
           .info("Reassigning CONSUMING segments with CONSUMING instance partitions for table: {}", _realtimeTableName);
 
       for (String segmentName : consumingSegmentAssignment.keySet()) {
-        List<String> instancesAssigned = assignSegment(segmentName, consumingInstancePartitions);
+        List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
         Map<String, String> instanceStateMap = SegmentAssignmentUtils
             .getInstanceStateMap(instancesAssigned, RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
         newAssignment.put(segmentName, instanceStateMap);
@@ -261,5 +280,27 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     LOGGER.info("Rebalanced table: {}, number of segments to be moved to each instance: {}", _realtimeTableName,
         SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
     return newAssignment;
+  }
+
+  /**
+   * Helper method to assign instances for COMPLETED segment based on the current assignment and instance partitions.
+   */
+  private List<String> assignCompletedSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      InstancePartitions instancePartitions) {
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    if (numReplicaGroups == 1) {
+      // Non-replica-group based assignment
+
+      return SegmentAssignmentUtils
+          .assignSegmentWithoutReplicaGroup(currentAssignment, instancePartitions, _replication);
+    } else {
+      // Replica-group based assignment
+
+      // Uniformly spray the segment partitions over the instance partitions
+      int segmentPartitionId = new LLCSegmentName(segmentName).getPartitionId();
+      int numPartitions = instancePartitions.getNumPartitions();
+      int partitionId = segmentPartitionId % numPartitions;
+      return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
+    }
   }
 }

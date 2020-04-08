@@ -52,6 +52,9 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-includeConsuming", metaVar = "<boolean>", usage = "Whether to reassign CONSUMING segments for real-time table (false by default)")
   private boolean _includeConsuming = false;
 
+  @Option(name = "-bootstrap", metaVar = "<boolean>", usage = "Whether to rebalance table in bootstrap mode (starting from an empty table and reassign all segments, where segments will be assigned in a round-robin fashion, but no minimum movement is guaranteed, false by default)")
+  private boolean _bootstrap = false;
+
   @Option(name = "-downtime", metaVar = "<boolean>", usage = "Whether to allow downtime for the rebalance (false by default)")
   private boolean _downtime = false;
 
@@ -77,8 +80,8 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   public boolean execute()
       throws Exception {
     PinotTableRebalancer tableRebalancer =
-        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming, _downtime,
-            _minAvailableReplicas, _bestEfforts);
+        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming, _bootstrap,
+            _downtime, _minAvailableReplicas, _bestEfforts);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
     LOGGER
         .info("Got rebalance result: {} for table: {}", JsonUtils.objectToString(rebalanceResult), _tableNameWithType);
@@ -112,6 +115,12 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
     System.out.println("Rebalance table with CONSUMING segments reassigned");
     System.out.println(
         "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_REALTIME -includeConsuming");
+    System.out.println();
+
+    System.out.println(
+        "Rebalance table in bootstrap mode. Rebalancer will start from an empty table and reassign all segments");
+    System.out.println(
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_REALTIME -bootstrap");
     System.out.println();
 
     System.out.println("Rebalance table with downtime");
