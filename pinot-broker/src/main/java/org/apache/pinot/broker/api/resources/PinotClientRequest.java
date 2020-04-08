@@ -38,18 +38,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.TimeUnit;
 
 
 @Api(tags = "Query")
@@ -74,7 +70,7 @@ public class PinotClientRequest {
       @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
       @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended AsyncResponse asyncResponse) {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.PQL, query);
@@ -99,12 +95,9 @@ public class PinotClientRequest {
   @Path("query")
   @ApiOperation(value = "Querying pinot")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
-  public void processQueryPost(String query, @Suspended final AsyncResponse asyncResponse) {
+  public void processQueryPost(String query, @Suspended AsyncResponse asyncResponse) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
-      if (requestJson.has("trace")) {
-        TimeUnit.SECONDS.sleep(15);
-      }
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
       asyncResponse.resume(brokerResponse);
     } catch (Exception e) {
@@ -123,7 +116,7 @@ public class PinotClientRequest {
   public void processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
       @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended AsyncResponse asyncResponse) {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
@@ -150,7 +143,7 @@ public class PinotClientRequest {
   @Path("query/sql")
   @ApiOperation(value = "Querying pinot using sql")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
-  public void processSqlQueryPost(String query, @Suspended final AsyncResponse asyncResponse) {
+  public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
       if (!requestJson.has(Request.SQL)) {
