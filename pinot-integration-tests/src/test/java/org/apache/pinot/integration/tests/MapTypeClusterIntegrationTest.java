@@ -37,6 +37,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -73,10 +74,10 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Create and upload segments
     File avroFile = createAvroFile();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(getTableName())
-        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + AvroUtils.MAP_KEY_COLUMN_SUFFIX, DataType.STRING)
-        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + AvroUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
-        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + AvroUtils.MAP_KEY_COLUMN_SUFFIX, DataType.INT)
-        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + AvroUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT).build();
+        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SourceFieldNameExtractor.MAP_KEY_COLUMN_SUFFIX, DataType.STRING)
+        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SourceFieldNameExtractor.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
+        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SourceFieldNameExtractor.MAP_KEY_COLUMN_SUFFIX, DataType.INT)
+        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SourceFieldNameExtractor.MAP_VALUE_COLUMN_SUFFIX, DataType.INT).build();
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
         .buildSegmentsFromAvro(Collections.singletonList(avroFile), 0, _segmentDir, _tarDir, getTableName(), null, null,

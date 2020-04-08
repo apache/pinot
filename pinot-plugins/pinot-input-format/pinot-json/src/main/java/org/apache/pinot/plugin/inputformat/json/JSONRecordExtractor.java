@@ -16,21 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.inputformat.avro;
+package org.apache.pinot.plugin.inputformat.json;
 
 import java.util.List;
-import org.apache.avro.generic.GenericRecord;
+import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
-public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
+/**
+ * Extractor for JSON records
+ */
+public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>> {
 
   @Override
-  public GenericRow extract(List<String> sourceFieldNames, GenericRecord from, GenericRow to) {
+  public GenericRow extract(List<String> sourceFieldNames, Map<String, Object> from, GenericRow to) {
     for (String fieldName : sourceFieldNames) {
       Object value = from.get(fieldName);
-      Object convertedValue = AvroUtils.convert(value);
+      Object convertedValue = RecordReaderUtils.convert(value);
       to.putValue(fieldName, convertedValue);
     }
     return to;

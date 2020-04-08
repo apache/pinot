@@ -21,11 +21,13 @@ package org.apache.pinot.plugin.inputformat.avro.confluent;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import java.util.List;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
@@ -44,13 +46,14 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     private KafkaAvroDeserializer deserializer;
     private RecordExtractor<Record> avroRecordConverter;
     private String topicName;
-    private Schema pinotSchema;
+    private List<String> _sourceFieldNames;
 
     @Override
     public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
         checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
         String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
-        pinotSchema = requireNonNull(indexingSchema, "indexingSchema is null");
+        requireNonNull(indexingSchema, "indexingSchema is null");
+        _sourceFieldNames = SourceFieldNameExtractor.extract(indexingSchema);
         SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000);
         deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
         this.topicName = requireNonNull(topicName, "topicName is null");
@@ -60,7 +63,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     @Override
     public GenericRow decode(byte[] payload, GenericRow destination) {
         Record avroRecord = (Record) deserializer.deserialize(topicName, payload);
-        return avroRecordConverter.extract(pinotSchema, avroRecord, destination);
+        return avroRecordConverter.extract(_sourceFieldNames, avroRecord, destination);
     }
 
     @Override

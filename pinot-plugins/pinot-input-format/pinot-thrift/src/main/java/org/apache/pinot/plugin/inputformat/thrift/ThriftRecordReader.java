@@ -25,12 +25,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
+import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -44,7 +44,8 @@ import org.apache.thrift.transport.TIOStreamTransport;
 public class ThriftRecordReader implements RecordReader {
   private File _dataFile;
   private Schema _schema;
-  private List<FieldSpec> _fieldSpecs;
+  private List<String> _sourceColumns;
+  private ThriftRecordExtractor _recordExtractor;
   private Class<?> _thriftClass;
   private Map<String, Integer> _fieldIds = new HashMap<>();
 
@@ -81,7 +82,6 @@ public class ThriftRecordReader implements RecordReader {
     ThriftRecordReaderConfig recordReaderConfig = (ThriftRecordReaderConfig) config;
     _dataFile = dataFile;
     _schema = schema;
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
     TBase tObject;
     try {
       _thriftClass = this.getClass().getClassLoader().loadClass(recordReaderConfig.getThriftClass());
@@ -95,6 +95,11 @@ public class ThriftRecordReader implements RecordReader {
       _fieldIds.put(tFieldIdEnum.getFieldName(), index);
       index++;
     }
+    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
+    recordExtractorConfig.setFieldIds(_fieldIds);
+    _recordExtractor = new ThriftRecordExtractor();
+    _recordExtractor.init(recordExtractorConfig);
 
     init();
   }
@@ -120,19 +125,7 @@ public class ThriftRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new IOException("Caught exception while reading thrift object", e);
     }
-    for (FieldSpec fieldSpec : _fieldSpecs) {
-      String fieldName = fieldSpec.getName();
-      Object value = null;
-      Integer fieldId = _fieldIds.get(fieldName);
-      if (fieldId != null) {
-        //noinspection unchecked
-        value = tObject.getFieldValue(tObject.fieldForId(fieldId));
-      }
-      // Allow default value for non-time columns
-      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
-      }
-    }
+    _recordExtractor.extract(_sourceColumns, tObject, reuse);
     _hasNext = hasMoreToRead();
     return reuse;
   }

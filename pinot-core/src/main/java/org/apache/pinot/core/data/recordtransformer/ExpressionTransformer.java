@@ -23,9 +23,8 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.function.FunctionExpressionEvaluator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluator;
+import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluatorFactory;
 
 
 /**
@@ -34,33 +33,29 @@ import org.slf4j.LoggerFactory;
  * regular column for other record transformers.
  */
 public class ExpressionTransformer implements RecordTransformer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
 
-  private final Map<String, FunctionExpressionEvaluator> _expressionEvaluators = new HashMap<>();
+  private final Map<String, ExpressionEvaluator> _expressionEvaluators = new HashMap<>();
 
   public ExpressionTransformer(Schema schema) {
+
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        String expression = fieldSpec.getTransformFunction();
-        if (expression != null) {
-          try {
-            _expressionEvaluators.put(fieldSpec.getName(), new FunctionExpressionEvaluator(expression));
-          } catch (Exception e) {
-            LOGGER.error("Caught exception while constructing expression evaluator for: {}, skipping", expression, e);
-          }
-        }
+      ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+      if (expressionEvaluator != null) {
+        _expressionEvaluators.put(fieldSpec.getName(), expressionEvaluator);
       }
     }
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
-    for (Map.Entry<String, FunctionExpressionEvaluator> entry : _expressionEvaluators.entrySet()) {
+    for (Map.Entry<String, ExpressionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
+      ExpressionEvaluator transformExpressionEvaluator = entry.getValue();
       // Skip transformation if column value already exist
       // NOTE: column value might already exist for OFFLINE data
       if (record.getValue(column) == null) {
-        record.putValue(column, entry.getValue().evaluate(record));
+        Object result = transformExpressionEvaluator.evaluate(record);
+        record.putValue(column, result);
       }
     }
     return record;

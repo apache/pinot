@@ -25,12 +25,11 @@ import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
+import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 
 
 /**
@@ -39,7 +38,8 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 public class ParquetRecordReader implements RecordReader {
   private Path _dataFilePath;
   private Schema _schema;
-  private List<FieldSpec> _fieldSpecs;
+  private List<String> _sourceColumns;
+  private ParquetRecordExtractor _recordExtractor;
   private ParquetReader<GenericRecord> _reader;
   private GenericRecord _nextRecord;
 
@@ -50,7 +50,9 @@ public class ParquetRecordReader implements RecordReader {
     _schema = schema;
     ParquetUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
 
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(_schema);
+    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    _recordExtractor = new ParquetRecordExtractor();
+
     _reader = ParquetUtils.getParquetReader(_dataFilePath);
     _nextRecord = _reader.read();
   }
@@ -71,14 +73,7 @@ public class ParquetRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    for (FieldSpec fieldSpec : _fieldSpecs) {
-      String fieldName = fieldSpec.getName();
-      Object value = _nextRecord.get(fieldName);
-      // Allow default value for non-time columns
-      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
-      }
-    }
+   _recordExtractor.extract(_sourceColumns, _nextRecord, reuse);
     _nextRecord = _reader.read();
     return reuse;
   }

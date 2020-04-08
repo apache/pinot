@@ -18,12 +18,18 @@
  */
 package org.apache.pinot.plugin.stream.kafka;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
@@ -33,32 +39,27 @@ import org.slf4j.LoggerFactory;
 
 public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private Schema _schema;
-  private FieldSpec _incomingTimeFieldSpec;
+  private List<String> _sourceFieldNames;
+  private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
-    _schema = indexingSchema;
-
-    // For time field, we use the incoming time field spec
-    TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
-    if (timeFieldSpec != null) {
-      _incomingTimeFieldSpec = new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec());
-    }
+    _sourceFieldNames = SourceFieldNameExtractor.extract(indexingSchema);
+    String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
+    // FIXME: if recordExtractorClass == null, create JSONRecordExtractor. But pinot-input-format/pinot-json is not available here
+    //  Did not face this issue in KafkaAvroMessageDecoder, because all the AvroMessageDecoders are in pinot-input-format/pinot-avro
+    _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
   }
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-        FieldSpec incomingFieldSpec =
-            fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
-        String column = incomingFieldSpec.getName();
-        destination.putValue(column, JsonUtils.extractValue(message.get(column), incomingFieldSpec));
-      }
+      Map<String, Object> from = OBJECT_MAPPER.convertValue(message, new TypeReference<Map<String, Object>>(){});
+      _jsonRecordExtractor.extract(_sourceFieldNames, from, destination);
       return destination;
     } catch (Exception e) {
       LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}", new String(payload), e);

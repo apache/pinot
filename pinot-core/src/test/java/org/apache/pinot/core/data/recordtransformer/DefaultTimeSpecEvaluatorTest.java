@@ -23,6 +23,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.function.evaluators.DefaultTimeSpecEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -33,30 +34,28 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
 
-public class TimeTransformerTest {
+public class DefaultTimeSpecEvaluatorTest {
   private static final long VALID_TIME = new DateTime(2018, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
   private static final long INVALID_TIME = new DateTime(2200, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
 
   @Test
   public void testTimeFormat() {
     // When incoming and outgoing spec are the same, any time format should work
-    Schema schema = new Schema();
-    schema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
-        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "time")));
-    TimeTransformer transformer = new TimeTransformer(schema);
+    TimeFieldSpec timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
+        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "time"));
+    DefaultTimeSpecEvaluator transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     GenericRow record = new GenericRow();
     record.putField("time", 20180101);
-    record = transformer.transform(record);
-    assertNotNull(record);
-    assertEquals(record.getValue("time"), 20180101);
+    Object transformedValue = transformer.evaluate(record);
+    assertNotNull(transformedValue);
+    assertEquals(transformedValue, 20180101);
 
     // When incoming and outgoing spec are not the same, simple date format is not allowed
-    schema = new Schema();
-    schema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
         TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "incoming"),
-        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.SECONDS, "outgoing")));
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.SECONDS, "outgoing"));
     try {
-      new TimeTransformer(schema);
+      new DefaultTimeSpecEvaluator(timeFieldSpec);
       fail();
     } catch (IllegalArgumentException e) {
       // Expected
@@ -66,58 +65,54 @@ public class TimeTransformerTest {
   @Test
   public void testSkipConversion() {
     // When incoming time does not exist or is invalid, outgoing time exists and is valid, skip conversion
-    Schema schema = new Schema();
-    schema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "incoming"),
-        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing")));
-    TimeTransformer transformer = new TimeTransformer(schema);
+    TimeFieldSpec timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
+    DefaultTimeSpecEvaluator transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     GenericRow record = new GenericRow();
     record.putField("outgoing", VALID_TIME);
-    record = transformer.transform(record);
-    assertNotNull(record);
-    assertEquals(record.getValue("outgoing"), VALID_TIME);
+    Object transformedValue = transformer.evaluate(record);
+    assertNotNull(transformedValue);
+    assertEquals(transformedValue, VALID_TIME);
 
-    transformer = new TimeTransformer(schema);
+    transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
     record.putField("incoming", INVALID_TIME);
     record.putField("outgoing", VALID_TIME);
-    record = transformer.transform(record);
-    assertNotNull(record);
-    assertEquals(record.getValue("outgoing"), VALID_TIME);
+    transformedValue = transformer.evaluate(record);
+    assertNotNull(transformedValue);
+    assertEquals(transformedValue, VALID_TIME);
 
     // When incoming and outgoing time column is the same, and the value is already converted, skip conversion
-    schema = new Schema();
-    schema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"),
-        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time")));
-    transformer = new TimeTransformer(schema);
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"));
+    transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
     record.putField("time", VALID_TIME);
-    record = transformer.transform(record);
-    assertNotNull(record);
-    assertEquals(record.getValue("time"), VALID_TIME);
+    transformedValue = transformer.evaluate(record);
+    assertNotNull(transformedValue);
+    assertEquals(transformedValue, VALID_TIME);
 
     // When both incoming and outgoing time do not exist or are invalid, throw exception
-    schema = new Schema();
-    schema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "incoming"),
-        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing")));
-    transformer = new TimeTransformer(schema);
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
+    transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
     record.putField("incoming", INVALID_TIME);
     record.putField("outgoing", INVALID_TIME);
     try {
-      transformer.transform(record);
+      transformer.evaluate(record);
       fail();
     } catch (IllegalStateException e) {
       // Expected
     }
 
-    schema = new Schema();
-    schema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"),
-        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time")));
-    transformer = new TimeTransformer(schema);
+    new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"));
+    transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
     record.putField("time", INVALID_TIME);
     try {
-      transformer.transform(record);
+      transformer.evaluate(record);
       fail();
     } catch (IllegalStateException e) {
       // Expected
@@ -127,25 +122,23 @@ public class TimeTransformerTest {
   @Test
   public void testTimeConversion() {
     // When incoming time exists and is valid, do the conversion
-    Schema schema = new Schema();
-    schema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "incoming"),
-        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing")));
-    TimeTransformer transformer = new TimeTransformer(schema);
+    TimeFieldSpec timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
+    DefaultTimeSpecEvaluator transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     GenericRow record = new GenericRow();
     record.putField("incoming", TimeUnit.MILLISECONDS.toDays(VALID_TIME));
-    record = transformer.transform(record);
-    assertNotNull(record);
-    assertEquals(record.getValue("outgoing"), VALID_TIME);
+    Object transformedValue = transformer.evaluate(record);
+    assertNotNull(transformedValue);
+    assertEquals(transformedValue, VALID_TIME);
 
     // When incoming and outgoing time column is the same, and the value is not yet converted, do the conversion
-    schema = new Schema();
-    schema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"),
-        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time")));
-    transformer = new TimeTransformer(schema);
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"));
+    transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
     record.putField("time", TimeUnit.MILLISECONDS.toDays(VALID_TIME));
-    record = transformer.transform(record);
-    assertNotNull(record);
-    assertEquals(record.getValue("time"), VALID_TIME);
+    transformedValue = transformer.evaluate(record);
+    assertNotNull(transformedValue);
+    assertEquals(transformedValue, VALID_TIME);
   }
 }

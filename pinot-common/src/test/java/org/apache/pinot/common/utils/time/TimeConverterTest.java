@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.time;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.TimeConverter;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

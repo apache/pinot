@@ -16,23 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.inputformat.avro;
+package org.apache.pinot.spi.data.function.evaluators;
 
 import java.util.List;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 
 
-public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
+/**
+ * Interface for evaluators of transform function expressions of schema field specs
+ */
+public interface ExpressionEvaluator {
 
-  @Override
-  public GenericRow extract(List<String> sourceFieldNames, GenericRecord from, GenericRow to) {
-    for (String fieldName : sourceFieldNames) {
-      Object value = from.get(fieldName);
-      Object convertedValue = AvroUtils.convert(value);
-      to.putValue(fieldName, convertedValue);
-    }
-    return to;
-  }
+  List<String> getArguments();
+
+  Object evaluate(GenericRow genericRow);
 }

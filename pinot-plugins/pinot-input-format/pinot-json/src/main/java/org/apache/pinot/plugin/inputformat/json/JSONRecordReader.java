@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
+import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -40,7 +41,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class JSONRecordReader implements RecordReader {
   private File _dataFile;
   private Schema _schema;
-  private List<FieldSpec> _fieldSpecs;
+  private List<String> _sourceColumns;
+  private JSONRecordExtractor _recordExtractor;
 
   private MappingIterator<Map<String, Object>> _iterator;
 
@@ -65,7 +67,8 @@ public class JSONRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
+    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    _recordExtractor = new JSONRecordExtractor();
     init();
   }
 
@@ -84,14 +87,7 @@ public class JSONRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     Map<String, Object> record = _iterator.next();
-    for (FieldSpec fieldSpec : _fieldSpecs) {
-      String fieldName = fieldSpec.getName();
-      Object value = record.get(fieldName);
-      // Allow default value for non-time columns
-      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
-      }
-    }
+    _recordExtractor.extract(_sourceColumns, record, reuse);
     return reuse;
   }
 

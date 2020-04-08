@@ -28,16 +28,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -66,32 +62,33 @@ public class RecordReaderUtils {
     }
   }
 
-  /**
-   * Extracts all field specs from the given schema.
-   * <p>For time field spec:
-   * <ul>
-   *   <li>If incoming and outgoing time column name are the same, use incoming time field spec</li>
-   *   <li>If incoming and outgoing time column name are different, put both of them as time field spec</li>
-   *   <li>
-   *     We keep both incoming and outgoing time column to handle cases where the input file contains time values that
-   *     are already converted
-   *   </li>
-   * </ul>
-   */
-  public static List<FieldSpec> extractFieldSpecs(Schema schema) {
-    List<FieldSpec> fieldSpecs = new ArrayList<>();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
-        TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-        fieldSpecs.add(new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec()));
-        if (!timeFieldSpec.getOutgoingTimeColumnName().equals(timeFieldSpec.getIncomingTimeColumnName())) {
-          fieldSpecs.add(new TimeFieldSpec(timeFieldSpec.getOutgoingGranularitySpec()));
+  public static Object convert(Object value) {
+    Object returnValue;
+    if (value != null) {
+      if (value instanceof Collection) {
+        Collection values = (Collection) value;
+        int numValues = values.size();
+        Object[] array = new Object[numValues];
+        int index = 0;
+        for (Object v : values) {
+          if (v != null) {
+            array[index++] = v;
+          }
+        }
+        if (index == numValues) {
+          returnValue = array;
+        } else if (index == 0) {
+          returnValue = null;
+        } else {
+          returnValue = Arrays.copyOf(array, index);
         }
       } else {
-        fieldSpecs.add(fieldSpec);
+        returnValue = value;
       }
+    } else {
+      returnValue = null;
     }
-    return fieldSpecs;
+    return returnValue;
   }
 
   /**

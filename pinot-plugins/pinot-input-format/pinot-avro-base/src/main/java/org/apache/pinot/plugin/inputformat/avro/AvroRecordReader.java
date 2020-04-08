@@ -24,12 +24,11 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
+import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 
 
 /**
@@ -38,8 +37,8 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 public class AvroRecordReader implements RecordReader {
   private File _dataFile;
   private Schema _schema;
-  private List<FieldSpec> _fieldSpecs;
-
+  private List<String> _sourceColumns;
+  private AvroRecordExtractor _recordExtractor;
   private DataFileStream<GenericRecord> _avroReader;
   private GenericRecord _reusableAvroRecord = null;
 
@@ -51,7 +50,6 @@ public class AvroRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
     _avroReader = AvroUtils.getAvroReader(dataFile);
     try {
       AvroUtils.validateSchema(_schema, _avroReader.getSchema());
@@ -59,6 +57,8 @@ public class AvroRecordReader implements RecordReader {
       _avroReader.close();
       throw e;
     }
+    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    _recordExtractor = new AvroRecordExtractor();
   }
 
   @Override
@@ -78,14 +78,7 @@ public class AvroRecordReader implements RecordReader {
   public GenericRow next(GenericRow reuse)
       throws IOException {
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
-    for (FieldSpec fieldSpec : _fieldSpecs) {
-      String fieldName = fieldSpec.getName();
-      Object value = _reusableAvroRecord.get(fieldName);
-      // Allow default value for non-time columns
-      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        AvroUtils.extractField(fieldSpec, _reusableAvroRecord, reuse);
-      }
-    }
+    _recordExtractor.extract(_sourceColumns, _reusableAvroRecord, reuse);
     return reuse;
   }
 

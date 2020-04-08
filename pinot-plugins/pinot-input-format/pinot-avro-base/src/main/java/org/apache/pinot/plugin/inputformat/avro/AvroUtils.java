@@ -26,8 +26,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
@@ -42,16 +40,12 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class AvroUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
-  public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
-  public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
 
   private AvroUtils() {
   }
@@ -305,42 +299,16 @@ public class AvroUtils {
     }
   }
 
-  @SuppressWarnings("unchecked")
-  public static void extractField(FieldSpec fieldSpec, GenericRecord from, GenericRow to) {
-    String fieldName = fieldSpec.getName();
-
-    // Handle the Map type
-    if (fieldName.endsWith(MAP_KEY_COLUMN_SUFFIX)) {
-      String avroFieldName = fieldName.substring(0, fieldName.length() - MAP_KEY_COLUMN_SUFFIX.length());
-      Map map = (Map) from.get(avroFieldName);
-      if (map != null) {
-        // Sort the keys so that the order is deterministic
-        TreeSet sortedKeys = new TreeSet(map.keySet());
-        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedKeys));
-        return;
-      }
-    } else if (fieldName.endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
-      String avroFieldName = fieldName.substring(0, fieldName.length() - MAP_VALUE_COLUMN_SUFFIX.length());
-      Map map = (Map) from.get(avroFieldName);
-      if (map != null) {
-        // Sort the keys so that the order is deterministic
-        TreeMap sortedMap = new TreeMap<>(map);
-        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedMap.values()));
-        return;
-      }
-    }
-    to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, convert(fieldSpec, from.get(fieldName))));
-  }
-
-  /**
-   * Converts the value based on the given field spec.
-   */
-  public static Object convert(FieldSpec fieldSpec, @Nullable Object value) {
-    if (fieldSpec.isSingleValueField()) {
-      return handleSingleValue(value);
+  public static Object convert(Object value) {
+    Object convertedValue;
+    if (value instanceof Collection) {
+      convertedValue = AvroUtils.handleMultiValue((Collection) value);
+    } else if (value instanceof Map) {
+      convertedValue = value;
     } else {
-      return handleMultiValue((Collection) value);
+      convertedValue =AvroUtils.handleSingleValue(value);
     }
+    return convertedValue;
   }
 
   /**
