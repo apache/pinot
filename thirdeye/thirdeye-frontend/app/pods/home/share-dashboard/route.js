@@ -64,12 +64,15 @@ export default Route.extend(AuthenticatedRouteMixin, {
   afterModel(model) {
     // Overrides with params if exists
     const appName = model.appName || null;
-    const startDate = Number(model.startDate) || get(this, 'startDate');//TODO: we can use ember transform here
-    const endDate = Number(model.endDate) || get(this, 'endDate');
+    let startDate = Number(model.startDate) || get(this, 'startDate');//TODO: we can use ember transform here
+    let endDate = Number(model.endDate) || get(this, 'endDate');
     const duration = model.duration || get(this, 'duration');
     const feedbackType = model.feedbackType || get(this, 'feedbackType');
     const shareId = model.shareId || get(this, 'shareId');
     const subGroup = model.subGroup || null;
+
+    [startDate, endDate] = this.get('setDatesFromDuration')(duration, startDate, endDate); // if there's a duration param, override dates.
+
     // Update props
     setProperties(this, {
       appName,
@@ -211,6 +214,34 @@ export default Route.extend(AuthenticatedRouteMixin, {
     return anomalyMapping;
   }).drop(),
 
+  /**
+   * Overrides startDate and endDate params if duration present
+   * @return {Undefined}
+   */
+  setDatesFromDuration(duration, start, end) {
+    if (duration) {
+      switch(duration) {
+        case 'today':
+          start = moment().startOf('day').valueOf();
+          end = moment().startOf('day').add(1, 'days').valueOf();
+          break;
+        case '2d':
+          start = moment().subtract(1, 'day').startOf('day').valueOf();
+          end = moment().startOf('day').valueOf();
+          break;
+        case '1d':
+          start = moment().subtract(24, 'hour').startOf('hour').valueOf();
+          end = moment().startOf('hour').valueOf();
+          break;
+        case '1w':
+          start = moment().subtract(1, 'week').startOf('day').valueOf();
+          end = moment().startOf('day').add(1, 'days').valueOf();
+          break;
+      }
+    }
+    return [start, end];
+  },
+
   actions: {
     willTransition: function(transition){
       //saving session url - TODO: add a util or service - lohuynh
@@ -237,7 +268,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     this._super(...arguments);
     //set and reset controller props as needed
     controller.setProperties({
-      shareTemplateConfig: model.shareTemplateConfig.data || {},
+      shareTemplateConfig: (model.shareTemplateConfig || {}).data || {},
       columns,
       start: get(this, 'startDate'),
       end: get(this, 'endDate'),
