@@ -98,9 +98,10 @@ class Tables extends Component {
         fetch(App.serverAddress + '/tables/' + table)
             .then(res => res.json())
             .then((data) => {
-                console.log(JSON.stringify(data));
+                // console.log(JSON.stringify(data));
                 this.treeData = Utils.populateNode(data,1, 'properties');
-                // console.log(this.treeData['children'])
+                console.log('hi')
+                console.log(this.treeData['children'])
                 this.setState({instances: this.tables, treeData: this.treeData})
                 
             })
@@ -109,7 +110,7 @@ class Tables extends Component {
 
     displayTable(table) {
         this.currentTable  = table;
-        console.log('hi')
+        
         return () =>  {
             this.tableDisplay = <PinotTable table = {this.currentTable}></PinotTable>;
             this.setState({currentTable: this.currentTable });
@@ -128,7 +129,14 @@ class Tables extends Component {
                         { title: 'Table Name', field: 'name' },
                         { title: 'Reported Size', field: 'reportedSizeInBytes' },
                         { title: 'Estimated Size', field: 'estimatedSizeInBytes'},
-                        { title: 'Table Properties', field: 'properties'},
+                        { title: 'Properties', render: rowData => <TreeView
+                        defaultCollapseIcon={<ExpandMoreIcon />}
+                        defaultExpandIcon={<ChevronRightIcon />}
+                        defaultExpanded={['2']}>
+                        {Utils.renderTree(this.state.treeData)}
+</TreeView>}
+                        
+                        
                     ]}
                     data={this.tables}
                     localization={{
@@ -136,25 +144,13 @@ class Tables extends Component {
                             actions: 'Table Properties'
                         },
                       }}
-                    // actions={[
-                    //     {
-                    //       icon: 'check',
-                    //       tooltip: 'Save User',
-                    //       onClick: (event, rowData) => {return (
-                            
-                                
-                        
-                    //     <PinotTable table = {rowData.name}></PinotTable>
-                        
-                    //       )}
-                    //     }
-                    //   ]}
+                    
                     detailPanel={rowData => {
                         return (
                             <div>
-                                
-                        
                         <PinotTable table = {rowData.name}></PinotTable>
+                        
+                        
                         </div>
                         )
                       }}
