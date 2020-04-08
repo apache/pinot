@@ -108,7 +108,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
    */
   private DataFrame constructBaselineAndBoundaries(DataFrame df) {
     // Set default baseline as the actual value
-    df.addSeries(COL_VALUE, df.get(COL_CURRENT));
+    df.addSeries(COL_VALUE, df.getDoubles(COL_CURRENT));
     if (!Double.isNaN(this.min)) {
       df.addSeries(COL_LOWER_BOUND, DoubleSeries.fillValues(df.size(), this.min));
       // set baseline value as the lower bound when actual value across below the mark
