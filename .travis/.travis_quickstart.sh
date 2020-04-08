@@ -22,7 +22,7 @@
 git diff --name-only "${TRAVIS_COMMIT_RANGE}" | egrep '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'Skip ThirdEye tests for Quickstart'
-  rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
+  rm -rf ~/.m2/repository/org/apache/pinot ~/.m2/repository/org/apache/pinot/thirdeye
   exit 0
 fi
 
