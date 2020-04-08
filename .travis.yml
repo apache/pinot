@@ -11,7 +11,8 @@ before_install:
   - jq --version
   - curl -sSL -o ~/bin/install-jdk.sh https://raw.githubusercontent.com/sormuras/bach/master/install-jdk.sh && chmod +x ~/bin/install-jdk.sh
   - source ./.travis/.travis_set_deploy_build_opts.sh
-  - TIMEOUTEXE=`which timeout`
+  - TIMEOUTEXE=$(which timeout)
+  - echo $TIMEOUTEXE
   - TIMEOUT='50m'
 
 cache:
@@ -39,6 +40,8 @@ jobs:
     - name: "Integration Tests - OracleJDK 8"
       jdk: oraclejdk8
       script:
+        - if [ "x" = "x$TIMEOUTEXE" ] ; then TIMEOUTEXE=gtimeout; fi
+        - echo $TIMEOUTEXE
         - $TIMEOUTEXE -s SIGTERM $TIMEOUT ./.travis/.travis_test.sh
         - RESULT=$?; if [ $RESULT -eq 0 ] || [ $RESULT -eq 124 ]; then exit 0; else exit 1; fi;
       env:
@@ -46,6 +49,8 @@ jobs:
     - name: "Unit Tests - OracleJDK 8"
       jdk: oraclejdk8
       script:
+        - if [ "x" = "x$TIMEOUTEXE" ] ; then TIMEOUTEXE=gtimeout; fi
+        - echo $TIMEOUTEXE
         - $TIMEOUTEXE -s SIGTERM $TIMEOUT ./.travis/.travis_test.sh
         - RESULT=$?; if [ $RESULT -eq 0 ] || [ $RESULT -eq 124 ]; then exit 0; else exit 1; fi;
       env:

@@ -19,7 +19,7 @@
 #
 
 # ThirdEye related changes
-git diff --name-only "${TRAVIS_COMMIT_RANGE}" | egrep '^(thirdeye)'
+git diff --name-only "${TRAVIS_COMMIT_RANGE}" | grep -E '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'Skip ThirdEye tests for Quickstart'
   rm -rf ~/.m2/repository/org/apache/pinot ~/.m2/repository/org/apache/pinot/thirdeye
