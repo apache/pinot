@@ -7,7 +7,7 @@ const COLUMN_CLASS = 'rootcause-dimensions-table__column';
 export const groupedHeaders = (advDimensionCount, overallChange) => [
   [
     {title: 'Top Anomalous Dimensions', className: 'rootcause-dimensions-table__header', colspan: advDimensionCount},
-    {title: '', className: 'rootcause-dimensions-table__header', colspan: 1},
+    {title: '', className: 'rootcause-dimensions-table__header', colspan: 2},
     {title: `Overall Change ${overallChange}`, className: 'rootcause-dimensions-table__header', colspan: 1},
     {title: '', className: 'rootcause-dimensions-table__header', colspan: 2}
   ]
@@ -19,17 +19,24 @@ export const groupedHeaders = (advDimensionCount, overallChange) => [
  */
 export const baseColumns = [
   {
-    propertyName: 'boc',
-    title: 'Baseline/Current',
-    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--large-width`,
+    propertyName: 'baseline',
+    title: 'Baseline',
+    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width baseline`,
+    disableSorting: true,
+    disableFiltering: true
+  },
+  {
+    propertyName: 'current',
+    title: 'Current',
+    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width current`,
     disableSorting: true,
     disableFiltering: true
   },
   {
     propertyName: 'percentageChange',
-    component: 'custom/dimensions-table/change-bars',
+    component: 'custom/dimensions-table/percent-change',
     title: '% Change',
-    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--bar-cell`,
+    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width`,
     disableSorting: true,
     disableFiltering: true
   },
@@ -44,8 +51,8 @@ export const baseColumns = [
   {
     propertyName: 'cost',
     title: 'Cost',
-    component: 'custom/dimensions-table/cost',
-    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width`,
+    component: 'custom/dimensions-table/change-bars',
+    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--bar-cell`,
     disableSorting: true,
     disableFiltering: true
   }
