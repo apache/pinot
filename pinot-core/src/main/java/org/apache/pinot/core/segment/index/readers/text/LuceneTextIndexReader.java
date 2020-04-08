@@ -54,7 +54,6 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
-  private final QueryParser _queryParser;
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
 
@@ -90,7 +89,6 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
           .error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());
       throw new RuntimeException(e);
     }
-    _queryParser = new QueryParser(column, new StandardAnalyzer());
   }
 
   /**
@@ -133,7 +131,8 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      Query query = _queryParser.parse(searchQuery);
+      QueryParser parser = new QueryParser(_column, new StandardAnalyzer());
+      Query query = parser.parse(searchQuery);
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {

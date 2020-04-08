@@ -26,6 +26,7 @@ import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -45,7 +46,13 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.pinot.common.response.broker.AggregationResult;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -162,6 +169,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexLoadingConfig.setTextIndexColumns(new HashSet<>(textIndexColumns));
     ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegments.add(segment);
+    _segmentDataManagers =
+        Arrays.asList(new ImmutableSegmentDataManager(segment), new ImmutableSegmentDataManager(segment));
   }
 
   private void createTestData()
@@ -1111,5 +1120,100 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     long count = (Long) operatorResult.getAggregationResult().get(0);
     Assert.assertEquals(expectedCount, count);
+  }
+
+  @Test
+  public void testInterSegment() {
+    String query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
+    testInterSegmentAggregationQueryHelper(query, 12);
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
+    List<Serializable[]> expected = new ArrayList<>();
+    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Serializable[]{1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large scale systems, Machine learning"});
+    expected.add(new Serializable[]{1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high performance scalable systems"});
+    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Serializable[]{1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large scale systems, Machine learning"});
+    expected.add(new Serializable[]{1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high performance scalable systems"});
+    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Serializable[]{1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large scale systems, Machine learning"});
+    expected.add(new Serializable[]{1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high performance scalable systems"});
+    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Serializable[]{1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large scale systems, Machine learning"});
+    expected.add(new Serializable[]{1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high performance scalable systems"});
+    testInterSegmentSelectionQueryHelper(query, expected);
+
+    // try arbitrary filters in search expressions
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) OR (Java AND C++)') LIMIT 50000";
+    testInterSegmentAggregationQueryHelper(query, 36);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
+    testInterSegmentAggregationQueryHelper(query, 4);
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
+    expected = new ArrayList<>();
+    expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
+    expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
+    expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
+    expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
+    testInterSegmentSelectionQueryHelper(query, expected);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"') LIMIT 50000";
+    testInterSegmentAggregationQueryHelper(query, 4);
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"') LIMIT 50000";
+    expected = new ArrayList<>();
+    expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
+    expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
+    expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
+    expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
+    testInterSegmentSelectionQueryHelper(query, expected);
+  }
+
+  private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
+    // PQL
+    BrokerResponseNative brokerResponseNative  = getBrokerResponseForPqlQuery(query);
+    List<AggregationResult> aggregationResults = brokerResponseNative.getAggregationResults();
+    Assert.assertEquals(aggregationResults.size(), 1);
+    Assert.assertEquals(aggregationResults.get(0).getValue().toString(), String.valueOf(expectedCount));
+    // SQL
+    brokerResponseNative = getBrokerResponseForSqlQuery(query);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    DataSchema dataSchema = resultTable.getDataSchema();
+    Assert.assertEquals(dataSchema.size(), 1);
+    Assert.assertEquals(dataSchema.getColumnName(0), "count(*)");
+    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.LONG);
+    List<Object[]> rows = resultTable.getRows();
+    Assert.assertEquals(rows.size(), 1);
+    Object[] row = rows.get(0);
+    Assert.assertEquals(row.length, 1);
+    Assert.assertEquals(row[0], expectedCount);
+  }
+
+  private void testInterSegmentSelectionQueryHelper(String query, List<Serializable[]> expectedResults) {
+    // PQL
+    BrokerResponseNative brokerResponseNative  = getBrokerResponseForPqlQuery(query);
+    SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
+    List<String> columns = selectionResults.getColumns();
+    Assert.assertEquals(columns.size(), 2);
+    List<Serializable[]> rows = selectionResults.getRows();
+    Assert.assertEquals(rows.size(), expectedResults.size());
+    for (int i = 0; i < rows.size(); i++) {
+      Serializable[] actualRow = rows.get(i);
+      Serializable[] expectedRow = expectedResults.get(i);
+      Assert.assertEquals(actualRow[0], String.valueOf(expectedRow[0]));
+      Assert.assertEquals(actualRow[1], expectedRow[1]);
+    }
+    // SQL
+    brokerResponseNative  = getBrokerResponseForSqlQuery(query);
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    DataSchema dataSchema = resultTable.getDataSchema();
+    Assert.assertEquals(dataSchema.size(), 2);
+    Assert.assertEquals(dataSchema.getColumnName(0), "INT_COL");
+    Assert.assertEquals(dataSchema.getColumnName(1), "SKILLS_TEXT_COL");
+    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(dataSchema.getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    List<Object[]> results = resultTable.getRows();
+    Assert.assertEquals(results.size(), expectedResults.size());
+    for (int i = 0; i < results.size(); i++) {
+      Object[] actualRow = results.get(i);
+      Serializable[] expectedRow = expectedResults.get(i);
+      Assert.assertEquals(actualRow, expectedRow);
+    }
   }
 }
