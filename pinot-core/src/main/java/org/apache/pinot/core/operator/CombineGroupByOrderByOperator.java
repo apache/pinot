@@ -245,30 +245,23 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   }
 
   private Function<String, Object> getConverterFunction(DataSchema.ColumnDataType columnDataType) {
-    Function<String, Object> function;
     switch (columnDataType) {
-
       case INT:
-        function = Integer::valueOf;
-        break;
+        return Integer::valueOf;
       case LONG:
-        function = Long::valueOf;
-        break;
+        return Long::valueOf;
       case FLOAT:
-        function = Float::valueOf;
-        break;
+        return Float::valueOf;
       case DOUBLE:
-        function = Double::valueOf;
-        break;
-      case BYTES:
-        function = BytesUtils::toByteArray;
-        break;
+        return Double::valueOf;
       case STRING:
+        return s -> s;
+      case BYTES:
+        return BytesUtils::toByteArray;
+      // Add other group-by column type supports here
       default:
-        function = s -> s;
-        break;
+        throw new IllegalStateException();
     }
-    return function;
   }
 
   @Override

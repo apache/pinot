@@ -1067,7 +1067,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     SelectionOnlyOperator operator = getOperatorForQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
-    List<Serializable[]> resultset = (List<Serializable[]>) operatorResult.getSelectionResult();
+    List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
     Assert.assertEquals(resultset.size(), expectedResultSize);
     if (compareGrepOutput) {
@@ -1076,8 +1076,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     } else if (expectedResults != null) {
       // compare with expected result table
       for (int i = 0; i < expectedResultSize; i++) {
-        Serializable[] actualRow = resultset.get(i);
-        Serializable[] expectedRow = expectedResults.get(i);
+        Object[] actualRow = resultset.get(i);
+        Object[] expectedRow = expectedResults.get(i);
         Assert.assertEquals(actualRow.length, expectedRow.length);
         for (int j = 0; j < actualRow.length; j++) {
           Object actualColValue = actualRow[j];
@@ -1088,7 +1088,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     }
   }
 
-  private void verifySearchOutputWithGrepResults(List<Serializable[]> actualResultSet)
+  private void verifySearchOutputWithGrepResults(List<Object[]> actualResultSet)
       throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/group_by_grep_results.out");
     File file = new File(resourceUrl.getFile());
@@ -1098,7 +1098,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     int counter = 0;
     while ((line = reader.readLine()) != null) {
       String[] expectedRow = line.split(":");
-      Serializable[] actualRow = actualResultSet.get(counter);
+      Object[] actualRow = actualResultSet.get(counter);
       int expectedIntColValue = Integer.valueOf(expectedRow[0]) + INT_BASE_VALUE - 1;
       Assert.assertEquals(expectedIntColValue, actualRow[0]);
       Assert.assertEquals(expectedRow[1], actualRow[1]);

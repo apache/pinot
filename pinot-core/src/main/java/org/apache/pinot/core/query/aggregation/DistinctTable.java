@@ -36,7 +36,7 @@ import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.BaseTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -120,8 +120,9 @@ public class DistinctTable extends BaseTable {
     return dataTable.toBytes();
   }
 
-  private void serializeColumns(final Object[] columns, final DataSchema.ColumnDataType[] columnDataTypes,
-      final DataTableBuilder dataTableBuilder) {
+  private void serializeColumns(Object[] columns, DataSchema.ColumnDataType[] columnDataTypes,
+      DataTableBuilder dataTableBuilder)
+      throws IOException {
     for (int colIndex = 0; colIndex < columns.length; colIndex++) {
       switch (columnDataTypes[colIndex]) {
         case INT:
@@ -140,7 +141,11 @@ public class DistinctTable extends BaseTable {
           dataTableBuilder.setColumn(colIndex, ((String) columns[colIndex]));
           break;
         case BYTES:
-          dataTableBuilder.setColumn(colIndex, BytesUtils.toHexString((byte[]) columns[colIndex]));
+          dataTableBuilder.setColumn(colIndex, (ByteArray) columns[colIndex]);
+          break;
+        // Add other distinct column type supports here
+        default:
+          throw new IllegalStateException();
       }
     }
   }
@@ -188,8 +193,9 @@ public class DistinctTable extends BaseTable {
             columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
             break;
           case BYTES:
-            columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
+            columnValues[colIndex] = dataTable.getBytes(rowIndex, colIndex);
             break;
+          // Add other distinct column type supports here
           default:
             throw new IllegalStateException(
                 "Unexpected column data type " + columnDataType + " while deserializing data table for DISTINCT query");

@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -74,6 +75,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 // TODO:   1. Fix float size.
 // TODO:   2. Use one dictionary for all columns (save space).
 // TODO:   3. Given a data schema, write all values one by one instead of using rowId and colId to position (save time).
+// TODO:   4. Store bytes as variable size data instead of String
 public class DataTableBuilder {
   private final DataSchema _dataSchema;
   private final int[] _columnOffsets;
@@ -162,6 +164,23 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.putInt(dictId);
   }
 
+  public void setColumn(int colId, ByteArray value)
+      throws IOException {
+    // NOTE: Use String to store bytes value in DataTable V2 for backward-compatibility
+    setColumn(colId, value.toHexString());
+
+    /*
+    TODO: Store bytes as variable size data instead of String. Make the change for the next version data table for
+          backward-compatibility
+
+    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    byte[] bytes = value.getBytes();
+    _currentRowDataByteBuffer.putInt(bytes.length);
+    _variableSizeDataByteArrayOutputStream.write(bytes);
+     */
+  }
+
   public void setColumn(int colId, Object value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
@@ -171,35 +190,6 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.putInt(bytes.length);
     _variableSizeDataOutputStream.writeInt(objectTypeValue);
     _variableSizeDataByteArrayOutputStream.write(bytes);
-  }
-
-  public void setColumn(int colId, byte[] values) {
-    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    _currentRowDataByteBuffer.putInt(values.length);
-    for (byte value : values) {
-      _variableSizeDataByteArrayOutputStream.write(value);
-    }
-  }
-
-  public void setColumn(int colId, char[] values)
-      throws IOException {
-    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    _currentRowDataByteBuffer.putInt(values.length);
-    for (char value : values) {
-      _variableSizeDataOutputStream.writeChar(value);
-    }
-  }
-
-  public void setColumn(int colId, short[] values)
-      throws IOException {
-    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    _currentRowDataByteBuffer.putInt(values.length);
-    for (short value : values) {
-      _variableSizeDataOutputStream.writeShort(value);
-    }
   }
 
   public void setColumn(int colId, int[] values)

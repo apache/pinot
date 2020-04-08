@@ -91,17 +91,13 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
     // for DISTINCT queries without filter.
     RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
 
-    int rowIndex = 0;
     // TODO: Do early termination in the operator itself which should
     // not call aggregate function at all if the limit has reached
     // that will require the interface change since this function
     // has to communicate back that required number of records have
     // been collected
-    while (rowIndex < length) {
-      Object[] columnData = blockValueFetcher.getRow(rowIndex);
-      Record record = new Record(columnData);
-      distinctTable.upsert(record);
-      rowIndex++;
+    for (int i = 0; i < length; i++) {
+      distinctTable.upsert(new Record(blockValueFetcher.getRow(i)));
     }
   }
 

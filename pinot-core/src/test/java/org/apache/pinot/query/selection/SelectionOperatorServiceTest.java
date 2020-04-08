@@ -35,13 +35,13 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -62,14 +62,18 @@ public class SelectionOperatorServiceTest {
   private final DataSchema.ColumnDataType[] _upgradedColumnDataTypes =
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES};
   private final DataSchema _upgradedDataSchema = new DataSchema(_columnNames, _upgradedColumnDataTypes);
-  private final Serializable[] _row1 =
-      {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}, new byte[]{0x10, 0x20}};
-  private final Serializable[] _row2 =
-      {10, 11L, 12.0F, 13.0, "14", new int[]{15}, new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new String[]{"19"}, new byte[]{0x30, 0x40}};
-  private final Serializable[] _compatibleRow1 =
-      {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}, new byte[]{0x50, 0x60}};
-  private final Serializable[] _compatibleRow2 =
-      {11L, 12.0F, 13.0, 14, "15", new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new int[]{19}, new String[]{"20"}, new byte[]{0x70, 0x00}};
+  private final Object[] _row1 =
+      {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}, BytesUtils.toByteArray(
+          "1020")};
+  private final Object[] _row2 =
+      {10, 11L, 12.0F, 13.0, "14", new int[]{15}, new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new String[]{"19"}, BytesUtils.toByteArray(
+          "3040")};
+  private final Object[] _compatibleRow1 =
+      {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}, BytesUtils.toByteArray(
+          "5060")};
+  private final Object[] _compatibleRow2 =
+      {11L, 12.0F, 13.0, 14, "15", new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new int[]{19}, new String[]{"20"}, BytesUtils.toByteArray(
+          "7000")};
   private final Selection _selectionOrderBy = new Selection();
 
   @BeforeClass
@@ -152,10 +156,10 @@ public class SelectionOperatorServiceTest {
 
   @Test
   public void testCompatibleRowsMergeWithoutOrdering() {
-    ArrayList<Serializable[]> mergedRows = new ArrayList<>(2);
+    ArrayList<Object[]> mergedRows = new ArrayList<>(2);
     mergedRows.add(_row1);
     mergedRows.add(_row2);
-    Collection<Serializable[]> rowsToMerge = new ArrayList<>(2);
+    Collection<Object[]> rowsToMerge = new ArrayList<>(2);
     rowsToMerge.add(_compatibleRow1);
     rowsToMerge.add(_compatibleRow2);
     SelectionOperatorUtils.mergeWithoutOrdering(mergedRows, rowsToMerge, 3);
@@ -168,13 +172,13 @@ public class SelectionOperatorServiceTest {
   @Test
   public void testCompatibleRowsMergeWithOrdering() {
     SelectionOperatorService selectionOperatorService = new SelectionOperatorService(_selectionOrderBy, _dataSchema);
-    PriorityQueue<Serializable[]> mergedRows = selectionOperatorService.getRows();
+    PriorityQueue<Object[]> mergedRows = selectionOperatorService.getRows();
     int maxNumRows = _selectionOrderBy.getOffset() + _selectionOrderBy.getSize();
-    Collection<Serializable[]> rowsToMerge1 = new ArrayList<>(2);
+    Collection<Object[]> rowsToMerge1 = new ArrayList<>(2);
     rowsToMerge1.add(_row1);
     rowsToMerge1.add(_row2);
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge1, maxNumRows);
-    Collection<Serializable[]> rowsToMerge2 = new ArrayList<>(2);
+    Collection<Object[]> rowsToMerge2 = new ArrayList<>(2);
     rowsToMerge2.add(_compatibleRow1);
     rowsToMerge2.add(_compatibleRow2);
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge2, maxNumRows);
@@ -187,7 +191,7 @@ public class SelectionOperatorServiceTest {
   @Test
   public void testCompatibleRowsDataTableTransformation()
       throws Exception {
-    Collection<Serializable[]> rows = new ArrayList<>(2);
+    Collection<Object[]> rows = new ArrayList<>(2);
     rows.add(_row1);
     rows.add(_compatibleRow1);
     DataSchema dataSchema = _dataSchema.clone();
@@ -195,35 +199,32 @@ public class SelectionOperatorServiceTest {
     dataSchema.upgradeToCover(_compatibleDataSchema);
     assertEquals(dataSchema, _upgradedDataSchema);
     DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema);
-    Serializable[] expectedRow1 =
-        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, "1020"};
-    Serializable[] expectedCompatibleRow1 =
-        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, "5060"};
+    Object[] expectedRow1 =
+        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, BytesUtils.toByteArray(
+            "1020")};
+    Object[] expectedCompatibleRow1 =
+        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, BytesUtils.toByteArray(
+            "5060")};
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), expectedRow1));
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), expectedCompatibleRow1));
   }
 
   @Test
   public void testCompatibleRowsRenderSelectionResultsWithoutOrdering() {
-    // Replace byte[] with String because it is already converted to String at this stage
-    Serializable[] row1 = _row1.clone();
-    row1[10] = "1020";
-    Serializable[] compatibleRow1 = _compatibleRow1.clone();
-    compatibleRow1[10] = "5060";
-
-    List<Serializable[]> rows = new ArrayList<>(2);
-    rows.add(row1);
-    rows.add(compatibleRow1);
+    List<Object[]> rows = new ArrayList<>(2);
+    rows.add(_row1);
+    rows.add(_compatibleRow1);
     SelectionResults selectionResults = SelectionOperatorUtils
         .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames), true);
     List<Serializable[]> resultRows = selectionResults.getRows();
-    assertSame(resultRows.get(0), row1);
-    assertSame(resultRows.get(1), compatibleRow1);
+    Serializable[] expectedRow1 =
+        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, "1020"};
+    Serializable[] expectedRow2 =
+        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, "5060"};
+    assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
+    assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
-    rows = new ArrayList<>(2);
-    rows.add(row1);
-    rows.add(compatibleRow1);
-    SelectionOperatorUtils
+    selectionResults = SelectionOperatorUtils
         .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames), false);
     resultRows = selectionResults.getRows();
     Serializable[] expectedFormattedRow1 =
@@ -236,32 +237,26 @@ public class SelectionOperatorServiceTest {
 
   @Test
   public void testCompatibleRowsRenderSelectionResultsWithOrdering() {
-    // Replace byte[] with String because it is already converted to String at this stage
-    Serializable[] row1 = _row1.clone();
-    row1[10] = "1020";
-    Serializable[] compatibleRow1 = _compatibleRow1.clone();
-    compatibleRow1[10] = "5060";
-    Serializable[] compatibleRow2 = _compatibleRow2.clone();
-    compatibleRow2[10] = "7000";
-
     SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(_selectionOrderBy, _upgradedDataSchema);
-    PriorityQueue<Serializable[]> rows = selectionOperatorService.getRows();
-    rows.offer(row1);
-    rows.offer(compatibleRow1);
-    rows.offer(compatibleRow2);
+    PriorityQueue<Object[]> rows = selectionOperatorService.getRows();
+    rows.offer(_row1);
+    rows.offer(_compatibleRow1);
+    rows.offer(_compatibleRow2);
     SelectionResults selectionResults = selectionOperatorService.renderSelectionResultsWithOrdering(true);
     List<Serializable[]> resultRows = selectionResults.getRows();
-    assertNotSame(resultRows.get(0), compatibleRow1);
-    assertEquals(resultRows.get(0), compatibleRow1);
-    assertNotSame(resultRows.get(1), row1);
-    assertEquals(resultRows.get(1), row1);
+    Serializable[] expectedRow1 =
+        {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}, "5060"};
+    Serializable[] expectedRow2 =
+        {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}, "1020"};
+    assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
+    assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
     selectionOperatorService = new SelectionOperatorService(_selectionOrderBy, _upgradedDataSchema);
     rows = selectionOperatorService.getRows();
-    rows.offer(row1);
-    rows.offer(compatibleRow1);
-    rows.offer(compatibleRow2);
+    rows.offer(_row1);
+    rows.offer(_compatibleRow1);
+    rows.offer(_compatibleRow2);
     selectionResults = selectionOperatorService.renderSelectionResultsWithOrdering(false);
     resultRows = selectionResults.getRows();
     Serializable[] expectedFormattedRow1 =

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -214,7 +213,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     Selection selections = brokerRequest.getSelections();
     if (selections != null && brokerRequest.getOrderBy() == null) {
       // Selection-only
-      Collection<Serializable[]> selectionResult = mergedBlock.getSelectionResult();
+      Collection<Object[]> selectionResult = mergedBlock.getSelectionResult();
       return selectionResult != null && selectionResult.size() >= selections.getSize();
     }
     return false;

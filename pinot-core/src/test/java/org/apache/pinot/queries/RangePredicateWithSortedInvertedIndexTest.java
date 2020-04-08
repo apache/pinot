@@ -19,7 +19,6 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -37,7 +36,6 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -209,14 +207,14 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
   private void runQuery(String query, int count, List<Pairs.IntPair> intPairs, int numColumns) {
     SelectionOnlyOperator operator = getOperatorForQuery(query);
     IntermediateResultsBlock block = operator.nextBlock();
-    Collection<Serializable[]> rows = block.getSelectionResult();
+    Collection<Object[]> rows = block.getSelectionResult();
     Assert.assertNotNull(rows);
     Assert.assertEquals(rows.size(), count);
     if (count > 0) {
       Pairs.IntPair pair = intPairs.get(0);
       int startPos = pair.getLeft();
       int pairPos = 0;
-      for (Serializable[] row : rows) {
+      for (Object[] row : rows) {
         Assert.assertEquals(numColumns, row.length);
         Assert.assertEquals(row[0], stringValues[startPos]);
         Assert.assertEquals(row[1], startPos);

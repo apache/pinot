@@ -57,6 +57,7 @@ import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -69,7 +70,6 @@ import static org.testng.Assert.assertTrue;
 
 /**
  * Queries test for DISTINCT queries.
- * TODO: Add a test for 'ORDER BY bytesColumn' when it is supported
  */
 public class DistinctQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DistinctQueryTest");
@@ -169,6 +169,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * <ul>
    *   <li>Selecting all columns</li>
    *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
    * </ul>
@@ -207,7 +208,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           assertEquals(((Float) values[2]).intValue(), intValue);
           assertEquals(((Double) values[3]).intValue(), intValue);
           assertEquals(Integer.parseInt((String) values[4]), intValue);
-          assertEquals(StringUtil.decodeUtf8((byte[]) values[5]), values[4]);
+          assertEquals(StringUtil.decodeUtf8(((ByteArray) values[5]).getBytes()), values[4]);
           actualValues.add(intValue);
         }
         assertEquals(actualValues, expectedValues);
@@ -236,8 +237,37 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           Record record = iterator.next();
           Object[] values = record.getValues();
           int intValue = Integer.parseInt((String) values[0]);
-          assertEquals(StringUtil.decodeUtf8((byte[]) values[1]), values[0]);
+          assertEquals(StringUtil.decodeUtf8(((ByteArray) values[1]).getBytes()), values[0]);
           assertEquals(((Float) values[2]).intValue(), intValue);
+          actualValues.add(intValue);
+        }
+        assertEquals(actualValues, expectedValues);
+      }
+      {
+        // Test selecting some columns order by BYTES column
+        String query = "SELECT DISTINCT(intColumn, bytesColumn) FROM testTable ORDER BY bytesColumn LIMIT 5";
+
+        // Check data schema
+        DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+        DataSchema dataSchema = distinctTable.getDataSchema();
+        assertEquals(dataSchema.getColumnNames(), new String[]{"intColumn", "bytesColumn"});
+        assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.BYTES});
+
+        // Check values, where all 100 unique values should be returned (limit won't take effect on server side)
+        // TODO: After optimizing the DistinctTable (only keep the limit number of records), only 5 values should be
+        //       returned
+        assertEquals(distinctTable.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        Set<Integer> expectedValues = new HashSet<>();
+        for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
+          expectedValues.add(i);
+        }
+        Set<Integer> actualValues = new HashSet<>();
+        Iterator<Record> iterator = distinctTable.iterator();
+        while (iterator.hasNext()) {
+          Record record = iterator.next();
+          Object[] values = record.getValues();
+          int intValue = (int) values[0];
+          assertEquals(StringUtil.decodeUtf8(((ByteArray) values[1]).getBytes()), Integer.toString(intValue));
           actualValues.add(intValue);
         }
         assertEquals(actualValues, expectedValues);
@@ -255,6 +285,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.STRING});
 
         // Check values, where 60 matched values should be returned (limit won't take effect on server side)
+        // TODO: After optimizing the DistinctTable (only keep the limit number of records), only 10 values should be
+        //       returned
         assertEquals(distinctTable.size(), 60);
         Set<Integer> expectedValues = new HashSet<>();
         for (int i = 0; i < 60; i++) {
@@ -310,6 +342,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * <ul>
    *   <li>Selecting all columns</li>
    *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
    *   <li>
@@ -433,6 +466,44 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           sqlValues.add(intValue);
         }
         assertEquals(sqlValues, expectedValues);
+      }
+      {
+        // Test selecting some columns order by BYTES column
+        String pqlQuery = "SELECT DISTINCT(intColumn, bytesColumn) FROM testTable ORDER BY bytesColumn LIMIT 5";
+        String sqlQuery = "SELECT DISTINCT intColumn, bytesColumn FROM testTable ORDER BY bytesColumn LIMIT 5";
+
+        // Check data schema
+        BrokerResponseNative pqlResponse = getBrokerResponseForPqlQuery(pqlQuery);
+        SelectionResults selectionResults = pqlResponse.getSelectionResults();
+        assertNotNull(selectionResults);
+        assertEquals(selectionResults.getColumns(), Arrays.asList("intColumn", "bytesColumn"));
+        BrokerResponseNative sqlResponse = getBrokerResponseForSqlQuery(sqlQuery);
+        ResultTable resultTable = sqlResponse.getResultTable();
+        assertNotNull(resultTable);
+        DataSchema dataSchema = resultTable.getDataSchema();
+        assertEquals(dataSchema.getColumnNames(), new String[]{"intColumn", "bytesColumn"});
+        assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.BYTES});
+
+        // Check values, where only 5 top values sorted in ByteArray format ascending order should be returned
+        List<Serializable[]> pqlRows = selectionResults.getRows();
+        assertEquals(pqlRows.size(), 5);
+        List<Object[]> sqlRows = resultTable.getRows();
+        assertEquals(sqlRows.size(), 5);
+        // ByteArray of "30", "31", "3130", "31303030", "31303031" (same as String order because all digits can be
+        // encoded with a single byte)
+        int[] expectedValues = new int[]{0, 1, 10, 1000, 1001};
+        for (int i = 0; i < 5; i++) {
+          Serializable[] row = pqlRows.get(i);
+          int intValue = (int) row[0];
+          assertEquals(intValue, expectedValues[i]);
+          assertEquals(Integer.parseInt(StringUtil.decodeUtf8(BytesUtils.toBytes((String) row[1]))), intValue);
+        }
+        for (int i = 0; i < 5; i++) {
+          Object[] row = sqlRows.get(i);
+          int intValue = (int) row[0];
+          assertEquals(intValue, expectedValues[i]);
+          assertEquals(Integer.parseInt(StringUtil.decodeUtf8(BytesUtils.toBytes((String) row[1]))), intValue);
+        }
       }
       {
         // Test selecting some columns with transform, filter, order-by and limit
