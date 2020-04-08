@@ -21,15 +21,16 @@ package org.apache.pinot.thirdeye.detection.alert;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
-import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -47,31 +48,35 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
   public static final String PROP_BCC = "bcc";
   public static final String PROP_RECIPIENTS = "recipients";
 
+  private static final String PROP_SEND_ONCE = "sendOnce";
+
+  // Time beyond which we do not want to notify anomalies
+  private static final long ANOMALY_NOTIFICATION_LOOKBACK_TIME = TimeUnit.DAYS.toMillis(14);
+
   public StatefulDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
-    super(provider, config, endTime);
+    super(provider, config, endTime);//prepareStatement.setObject(parameterIndex++, pair.getValue(), info.sqlType);
   }
 
-  @Override
-  public DetectionAlertFilterResult run() throws Exception {
-    return this.run(this.config.getVectorClocks(), this.getAnomalyMinId());
-  }
-
-  protected abstract DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark);
-
-  protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks, final long minId) {
+  protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks) {
     // retrieve all candidate anomalies
     Set<MergedAnomalyResultDTO> allAnomalies = new HashSet<>();
     for (Long detectionId : vectorClocks.keySet()) {
+      // Ignore disabled detections
+      DetectionConfigDTO detection = DAORegistry.getInstance().getDetectionConfigManager().findById(detectionId);
+      if (detection == null || !detection.isActive()) {
+        return allAnomalies;
+      }
+
+      // No point in fetching anomalies older than MAX_ANOMALY_NOTIFICATION_LOOKBACK
       long startTime = vectorClocks.get(detectionId);
+      if (startTime < this.endTime - ANOMALY_NOTIFICATION_LOOKBACK_TIME) {
+        startTime = this.endTime - ANOMALY_NOTIFICATION_LOOKBACK_TIME;
+      }
 
-      AnomalySlice slice =
-          new AnomalySlice()
-          .withDetectionId(detectionId)
-          .withStart(startTime)
-          .withEnd(this.endTime);
-      Collection<MergedAnomalyResultDTO> candidates;
-      candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
+      Collection<MergedAnomalyResultDTO> candidates = DAORegistry.getInstance().getMergedAnomalyResultDAO()
+          .findByCreatedTimeInRangeAndDetectionConfigId(startTime + 1,  this.endTime, detectionId);
 
+      long finalStartTime = startTime;
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
             @Override
@@ -79,7 +84,7 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
               return mergedAnomalyResultDTO != null
                   && !mergedAnomalyResultDTO.isChild()
                   && !AlertUtils.hasFeedback(mergedAnomalyResultDTO)
-                  && (mergedAnomalyResultDTO.getId() == null || mergedAnomalyResultDTO.getId() >= minId)
+                  && mergedAnomalyResultDTO.getCreatedTime() > finalStartTime
                   && mergedAnomalyResultDTO.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
             }
           });
@@ -97,13 +102,6 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     }
 
     return clocks;
-  }
-
-  private long getAnomalyMinId() {
-    if (this.config.getHighWaterMark() != null) {
-      return this.config.getHighWaterMark();
-    }
-    return 0;
   }
 
   protected Set<String> cleanupRecipients(Set<String> recipient) {
