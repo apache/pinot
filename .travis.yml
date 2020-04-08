@@ -11,6 +11,9 @@ before_install:
   - curl -sSL -o ~/bin/install-jdk.sh https://raw.githubusercontent.com/sormuras/bach/master/install-jdk.sh && chmod +x ~/bin/install-jdk.sh
   - source ./.travis/.travis_set_deploy_build_opts.sh
 
+before_cache:
+  - rm -rf $HOME/.m2/repository/org/apache/pinot
+
 cache:
   directories:
     - $HOME/.m2

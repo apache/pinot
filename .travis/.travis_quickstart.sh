@@ -22,12 +22,8 @@
 git diff --name-only "${TRAVIS_COMMIT_RANGE}" | egrep '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'Skip ThirdEye tests for Quickstart'
-  rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
   exit 0
 fi
-
-# Remove Pinot files from local Maven repository to avoid a useless cache rebuild
-rm -rf ~/.m2/repository/org/apache/pinot/
 
 # Java version
 java -version
