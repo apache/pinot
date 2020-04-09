@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.RateLimiter;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -88,9 +88,6 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.TaskUtils;
-import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
-import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
-import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
 import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskInfo;
@@ -150,8 +147,9 @@ public class YamlResource {
   private final ExecutorService executor;
   private final long previewTimeout;
   private final DetectionConfigFormatter detectionConfigFormatter;
+  private final RateLimiter onboardingRateLimiter;
 
-  public YamlResource(DetectionPreviewConfiguration previewConfig) {
+  public YamlResource(DetectionPreviewConfiguration previewConfig, double alertOnboardingPermitPerSecond) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.subscriptionConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -164,6 +162,7 @@ public class YamlResource {
     this.yaml = new Yaml();
     this.executor = Executors.newFixedThreadPool(previewConfig.getParallelism());
     this.previewTimeout = previewConfig.getTimeout();
+    this.onboardingRateLimiter = RateLimiter.create(alertOnboardingPermitPerSecond);
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
@@ -181,6 +180,10 @@ public class YamlResource {
     this.detectionValidator = new DetectionConfigValidator(this.provider);
     this.subscriptionValidator = new SubscriptionConfigValidator();
     this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
+  }
+
+  public YamlResource(DetectionPreviewConfiguration previewConfig) {
+    this(previewConfig, Double.MAX_VALUE);
   }
 
   /*
@@ -366,6 +369,11 @@ public class YamlResource {
   }
 
   long createDetectionConfig(@NotNull String payload, long startTime, long endTime) throws Exception {
+    // if can't acquire alert onboarding QPS permit, throw an exception
+    if (!this.onboardingRateLimiter.tryAcquire()) {
+      throw new RuntimeException("Server is busy handling create detection requests. Please retry later.");
+    }
+
     DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, null);
 
     // Check for duplicates

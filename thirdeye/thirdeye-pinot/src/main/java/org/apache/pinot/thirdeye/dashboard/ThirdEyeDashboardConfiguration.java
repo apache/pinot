@@ -27,10 +27,15 @@ import java.util.List;
 
 
 public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
+  private static final double PROP_DEFAULT_ALERT_ONBOARDING_PERMIT_PER_SECOND = 2;
+
   AuthConfiguration authConfig;
   RootCauseConfiguration rootCause;
   List<ResourceConfiguration> resourceConfig;
   DetectionPreviewConfiguration detectionPreviewConfig = new DetectionPreviewConfiguration();
+
+  // the maximum number of onboarding requests allowed per second
+  double alertOnboardingPermitPerSecond = PROP_DEFAULT_ALERT_ONBOARDING_PERMIT_PER_SECOND;
 
   public DetectionPreviewConfiguration getDetectionPreviewConfig() {
     return detectionPreviewConfig;
@@ -38,6 +43,14 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
 
   public void setDetectionPreviewConfig(DetectionPreviewConfiguration detectionPreviewConfig) {
     this.detectionPreviewConfig = detectionPreviewConfig;
+  }
+
+  public double getAlertOnboardingPermitPerSecond() {
+    return alertOnboardingPermitPerSecond;
+  }
+
+  public void setAlertOnboardingPermitPerSecond(double alertOnoardingPermitPerSecond) {
+    this.alertOnboardingPermitPerSecond = alertOnoardingPermitPerSecond;
   }
 
   public List<ResourceConfiguration> getResourceConfig() {
