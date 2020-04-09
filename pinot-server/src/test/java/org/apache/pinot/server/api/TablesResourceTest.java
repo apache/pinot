@@ -25,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -36,11 +37,15 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class TablesResourceTest extends BaseResourceTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TablesResourceTest.class);
 
   @Test
   public void getTables()
@@ -55,8 +60,8 @@ public class TablesResourceTest extends BaseResourceTest {
     List<String> tables = tablesList.getTables();
     Assert.assertNotNull(tables);
     Assert.assertEquals(tables.size(), 2);
-    Assert.assertEquals(tables.get(0), REALTIME_TABLE_NAME);
-    Assert.assertEquals(tables.get(1), OFFLINE_TABLE_NAME);
+    Assert.assertEquals(tables.get(0), TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME));
+    Assert.assertEquals(tables.get(1), TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
 
     String secondTable = "secondTable_REALTIME";
     addTable(secondTable);
@@ -68,15 +73,15 @@ public class TablesResourceTest extends BaseResourceTest {
     tables = tablesList.getTables();
     Assert.assertNotNull(tables);
     Assert.assertEquals(tables.size(), 3);
-    Assert.assertTrue(tables.contains(REALTIME_TABLE_NAME));
+    Assert.assertTrue(tables.contains(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME)));
     Assert.assertTrue(tables.contains(secondTable));
-    Assert.assertTrue(tables.contains(OFFLINE_TABLE_NAME));
+    Assert.assertTrue(tables.contains(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)));
   }
 
   @Test
   public void getSegments()
       throws Exception {
-    String segmentsPath = "/tables/" + REALTIME_TABLE_NAME + "/segments";
+    String segmentsPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments";
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
 
     TableSegments tableSegments = _webTarget.path(segmentsPath).request().get(TableSegments.class);
@@ -86,7 +91,8 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(segmentNames.size(), 1);
     Assert.assertEquals(segmentNames.get(0), _realtimeIndexSegments.get(0).getSegmentName());
 
-    IndexSegment secondSegment = setUpSegment(REALTIME_TABLE_NAME, "0", _realtimeIndexSegments);
+    IndexSegment secondSegment =
+        setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), "0", _realtimeIndexSegments);
     tableSegments = _webTarget.path(segmentsPath).request().get(TableSegments.class);
     Assert.assertNotNull(tableSegments);
     segmentNames = tableSegments.getSegments();
@@ -105,7 +111,9 @@ public class TablesResourceTest extends BaseResourceTest {
   public void testSegmentMetadata()
       throws Exception {
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
-    String segmentMetadataPath = "/tables/" + REALTIME_TABLE_NAME + "/segments/" + defaultSegment.getSegmentName() + "/metadata";
+    String segmentMetadataPath =
+        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
+            .getSegmentName() + "/metadata";
 
     JsonNode jsonResponse =
         JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
@@ -137,17 +145,20 @@ public class TablesResourceTest extends BaseResourceTest {
         .get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
-    response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/segments/UNKNOWN_SEGMENT").request().get(Response.class);
+    response = _webTarget
+        .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
+        .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
   public void testSegmentCrcMetadata()
       throws Exception {
-    String segmentsCrcPath = "/tables/" + REALTIME_TABLE_NAME + "/segments/crc";
+    String segmentsCrcPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/crc";
 
     // Upload segments
-    List<ImmutableSegment> immutableSegments = setUpSegments(REALTIME_TABLE_NAME,2, _realtimeIndexSegments);
+    List<ImmutableSegment> immutableSegments =
+        setUpSegments(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 2, _realtimeIndexSegments);
 
     // Trigger crc api to fetch crc information
     String response = _webTarget.path(segmentsCrcPath).request().get(String.class);
@@ -165,22 +176,25 @@ public class TablesResourceTest extends BaseResourceTest {
   public void testDownloadSegments()
       throws Exception {
     // Verify the content of the downloaded segment from a realtime table.
-    Assert.assertTrue(downLoadAndVerifySegmentContent(REALTIME_TABLE_NAME, _realtimeIndexSegments.get(0)));
+    Assert.assertTrue(downLoadAndVerifySegmentContent(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        _realtimeIndexSegments.get(0)));
     // Verify the content of the downloaded segment from an offline table.
-    Assert.assertTrue(downLoadAndVerifySegmentContent(OFFLINE_TABLE_NAME, _offlineIndexSegments.get(0)));
+    Assert.assertTrue(downLoadAndVerifySegmentContent(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
+        _offlineIndexSegments.get(0)));
 
     // Verify non-existent table and segment download return NOT_FOUND status.
-    Response response = _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname").request()
-        .get(Response.class);
+    Response response = _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
-    response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/segments/UNKNOWN_SEGMENT").request().get(Response.class);
+    response = _webTarget
+        .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
+        .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   // Verify metadata file from segments.
   private boolean downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment) {
-    String segmentPath = "/tables/" + tableNameWithType + "/segments/" + segment.getSegmentName();
+    String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
     // Download the segment and save to a temp local file.
     Response response = _webTarget.path(segmentPath).request().get(Response.class);
@@ -199,12 +213,12 @@ public class TablesResourceTest extends BaseResourceTest {
 
       Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
           V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      java.nio.file.Path metadataPropertiesPath = FileSystems.getDefault()
+      Path metadataPropertiesPath = FileSystems.getDefault()
           .getPath(tempMetadataDir.getAbsolutePath(), V1Constants.MetadataKeys.METADATA_FILE_NAME);
       Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
 
       Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
-      java.nio.file.Path creationMetaPath =
+      Path creationMetaPath =
           FileSystems.getDefault().getPath(tempMetadataDir.getAbsolutePath(), V1Constants.SEGMENT_CREATION_META);
       Files.copy(creationMetaInputStream, creationMetaPath);
       // Load segment metadata
@@ -213,6 +227,7 @@ public class TablesResourceTest extends BaseResourceTest {
       Assert.assertEquals(tableNameWithType, metadata.getTableName());
       return true;
     } catch (Exception e) {
+      LOGGER.error("Failure in segment extraction and verification:", e);
       return false;
     } finally {
       FileUtils.deleteQuietly(tempMetadataDir);

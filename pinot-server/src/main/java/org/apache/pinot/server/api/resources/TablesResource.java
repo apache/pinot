@@ -184,25 +184,28 @@ public class TablesResource {
     }
   }
 
+  // TODO Add access control similar to PinotSegmentUploadDownloadRestletResource for segment download.
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Path("/tables/{tableName}/segments/{segmentName}")
+  @Path("/segments/{tableNameWithType}/{segmentName}")
   @ApiOperation(value = "Download a segment", notes = "Download a segment in zipped tar format")
   public Response downloadSegment(
-      @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
+      @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE") @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
-    LOGGER.info("Get a request to download segment {} for table {}", segmentName, tableName);
-    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    LOGGER.info("Received a request to download segment {} for table {}", segmentName, tableNameWithType);
+    TableDataManager tableDataManager = checkGetTableDataManager(tableNameWithType);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
-      throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
           Response.Status.NOT_FOUND);
     }
     try {
       String tableDir = tableDataManager.getTableDataDir();
-      String tarFilePath = TarGzCompressionUtils.createTarGzOfDirectory(tableDir + "/" + segmentName);
+      // TODO Limit the number of concurrent downloads of segments because compression is an expensive operation.
+      String tarFilePath = TarGzCompressionUtils.createTarGzOfDirectory(tableDir + File.separator + segmentName);
       File tarFile = new File(tarFilePath);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
@@ -219,5 +222,4 @@ public class TablesResource {
       tableDataManager.releaseSegment(segmentDataManager);
     }
   }
-
 }

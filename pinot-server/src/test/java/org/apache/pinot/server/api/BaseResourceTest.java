@@ -56,8 +56,7 @@ import static org.mockito.Mockito.when;
 public abstract class BaseResourceTest {
   private static final String AVRO_DATA_PATH = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BaseResourceTest");
-  protected static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
-  protected static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
+  protected static final String TABLE_NAME = "testTable";
 
   private final Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   protected final List<ImmutableSegment> _realtimeIndexSegments = new ArrayList<>();
@@ -87,10 +86,13 @@ public abstract class BaseResourceTest {
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
 
     // Add the default tables and segments.
-    addTable(REALTIME_TABLE_NAME);
-    addTable(OFFLINE_TABLE_NAME);
-    setUpSegment(REALTIME_TABLE_NAME, "default", _realtimeIndexSegments);
-    setUpSegment(OFFLINE_TABLE_NAME, "default", _offlineIndexSegments);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+
+    addTable(realtimeTableName);
+    addTable(offlineTableName);
+    setUpSegment(realtimeTableName, "default", _realtimeIndexSegments);
+    setUpSegment(offlineTableName, "default", _offlineIndexSegments);
 
     _adminApiApplication = new AdminApiApplication(serverInstance);
     _adminApiApplication.start(CommonConstants.Server.DEFAULT_ADMIN_API_PORT);

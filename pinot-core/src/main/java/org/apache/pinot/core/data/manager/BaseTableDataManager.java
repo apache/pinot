@@ -213,5 +213,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public String getTableDataDir() { return _tableDataDir; }
+  public String getTableDataDir() {
+    return _tableDataDir;
+  }
 }
