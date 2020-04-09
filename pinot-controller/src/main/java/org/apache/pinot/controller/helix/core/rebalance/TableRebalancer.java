@@ -114,6 +114,8 @@ public class TableRebalancer {
         .getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES, RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
     boolean includeConsuming = rebalanceConfig
         .getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING);
+    boolean bootstrap =
+        rebalanceConfig.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
     boolean downtime =
         rebalanceConfig.getBoolean(RebalanceConfigConstants.DOWNTIME, RebalanceConfigConstants.DEFAULT_DOWNTIME);
     int minReplicasToKeepUpForNoDowntime = rebalanceConfig
@@ -122,9 +124,9 @@ public class TableRebalancer {
     boolean bestEfforts = rebalanceConfig
         .getBoolean(RebalanceConfigConstants.BEST_EFFORTS, RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
     LOGGER.info(
-        "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, bestEfforts: {}",
-        tableNameWithType, dryRun, reassignInstances, includeConsuming, downtime, minReplicasToKeepUpForNoDowntime,
-        bestEfforts);
+        "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, bestEfforts: {}",
+        tableNameWithType, dryRun, reassignInstances, includeConsuming, bootstrap, downtime,
+        minReplicasToKeepUpForNoDowntime, bestEfforts);
 
     // Validate table config
     try {

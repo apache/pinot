@@ -24,6 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.commons.configuration.BaseConfiguration;
+import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -34,6 +36,7 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.config.TableType;
@@ -261,7 +264,8 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_segmentAssignmentWithoutPartition
-        .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null), currentAssignment);
+            .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, new BaseConfiguration()),
+        currentAssignment);
   }
 
   @Test
@@ -288,8 +292,67 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(
-        _segmentAssignmentWithPartition.rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null),
+    assertEquals(_segmentAssignmentWithPartition
+            .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, new BaseConfiguration()),
         currentAssignment);
+  }
+
+  @Test
+  public void testBootstrapTableWithoutPartition() {
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    for (String segmentName : SEGMENTS) {
+      List<String> instancesAssigned = _segmentAssignmentWithoutPartition
+          .assignSegment(segmentName, currentAssignment, _instancePartitionsMapWithoutPartition);
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
+    }
+
+    // Bootstrap table should reassign all segments based on their alphabetical order
+    Configuration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    Map<String, Map<String, String>> newAssignment = _segmentAssignmentWithoutPartition
+        .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, rebalanceConfig);
+    assertEquals(newAssignment.size(), NUM_SEGMENTS);
+    List<String> sortedSegments = new ArrayList<>(SEGMENTS);
+    sortedSegments.sort(null);
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      assertEquals(newAssignment.get(sortedSegments.get(i)), currentAssignment.get(SEGMENTS.get(i)));
+    }
+  }
+
+  @Test
+  public void testBootstrapTableWithPartition() {
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    for (String segmentName : SEGMENTS) {
+      List<String> instancesAssigned = _segmentAssignmentWithPartition
+          .assignSegment(segmentName, currentAssignment, _instancePartitionsMapWithPartition);
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
+    }
+
+    // Bootstrap table should reassign all segments based on their alphabetical order within the partition
+    Configuration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    Map<String, Map<String, String>> newAssignment = _segmentAssignmentWithPartition
+        .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, rebalanceConfig);
+    assertEquals(newAssignment.size(), NUM_SEGMENTS);
+    int numSegmentsPerPartition = NUM_SEGMENTS / NUM_PARTITIONS;
+    String[][] partitionIdToSegmentsMap = new String[NUM_PARTITIONS][numSegmentsPerPartition];
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      partitionIdToSegmentsMap[i % NUM_PARTITIONS][i / NUM_PARTITIONS] = SEGMENTS.get(i);
+    }
+    String[][] partitionIdToSortedSegmentsMap = new String[NUM_PARTITIONS][numSegmentsPerPartition];
+    for (int i = 0; i < NUM_PARTITIONS; i++) {
+      String[] sortedSegments = new String[numSegmentsPerPartition];
+      System.arraycopy(partitionIdToSegmentsMap[i], 0, sortedSegments, 0, numSegmentsPerPartition);
+      Arrays.sort(sortedSegments);
+      partitionIdToSortedSegmentsMap[i] = sortedSegments;
+    }
+    for (int i = 0; i < NUM_PARTITIONS; i++) {
+      for (int j = 0; j < numSegmentsPerPartition; j++) {
+        assertEquals(newAssignment.get(partitionIdToSortedSegmentsMap[i][j]),
+            currentAssignment.get(partitionIdToSegmentsMap[i][j]));
+      }
+    }
   }
 }

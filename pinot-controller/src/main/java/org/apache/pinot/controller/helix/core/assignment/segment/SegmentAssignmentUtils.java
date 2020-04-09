@@ -87,6 +87,55 @@ public class SegmentAssignmentUtils {
   }
 
   /**
+   * Assigns the segment for the non-replica-group based segment assignment strategy and returns the assigned instances.
+   */
+  static List<String> assignSegmentWithoutReplicaGroup(Map<String, Map<String, String>> currentAssignment,
+      InstancePartitions instancePartitions, int replication) {
+    List<String> instances =
+        SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, replication);
+    int[] numSegmentsAssignedPerInstance = getNumSegmentsAssignedPerInstance(currentAssignment, instances);
+    int numInstances = numSegmentsAssignedPerInstance.length;
+    PriorityQueue<Pairs.IntPair> heap = new PriorityQueue<>(numInstances, Pairs.intPairComparator());
+    for (int instanceId = 0; instanceId < numInstances; instanceId++) {
+      heap.add(new Pairs.IntPair(numSegmentsAssignedPerInstance[instanceId], instanceId));
+    }
+    List<String> instancesAssigned = new ArrayList<>(replication);
+    for (int i = 0; i < replication; i++) {
+      instancesAssigned.add(instances.get(heap.remove().getRight()));
+    }
+    return instancesAssigned;
+  }
+
+  /**
+   * Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
+   */
+  static List<String> assignSegmentWithReplicaGroup(Map<String, Map<String, String>> currentAssignment,
+      InstancePartitions instancePartitions, int partitionId) {
+    // First assign the segment to replica-group 0
+    List<String> instances = instancePartitions.getInstances(partitionId, 0);
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, instances);
+    int minNumSegmentsAssigned = numSegmentsAssignedPerInstance[0];
+    int instanceIdWithLeastSegmentsAssigned = 0;
+    int numInstances = numSegmentsAssignedPerInstance.length;
+    for (int instanceId = 1; instanceId < numInstances; instanceId++) {
+      if (numSegmentsAssignedPerInstance[instanceId] < minNumSegmentsAssigned) {
+        minNumSegmentsAssigned = numSegmentsAssignedPerInstance[instanceId];
+        instanceIdWithLeastSegmentsAssigned = instanceId;
+      }
+    }
+
+    // Mirror the assignment to all replica-groups
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
+    for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+      instancesAssigned
+          .add(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
+    }
+    return instancesAssigned;
+  }
+
+  /**
    * Rebalances the table with Helix AutoRebalanceStrategy.
    */
   static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(
