@@ -54,9 +54,9 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
-  private final QueryParser _queryParser;
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
+  private final StandardAnalyzer _standardAnalyzer;
 
   public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
 
@@ -85,12 +85,12 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
+      _standardAnalyzer = new StandardAnalyzer();
     } catch (Exception e) {
       LOGGER
           .error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());
       throw new RuntimeException(e);
     }
-    _queryParser = new QueryParser(column, new StandardAnalyzer());
   }
 
   /**
@@ -133,7 +133,11 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      Query query = _queryParser.parse(searchQuery);
+      // Lucene Query Parser is JavaCC based. It is stateful and should
+      // be instantiated per query. Analyzer on the other hand is stateless
+      // and can be created upfront.
+      QueryParser parser = new QueryParser(_column, _standardAnalyzer);
+      Query query = parser.parse(searchQuery);
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
