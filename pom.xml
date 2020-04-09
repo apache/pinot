@@ -143,7 +143,7 @@
     <netty.version>4.1.42.Final</netty.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g</argLine>
+    <argLine>-Xms4g -Xmx4g</argLine>
 
     <!-- handle kafka imports
     kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
