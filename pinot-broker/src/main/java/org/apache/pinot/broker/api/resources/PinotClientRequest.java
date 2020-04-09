@@ -32,6 +32,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.api.RequestStatistics;
@@ -41,6 +43,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,15 +60,17 @@ public class PinotClientRequest {
   private BrokerMetrics brokerMetrics;
 
   @GET
+  @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
   @ApiOperation(value = "Querying pinot")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
-  public String processQueryGet(
+  public void processQueryGet(
       // Query param "bql" is for backward compatibility
       @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
-      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions) {
+      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
+      @Suspended AsyncResponse asyncResponse) {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.PQL, query);
@@ -76,24 +81,25 @@ public class PinotClientRequest {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
-      return brokerResponse.toJsonString();
+      asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+      asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
     }
   }
 
   @POST
+  @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
   @ApiOperation(value = "Querying pinot")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
-  public String processQueryPost(String query) {
+  public void processQueryPost(String query, @Suspended AsyncResponse asyncResponse) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
-      return brokerResponse.toJsonString();
+      asyncResponse.resume(brokerResponse);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
@@ -102,13 +108,15 @@ public class PinotClientRequest {
   }
 
   @GET
+  @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/sql")
   @ApiOperation(value = "Querying pinot using sql")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
-  public String processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
+  public void processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
-      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions) {
+      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
+      @Suspended AsyncResponse asyncResponse) {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
@@ -121,20 +129,21 @@ public class PinotClientRequest {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
-      return brokerResponse.toJsonString();
+      asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+      asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
     }
   }
 
   @POST
+  @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/sql")
   @ApiOperation(value = "Querying pinot using sql")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
-  public String processSqlQueryPost(String query) {
+  public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
       if (!requestJson.has(Request.SQL)) {
@@ -144,11 +153,11 @@ public class PinotClientRequest {
       // the only query options as of now are sql related. do not allow any custom query options in sql endpoint
       ObjectNode sqlRequestJson = ((ObjectNode) requestJson).put(Request.QUERY_OPTIONS, queryOptions);
       BrokerResponse brokerResponse = requestHandler.handleRequest(sqlRequestJson, null, new RequestStatistics());
-      return brokerResponse.toJsonString();
+      asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+      asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
     }
   }
 
