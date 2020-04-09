@@ -17,24 +17,13 @@
  * under the License.
  */
 import React, {Component} from 'react';
-import Table from '@material-ui/core/Table';
-import TableCell from '@material-ui/core/TableCell';
-import TableContainer from '@material-ui/core/TableContainer';
-import TableHead from '@material-ui/core/TableHead';
-import TableRow from '@material-ui/core/TableRow';
-import Paper from '@material-ui/core/Paper';
 import withStyles from "@material-ui/core/styles/withStyles";
-import TableBody from "@material-ui/core/TableBody";
-import CardContent from "@material-ui/core/CardContent";
-import Card from "@material-ui/core/Card";
-import TypoGraphy from "@material-ui/core/Typography";
 import TreeView from '@material-ui/lab/TreeView';
 import App from "../App";
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
 import Utils from "./Utils";
 import PinotTable from "./tables/PinotTable";
-import Link from '@material-ui/core/Link';
 import MaterialTable from "material-table";
 
 
@@ -134,7 +123,7 @@ class Tables extends Component {
                         defaultExpandIcon={<ChevronRightIcon />}
                         defaultExpanded={['2']}>
                         {Utils.renderTree(this.state.treeData)}
-</TreeView>}
+                        </TreeView>}
                         
                         
                     ]}

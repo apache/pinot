@@ -17,17 +17,7 @@
  * under the License.
  */
 import React, {Component} from 'react';
-import Table from '@material-ui/core/Table';
-import TableCell from '@material-ui/core/TableCell';
-import TableContainer from '@material-ui/core/TableContainer';
-import TableHead from '@material-ui/core/TableHead';
-import TableRow from '@material-ui/core/TableRow';
-import Paper from '@material-ui/core/Paper';
-import TableBody from "@material-ui/core/TableBody";
-import CardContent from "@material-ui/core/CardContent";
-import Card from "@material-ui/core/Card";
 import App from "../App";
-import TypoGraphy from "@material-ui/core/Typography";
 import MaterialTable from "material-table";
 import Utils from "./Utils";
 
