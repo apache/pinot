@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
 import java.io.File;
@@ -56,6 +55,7 @@ import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUt
 import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.getFileName;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
+
 
 public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Serializable {
 
