@@ -244,19 +244,31 @@
 
             <div class="col-xs-12 te-graph-container">
               {{#if isDataLoading}}
-                <div class="spinner-wrapper spinner-wrapper--card">
-                  {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
-                </div>
+                {{rootcause-placeholder
+                  message=blobMessage
+                  iconClass="glyphicon glyphicon-equalizer"}}
+                {{#unless getAnomaliesError}}
+                  <div class="spinner-wrapper spinner-wrapper--card">
+                    {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
+                  </div>
+                {{/unless}}
+              {{else}}
+                {{#if getAnomaliesError}}
+                  {{rootcause-placeholder
+                    message=blobMessage
+                    iconClass="glyphicon glyphicon-equalizer"}}
+                {{else}}
+                  {{timeseries-chart
+                    series=series
+                    colorMapping=colorMapping
+                    axis=axis
+                    zoom=zoom
+                    legend=legend
+                    point=point
+                    order=order
+                  }}
+                {{/if}}
               {{/if}}
-              {{timeseries-chart
-                series=series
-                colorMapping=colorMapping
-                axis=axis
-                zoom=zoom
-                legend=legend
-                point=point
-                order=order
-              }}
               {{#unless isPreviewMode}}
                 <div class="te-form__note">
                   NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
