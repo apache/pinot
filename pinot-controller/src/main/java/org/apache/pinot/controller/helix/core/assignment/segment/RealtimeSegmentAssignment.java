@@ -113,7 +113,9 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
 
   /**
    * Helper method to check whether the number of replica-groups matches the table replication for replica-group based
-   * instance partitions. Log a warning if they do not match.
+   * instance partitions. Log a warning if they do not match and use the one inside the instance partitions. The
+   * mismatch can happen when table is not configured correctly (table replication and numReplicaGroups does not match
+   * or replication changed without reassigning instances).
    */
   private void checkReplication(InstancePartitions instancePartitions) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
@@ -200,7 +202,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
           .info("Reassigning COMPLETED segments with COMPLETED instance partitions for table: {}", _realtimeTableName);
 
       if (bootstrap) {
-        LOGGER.info("Bootstrapping the COMPLETED segments for table: {}", _realtimeTableName);
+        LOGGER.info("Bootstrapping segment assignment for COMPLETED segments of table: {}", _realtimeTableName);
 
         // When bootstrap is enabled, start with an empty assignment and reassign all segments
         newAssignment = new TreeMap<>();

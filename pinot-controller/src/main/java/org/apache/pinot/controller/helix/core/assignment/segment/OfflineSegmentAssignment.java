@@ -110,7 +110,9 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
   /**
    * Helper method to check whether the number of replica-groups matches the table replication for replica-group based
-   * instance partitions. Log a warning if they do not match.
+   * instance partitions. Log a warning if they do not match and use the one inside the instance partitions. The
+   * mismatch can happen when table is not configured correctly (table replication and numReplicaGroups does not match
+   * or replication changed without reassigning instances).
    */
   private void checkReplication(InstancePartitions instancePartitions) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
@@ -171,7 +173,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
     Map<String, Map<String, String>> newAssignment;
     if (bootstrap) {
-      LOGGER.info("Bootstrapping the table: {}", _offlineTableName);
+      LOGGER.info("Bootstrapping segment assignment for table: {}", _offlineTableName);
 
       // When bootstrap is enabled, start with an empty assignment and reassign all segments
       newAssignment = new TreeMap<>();
