@@ -202,7 +202,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       if (bootstrap) {
         LOGGER.info("Bootstrapping the COMPLETED segments for table: {}", _realtimeTableName);
 
-        // When bootstrap is enabled, start with an empty table add reassign all segments
+        // When bootstrap is enabled, start with an empty assignment and reassign all segments
         newAssignment = new TreeMap<>();
         for (String segment : completedSegmentAssignment.keySet()) {
           List<String> assignedInstances = assignCompletedSegment(segment, newAssignment, completedInstancePartitions);

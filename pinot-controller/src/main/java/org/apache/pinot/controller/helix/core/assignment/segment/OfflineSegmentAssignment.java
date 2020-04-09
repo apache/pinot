@@ -173,7 +173,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     if (bootstrap) {
       LOGGER.info("Bootstrapping the table: {}", _offlineTableName);
 
-      // When bootstrap is enabled, start with an empty table add reassign all segments
+      // When bootstrap is enabled, start with an empty assignment and reassign all segments
       newAssignment = new TreeMap<>();
       for (String segment : currentAssignment.keySet()) {
         List<String> assignedInstances = assignSegment(segment, newAssignment, instancePartitions);

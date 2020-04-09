@@ -52,7 +52,7 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-includeConsuming", metaVar = "<boolean>", usage = "Whether to reassign CONSUMING segments for real-time table (false by default)")
   private boolean _includeConsuming = false;
 
-  @Option(name = "-bootstrap", metaVar = "<boolean>", usage = "Whether to rebalance table in bootstrap mode (starting from an empty table and reassign all segments, where segments will be assigned in a round-robin fashion, but no minimum movement is guaranteed, false by default)")
+  @Option(name = "-bootstrap", metaVar = "<boolean>", usage = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
   private boolean _bootstrap = false;
 
   @Option(name = "-downtime", metaVar = "<boolean>", usage = "Whether to allow downtime for the rebalance (false by default)")
@@ -118,7 +118,7 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
     System.out.println();
 
     System.out.println(
-        "Rebalance table in bootstrap mode. Rebalancer will start from an empty table and reassign all segments");
+        "Rebalance table in bootstrap mode. Rebalancer will reassign all segments in a round-robin fashion as if adding new segments to an empty table");
     System.out.println(
         "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable_REALTIME -bootstrap");
     System.out.println();
