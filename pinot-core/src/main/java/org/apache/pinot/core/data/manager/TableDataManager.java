@@ -119,6 +119,7 @@ public interface TableDataManager {
 
   /**
    * Returns the dir which contains the data segments.
+   * @return
    */
-  String getTableDataDir();
+  File getTableDataDir();
 }

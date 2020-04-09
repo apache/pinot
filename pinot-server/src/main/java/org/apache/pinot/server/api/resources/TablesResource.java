@@ -203,10 +203,11 @@ public class TablesResource {
           Response.Status.NOT_FOUND);
     }
     try {
-      String tableDir = tableDataManager.getTableDataDir();
+      String tableDir = tableDataManager.getTableDataDir().getAbsolutePath();
       // TODO Limit the number of concurrent downloads of segments because compression is an expensive operation.
       String tarFilePath = TarGzCompressionUtils.createTarGzOfDirectory(tableDir + File.separator + segmentName);
       File tarFile = new File(tarFilePath);
+      tarFile.deleteOnExit();
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
         try {
