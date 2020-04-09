@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.ingestion.batch.common;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -146,5 +147,20 @@ public class SegmentGenerationUtils {
     outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
     return relativeOutputURI;
+  }
+
+  /**
+   * Extract file name from a given URI.
+   *
+   * @param inputFileURI
+   * @return
+   */
+  public static String getFileName(URI inputFileURI) {
+    String scheme = inputFileURI.getScheme();
+    if (scheme != null && scheme.equalsIgnoreCase("file")) {
+      return new File(inputFileURI).getName();
+    }
+    String[] pathSplits = inputFileURI.getPath().split("/");
+    return pathSplits[pathSplits.length - 1];
   }
 }

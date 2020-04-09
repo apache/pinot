@@ -111,9 +111,14 @@ public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Seriali
     } else {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, pushParallelism);
+      URI finalOutputDirURI = outputDirURI;
       pathRDD.foreach(segmentTarPath -> {
+        for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
+          Configuration config = new MapConfiguration(pinotFSSpec.getConfigs());
+          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), config);
+        }
         try {
-          SegmentPushUtils.pushSegments(_spec, outputDirFS, Arrays.asList(segmentTarPath));
+          SegmentPushUtils.pushSegments(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()), Arrays.asList(segmentTarPath));
         } catch (RetriableOperationException | AttemptsExceededException e) {
           throw new RuntimeException(e);
         }
