@@ -60,8 +60,6 @@ public class DetectionConfigTuner {
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   public static final String PROP_YAML_PARAMS = "yamlParams";
-  public static final Set<String> TURNOFF_TUNING_COMPONENTS =
-      ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
 
   private final DetectionConfigDTO detectionConfig;
   private final DataProvider dataProvider;
@@ -139,7 +137,7 @@ public class DetectionConfigTuner {
       // For tunable components, the model params are computed from user supplied yaml params and previous model params.
       String componentClassName = existingComponentProps.get(PROP_CLASS_NAME).toString();
       String type = DetectionUtils.getComponentType(componentKey);
-      if (!TURNOFF_TUNING_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
+      if (DETECTION_REGISTRY.isTunable(componentClassName)) {
         try {
           tunedComponentProps.putAll(getTunedSpecs(existingComponentProps, tuningWindowStart, tuningWindowEnd));
         } catch (Exception e) {

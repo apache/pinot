@@ -169,7 +169,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-  private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
+  private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
   private DataProvider dataProvider;
@@ -503,7 +503,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     // For tunable components, the model params are computed from user supplied yaml params and previous model params.
     // We store the yaml params under a separate key, PROP_YAML_PARAMS, to distinguish from model params.
-    if (!TURNOFF_TUNING_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
+    if (DETECTION_REGISTRY.isTunable(componentClassName)) {
       componentSpecs.put(PROP_YAML_PARAMS, params);
     } else {
       componentSpecs.putAll(params);

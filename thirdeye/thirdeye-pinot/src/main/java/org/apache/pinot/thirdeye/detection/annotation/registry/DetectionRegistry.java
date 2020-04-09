@@ -91,13 +91,6 @@ public class DetectionRegistry {
           }
         }
       }
-      // todo: get rid of MIGRATED_ALGORITHM and MIGRATED_ALGORITHM_FILTER after the migration is completed
-      if (REGISTRY_MAP.containsKey("ALGORITHM")) {
-        REGISTRY_MAP.put("MIGRATED_ALGORITHM", REGISTRY_MAP.get("ALGORITHM"));
-      }
-      if (REGISTRY_MAP.containsKey("ALGORITHM_FILTER")) {
-        REGISTRY_MAP.put("MIGRATED_ALGORITHM_FILTER", REGISTRY_MAP.get("ALGORITHM_FILTER"));
-      }
     } catch (Exception e) {
       LOG.warn("initialize detection registry error", e);
     }
