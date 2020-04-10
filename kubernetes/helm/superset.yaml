@@ -30,7 +30,7 @@ data:
     ROW_LIMIT = 5000
 
     SUPERSET_WEBSERVER_PORT = 8088
-    SUPERSET_HOME = '/var/data/superset.db'
+    SUPERSET_HOME = '/app/superset_home/superset.db'
     SUPERSET_ENV = 'production'
     #---------------------------------------------------------
 
@@ -45,7 +45,7 @@ data:
     # superset metadata (slices, connections, tables, dashboards, ...).
     # Note that the connection information to connect to the datasources
     # you want to explore are managed directly in the web UI
-    SQLALCHEMY_DATABASE_URI = 'sqlite:////var/data/superset.db'
+    SQLALCHEMY_DATABASE_URI = 'sqlite:////app/superset_home/superset.db'
 
     # Flask-WTF flag for CSRF
     WTF_CSRF_ENABLED = True
@@ -2273,9 +2273,13 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-        - image: fx19880617/superset:0.34.1
+        - image: apachepinot/pinot-superset:0.36.0rc3
           imagePullPolicy: Always
           name: superset
+          args: [ "flask", "run", "-p", "8088", "--with-threads", "--reload", "--debugger", "--host=0.0.0.0" ]
+          env:
+            - name: PYTHONPATH
+              value: "/etc/superset"
           ports:
             - containerPort: 8088
               protocol: TCP
@@ -2284,7 +2288,7 @@ spec:
               memory: 1Gi
           volumeMounts:
             - name: superset-storage-vol
-              mountPath: "/var/data"
+              mountPath: "/app/superset_home"
             - name: superset-config
               mountPath: "/etc/superset"
       nodeSelector: {}

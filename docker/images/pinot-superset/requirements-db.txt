@@ -16,20 +16,8 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-
-flask-cors==3.0.3
-flask-mail==0.9.1
-flask-oauth==0.12
-flask_oauthlib==0.9.5
-gevent==1.2.2
-impyla==0.14.0
-mysqlclient==1.4.2
-psycopg2==2.7.6.1
-pyathena==1.5.1
-pybigquery==0.4.10
-pyhive==0.5.1
-pyldap==2.4.28
-pymssql==2.1.4
+gevent==1.4.0
+psycopg2-binary==2.7.5
+pyhive==0.6.1
 redis==3.2.1
-sqlalchemy-redshift==0.7.1
 pinotdb==0.2.4

@@ -17,44 +17,79 @@
 # under the License.
 #
 
-ARG NODE_VERSION=latest
-ARG PYTHON_VERSION=latest
+######################################################################
+# PY stage that simply does a pip install on our requirements
+######################################################################
+ARG PY_VER=3.6.9
+FROM python:${PY_VER} AS superset-py
 
-# --- Build assets with NodeJS
-
-FROM node:${NODE_VERSION} AS build
+RUN mkdir /app \
+        && apt-get update -y \
+        && apt-get install -y --no-install-recommends \
+            build-essential \
+            default-libmysqlclient-dev \
+            libpq-dev \
+        && rm -rf /var/lib/apt/lists/*
 
 # Superset version to build
 ARG SUPERSET_VERSION=master
-ENV SUPERSET_HOME=/var/lib/superset/
+ENV SUPERSET_SRC=/app/superset-src
 
 # Download source
-WORKDIR ${SUPERSET_HOME}
-RUN wget -O /tmp/superset.tar.gz https://github.com/apache/incubator-superset/archive/${SUPERSET_VERSION}.tar.gz && \
-    tar xzf /tmp/superset.tar.gz -C ${SUPERSET_HOME} --strip-components=1
+WORKDIR ${SUPERSET_SRC}
+RUN wget -qO /tmp/superset.tar.gz https://github.com/apache/incubator-superset/archive/${SUPERSET_VERSION}.tar.gz \
+      && tar xzf /tmp/superset.tar.gz -C ${SUPERSET_SRC} --strip-components=1
 
-# Build assets
-WORKDIR ${SUPERSET_HOME}/superset/assets
-RUN npm install && \
-    npm run build
+# First, we just wanna install requirements, which will allow us to utilize the cache
+# in order to only build if and only if requirements change
+COPY requirements-db.txt /app/
+RUN cp ${SUPERSET_SRC}/requirements.txt /app/ \
+      && cd /app \
+      && pip install --no-cache -r requirements.txt \
+      && pip install --no-cache -r requirements-db.txt
 
-# --- Build dist package with Python 3
+######################################################################
+# Node stage to deal with static asset construction
+######################################################################
+FROM node:10-jessie AS superset-node
 
-FROM python:${PYTHON_VERSION} AS dist
+ARG NPM_BUILD_CMD="build"
+ENV BUILD_CMD=${NPM_BUILD_CMD}
+ENV SUPERSET_SRC=/app/superset-src
 
-# Copy prebuilt workspace into stage
-ENV SUPERSET_HOME=/var/lib/superset/
-WORKDIR ${SUPERSET_HOME}
-COPY --from=build ${SUPERSET_HOME} .
-COPY requirements-db.txt .
+# NPM ci first, as to NOT invalidate previous steps except for when package.json changes
+RUN mkdir -p /app/superset-frontend
+RUN mkdir -p /app/superset/assets
 
-# Create package to install
-RUN python setup.py sdist && \
-    tar czfv /tmp/superset.tar.gz requirements.txt requirements-db.txt dist
+COPY --from=superset-py ${SUPERSET_SRC}/docker/frontend-mem-nag.sh /
+COPY --from=superset-py ${SUPERSET_SRC}/superset-frontend/package* /app/superset-frontend/
+RUN /frontend-mem-nag.sh \
+        && cd /app/superset-frontend \
+        && npm ci
 
-# --- Install dist package and finalize app
+# Next, copy in the rest and let webpack do its thing
+COPY --from=superset-py ${SUPERSET_SRC}/superset-frontend /app/superset-frontend
+# This is BY FAR the most expensive step (thanks Terser!)
+RUN cd /app/superset-frontend \
+        && npm run ${BUILD_CMD} \
+        && rm -rf node_modules
 
-FROM python:${PYTHON_VERSION} AS final
+
+######################################################################
+# Final lean image...
+######################################################################
+ARG PY_VER=3.6.9
+FROM python:${PY_VER} AS lean
+
+ENV SUPERSET_SRC=/app/superset-src
+
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    FLASK_ENV=production \
+    FLASK_APP="superset.app:create_app()" \
+    PYTHONPATH="/app/pythonpath" \
+    SUPERSET_HOME="/app/superset_home" \
+    SUPERSET_PORT=8080
 
 # Configure environment
 ENV GUNICORN_BIND=0.0.0.0:8088 \
@@ -62,51 +97,41 @@ ENV GUNICORN_BIND=0.0.0.0:8088 \
     GUNICORN_LIMIT_REQUEST_LINE=0 \
     GUNICORN_TIMEOUT=60 \
     GUNICORN_WORKERS=3 \
-    GUNICORN_THREADS=4 \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8 \
-    PYTHONPATH=/etc/superset:/home/superset:$PYTHONPATH \
-    SUPERSET_REPO=apache/incubator-superset \
-    SUPERSET_VERSION=${SUPERSET_VERSION} \
-    SUPERSET_HOME=/var/lib/superset
+    GUNICORN_THREADS=4
 ENV GUNICORN_CMD_ARGS="--workers ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --timeout ${GUNICORN_TIMEOUT} --bind ${GUNICORN_BIND} --limit-request-line ${GUNICORN_LIMIT_REQUEST_LINE} --limit-request-field_size ${GUNICORN_LIMIT_REQUEST_FIELD_SIZE}"
 
-# Create superset user & install dependencies
-WORKDIR /tmp/superset
-COPY --from=dist /tmp/superset.tar.gz .
-RUN useradd -U -m superset && \
-    mkdir -p /etc/superset && \
-    mkdir -p ${SUPERSET_HOME} && \
-    chown -R superset:superset /etc/superset && \
-    chown -R superset:superset ${SUPERSET_HOME} && \
-    apt-get update && \
-    apt-get install -y \
-        build-essential \
-        curl \
-        default-libmysqlclient-dev \
-        freetds-bin \
-        freetds-dev \
-        libffi-dev \
-        libldap2-dev \
-        libpq-dev \
-        libsasl2-2 \
-        libsasl2-dev \
-        libsasl2-modules-gssapi-mit \
-        libssl1.0 && \
-    apt-get clean && \
-    tar xzf superset.tar.gz && \
-    pip install dist/*.tar.gz -r requirements.txt -r requirements-db.txt && \
-    rm -rf ./*
+RUN useradd --user-group --no-create-home --no-log-init --shell /bin/bash superset \
+        && mkdir -p ${SUPERSET_HOME} ${PYTHONPATH} \
+        && apt-get update -y \
+        && apt-get install -y --no-install-recommends \
+            build-essential \
+            default-libmysqlclient-dev \
+            libpq-dev \
+        && rm -rf /var/lib/apt/lists/*
 
-# Configure Filesystem
+COPY --from=superset-py /usr/local/lib/python3.6/site-packages/ /usr/local/lib/python3.6/site-packages/
+# Copying site-packages doesn't move the CLIs, so let's copy them one by one
+COPY --from=superset-py /usr/local/bin/gunicorn /usr/local/bin/celery /usr/local/bin/flask /usr/bin/
+COPY --from=superset-node /app/superset/static/assets /app/superset/static/assets
+COPY --from=superset-node /app/superset-frontend /app/superset-frontend
+
+## Lastly, let's install superset itself
+COPY --from=superset-py ${SUPERSET_SRC}/superset /app/superset
+COPY --from=superset-py ${SUPERSET_SRC}/setup.py ${SUPERSET_SRC}/MANIFEST.in ${SUPERSET_SRC}/README.md /app/
+RUN cd /app \
+        && chown -R superset:superset * \
+        && pip install -e .
+
+COPY --from=superset-py ${SUPERSET_SRC}/docker/docker-entrypoint.sh /usr/bin/
+
 COPY bin /usr/local/bin
-WORKDIR /home/superset
-VOLUME /etc/superset \
-       /home/superset \
-       /var/lib/superset
 
-# Finalize application
-EXPOSE 8088
-HEALTHCHECK CMD ["curl", "-f", "http://localhost:8088/health"]
-CMD ["gunicorn", "superset:app"]
+WORKDIR /app
+
 USER superset
+
+HEALTHCHECK CMD ["curl", "-f", "http://localhost:8088/health"]
+
+EXPOSE ${SUPERSET_PORT}
+
+ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]
