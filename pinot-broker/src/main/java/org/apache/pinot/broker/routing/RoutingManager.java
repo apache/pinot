@@ -109,7 +109,7 @@ public class RoutingManager implements ClusterChangeHandler {
   @Override
   public synchronized void processClusterChange(HelixConstants.ChangeType changeType) {
     Preconditions.checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW
-        || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: " + changeType);
+        || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: %s", changeType);
     if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
       processExternalViewChange();
     } else {
@@ -294,7 +294,7 @@ public class RoutingManager implements ClusterChangeHandler {
     LOGGER.info("Building routing for table: {}", tableNameWithType);
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
     ExternalView externalView = getExternalView(tableNameWithType);
     int externalViewVersion;
@@ -308,7 +308,7 @@ public class RoutingManager implements ClusterChangeHandler {
     }
 
     Set<String> onlineSegments = getOnlineSegments(tableNameWithType);
-    Preconditions.checkState(onlineSegments != null, "Failed to find ideal state for table: {}", tableNameWithType);
+    Preconditions.checkState(onlineSegments != null, "Failed to find ideal state for table: %s", tableNameWithType);
 
     Set<String> enabledInstances = _enabledServerInstanceMap.keySet();
 
@@ -343,14 +343,14 @@ public class RoutingManager implements ClusterChangeHandler {
         // ensure no overlapping data getting queried
         TableConfig offlineTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
         Preconditions
-            .checkState(offlineTableConfig != null, "Failed to find table config for table: {}", offlineTableName);
+            .checkState(offlineTableConfig != null, "Failed to find table config for table: %s", offlineTableName);
         // NOTE: External view might be null for new created tables. In such case, create an empty one.
         ExternalView offlineTableExternalView = getExternalView(offlineTableName);
         if (offlineTableExternalView == null) {
           offlineTableExternalView = new ExternalView(offlineTableName);
         }
         Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableName);
-        Preconditions.checkState(offlineTableOnlineSegments != null, "Failed to find ideal state for table: {}",
+        Preconditions.checkState(offlineTableOnlineSegments != null, "Failed to find ideal state for table: %s",
             offlineTableName);
         TimeBoundaryManager offlineTableTimeBoundaryManager =
             new TimeBoundaryManager(offlineTableConfig, _propertyStore);
