@@ -85,7 +85,7 @@ public abstract class AbstractRecordReaderTest {
     }
   }
 
-  private static void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap)
+  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap)
       throws Exception {
     for (Map<String, Object> expectedRecord : expectedRecordsMap) {
       GenericRow actualRecord = recordReader.next();

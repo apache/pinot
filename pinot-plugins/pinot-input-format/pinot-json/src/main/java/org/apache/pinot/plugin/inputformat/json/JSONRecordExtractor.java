@@ -34,6 +34,8 @@ public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>>
   public GenericRow extract(List<String> sourceFieldNames, Map<String, Object> from, GenericRow to) {
     for (String fieldName : sourceFieldNames) {
       Object value = from.get(fieldName);
+      // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
+      // DataTypeTransformer fixes it.
       Object convertedValue = RecordReaderUtils.convert(value);
       to.putValue(fieldName, convertedValue);
     }

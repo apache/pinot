@@ -36,20 +36,21 @@ public class DefaultTimeSpecEvaluator implements ExpressionEvaluator {
   private TimeConverter _incomingTimeConverter;
   private TimeConverter _outgoingTimeConverter;
   private boolean _isValidated;
-  private boolean _useIncoming = true; // If true, use incoming. If false, do conversion.
+  private boolean _convert = false;
   private boolean _useOutgoing = false;
 
   public DefaultTimeSpecEvaluator(TimeFieldSpec timeFieldSpec) {
     TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
     TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
 
+    _incomingTimeColumn = incomingGranularitySpec.getName();
+
     // Perform time conversion only if incoming and outgoing granularity spec are different
     if (outgoingGranularitySpec != null && !incomingGranularitySpec.equals(outgoingGranularitySpec)) {
-      _incomingTimeColumn = incomingGranularitySpec.getName();
-      _outgoingTimeColumn = outgoingGranularitySpec.getName();
       _incomingTimeConverter = new TimeConverter(incomingGranularitySpec);
+      _outgoingTimeColumn = outgoingGranularitySpec.getName();
       _outgoingTimeConverter = new TimeConverter(outgoingGranularitySpec);
-      _useIncoming = false;
+      _convert = true;
     }
   }
 
@@ -58,20 +59,16 @@ public class DefaultTimeSpecEvaluator implements ExpressionEvaluator {
     return Lists.newArrayList(_incomingTimeColumn);
   }
 
+  /**
+   * Performs time transformation
+   */
   @Override
   public Object evaluate(GenericRow genericRow) {
 
     if (!_isValidated) {
       Object incomingTimeValue = genericRow.getValue(_incomingTimeColumn);
 
-      if (_useIncoming) { // Validate if we can use incoming.
-        // If incoming time value does not exist or the value is invalid after conversion, throw exception
-        if (incomingTimeValue == null || !TimeUtils
-            .timeValueInValidRange(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
-          throw new IllegalStateException(
-              "No valid time value found in incoming time column: " + _incomingTimeColumn);
-        }
-      } else { // Validate if we can convert.
+      if (_convert) { // Validate if we can convert.
         // If incoming time value does not exist or the value is invalid after conversion, check if we have outgoing time value.
         // If the outgoing time value is valid, don't convert, just use outgoing
         // otherwise, throw exception.
@@ -84,6 +81,7 @@ public class DefaultTimeSpecEvaluator implements ExpressionEvaluator {
                 "No valid time value found in either incoming time column: " + _incomingTimeColumn
                     + " or outgoing time column: " + _outgoingTimeColumn);
           } else {
+            _convert = false;
             _useOutgoing = true;
           }
         }
@@ -92,13 +90,15 @@ public class DefaultTimeSpecEvaluator implements ExpressionEvaluator {
     }
 
     Object convertedTime;
-    if (_useOutgoing) {
-      convertedTime = genericRow.getValue(_outgoingTimeColumn);
-    } else if (_useIncoming) {
-      convertedTime = genericRow.getValue(_incomingTimeColumn);
-    } else { // convert
-      convertedTime =
-          _outgoingTimeConverter.fromMillisSinceEpoch(_incomingTimeConverter.toMillisSinceEpoch(genericRow.getValue(_incomingTimeColumn)));
+    if (_convert) {
+      convertedTime = _outgoingTimeConverter
+          .fromMillisSinceEpoch(_incomingTimeConverter.toMillisSinceEpoch(genericRow.getValue(_incomingTimeColumn)));
+    } else {
+      if (_useOutgoing) {
+        convertedTime = genericRow.getValue(_outgoingTimeColumn);
+      } else {
+        convertedTime = genericRow.getValue(_incomingTimeColumn);
+      }
     }
     return convertedTime;
   }

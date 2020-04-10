@@ -42,18 +42,17 @@ public class CSVRecordExtractor implements RecordExtractor<CSVRecord> {
   public GenericRow extract(List<String> sourceFieldNames, CSVRecord from, GenericRow to) {
     for (String fieldName : sourceFieldNames) {
       String value = from.isSet(fieldName) ? from.get(fieldName) : null;
-      if (StringUtils.isEmpty(value)) {
-        value = null;
-        // FIXME: forcibly treating empty STRING as null is wrong. defaultNullValue could be something other than "".
-        //  But what choice do we have in CSV?
-      }
-      to.putValue(fieldName, value);
-      if (value != null) {
+      if (value == null || StringUtils.isEmpty(value)) {
+        to.putValue(fieldName, null);
+        // NOTE about CSV behavior for empty string e.g. foo,bar,,zoo or foo,bar,"",zoo. These both are equivalent to a CSVParser
+        // Empty string has to be treated as null, as this could be a column of any data type.
+        // This could be incorrect for STRING dataType, as "" could be a legit entry, different than null.
+      } else {
         String[] stringValues = StringUtils.split(value, _multiValueDelimiter);
         int numValues = stringValues.length;
-        // FIXME: MV column with single value will be treated as single value until DataTypeTransformer.
-        //  What about transform function on MV column? The function will have to handle this.
-        //  Again, what choice do we have in CSV
+        // NOTE about CSV behavior for multi value column - cannot distinguish between multi value column with just 1 entry vs single value
+        // MV column with single value will be treated as single value until DataTypeTransformer.
+        // Transform functions on such columns will have to handle the special case.
         if (numValues > 1) {
           Object[] array = new Object[numValues];
           int index = 0;
@@ -61,6 +60,8 @@ public class CSVRecordExtractor implements RecordExtractor<CSVRecord> {
               array[index++] = stringValue;
           }
           to.putValue(fieldName, array);
+        } else {
+          to.putValue(fieldName, value);
         }
       }
     }

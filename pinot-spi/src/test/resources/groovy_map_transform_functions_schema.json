@@ -1,0 +1,27 @@
+{
+  "schemaName": "map",
+  "dimensionFieldSpecs": [
+    {
+      "name": "map1__KEYS",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "map1__VALUES",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "map2_keys",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "transformFunction": "Groovy({map2.sort()*.key}, map2)"
+    },
+    {
+      "name": "map2_values",
+      "dataType": "INT",
+      "singleValueField": false,
+      "transformFunction": "Groovy({map2.sort()*.value}, map2)"
+    }
+  ]
+}

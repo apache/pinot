@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -299,20 +301,23 @@ public class AvroUtils {
     }
   }
 
+  /**
+   * Converts the value to a single-valued value or a multi-valued value
+   */
   public static Object convert(Object value) {
     Object convertedValue;
     if (value instanceof Collection) {
-      convertedValue = AvroUtils.handleMultiValue((Collection) value);
+      convertedValue = handleMultiValue((Collection) value);
     } else if (value instanceof Map) {
-      convertedValue = value;
+      convertedValue = handleMap((Map) value);
     } else {
-      convertedValue =AvroUtils.handleSingleValue(value);
+      convertedValue = handleSingleValue(value);
     }
     return convertedValue;
   }
 
   /**
-   * Converts the value based on the given field spec.
+   * Converts the value to a single-valued value
    */
   public static Object handleSingleValue(@Nullable Object value) {
     if (value == null) {
@@ -321,11 +326,11 @@ public class AvroUtils {
     if (value instanceof GenericData.Record) {
       return handleSingleValue(((GenericData.Record) value).get(0));
     }
-    return value;
+    return RecordReaderUtils.convertSingleValue(value);
   }
 
   /**
-   * Converts the value based on the given field spec.
+   * Converts the value to a multi-valued value
    */
   public static Object handleMultiValue(@Nullable Collection values) {
     if (values == null || values.isEmpty()) {
@@ -336,6 +341,21 @@ public class AvroUtils {
     for (Object value : values) {
       list.add(handleSingleValue(value));
     }
-    return list;
+    return RecordReaderUtils.convertMultiValue(list);
+  }
+
+  /**
+   * Converts the values withing the map to single-valued values
+   */
+  public static Object handleMap(@Nullable Map map) {
+    if (map == null || map.isEmpty()) {
+      return null;
+    }
+
+    Map<Object, Object> convertedMap = new HashMap<>();
+    for (Object key : map.keySet()) {
+      convertedMap.put(RecordReaderUtils.convertSingleValue(key), RecordReaderUtils.convertSingleValue(map.get(key)));
+    }
+    return convertedMap;
   }
 }

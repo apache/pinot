@@ -44,9 +44,9 @@ public class SourceFieldNameExtractor {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       String columnName = fieldSpec.getName();
       String transformFunction = fieldSpec.getTransformFunction();
+      ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
 
-      if (transformFunction != null) {
-        ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+      if (expressionEvaluator != null) {
         sourceFieldNames.addAll(expressionEvaluator.getArguments());
       } else {
         sourceFieldNames.add(columnName);

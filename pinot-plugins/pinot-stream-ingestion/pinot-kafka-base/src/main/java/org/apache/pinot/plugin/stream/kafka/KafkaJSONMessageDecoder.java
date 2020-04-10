@@ -49,7 +49,10 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       throws Exception {
     _sourceFieldNames = SourceFieldNameExtractor.extract(indexingSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
-    // FIXME: if recordExtractorClass == null, create JSONRecordExtractor. But pinot-input-format/pinot-json is not available here
+    if (recordExtractorClass == null) {
+      recordExtractorClass = "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
+    }
+    // FIXME: pinot-input-format/pinot-json is not available in pinot-stream-ingestion/pinot-kafka-base
     //  Did not face this issue in KafkaAvroMessageDecoder, because all the AvroMessageDecoders are in pinot-input-format/pinot-avro
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
   }

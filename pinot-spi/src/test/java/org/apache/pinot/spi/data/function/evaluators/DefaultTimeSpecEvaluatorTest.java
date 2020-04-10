@@ -16,14 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.recordtransformer;
+package org.apache.pinot.spi.data.function.evaluators;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.data.function.evaluators.DefaultTimeSpecEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -45,7 +43,7 @@ public class DefaultTimeSpecEvaluatorTest {
         TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "time"));
     DefaultTimeSpecEvaluator transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     GenericRow record = new GenericRow();
-    record.putField("time", 20180101);
+    record.putValue("time", 20180101);
     Object transformedValue = transformer.evaluate(record);
     assertNotNull(transformedValue);
     assertEquals(transformedValue, 20180101);
@@ -97,8 +95,8 @@ public class DefaultTimeSpecEvaluatorTest {
         new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
     transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
-    record.putField("incoming", INVALID_TIME);
-    record.putField("outgoing", INVALID_TIME);
+    record.putValue("incoming", INVALID_TIME);
+    record.putValue("outgoing", INVALID_TIME);
     try {
       transformer.evaluate(record);
       fail();
@@ -126,7 +124,7 @@ public class DefaultTimeSpecEvaluatorTest {
         new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
     DefaultTimeSpecEvaluator transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     GenericRow record = new GenericRow();
-    record.putField("incoming", TimeUnit.MILLISECONDS.toDays(VALID_TIME));
+    record.putValue("incoming", TimeUnit.MILLISECONDS.toDays(VALID_TIME));
     Object transformedValue = transformer.evaluate(record);
     assertNotNull(transformedValue);
     assertEquals(transformedValue, VALID_TIME);
@@ -136,7 +134,7 @@ public class DefaultTimeSpecEvaluatorTest {
         new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"));
     transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
-    record.putField("time", TimeUnit.MILLISECONDS.toDays(VALID_TIME));
+    record.putValue("time", TimeUnit.MILLISECONDS.toDays(VALID_TIME));
     transformedValue = transformer.evaluate(record);
     assertNotNull(transformedValue);
     assertEquals(transformedValue, VALID_TIME);
