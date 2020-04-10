@@ -18,7 +18,7 @@
 # under the License.
 #
 
-JAR_PATH="/opt/pinot/lib/pinot-all-0.3.0-SNAPSHOT-jar-with-dependencies.jar"
+JAR_PATH="/opt/pinot/lib/pinot-all-0.4.0-SNAPSHOT-jar-with-dependencies.jar"
 ADMIN_PATH="/opt/pinot/bin/pinot-admin.sh"
 TEMPLATE_BASEDIR="/tmp/pinotGenerator/generator"
 TEMP_DIR="/tmp/pinotGenerator"
