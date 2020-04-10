@@ -31,7 +31,9 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * An {@link ExpressionEvaluator} for evaluating schema transform expressions written in Groovy
+ * An {@link ExpressionEvaluator} for evaluating schema transform expressions written in Groovy.
+ * GroovyShell is used to execute expressions.
+ *
  * The transform expression must follow the convention Groovy({expression}, arguments1, argument2...)
  * For example:
  * "dimensionFieldSpecs": [

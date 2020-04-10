@@ -34,7 +34,7 @@
 
   </Appenders>
   <Loggers>
-    <Root level="info" additivity="false">
+    <Root level="error" additivity="false">
       <AppenderRef ref="console"/>
     </Root>
     <Logger name="org.apache.pinot" level="info" additivity="false">

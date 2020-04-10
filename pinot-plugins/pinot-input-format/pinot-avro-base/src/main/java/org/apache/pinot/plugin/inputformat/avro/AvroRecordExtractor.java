@@ -24,6 +24,9 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 
 
+/**
+ * Extractor for Avro Records
+ */
 public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
 
   @Override

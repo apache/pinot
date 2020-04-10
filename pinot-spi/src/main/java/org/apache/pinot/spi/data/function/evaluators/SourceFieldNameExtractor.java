@@ -43,7 +43,6 @@ public class SourceFieldNameExtractor {
     Set<String> sourceFieldNames = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       String columnName = fieldSpec.getName();
-      String transformFunction = fieldSpec.getTransformFunction();
       ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
 
       if (expressionEvaluator != null) {

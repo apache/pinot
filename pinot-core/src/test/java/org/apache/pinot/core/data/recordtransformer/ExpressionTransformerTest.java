@@ -33,6 +33,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+/**
+ * Tests the evaluation of transform expressions by the ExpressionTransformer
+ */
 public class ExpressionTransformerTest {
 
   private Schema _pinotSchema;

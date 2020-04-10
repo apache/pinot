@@ -24,10 +24,20 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 /**
  * Interface for evaluators of transform function expressions of schema field specs
+ * They transformFunction follows the convention:
+ *  "transformFunction": "FunctionType({function}, argument1, argument2,...argumentN)"
+ *  For example,
+ *  "transformFunction" : "Groovy({firstName + ' ' + lastName}, firstName, lastName)"
  */
 public interface ExpressionEvaluator {
 
+  /**
+   * Get the arguments of the function
+   */
   List<String> getArguments();
 
+  /**
+   * Evaluate the function on the generic row and return the result
+   */
   Object evaluate(GenericRow genericRow);
 }
