@@ -74,6 +74,14 @@ public class GroovyExpressionEvaluatorTest {
     genericRow5.putValue("lastName", "Doe");
     entries.add(new Object[]{"Groovy({firstName + ' ' + lastName}, firstName, lastName)", Lists.newArrayList("firstName", "lastName"), genericRow5, "John Doe"});
 
+    GenericRow genericRow6 = new GenericRow();
+    genericRow6.putValue("eventType", "IMPRESSION");
+    entries.add(new Object[]{"Groovy({eventType == 'IMPRESSION' ? 1: 0}, eventType)", Lists.newArrayList("eventType"), genericRow6, 1});
+
+    GenericRow genericRow7 = new GenericRow();
+    genericRow7.putValue("eventType", "CLICK");
+    entries.add(new Object[]{"Groovy({eventType == 'IMPRESSION' ? 1: 0}, eventType)", Lists.newArrayList("eventType"), genericRow7, 0});
+
     return entries.toArray(new Object[entries.size()][]);
   }
 
