@@ -149,25 +149,25 @@ public class MonitorTaskRunner implements TaskRunner {
   private void disableLongFailedAlerts() {
     DetectionConfigManager detectionDAO = DAO_REGISTRY.getDetectionConfigManager();
     List<DetectionConfigDTO> detectionConfigs = detectionDAO.findAllActive();
-    long currentTimeMills = System.currentTimeMillis();
-    long maxTaskFailMills = TimeUnit.DAYS.toMillis(MAX_FAILED_DISABLE_DAYS);
+    long currentTimeMillis = System.currentTimeMillis();
+    long maxTaskFailMillis = TimeUnit.DAYS.toMillis(MAX_FAILED_DISABLE_DAYS);
     for (DetectionConfigDTO config : detectionConfigs) {
       try {
         Timestamp updateTime = config.getUpdateTime();
         if (updateTime != null && config.getHealth() != null && config.getHealth().getDetectionTaskStatus() != null) {
           long lastTaskExecutionTime = config.getHealth().getDetectionTaskStatus().getLastTaskExecutionTime();
-          if (updateTime.getTime() <= currentTimeMills - maxTaskFailMills && (lastTaskExecutionTime == -1L
-              || lastTaskExecutionTime <= currentTimeMills - maxTaskFailMills)) {
+          // lastTaskExecutionTime == -1L is used for backward compatibility. Currently we have many long failing alerts have -1L.
+          if (updateTime.getTime() <= currentTimeMillis - maxTaskFailMillis && (lastTaskExecutionTime == -1L
+              || lastTaskExecutionTime <= currentTimeMillis - maxTaskFailMillis)) {
             config.setActive(false);
             detectionDAO.update(config);
             sendDisableAlertNotificationEmail(config);
-            LOG.info("Disabled alert " + config.getId() + " since it failed more than " + MAX_FAILED_DISABLE_DAYS + " days");
-            LOG.info("Task last update time: " + config.getUpdateTime());
-            LOG.info("Last success task execution time: " + lastTaskExecutionTime);
+            LOG.info("Disabled alert {} since it failed more than {} days. " + "Task last update time: {}. Last success task execution time: {}",
+                config.getId(), MAX_FAILED_DISABLE_DAYS, config.getUpdateTime(), lastTaskExecutionTime);
           }
         }
       } catch (Exception e) {
-        LOG.error("Exception in disabling alert ", config.getId());
+        LOG.error("Exception in disabling alert ", e);
       }
     }
   }
