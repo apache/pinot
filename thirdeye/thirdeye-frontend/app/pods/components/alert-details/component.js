@@ -179,6 +179,21 @@ export default Component.extend({
   ),
 
   /**
+   * Value to display in placeholder blob
+   * @type {String}
+   */
+  blobMessage: computed(
+    'getAnomaliesError',
+    function() {
+      let message = "Loading time series.";
+      if (this.get('getAnomaliesError')) {
+        message = "Error: can't get data.";
+      }
+      return message;
+    }
+  ),
+
+  /**
    * Rules to display in rules dropdown
    * @type {Array}
    */
@@ -901,7 +916,7 @@ export default Component.extend({
     } catch (error) {
       const previewErrorMsg = (error.body && typeof error.body === 'object') ? error.body.message : error.message;
       const previewErrorInfo = (error.body && typeof error.body === 'object') ? error.body['more-info'] : error['more-info'];
-      notifications.error('Failed to get anomalies, please check warning above detection configuration', 'Error', toastOptions);
+      notifications.error('Failed to get anomalies', 'Error', toastOptions);
       this.set('getAnomaliesError', true);
       if (this.get('isPreviewMode')) {
         this.get('sendPreviewError')({
