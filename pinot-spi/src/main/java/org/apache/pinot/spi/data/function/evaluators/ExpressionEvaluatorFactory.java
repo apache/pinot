@@ -56,13 +56,14 @@ public class ExpressionEvaluatorFactory {
         try {
           expressionEvaluator = getExpressionEvaluator(transformExpression);
         } catch (Exception e) {
-          LOGGER.error("Caught exception while constructing expression evaluator for: {}, skipping", transformExpression, e);
+          LOGGER.error(
+              "Caught exception while constructing expression evaluator for transform expression: {}, of column: {}, skipping",
+              transformExpression, columnName, e);
         }
       } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
 
         // for backward compatible handling of TIME filed conversion
         expressionEvaluator = new DefaultTimeSpecEvaluator((TimeFieldSpec) fieldSpec);
-
       } else if (columnName.endsWith(SourceFieldNameExtractor.MAP_KEY_COLUMN_SUFFIX)) {
 
         // for backward compatible handling of Map type (currently only in Avro)
@@ -70,7 +71,6 @@ public class ExpressionEvaluatorFactory {
             columnName.substring(0, columnName.length() - SourceFieldNameExtractor.MAP_KEY_COLUMN_SUFFIX.length());
         String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
         expressionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
-
       } else if (columnName.endsWith(SourceFieldNameExtractor.MAP_VALUE_COLUMN_SUFFIX)) {
 
         // for backward compatible handling of Map type in avro (currently only in Avro)

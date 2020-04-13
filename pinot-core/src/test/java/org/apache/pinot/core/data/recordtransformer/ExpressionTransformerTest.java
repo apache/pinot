@@ -56,7 +56,7 @@ public class ExpressionTransformerTest {
 
     // test functions from schema
     GenericRow genericRow = new GenericRow();
-    genericRow.putValue("userID", 1L);
+    genericRow.putValue("user_id", 1L);
     genericRow.putValue("firstName", "John");
     genericRow.putValue("lastName", "Denver");
     genericRow.putValue("bids", Arrays.asList(10, 20));
@@ -124,6 +124,10 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("cost"), 1000.0);
     // convert to LONG
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch"), 437222L);
+  }
 
+  @Test
+  public void testTimeSpecConversion() {
+    // all combinations of timespec, and values in the incoming outgoing
   }
 }

@@ -19,6 +19,8 @@
 package org.apache.pinot.spi.data.function.evaluators;
 
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -56,7 +58,11 @@ public class DefaultTimeSpecEvaluator implements ExpressionEvaluator {
 
   @Override
   public List<String> getArguments() {
-    return Lists.newArrayList(_incomingTimeColumn);
+    if (_outgoingTimeColumn != null && !_outgoingTimeColumn.equals(_incomingTimeColumn)) {
+      return Lists.newArrayList(_incomingTimeColumn, _outgoingTimeColumn);
+    } else {
+      return Collections.singletonList(_incomingTimeColumn);
+    }
   }
 
   /**
