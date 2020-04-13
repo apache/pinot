@@ -371,7 +371,8 @@ public class YamlResource {
   long createDetectionConfig(@NotNull String payload, long startTime, long endTime) throws Exception {
     // if can't acquire alert onboarding QPS permit, throw an exception
     if (!this.onboardingRateLimiter.tryAcquire()) {
-      throw new RuntimeException("Server is busy handling create detection requests. Please retry later.");
+      throw new RuntimeException(
+          String.format("Server is busy handling create detection requests. Please retry later. QPS quota: %f", this.onboardingRateLimiter.getRate()));
     }
 
     DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, null);
