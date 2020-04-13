@@ -65,7 +65,7 @@ public class RecordReaderUtils {
   /**
    * Converts the value to a multi-values value or a single values value
    */
-  public static Object convert(Object value) {
+  public static @Nullable Object convert(@Nullable Object value) {
 
     if (value == null) {
       return null;
@@ -80,7 +80,7 @@ public class RecordReaderUtils {
   /**
    * Converts the value to a single-valued value
    */
-  public static Object convertSingleValue(@Nullable Object value) {
+  public static @Nullable Object convertSingleValue(@Nullable Object value) {
     if (value == null) {
       return null;
     }
@@ -103,7 +103,7 @@ public class RecordReaderUtils {
   /**
    * Converts the value to a multi-valued value
    */
-  public static Object convertMultiValue(@Nullable Collection values) {
+  public static @Nullable Object convertMultiValue(@Nullable Collection values) {
     if (values == null || values.isEmpty()) {
       return null;
     }
@@ -135,8 +135,6 @@ public class RecordReaderUtils {
       return convertMultiValue(fieldSpec, (Collection) value);
     }
   }
-
-
 
   /**
    * Converts the value to a single-valued value based on the given field spec.

@@ -96,5 +96,4 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
       mrRecordWriter.write(null, struct);
     } mrRecordWriter.close(null);
   }
-
 }

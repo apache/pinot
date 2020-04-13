@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data.function.evaluators;
 
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,15 +43,17 @@ public class SourceFieldNameExtractor {
   public static List<String> extract(Schema schema) {
     Set<String> sourceFieldNames = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      String columnName = fieldSpec.getName();
-      ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+      if (!fieldSpec.isVirtualColumn()) {
+        String columnName = fieldSpec.getName();
+        ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
 
-      if (expressionEvaluator != null) {
-        sourceFieldNames.addAll(expressionEvaluator.getArguments());
-      } else {
-        sourceFieldNames.add(columnName);
+        if (expressionEvaluator != null) {
+          sourceFieldNames.addAll(expressionEvaluator.getArguments());
+        } else {
+          sourceFieldNames.add(columnName);
+        }
       }
     }
-    return Lists.newArrayList(sourceFieldNames);
+    return new ArrayList<>(sourceFieldNames);
   }
 }

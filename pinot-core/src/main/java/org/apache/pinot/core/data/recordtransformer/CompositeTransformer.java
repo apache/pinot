@@ -47,8 +47,6 @@ public class CompositeTransformer implements RecordTransformer {
    * </ul>
    */
   public static CompositeTransformer getDefaultTransformer(Schema schema) {
-    // TODO: ExpressionTransformer contains record with source columns, and after transformation, the record has source + destination columns.
-    //  Should we add some record transformer after ExpressionTransformer, to remove the source columns? But that would mean creating a new record, as we cannot remove columns from the record.
     return new CompositeTransformer(Arrays
         .asList(new ExpressionTransformer(schema), new NullValueTransformer(schema), new DataTypeTransformer(schema),
             new SanitizationTransformer(schema)));

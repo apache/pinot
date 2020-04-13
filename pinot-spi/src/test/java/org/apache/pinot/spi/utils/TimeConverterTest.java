@@ -1,3 +1,5 @@
+package org.apache.pinot.spi.utils;
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,12 +18,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.time;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.TimeConverter;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

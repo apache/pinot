@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data.function.evaluators;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.slf4j.Logger;
@@ -43,42 +44,40 @@ public class ExpressionEvaluatorFactory {
    * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default functions for handing the Map
    * 4. Return null, if none of the above
    */
-  public static ExpressionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
+  public static @Nullable
+  ExpressionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
     ExpressionEvaluator expressionEvaluator = null;
 
-    if (!fieldSpec.isVirtualColumn()) {
+    String columnName = fieldSpec.getName();
+    String transformExpression = fieldSpec.getTransformFunction();
+    if (transformExpression != null) {
 
-      String columnName = fieldSpec.getName();
-      String transformExpression = fieldSpec.getTransformFunction();
-      if (transformExpression != null) {
-
-        // if transform function expression present, use it to generate function evaluator
-        try {
-          expressionEvaluator = getExpressionEvaluator(transformExpression);
-        } catch (Exception e) {
-          LOGGER.error(
-              "Caught exception while constructing expression evaluator for transform expression: {}, of column: {}, skipping",
-              transformExpression, columnName, e);
-        }
-      } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
-
-        // for backward compatible handling of TIME filed conversion
-        expressionEvaluator = new DefaultTimeSpecEvaluator((TimeFieldSpec) fieldSpec);
-      } else if (columnName.endsWith(SourceFieldNameExtractor.MAP_KEY_COLUMN_SUFFIX)) {
-
-        // for backward compatible handling of Map type (currently only in Avro)
-        String sourceMapName =
-            columnName.substring(0, columnName.length() - SourceFieldNameExtractor.MAP_KEY_COLUMN_SUFFIX.length());
-        String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
-        expressionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
-      } else if (columnName.endsWith(SourceFieldNameExtractor.MAP_VALUE_COLUMN_SUFFIX)) {
-
-        // for backward compatible handling of Map type in avro (currently only in Avro)
-        String sourceMapName =
-            columnName.substring(0, columnName.length() - SourceFieldNameExtractor.MAP_VALUE_COLUMN_SUFFIX.length());
-        String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
-        expressionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
+      // if transform function expression present, use it to generate function evaluator
+      try {
+        expressionEvaluator = getExpressionEvaluator(transformExpression);
+      } catch (Exception e) {
+        LOGGER.error(
+            "Caught exception while constructing expression evaluator for transform expression: {}, of column: {}, skipping",
+            transformExpression, columnName, e);
       }
+    } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
+
+      // for backward compatible handling of TIME filed conversion
+      expressionEvaluator = new DefaultTimeSpecEvaluator((TimeFieldSpec) fieldSpec);
+    } else if (columnName.endsWith(SourceFieldNameExtractor.MAP_KEY_COLUMN_SUFFIX)) {
+
+      // for backward compatible handling of Map type (currently only in Avro)
+      String sourceMapName =
+          columnName.substring(0, columnName.length() - SourceFieldNameExtractor.MAP_KEY_COLUMN_SUFFIX.length());
+      String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
+      expressionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
+    } else if (columnName.endsWith(SourceFieldNameExtractor.MAP_VALUE_COLUMN_SUFFIX)) {
+
+      // for backward compatible handling of Map type in avro (currently only in Avro)
+      String sourceMapName =
+          columnName.substring(0, columnName.length() - SourceFieldNameExtractor.MAP_VALUE_COLUMN_SUFFIX.length());
+      String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
+      expressionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
     }
 
     return expressionEvaluator;

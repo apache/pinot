@@ -67,15 +67,15 @@ public class DefaultTimeSpecEvaluatorTest {
         new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
     DefaultTimeSpecEvaluator transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     GenericRow record = new GenericRow();
-    record.putField("outgoing", VALID_TIME);
+    record.putValue("outgoing", VALID_TIME);
     Object transformedValue = transformer.evaluate(record);
     assertNotNull(transformedValue);
     assertEquals(transformedValue, VALID_TIME);
 
     transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
-    record.putField("incoming", INVALID_TIME);
-    record.putField("outgoing", VALID_TIME);
+    record.putValue("incoming", INVALID_TIME);
+    record.putValue("outgoing", VALID_TIME);
     transformedValue = transformer.evaluate(record);
     assertNotNull(transformedValue);
     assertEquals(transformedValue, VALID_TIME);
@@ -85,7 +85,7 @@ public class DefaultTimeSpecEvaluatorTest {
         new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"));
     transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
-    record.putField("time", VALID_TIME);
+    record.putValue("time", VALID_TIME);
     transformedValue = transformer.evaluate(record);
     assertNotNull(transformedValue);
     assertEquals(transformedValue, VALID_TIME);
@@ -104,11 +104,11 @@ public class DefaultTimeSpecEvaluatorTest {
       // Expected
     }
 
-    new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"),
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"),
         new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"));
     transformer = new DefaultTimeSpecEvaluator(timeFieldSpec);
     record = new GenericRow();
-    record.putField("time", INVALID_TIME);
+    record.putValue("time", INVALID_TIME);
     try {
       transformer.evaluate(record);
       fail();

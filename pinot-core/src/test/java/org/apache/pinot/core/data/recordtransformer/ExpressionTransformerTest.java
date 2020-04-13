@@ -25,11 +25,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -38,21 +40,16 @@ import org.testng.annotations.Test;
  */
 public class ExpressionTransformerTest {
 
-  private Schema _pinotSchema;
-
-  @BeforeClass
-  public void setup()
-      throws IOException {
-    URL resource =
-        AbstractRecordExtractorTest.class.getClassLoader().getResource("data/expression_transformer/groovy_expression_transformer.json");
-    File schemaFile = new File(resource.getFile());
-    _pinotSchema = Schema.fromFile(schemaFile);
-  }
-
   @Test
-  public void testGroovyExpressionTransformer() {
-    ExpressionTransformer expressionTransformer = new ExpressionTransformer(_pinotSchema);
-    DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(_pinotSchema);
+  public void testGroovyExpressionTransformer()
+      throws IOException {
+    URL resource = AbstractRecordExtractorTest.class.getClassLoader()
+        .getResource("data/expression_transformer/groovy_expression_transformer.json");
+    File schemaFile = new File(resource.getFile());
+    Schema pinotSchema = Schema.fromFile(schemaFile);
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(pinotSchema);
+    DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(pinotSchema);
 
     // test functions from schema
     GenericRow genericRow = new GenericRow();
@@ -81,7 +78,7 @@ public class ExpressionTransformerTest {
     Assert.assertTrue(((List) genericRow.getValue("bids")).containsAll(Arrays.asList(10, 20)));
     // find max bid from bids
     Assert.assertEquals(genericRow.getValue("maxBid"), 20);
-     // Backward compatible way to support MAP - __KEYS indicates keys of map1
+    // Backward compatible way to support MAP - __KEYS indicates keys of map1
     ArrayList map1__keys = (ArrayList) genericRow.getValue("map1__KEYS");
     Assert.assertEquals(map1__keys.get(0), "200");
     Assert.assertEquals(map1__keys.get(1), "30");
@@ -105,7 +102,7 @@ public class ExpressionTransformerTest {
 
     Assert.assertEquals(genericRow.getValue("userId"), 1L);
     Assert.assertEquals(genericRow.getValue("fullName"), "John Denver");
-    Assert.assertEquals(((Integer[]) genericRow.getValue("bids")), new Integer[] {10, 20});
+    Assert.assertEquals(((Integer[]) genericRow.getValue("bids")), new Integer[]{10, 20});
     Assert.assertEquals(genericRow.getValue("maxBid"), 20);
     Integer[] map1Keys = (Integer[]) genericRow.getValue("map1__KEYS");
     Assert.assertEquals(map1Keys[0].intValue(), 200);
@@ -128,6 +125,133 @@ public class ExpressionTransformerTest {
 
   @Test
   public void testTimeSpecConversion() {
+    long validMillis = 1585724400000L;
+    long validHours = 440479;
+    ExpressionTransformer expressionTransformer;
+
     // all combinations of timespec, and values in the incoming outgoing
+    Schema pinotSchema;
+
+    // 1] only incoming defined
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming")).build();
+
+    // correct value - use incoming
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("incoming", validMillis);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("incoming"), validMillis);
+
+    // incorrect value - use whatever is
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("incoming", -1);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("incoming"), -1);
+
+    // 2] both incoming and outgoing defined - exactly the same
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time")).build();
+
+    // correct value - use incoming
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("time", validMillis);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("time"), validMillis);
+
+    // incorrect value - use whatever is
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("time", -1);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("time"), -1);
+
+    // 3] both incoming and outgoing defined - same column name only
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time")).build();
+
+    // value matches incoming - convert
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("time", validMillis);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("time"), validHours);
+
+    // value matches outgoing - use outgoing
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("time", validHours);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("time"), validHours);
+
+    // value matches neither - exception
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("time", -1);
+    try {
+      expressionTransformer.transform(genericRow);
+      Assert.fail("Value matches neither incoming nor outgoing, should have failed");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // 4] both incoming and outgoing defined - different column names
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "outgoing")).build();
+
+    // only valid incoming value exists - convert
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("incoming", validMillis);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
+
+    // only valid outgoing value exists - use outgoing
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("outgoing", validHours);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
+
+    // both valid incoming and outgoing exist - convert
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("incoming", validMillis);
+    genericRow.putValue("outgoing", validHours);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
+
+    // invalid incoming, valid outgoing - use outgoing
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("incoming", -1);
+    genericRow.putValue("outgoing", validHours);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
+
+    // valid incoming, invalid outgoing - convert
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("incoming", validMillis);
+    genericRow.putValue("outgoing", -1);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("outgoing"), validHours);
+
+    // invalid incoming and outgoing
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+    genericRow = new GenericRow();
+    genericRow.putValue("incoming", -1);
+    genericRow.putValue("outgoing", -1);
+    try {
+      expressionTransformer.transform(genericRow);
+      Assert.fail("Invalid incoming and outgoing time, should have failed");
+    } catch (Exception e) {
+      // expected
+    }
   }
 }

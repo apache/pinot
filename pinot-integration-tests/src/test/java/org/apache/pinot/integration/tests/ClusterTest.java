@@ -347,7 +347,7 @@ public abstract class ClusterTest extends ControllerTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;
     private org.apache.avro.Schema _avroSchema;
-    List<String> _sourceFieldNames;
+    private List<String> _sourceFieldNames;
     private RecordExtractor _recordExtractor;
     private DecoderFactory _decoderFactory = new DecoderFactory();
     private DatumReader<GenericData.Record> _reader;

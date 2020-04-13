@@ -48,7 +48,8 @@ public class GroovyExpressionEvaluator implements ExpressionEvaluator {
 
   private static final String GROOVY_EXPRESSION_PREFIX = "Groovy";
   private static final String GROOVY_FUNCTION_REGEX = "Groovy\\(\\{(?<script>.+)}(,(?<arguments>.+))?\\)";
-  private static final Pattern GROOVY_FUNCTION_PATTERN = Pattern.compile(GROOVY_FUNCTION_REGEX, Pattern.CASE_INSENSITIVE);
+  private static final Pattern GROOVY_FUNCTION_PATTERN =
+      Pattern.compile(GROOVY_FUNCTION_REGEX, Pattern.CASE_INSENSITIVE);
   private static final String ARGUMENTS_GROUP_NAME = "arguments";
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
@@ -83,17 +84,19 @@ public class GroovyExpressionEvaluator implements ExpressionEvaluator {
   public Object evaluate(GenericRow genericRow) {
     Map<String, Object> params = new HashMap<>();
     for (String argument : _arguments) {
-      params.put(argument, genericRow.getValue(argument));
-    }
-    if (params.containsValue(null)) { // TODO: disallow evaluation of any of the params is null? Or give complete control to function?
-      return null;
-    } else {
-      Binding binding = new Binding();
-      for (String argument : _arguments) {
-        binding.setVariable(argument, params.get(argument));
+      Object value = genericRow.getValue(argument);
+      if (value == null) {
+        // TODO: disallow evaluation of any of the params is null? Or give complete control to function?
+        return null;
       }
-      GroovyShell shell = new GroovyShell(binding);
-      return shell.evaluate(_script);
+      params.put(argument, value);
     }
+
+    Binding binding = new Binding();
+    for (String argument : _arguments) {
+      binding.setVariable(argument, params.get(argument));
+    }
+    GroovyShell shell = new GroovyShell(binding);
+    return shell.evaluate(_script);
   }
 }

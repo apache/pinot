@@ -84,5 +84,4 @@ public class GroovyExpressionEvaluatorTest {
 
     return entries.toArray(new Object[entries.size()][]);
   }
-
 }

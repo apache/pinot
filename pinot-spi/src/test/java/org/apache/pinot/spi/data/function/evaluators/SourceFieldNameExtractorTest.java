@@ -25,6 +25,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -88,7 +89,7 @@ public class SourceFieldNameExtractorTest {
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("time"));
 
-    // incoming and outgoing same
+    // incoming and outgoing same column name
     schema = new Schema();
     timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time", FieldSpec.DataType.LONG, TimeUnit.HOURS);
     schema.addField(timeFieldSpec);
@@ -97,14 +98,13 @@ public class SourceFieldNameExtractorTest {
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("time"));
 
-    // incoming and outgoing different
+    // incoming and outgoing different column name
     schema = new Schema();
     timeFieldSpec = new TimeFieldSpec("in", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
     schema.addField(timeFieldSpec);
 
     extract = SourceFieldNameExtractor.extract(schema);
-    Assert.assertEquals(extract.size(), 1);
-    Assert.assertTrue(extract.contains("in"));
+    Assert.assertEquals(extract.size(), 2);
+    Assert.assertTrue(extract.containsAll(Arrays.asList("in", "out")));
   }
-
 }
