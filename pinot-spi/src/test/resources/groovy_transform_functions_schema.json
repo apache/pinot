@@ -20,6 +20,10 @@
       "name": "maxBid",
       "dataType": "INT",
       "transformFunction": "Groovy({bids.max{ it.toBigDecimal() }}, bids)"
+    },
+    {
+      "name": "campaignInfo",
+      "dataType": "BYTES"
     }
   ],
   "metricFieldSpecs": [

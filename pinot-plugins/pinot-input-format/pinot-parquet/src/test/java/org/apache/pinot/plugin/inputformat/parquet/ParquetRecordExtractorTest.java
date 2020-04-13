@@ -71,6 +71,7 @@ public class ParquetRecordExtractorTest extends AbstractRecordExtractorTest {
             new Schema.Field("lastName", createUnion(Lists.newArrayList(create(Schema.Type.STRING), create(Schema.Type.NULL))), null, null),
             new Schema.Field("bids", createUnion(Lists.newArrayList(createArray(create(Schema.Type.INT)), create(
                 Schema.Type.NULL))), null, null),
+            new Schema.Field("campaignInfo", create(Schema.Type.STRING), null, null),
             new Schema.Field("cost", create(Schema.Type.DOUBLE), null, null),
             new Schema.Field("timestamp", create(Schema.Type.LONG), null, null));
     avroSchema.setFields(fields);

@@ -68,6 +68,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     schema.addField("lastName", TypeDescription.createString());
     TypeDescription typeBids = TypeDescription.createList(TypeDescription.createInt());
     schema.addField("bids", typeBids);
+    schema.addField("campaignInfo", TypeDescription.createString());
     schema.addField("cost", TypeDescription.createDouble());
     schema.addField("timestamp", TypeDescription.createLong());
 
@@ -91,6 +92,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
       } else {
         struct.setFieldValue("bids", null);
       }
+      struct.setFieldValue("campaignInfo", new Text((String) inputRecord.get("campaignInfo")));
       struct.setFieldValue("cost", new DoubleWritable((Double) inputRecord.get("cost")));
       struct.setFieldValue("timestamp", new LongWritable((Long) inputRecord.get("timestamp")));
       mrRecordWriter.write(null, struct);

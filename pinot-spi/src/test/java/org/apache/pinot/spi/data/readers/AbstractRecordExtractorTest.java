@@ -30,6 +30,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -67,24 +68,27 @@ public abstract class AbstractRecordExtractorTest {
   }
 
   protected List<Map<String, Object>> getInputRecords() {
-    Integer[] userID = new Integer[] {1, 2, null, 4};
-    String[] firstName = new String[] {null, "John","Ringo", "George"};
-    String[] lastName = new String[] {"McCartney", "Lenon","Starr", "Harrison"};
+    Integer[] userID = new Integer[]{1, 2, null, 4};
+    String[] firstName = new String[]{null, "John", "Ringo", "George"};
+    String[] lastName = new String[]{"McCartney", "Lenon", "Starr", "Harrison"};
     List<List<Integer>> bids = new ArrayList<>(4);
     bids.add(new ArrayList<>(Arrays.asList(10, 20)));
     bids.add(null);
     bids.add(new ArrayList<>(Arrays.asList(1)));
     bids.add(new ArrayList<>(Arrays.asList(1, 2, 3)));
-    double[] cost = new double[] {10000, 20000, 30000, 25000};
-    long[] timestamp = new long[] {1570863600000L, 1571036400000L, 1571900400000L, 1574000000000L};
+    byte[][] campaignInfo =
+        new byte[][]{"yesterday".getBytes(), "blackbird".getBytes(), "here comes the sun".getBytes(), "hey jude".getBytes()};
+    double[] cost = new double[]{10000, 20000, 30000, 25000};
+    long[] timestamp = new long[]{1570863600000L, 1571036400000L, 1571900400000L, 1574000000000L};
 
     List<Map<String, Object>> inputRecords = new ArrayList<>(4);
-    for (int i = 0; i < 4; i ++) {
+    for (int i = 0; i < 4; i++) {
       Map<String, Object> record = new HashMap<>();
       record.put("userID", userID[i]);
       record.put("firstName", firstName[i]);
       record.put("lastName", lastName[i]);
       record.put("bids", bids.get(i));
+      record.put("campaignInfo", campaignInfo[i].toString());
       record.put("cost", cost[i]);
       record.put("timestamp", timestamp[i]);
       inputRecords.add(record);

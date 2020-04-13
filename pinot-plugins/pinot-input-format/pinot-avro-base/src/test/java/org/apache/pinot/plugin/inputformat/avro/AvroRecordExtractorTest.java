@@ -65,6 +65,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
             new Field("firstName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
             new Field("lastName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
             new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null, null),
+            new Field("campaignInfo", create(Type.STRING), null, null),
             new Field("cost", create(Type.DOUBLE), null, null),
             new Field("timestamp", create(Type.LONG), null, null));
 
