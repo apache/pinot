@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import com.google.common.base.Preconditions;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -32,9 +31,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class RecordReaderUtils {
@@ -112,7 +108,7 @@ public class RecordReaderUtils {
     int index = 0;
     for (Object value : values) {
       Object convertedValue = convertSingleValue(value);
-      if (convertedValue != null) {
+      if (convertedValue != null && !convertedValue.toString().equals("")) {
         array[index++] = convertedValue;
       }
     }
@@ -122,143 +118,6 @@ public class RecordReaderUtils {
       return null;
     } else {
       return Arrays.copyOf(array, index);
-    }
-  }
-
-  /**
-   * Converts the value based on the given field spec.
-   */
-  public static Object convert(FieldSpec fieldSpec, @Nullable Object value) {
-    if (fieldSpec.isSingleValueField()) {
-      return convertSingleValue(fieldSpec, value);
-    } else {
-      return convertMultiValue(fieldSpec, (Collection) value);
-    }
-  }
-
-  /**
-   * Converts the value to a single-valued value based on the given field spec.
-   */
-  public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable Object value) {
-    if (value == null) {
-      return null;
-    }
-    DataType dataType = fieldSpec.getDataType();
-    if (dataType == FieldSpec.DataType.BYTES) {
-      // Avro ByteBuffer maps to byte[]
-      if (value instanceof ByteBuffer) {
-        ByteBuffer byteBufferValue = (ByteBuffer) value;
-
-        // Use byteBufferValue.remaining() instead of byteBufferValue.capacity() so that it still works when buffer is
-        // over-sized
-        byte[] bytesValue = new byte[byteBufferValue.remaining()];
-        byteBufferValue.get(bytesValue);
-        return bytesValue;
-      } else {
-        Preconditions
-            .checkState(value instanceof byte[], "For BYTES data type, value must be either ByteBuffer or byte[]");
-        return value;
-      }
-    }
-    if (value instanceof Number) {
-      Number numberValue = (Number) value;
-      switch (dataType) {
-        case INT:
-          return numberValue.intValue();
-        case LONG:
-          return numberValue.longValue();
-        case FLOAT:
-          return numberValue.floatValue();
-        case DOUBLE:
-          return numberValue.doubleValue();
-        case STRING:
-          return numberValue.toString();
-        default:
-          throw new IllegalStateException("Illegal data type: " + dataType);
-      }
-    }
-    return convertSingleValue(fieldSpec, value.toString());
-  }
-
-  /**
-   * Converts the string value to a single-valued value based on the given field spec.
-   */
-  public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable String stringValue) {
-    if (stringValue == null) {
-      return null;
-    }
-    DataType dataType = fieldSpec.getDataType();
-    // Treat empty string as null for data types other than STRING
-    if (stringValue.isEmpty() && dataType != DataType.STRING) {
-      return null;
-    }
-    switch (dataType) {
-      case INT:
-        return Integer.parseInt(stringValue);
-      case LONG:
-        return Long.parseLong(stringValue);
-      case FLOAT:
-        return Float.parseFloat(stringValue);
-      case DOUBLE:
-        return Double.parseDouble(stringValue);
-      case STRING:
-        return stringValue;
-      case BYTES:
-        return BytesUtils.toBytes(stringValue);
-      default:
-        throw new IllegalStateException("Illegal data type: " + dataType);
-    }
-  }
-
-  /**
-   * Converts the values to a multi-valued value based on the given field spec.
-   */
-  public static Object convertMultiValue(FieldSpec fieldSpec, @Nullable Collection values) {
-    if (values == null || values.isEmpty()) {
-      return null;
-    } else {
-      int numValues = values.size();
-      Object[] array = new Object[numValues];
-      int index = 0;
-      for (Object value : values) {
-        Object convertedValue = convertSingleValue(fieldSpec, value);
-        if (convertedValue != null) {
-          array[index++] = convertedValue;
-        }
-      }
-      if (index == numValues) {
-        return array;
-      } else if (index == 0) {
-        return null;
-      } else {
-        return Arrays.copyOf(array, index);
-      }
-    }
-  }
-
-  /**
-   * Converts the string values to a multi-valued value based on the given field spec.
-   */
-  public static Object convertMultiValue(FieldSpec fieldSpec, @Nullable String[] stringValues) {
-    if (stringValues == null || stringValues.length == 0) {
-      return null;
-    } else {
-      int numValues = stringValues.length;
-      Object[] array = new Object[numValues];
-      int index = 0;
-      for (String stringValue : stringValues) {
-        Object convertedValue = convertSingleValue(fieldSpec, stringValue);
-        if (convertedValue != null) {
-          array[index++] = convertedValue;
-        }
-      }
-      if (index == numValues) {
-        return array;
-      } else if (index == 0) {
-        return null;
-      } else {
-        return Arrays.copyOf(array, index);
-      }
     }
   }
 }

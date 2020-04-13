@@ -19,11 +19,7 @@
 package org.apache.pinot.spi.data.readers;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -34,24 +30,17 @@ public class RecordReaderUtilsTest {
 
   @Test
   public void testConvertMultiValue() {
-    FieldSpec fieldSpec = new DimensionFieldSpec("intMV", DataType.INT, false);
 
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, (Collection) null));
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, (String[]) null));
+    assertNull(RecordReaderUtils.convertMultiValue(null));
 
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, Collections.emptyList()));
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, new String[0]));
+    assertNull(RecordReaderUtils.convertMultiValue(Collections.emptyList()));
 
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, Collections.singletonList(null)));
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, new String[]{null}));
+    assertNull(RecordReaderUtils.convertMultiValue(Collections.singletonList(null)));
 
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, Collections.singletonList("")));
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, new String[]{""}));
+    assertNull(RecordReaderUtils.convertMultiValue(Collections.singletonList("")));
 
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, Arrays.asList(null, "")));
-    assertNull(RecordReaderUtils.convertMultiValue(fieldSpec, new String[]{null, ""}));
+    assertNull(RecordReaderUtils.convertMultiValue(Arrays.asList(null, "")));
 
-    assertEquals(RecordReaderUtils.convertMultiValue(fieldSpec, Arrays.asList(null, "", 123)), new Object[]{123});
-    assertEquals(RecordReaderUtils.convertMultiValue(fieldSpec, new String[]{null, "", "123"}), new Object[]{123});
+    assertEquals(RecordReaderUtils.convertMultiValue(Arrays.asList(null, "", 123)), new Object[]{123});
   }
 }

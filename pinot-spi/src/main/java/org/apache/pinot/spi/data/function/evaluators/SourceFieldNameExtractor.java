@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.data.function.evaluators;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
