@@ -210,6 +210,17 @@
               {{/if}}
             </div>
 
+            {{#if isTrainingDisplayed}}
+              <div class="col-xs-12 no-padding">
+                  <div class="alert-details-msg-forecast">
+                    <p>{{material-design-icon
+                      name='error-outline'
+                    }} {{trainingMessage}}
+                    </p>
+                  </div>
+              </div>
+            {{/if}}
+
             {{!-- Missing anomaly modal --}}
             {{#te-modal
               cancelButtonText="Cancel"

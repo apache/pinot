@@ -141,8 +141,8 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
  * @param {String} duration - the selected time span that is default
  * @return {Array}
  */
-export function setUpTimeRangeOptions(datesKeys, duration) {
-  const newRangeArr = [];
+export function setUpTimeRangeOptions(datesKeys, duration, forecast=false) {
+  let newRangeArr = [];
 
   const defaultCustomRange = {
     name: 'Custom',
@@ -150,11 +150,20 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
     start: null,
     isActive: !datesKeys.includes(duration)
   };
+  newRangeArr = forecast ? futureAndPast(datesKeys, duration, newRangeArr) : pastOnly(datesKeys, duration, newRangeArr);
+  newRangeArr.push(defaultCustomRange);
+  return newRangeArr;
+}
 
+/**
+ * Helper function for setUpTimeRangeOptions when returning past ranges only
+ * @returns {Array}
+ */
+function pastOnly(datesKeys, duration, newRangeArr) {
   const dateKeyMap = new Map(
     [
       [ '1m', ['Last 30 Days', 1, 'month'] ],
-      [ '3m', ['3 Months', 3, 'month'] ],
+      [ '3m', ['Last 3 Months', 3, 'month'] ],
       [ '2w', ['Last 2 Weeks', 2, 'week'] ],
       [ '1w', ['Last Week', 1, 'week'] ],
       [ '2d', ['Yesterday', 2, 'day'] ],
@@ -193,8 +202,58 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
     const isActive = duration === value;
     newRangeArr.push({ name: label, value, start, end, isActive });
   });
+  return newRangeArr;
+}
 
-  newRangeArr.push(defaultCustomRange);
+/**
+ * Helper function for setUpTimeRangeOptions when returning past and future options
+ * @returns {Array}
+ */
+function futureAndPast(datesKeys, duration, newRangeArr) {
+  const dateKeyMap = new Map(
+    [
+      [ '1m', ['Next 30 Days', 1, 'month'] ],
+      [ '3m', ['Next 3 Months', 3, 'month'] ],
+      [ '2w', ['Next 2 Weeks', 2, 'week'] ],
+      [ '1w', ['Next Week', 1, 'week'] ],
+      [ '2d', ['Tomorrow', 2, 'day'] ],
+      [ '1d', ['Next 24 Hours', 24, 'hour'] ],
+      [ '48h', ['Next 48 Hours', 48, 'hour'] ],
+      [ 'today', ['Today'] ]
+    ]);
+
+  newRangeArr = pastOnly(datesKeys, duration, newRangeArr);
+
+  datesKeys.forEach((value) => {
+    const currVal = dateKeyMap.get(value);
+    const label = currVal[0];
+    let start;
+    let end;
+    // overrides map above
+    switch(label) {
+      case 'Today':
+        start = moment().startOf('day');
+        end = start.add(1, 'days');
+        break;
+      case 'Tomorrow':
+        start = moment().startOf('day');
+        end = moment().add(2, 'day').startOf('day');
+        break;
+      case 'Next 24 Hours':
+        start = moment().startOf('hour');
+        end = moment().add(24, 'hour').startOf('hour');
+        break;
+      case 'Next 48 Hours':
+        start = moment().startOf('hour');
+        end = moment().add(48, 'hour').startOf('hour');
+        break;
+      default:
+        start = moment().startOf('day');
+        end = moment().add(currVal[1], currVal[2]).startOf('day');
+    }
+    const isActive = duration === value;
+    newRangeArr.push({ name: label, value, start, end, isActive });
+  });
   return newRangeArr;
 }
 
