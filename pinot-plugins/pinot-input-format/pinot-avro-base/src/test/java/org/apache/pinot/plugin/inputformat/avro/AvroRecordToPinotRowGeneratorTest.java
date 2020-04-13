@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +52,8 @@ public class AvroRecordToPinotRowGeneratorTest {
     GenericRow genericRow = new GenericRow();
     avroRecordToPinotRowGenerator.extract(sourceFieldNames, avroRecord, genericRow);
 
-    Assert.assertEquals(genericRow.getFieldNames(), new String[]{"incomingTime"});
+    Assert.assertTrue(
+        genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("incomingTime", "outgoingTime")));
     Assert.assertEquals(genericRow.getValue("incomingTime"), 12345L);
   }
 }
