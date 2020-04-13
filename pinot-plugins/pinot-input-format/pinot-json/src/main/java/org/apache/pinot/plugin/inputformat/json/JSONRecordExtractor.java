@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
@@ -36,9 +40,54 @@ public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>>
       Object value = from.get(fieldName);
       // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
       // DataTypeTransformer fixes it.
-      Object convertedValue = RecordReaderUtils.convert(value);
+      Object convertedValue;
+      if (value instanceof Collection) {
+        convertedValue = convertMultiValue((Collection) value);
+      } else {
+        convertedValue = convertSingleValue(value);
+      }
       to.putValue(fieldName, convertedValue);
     }
     return to;
+  }
+
+  /**
+   * Converts the value to a single-valued value
+   */
+  @Nullable
+  private Object convertSingleValue(@Nullable Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Number) {
+      return value;
+    }
+    return value.toString();
+  }
+
+  /**
+   * Converts the value to a multi-valued value
+   */
+  @Nullable
+  private Object convertMultiValue(@Nullable Collection values) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    int numValues = values.size();
+    Object[] array = new Object[numValues];
+    int index = 0;
+    for (Object value : values) {
+      Object convertedValue = convertSingleValue(value);
+      if (convertedValue != null && !convertedValue.toString().equals("")) {
+        array[index++] = convertedValue;
+      }
+    }
+    if (index == numValues) {
+      return array;
+    } else if (index == 0) {
+      return null;
+    } else {
+      return Arrays.copyOf(array, index);
+    }
   }
 }
