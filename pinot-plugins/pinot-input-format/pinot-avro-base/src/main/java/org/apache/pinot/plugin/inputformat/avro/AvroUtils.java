@@ -317,7 +317,7 @@ public class AvroUtils {
   }
 
   /**
-   * Converts the value to a single-valued value
+   * Converts the value to a single-valued value by handling instance of ByteBuffer, Number and String
    */
   public static Object handleSingleValue(@Nullable Object value) {
     if (value == null) {
@@ -330,7 +330,7 @@ public class AvroUtils {
   }
 
   /**
-   * Converts the value to a multi-valued value
+   * Converts the value to a multi-valued column
    */
   public static Object handleMultiValue(@Nullable Collection values) {
     if (values == null || values.isEmpty()) {
@@ -345,7 +345,7 @@ public class AvroUtils {
   }
 
   /**
-   * Converts the values withing the map to single-valued values
+   * Converts the values within the map to single-valued values
    */
   public static Object handleMap(@Nullable Map map) {
     if (map == null || map.isEmpty()) {

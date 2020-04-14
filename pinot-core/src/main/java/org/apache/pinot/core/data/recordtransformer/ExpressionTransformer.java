@@ -36,10 +36,7 @@ public class ExpressionTransformer implements RecordTransformer {
 
   private final Map<String, ExpressionEvaluator> _expressionEvaluators = new HashMap<>();
 
-  private final String _timeColumn;
-
   public ExpressionTransformer(Schema schema) {
-    _timeColumn = schema.getTimeColumnName();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
@@ -55,9 +52,9 @@ public class ExpressionTransformer implements RecordTransformer {
     for (Map.Entry<String, ExpressionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
       ExpressionEvaluator transformExpressionEvaluator = entry.getValue();
-      // Skip transformation if column value already exist. Value can exist for time transformation (incoming name = outgoing name)
+      // Skip transformation if column value already exist.
       // NOTE: column value might already exist for OFFLINE data
-      if (record.getValue(column) == null || column.equals(_timeColumn)) {
+      if (record.getValue(column) == null) {
         Object result = transformExpressionEvaluator.evaluate(record);
         record.putValue(column, result);
       }

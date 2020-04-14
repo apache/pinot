@@ -23,8 +23,10 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -106,5 +108,58 @@ public class SchemaFieldExtractorUtilsTest {
     extract = SchemaFieldExtractorUtils.extract(schema);
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("in", "out")));
+  }
+
+  @Test
+  public void testValidate() {
+    Schema pinotSchema;
+    // source name used as destination name
+    pinotSchema = new Schema();
+    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
+    dimensionFieldSpec.setTransformFunction("Groovy({function}, argument1, dim1, argument3)");
+    pinotSchema.addField(dimensionFieldSpec);
+    Assert.assertFalse(SchemaFieldExtractorUtils.validate(pinotSchema));
+
+    pinotSchema = new Schema();
+    MetricFieldSpec metricFieldSpec = new MetricFieldSpec("m1", FieldSpec.DataType.LONG);
+    metricFieldSpec.setTransformFunction("Groovy({function}, m1, m1)");
+    pinotSchema.addField(metricFieldSpec);
+    Assert.assertFalse(SchemaFieldExtractorUtils.validate(pinotSchema));
+
+    pinotSchema = new Schema();
+    TimeFieldSpec timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
+    timeFieldSpec.setTransformFunction("Groovy({function}, time)");
+    pinotSchema.addField(timeFieldSpec);
+    Assert.assertFalse(SchemaFieldExtractorUtils.validate(pinotSchema));
+
+    // time field spec using same name for incoming and outgoing
+    pinotSchema = new Schema();
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), new TimeGranularitySpec(
+        FieldSpec.DataType.INT, TimeUnit.DAYS, "time"));
+    pinotSchema.addField(timeFieldSpec);
+    Assert.assertFalse(SchemaFieldExtractorUtils.validate(pinotSchema));
+
+    // valid schema
+    pinotSchema = new Schema();
+    dimensionFieldSpec = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
+    dimensionFieldSpec.setTransformFunction("Groovy({function}, argument1, argument2, argument3)");
+    pinotSchema.addField(dimensionFieldSpec);
+
+    metricFieldSpec = new MetricFieldSpec("m1", FieldSpec.DataType.LONG);
+    metricFieldSpec.setTransformFunction("Groovy({function}, m2, m3)");
+    pinotSchema.addField(metricFieldSpec);
+
+    timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
+    timeFieldSpec.setTransformFunction("Groovy({function}, millis)");
+    pinotSchema.addField(timeFieldSpec);
+
+    Assert.assertTrue(SchemaFieldExtractorUtils.validate(pinotSchema));
+
+    // valid time field spec
+    pinotSchema = new Schema();
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"), new TimeGranularitySpec(
+        FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing"));
+    pinotSchema.addField(timeFieldSpec);
+    Assert.assertTrue(SchemaFieldExtractorUtils.validate(pinotSchema));
   }
 }

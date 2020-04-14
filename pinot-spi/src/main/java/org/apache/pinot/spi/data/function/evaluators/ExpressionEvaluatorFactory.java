@@ -21,6 +21,7 @@ package org.apache.pinot.spi.data.function.evaluators;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +42,7 @@ public class ExpressionEvaluatorFactory {
    * Creates the {@link ExpressionEvaluator} for the given field spec
    *
    * 1. If transform expression is defined, use it to create {@link ExpressionEvaluator}
-   * 2. For TIME column, {@link DefaultTimeSpecEvaluator} for backward compatible handling of time spec. This is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
+   * 2. For TIME column, if conversion is needed, {@link DefaultTimeSpecEvaluator} for backward compatible handling of time spec. This is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
    * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default functions for handing the Map
    * 4. Return null, if none of the above
    */
@@ -63,8 +64,14 @@ public class ExpressionEvaluatorFactory {
       }
     } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
 
-      // for backward compatible handling of TIME filed conversion
-      expressionEvaluator = new DefaultTimeSpecEvaluator((TimeFieldSpec) fieldSpec);
+      // for backward compatible handling of TIME field conversion
+      TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+      TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
+      TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+      if (outgoingGranularitySpec != null && !incomingGranularitySpec.equals(outgoingGranularitySpec)
+          && !incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
+        expressionEvaluator = new DefaultTimeSpecEvaluator(incomingGranularitySpec, outgoingGranularitySpec);
+      }
     } else if (columnName.endsWith(SchemaFieldExtractorUtils.MAP_KEY_COLUMN_SUFFIX)) {
 
       // for backward compatible handling of Map type (currently only in Avro)

@@ -18,14 +18,19 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluator;
 import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluatorFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,6 +39,8 @@ import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluatorFactory;
 public class SchemaFieldExtractorUtils {
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
   public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SchemaFieldExtractorUtils.class);
 
   /**
    * Extracts the source fields from the schema
@@ -45,16 +52,54 @@ public class SchemaFieldExtractorUtils {
     Set<String> sourceFieldNames = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        String columnName = fieldSpec.getName();
         ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
 
         if (expressionEvaluator != null) {
           sourceFieldNames.addAll(expressionEvaluator.getArguments());
         } else {
-          sourceFieldNames.add(columnName);
+          sourceFieldNames.add(fieldSpec.getName());
         }
       }
     }
     return new ArrayList<>(sourceFieldNames);
+  }
+
+  /**
+   * Validates that for a field spec with transform function, the source column name and destination column name are exclusive
+   * i.e. do not allow using source column name for destination column
+   * 1. Transform function of a field spec should not use the destination column
+   * 2. TimeFieldSpec - cannot have same name for incoming and outgoing field spec, if the specs are different
+   */
+  public static boolean validate(Schema schema) {
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        String column = fieldSpec.getName();
+        String transformFunction = fieldSpec.getTransformFunction();
+        if (transformFunction != null) {
+          ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+          if (expressionEvaluator != null) {
+            List<String> arguments = expressionEvaluator.getArguments();
+            // output column used as input
+            if (arguments.contains(column)) {
+              LOGGER.error("The arguments of transform function: {}, should not contain the destination column: {}",
+                  transformFunction, column);
+              return false;
+            }
+          }
+        } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
+          TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+          TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
+          TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+          // different incoming and outgoing spec, but same name
+          if (outgoingGranularitySpec != null && !incomingGranularitySpec.equals(outgoingGranularitySpec)
+              && incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
+            LOGGER.error("Cannot convert from incoming field spec:{} to outgoing field spec:{} if name is the same",
+                incomingGranularitySpec, outgoingGranularitySpec);
+            return false;
+          }
+        }
+      }
+    }
+    return true;
   }
 }

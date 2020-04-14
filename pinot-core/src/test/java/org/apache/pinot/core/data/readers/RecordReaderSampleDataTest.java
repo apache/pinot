@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -28,6 +29,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -88,8 +90,8 @@ public class RecordReaderSampleDataTest {
         GenericRow avroRecord = defaultTransformer.transform(avroRecordReader.next());
         GenericRow csvRecord = defaultTransformer.transform(csvRecordReader.next());
         GenericRow jsonRecord = defaultTransformer.transform(jsonRecordReader.next());
-        assertEquals(avroRecord, csvRecord);
-        assertEquals(avroRecord, jsonRecord);
+        checkEqualCSV(avroRecord, csvRecord);
+        checkEqual(avroRecord, jsonRecord);
 
         // Check the values from the first record
         if (numRecords == 1) {
@@ -133,13 +135,13 @@ public class RecordReaderSampleDataTest {
         GenericRow avroRecord = avroRecordReader.next();
         GenericRow csvRecord = csvRecordReader.next();
         GenericRow jsonRecord = jsonRecordReader.next();
-        assertEquals(avroRecord, csvRecord);
-        assertEquals(avroRecord, jsonRecord);
+        checkEqualCSV(avroRecord, csvRecord);
+        checkEqual(avroRecord, jsonRecord);
 
         // Check the values from the first record
         if (numRecords == 1) {
           // Should be in incoming time data type (LONG)
-          assertEquals(avroRecord.getValue("time_day"), 1072889503L);
+          assertEquals(Long.valueOf(avroRecord.getValue("time_day").toString()), new Long(1072889503L));
         }
       }
       assertEquals(numRecords, 10001);
@@ -164,13 +166,13 @@ public class RecordReaderSampleDataTest {
         GenericRow avroRecord = avroRecordReader.next();
         GenericRow csvRecord = csvRecordReader.next();
         GenericRow jsonRecord = jsonRecordReader.next();
-        assertEquals(avroRecord, csvRecord);
-        assertEquals(avroRecord, jsonRecord);
+        checkEqualCSV(avroRecord, csvRecord);
+        checkEqual(avroRecord, jsonRecord);
 
         // Check the values from the first record
         if (numRecords == 1) {
           // Incoming time column
-          assertEquals(avroRecord.getValue("time_day"), 1072889503L);
+          assertEquals(Long.valueOf(avroRecord.getValue("time_day").toString()), new Long(1072889503L));
 
           // Outgoing time column
           assertEquals(avroRecord.getValue("column2"), 231355578);
@@ -198,8 +200,8 @@ public class RecordReaderSampleDataTest {
         GenericRow avroRecord = avroRecordReader.next();
         GenericRow csvRecord = csvRecordReader.next();
         GenericRow jsonRecord = jsonRecordReader.next();
-        assertEquals(avroRecord, csvRecord);
-        assertEquals(avroRecord, jsonRecord);
+        checkEqualCSV(avroRecord, csvRecord);
+        checkEqual(avroRecord, jsonRecord);
 
         // Check the values from the first record
         if (numRecords == 1) {
@@ -232,19 +234,50 @@ public class RecordReaderSampleDataTest {
         GenericRow avroRecord = avroRecordReader.next();
         GenericRow csvRecord = csvRecordReader.next();
         GenericRow jsonRecord = jsonRecordReader.next();
-        assertEquals(avroRecord, csvRecord);
-        assertEquals(avroRecord, jsonRecord);
+        checkEqualCSV(avroRecord, csvRecord);
+        checkEqual(avroRecord, jsonRecord);
 
         // Check the values from the first record
         if (numRecords == 1) {
           // Incoming time column
-          assertEquals(avroRecord.getValue("time_day"), 1072889503L);
+          assertEquals(Long.valueOf(avroRecord.getValue("time_day").toString()), new Long(1072889503L));
 
           // Outgoing time column should be null
           assertNull(avroRecord.getValue("outgoing"));
         }
       }
       assertEquals(numRecords, 10001);
+    }
+  }
+
+  /**
+   * True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases (Integer Long etc)
+   */
+  private void checkEqual(GenericRow row1, GenericRow row2) {
+    for (Map.Entry<String, Object> entry : row1.getFieldToValueMap().entrySet()) {
+      if (entry.getValue() == null) {
+        Assert.assertNull(row2.getValue(entry.getKey()));
+      } else {
+        Assert.assertEquals(entry.getValue().toString(), row2.getValue(entry.getKey()).toString());
+      }
+    }
+  }
+
+  /**
+   * True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases (Integer Long etc)
+   * Empty string gets treated as null value in CSV, because we no longer have data types
+   */
+  private void checkEqualCSV(GenericRow row, GenericRow csvRecord) {
+    for (Map.Entry<String, Object> entry : row.getFieldToValueMap().entrySet()) {
+      Object row1Value = entry.getValue();
+      String row1Key = entry.getKey();
+      if (row1Value == null) {
+        Assert.assertNull(csvRecord.getValue(row1Key));
+      } else if (row1Value.toString().isEmpty()) {
+        Assert.assertEquals(csvRecord.getValue(row1Key), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+      } else {
+        Assert.assertEquals(row1Value.toString(), csvRecord.getValue(row1Key).toString());
+      }
     }
   }
 }
