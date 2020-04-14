@@ -476,7 +476,7 @@ export default Component.extend({
       const {
         analysisRange, displayRange, selectedBaseline
       } = this.getProperties('analysisRange', 'displayRange', 'selectedBaseline');
-      return !(analysisRange[0] === displayRange[0] || selectedBaseline !== 'predicted');
+      return (analysisRange[0] !== displayRange[0] && selectedBaseline === 'predicted');
     }
   ),
 
@@ -916,7 +916,8 @@ export default Component.extend({
     } catch (error) {
       const previewErrorMsg = (error.body && typeof error.body === 'object') ? error.body.message : error.message;
       const previewErrorInfo = (error.body && typeof error.body === 'object') ? error.body['more-info'] : error['more-info'];
-      notifications.error('Failed to get anomalies', 'Error', toastOptions);
+      const previewPrompt = this.get('isPreviewMode') ? ' Check warning above detection config.' : '';
+      notifications.error(`Failed to get anomalies.${previewPrompt}`, 'Error', toastOptions);
       this.set('getAnomaliesError', true);
       if (this.get('isPreviewMode')) {
         this.get('sendPreviewError')({
@@ -1169,7 +1170,6 @@ export default Component.extend({
       errorTimeseries: null,
       isLoadingTimeSeries: true
     });
-
     if (showRules) {
       const seriesSet = uniqueTimeSeries.find(series => {
         if (series.detectorName === selectedRule.detectorName && series.metricUrn === metricUrn) {
@@ -1451,6 +1451,7 @@ export default Component.extend({
       const endDate = moment(end).valueOf();
       //Update the time range option selected
       set(this, 'analysisRange', [startDate, endDate]);
+      set(this, 'displayRange', [startDate, endDate]);
       set(this, 'duration', duration);
       // This makes sure we don't fetch if the preview is collapsed
       if(get(this, 'showDetails') && get(this, 'dataIsCurrent')){
