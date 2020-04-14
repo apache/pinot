@@ -214,6 +214,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public File getTableDataDir() {
-    return new File(_tableDataDir);
+    return _indexDir;
   }
 }

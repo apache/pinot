@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
@@ -63,6 +64,7 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
+  private static final String PEER_SEGMENT_DOWNLOAD_DIR = "peerSegmentDownloadDir";
 
   @Inject
   ServerInstance serverInstance;
@@ -203,14 +205,16 @@ public class TablesResource {
           Response.Status.NOT_FOUND);
     }
     try {
-      String tableDir = tableDataManager.getTableDataDir().getAbsolutePath();
       // TODO Limit the number of concurrent downloads of segments because compression is an expensive operation.
       // Store the tar.gz segment file in the server's segmentTarDir folder with a unique file name.
       // Note that two clients asking the same segment file will result in the same tar.gz files being created twice.
       // Will revisit for optimization if performance becomes an issue.
-      String tarFilePath = TarGzCompressionUtils.createTarGzOfDirectory(tableDir + File.separator + segmentName,
-          serverInstance.getInstanceDataManager().getSegmentFileDirectory() + File.separator + segmentName + "-"
-              + System.currentTimeMillis());
+      File tmpSegmentTarDir = new File(serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
+      tmpSegmentTarDir.mkdir();
+
+      String tarFilePath = TarGzCompressionUtils
+          .createTarGzOfDirectory(new File(tableDataManager.getTableDataDir(), segmentName).getAbsolutePath(),
+              new File(tmpSegmentTarDir, tableNameWithType+ "_" + segmentName + "_" + UUID.randomUUID()).getAbsolutePath());
       File tarFile = new File(tarFilePath);
       tarFile.deleteOnExit();
       Response.ResponseBuilder builder = Response.ok();
