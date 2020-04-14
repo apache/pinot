@@ -27,13 +27,12 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
@@ -42,7 +41,6 @@ import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 public class CSVRecordReader implements RecordReader {
   private File _dataFile;
   private Schema _schema;
-  private List<String> _sourceColumns;
   private CSVFormat _format;
   private char _multiValueDelimiter;
 
@@ -97,11 +95,11 @@ public class CSVRecordReader implements RecordReader {
       _format = format;
       _multiValueDelimiter = config.getMultiValueDelimiter();
     }
-    _sourceColumns = SourceFieldNameExtractor.extract(_schema);
+    List<String> sourceFields = SchemaFieldExtractorUtils.extract(_schema);
     _recordExtractor = new CSVRecordExtractor();
     CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
     recordExtractorConfig.setMultiValueDelimiter(_multiValueDelimiter);
-    _recordExtractor.init(recordExtractorConfig);
+    _recordExtractor.init(sourceFields, recordExtractorConfig);
     init();
   }
 
@@ -124,7 +122,7 @@ public class CSVRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     CSVRecord record = _iterator.next();
-    _recordExtractor.extract(_sourceColumns, record, reuse);
+    _recordExtractor.extract(record, reuse);
     return reuse;
   }
 

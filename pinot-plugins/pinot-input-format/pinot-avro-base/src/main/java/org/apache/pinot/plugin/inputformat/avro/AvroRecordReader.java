@@ -28,7 +28,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
@@ -37,7 +37,6 @@ import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 public class AvroRecordReader implements RecordReader {
   private File _dataFile;
   private Schema _schema;
-  private List<String> _sourceColumns;
   private AvroRecordExtractor _recordExtractor;
   private DataFileStream<GenericRecord> _avroReader;
   private GenericRecord _reusableAvroRecord = null;
@@ -57,8 +56,9 @@ public class AvroRecordReader implements RecordReader {
       _avroReader.close();
       throw e;
     }
-    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    List<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     _recordExtractor = new AvroRecordExtractor();
+    _recordExtractor.init(sourceFields, null);
   }
 
   @Override
@@ -78,7 +78,7 @@ public class AvroRecordReader implements RecordReader {
   public GenericRow next(GenericRow reuse)
       throws IOException {
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
-    _recordExtractor.extract(_sourceColumns, _reusableAvroRecord, reuse);
+    _recordExtractor.extract(_reusableAvroRecord, reuse);
     return reuse;
   }
 

@@ -32,15 +32,17 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 public class CSVRecordExtractor implements RecordExtractor<CSVRecord> {
 
   private char _multiValueDelimiter;
+  private List<String> _fields;
 
   @Override
-  public void init(RecordExtractorConfig recordExtractorConfig) {
+  public void init(List<String> fields, RecordExtractorConfig recordExtractorConfig) {
+    _fields = fields;
     _multiValueDelimiter = ((CSVRecordExtractorConfig) recordExtractorConfig).getMultiValueDelimiter();
   }
 
   @Override
-  public GenericRow extract(List<String> sourceFieldNames, CSVRecord from, GenericRow to) {
-    for (String fieldName : sourceFieldNames) {
+  public GenericRow extract(CSVRecord from, GenericRow to) {
+    for (String fieldName : _fields) {
       String value = from.isSet(fieldName) ? from.get(fieldName) : null;
       if (value == null || StringUtils.isEmpty(value)) {
         to.putValue(fieldName, null);

@@ -29,17 +29,18 @@ public interface RecordExtractor<T> {
 
   /**
    * Initialize the record extractor with its config
+   *
+   * @param fields List of field names to extract from the provided input record
+   * @param recordExtractorConfig The record extractor config
    */
-  default void init(RecordExtractorConfig recordExtractorConfig) {
-  }
+  void init(List<String> fields, RecordExtractorConfig recordExtractorConfig);
 
   /**
    * Extracts fields as listed in the sourceFieldNames from the given input record and sets them into the GenericRow
    *
-   * @param sourceFieldNames List of field names to extract from the provided input record
    * @param from The input record
    * @param to The output GenericRow
    * @return The output GenericRow
    */
-  GenericRow extract(List<String> sourceFieldNames, T from, GenericRow to);
+  GenericRow extract(T from, GenericRow to);
 }

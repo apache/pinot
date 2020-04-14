@@ -52,14 +52,16 @@ public class ORCRecordExtractor implements RecordExtractor<VectorizedRowBatch> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ORCRecordExtractor.class);
 
   private TypeDescription _orcSchema;
+  private List<String> _fields;
 
   @Override
-  public void init(RecordExtractorConfig recordExtractorConfig) {
+  public void init(List<String> fields, RecordExtractorConfig recordExtractorConfig) {
+    _fields = fields;
     _orcSchema = ((ORCRecordExtractorConfig) recordExtractorConfig).getOrcSchema();
   }
 
   @Override
-  public GenericRow extract(List<String> sourceFieldNames, VectorizedRowBatch from, GenericRow to) {
+  public GenericRow extract(VectorizedRowBatch from, GenericRow to) {
     // TODO: use Pinot schema to fill the values to handle missing column and default values properly
 
     // ORC's TypeDescription is the equivalent of a schema. The way we will support ORC in Pinot
@@ -70,8 +72,7 @@ public class ORCRecordExtractor implements RecordExtractor<VectorizedRowBatch> {
       for (int i = 0; i < orcSchemaChildren.size(); i++) {
         // Get current column in schema
         String currColumnName = _orcSchema.getFieldNames().get(i);
-        if (!sourceFieldNames.contains(currColumnName)) {
-          LOGGER.warn("Skipping column {} because it is not in source columns", currColumnName);
+        if (!_fields.contains(currColumnName)) {
           continue;
         }
         // ORC will keep your columns in the same order as the schema provided
@@ -95,7 +96,7 @@ public class ORCRecordExtractor implements RecordExtractor<VectorizedRowBatch> {
    * @return Object that will be added to the Pinot GenericRow
    */
   private Object getBaseObject(WritableComparable w) {
-    Object obj = null;
+    Object obj;
 
     if (w == null || NullWritable.class.isAssignableFrom(w.getClass())) {
       obj = null;

@@ -33,15 +33,17 @@ import org.apache.thrift.TBase;
 public class ThriftRecordExtractor implements RecordExtractor<TBase> {
 
   private Map<String, Integer> _fieldIds;
+  private List<String> _fields;
 
   @Override
-  public void init(RecordExtractorConfig recordExtractorConfig) {
+  public void init(List<String> fields, RecordExtractorConfig recordExtractorConfig) {
+    _fields = fields;
     _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
   }
 
   @Override
-  public GenericRow extract(List<String> sourceFieldNames, TBase from, GenericRow to) {
-    for (String fieldName : sourceFieldNames) {
+  public GenericRow extract(TBase from, GenericRow to) {
+    for (String fieldName : _fields) {
       Object value = null;
       Integer fieldId = _fieldIds.get(fieldName);
       if (fieldId != null) {

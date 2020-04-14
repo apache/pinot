@@ -26,6 +26,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
@@ -34,9 +35,16 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
  */
 public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>> {
 
+  private List<String> _fields;
+
   @Override
-  public GenericRow extract(List<String> sourceFieldNames, Map<String, Object> from, GenericRow to) {
-    for (String fieldName : sourceFieldNames) {
+  public void init(List<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+    _fields = fields;
+  }
+
+  @Override
+  public GenericRow extract(Map<String, Object> from, GenericRow to) {
+    for (String fieldName : _fields) {
       Object value = from.get(fieldName);
       // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
       // DataTypeTransformer fixes it.

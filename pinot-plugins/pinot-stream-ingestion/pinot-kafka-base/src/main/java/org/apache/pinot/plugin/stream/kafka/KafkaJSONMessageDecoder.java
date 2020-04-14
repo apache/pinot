@@ -24,10 +24,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -41,13 +39,12 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private List<String> _sourceFieldNames;
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
-    _sourceFieldNames = SourceFieldNameExtractor.extract(indexingSchema);
+    List<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     if (recordExtractorClass == null) {
       recordExtractorClass = "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
@@ -55,6 +52,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     // FIXME: pinot-input-format/pinot-json is not available in pinot-stream-ingestion/pinot-kafka-base
     //  Did not face this issue in KafkaAvroMessageDecoder, because all the AvroMessageDecoders are in pinot-input-format/pinot-avro
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+    _jsonRecordExtractor.init(sourceFields, null);
   }
 
   @Override
@@ -62,7 +60,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     try {
       JsonNode message = JsonUtils.bytesToJsonNode(payload);
       Map<String, Object> from = OBJECT_MAPPER.convertValue(message, new TypeReference<Map<String, Object>>(){});
-      _jsonRecordExtractor.extract(_sourceFieldNames, from, destination);
+      _jsonRecordExtractor.extract(from, destination);
       return destination;
     } catch (Exception e) {
       LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}", new String(payload), e);

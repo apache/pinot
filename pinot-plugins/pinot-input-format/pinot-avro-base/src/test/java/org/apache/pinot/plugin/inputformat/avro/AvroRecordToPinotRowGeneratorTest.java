@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -46,11 +46,12 @@ public class AvroRecordToPinotRowGeneratorTest {
         new org.apache.pinot.spi.data.Schema.SchemaBuilder().setSchemaName("testSchema")
             .addTime("incomingTime", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG, "outgoingTime", TimeUnit.DAYS,
                 FieldSpec.DataType.INT).build();
-    List<String> sourceFieldNames = SourceFieldNameExtractor.extract(pinotSchema);
+    List<String> sourceFieldNames = SchemaFieldExtractorUtils.extract(pinotSchema);
 
-    AvroRecordExtractor avroRecordToPinotRowGenerator = new AvroRecordExtractor();
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    avroRecordExtractor.init(sourceFieldNames, null);
     GenericRow genericRow = new GenericRow();
-    avroRecordToPinotRowGenerator.extract(sourceFieldNames, avroRecord, genericRow);
+    avroRecordExtractor.extract(avroRecord, genericRow);
 
     Assert.assertTrue(
         genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("incomingTime", "outgoingTime")));

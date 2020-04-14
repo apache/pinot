@@ -19,19 +19,27 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
 /**
  * Extractor for Avro Records
  */
 public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
+  private List<String> _fields;
 
   @Override
-  public GenericRow extract(List<String> sourceFieldNames, GenericRecord from, GenericRow to) {
-    for (String fieldName : sourceFieldNames) {
+  public void init(List<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+    _fields = fields;
+  }
+
+  @Override
+  public GenericRow extract(GenericRecord from, GenericRow to) {
+    for (String fieldName : _fields) {
       Object value = from.get(fieldName);
       Object convertedValue = AvroUtils.convert(value);
       to.putValue(fieldName, convertedValue);

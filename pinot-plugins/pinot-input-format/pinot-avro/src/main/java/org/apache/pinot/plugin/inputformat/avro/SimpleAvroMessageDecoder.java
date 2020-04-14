@@ -31,7 +31,7 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
@@ -49,13 +49,12 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private RecordExtractor<GenericData.Record> _avroRecordExtractor;
   private BinaryDecoder _binaryDecoderToReuse;
   private GenericData.Record _avroRecordToReuse;
-  private List<String> _sourceFieldNames;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
-    _sourceFieldNames = SourceFieldNameExtractor.extract(indexingSchema);
+    List<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
     _datumReader = new GenericDatumReader<>(_avroSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
@@ -64,6 +63,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
     _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+    _avroRecordExtractor.init(sourceFields, null);
   }
 
   /**
@@ -90,6 +90,6 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       LOGGER.error("Caught exception while reading message using schema: {}", _avroSchema, e);
       return null;
     }
-    return _avroRecordExtractor.extract(_sourceFieldNames, _avroRecordToReuse, destination);
+    return _avroRecordExtractor.extract(_avroRecordToReuse, destination);
   }
 }

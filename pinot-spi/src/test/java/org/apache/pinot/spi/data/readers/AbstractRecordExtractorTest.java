@@ -29,8 +29,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
-import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -53,7 +52,7 @@ public abstract class AbstractRecordExtractorTest {
       throws IOException {
     FileUtils.forceMkdir(_tempDir);
     _pinotSchema = getPinotSchema();
-    _sourceFieldNames = SourceFieldNameExtractor.extract(_pinotSchema);
+    _sourceFieldNames = SchemaFieldExtractorUtils.extract(_pinotSchema);
     _inputRecords = getInputRecords();
     createInputFile();
     _recordReader = createRecordReader();

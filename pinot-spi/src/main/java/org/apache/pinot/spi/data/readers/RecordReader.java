@@ -39,6 +39,8 @@ public interface RecordReader extends Closeable {
    * @param schema Pinot Schema associated with the table
    * @param recordReaderConfig Config for the reader specific to the format. e.g. delimiter for csv format etc
    * @throws IOException If an I/O error occurs
+   *
+   * TODO: decouple Schema and RecordReader
    */
   void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException;

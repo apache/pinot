@@ -19,9 +19,11 @@
 package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
@@ -30,9 +32,16 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
  */
 public class ParquetRecordExtractor implements RecordExtractor<GenericRecord> {
 
+  private List<String> _fields;
+
   @Override
-  public GenericRow extract(List<String> sourceFieldNames, GenericRecord from, GenericRow to) {
-    for (String fieldName : sourceFieldNames) {
+  public void init(List<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+    _fields = fields;
+  }
+
+  @Override
+  public GenericRow extract(GenericRecord from, GenericRow to) {
+    for (String fieldName : _fields) {
       Object value = from.get(fieldName);
       Object convertedValue = RecordReaderUtils.convert(value);
       to.putValue(fieldName, convertedValue);

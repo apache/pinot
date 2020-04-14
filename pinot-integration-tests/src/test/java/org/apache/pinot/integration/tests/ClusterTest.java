@@ -69,7 +69,7 @@ import org.apache.pinot.spi.config.TableTaskConfig;
 import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.config.TenantConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -347,7 +347,6 @@ public abstract class ClusterTest extends ControllerTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;
     private org.apache.avro.Schema _avroSchema;
-    private List<String> _sourceFieldNames;
     private RecordExtractor _recordExtractor;
     private DecoderFactory _decoderFactory = new DecoderFactory();
     private DatumReader<GenericData.Record> _reader;
@@ -359,8 +358,9 @@ public abstract class ClusterTest extends ControllerTest {
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
       reader.close();
+      List<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
       _recordExtractor = new AvroRecordExtractor();
-      _sourceFieldNames = SourceFieldNameExtractor.extract(indexingSchema);
+      _recordExtractor.init(sourceFields, null);
       _reader = new GenericDatumReader<>(_avroSchema);
     }
 
@@ -374,7 +374,7 @@ public abstract class ClusterTest extends ControllerTest {
       try {
         GenericData.Record avroRecord =
             _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
-        return _recordExtractor.extract(_sourceFieldNames, avroRecord, destination);
+        return _recordExtractor.extract(avroRecord, destination);
       } catch (Exception e) {
         LOGGER.error("Caught exception", e);
         throw new RuntimeException(e);

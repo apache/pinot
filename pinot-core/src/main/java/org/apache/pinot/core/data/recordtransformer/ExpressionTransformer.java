@@ -41,9 +41,11 @@ public class ExpressionTransformer implements RecordTransformer {
   public ExpressionTransformer(Schema schema) {
     _timeColumn = schema.getTimeColumnName();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-      if (expressionEvaluator != null) {
-        _expressionEvaluators.put(fieldSpec.getName(), expressionEvaluator);
+      if (!fieldSpec.isVirtualColumn()) {
+        ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        if (expressionEvaluator != null) {
+          _expressionEvaluators.put(fieldSpec.getName(), expressionEvaluator);
+        }
       }
     }
   }

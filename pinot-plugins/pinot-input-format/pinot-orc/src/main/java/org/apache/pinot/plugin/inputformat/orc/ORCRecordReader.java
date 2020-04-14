@@ -32,7 +32,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,6 @@ public class ORCRecordReader implements RecordReader {
   private static final String LOCAL_FS_PREFIX = "file://";
 
   private Schema _pinotSchema;
-  private List<String> _sourceColumns;
   private ORCRecordExtractor _recordExtractor;
   private TypeDescription _orcSchema;
   private Reader _reader;
@@ -70,11 +69,11 @@ public class ORCRecordReader implements RecordReader {
 
     // Create a row batch with max size 1
     _reusableVectorizedRowBatch = _orcSchema.createRowBatch(1);
-    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    List<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     ORCRecordExtractorConfig recordExtractorConfig = new ORCRecordExtractorConfig();
     recordExtractorConfig.setOrcSchema(_orcSchema);
     _recordExtractor = new ORCRecordExtractor();
-    _recordExtractor.init(recordExtractorConfig);
+    _recordExtractor.init(sourceFields, recordExtractorConfig);
   }
 
   @Override
@@ -97,7 +96,7 @@ public class ORCRecordReader implements RecordReader {
   public GenericRow next(GenericRow reuse)
       throws IOException {
     _recordReader.nextBatch(_reusableVectorizedRowBatch);
-    return _recordExtractor.extract(_sourceColumns, _reusableVectorizedRowBatch, reuse);
+    return _recordExtractor.extract(_reusableVectorizedRowBatch, reuse);
   }
 
 

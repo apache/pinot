@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data.function.evaluators;
+package org.apache.pinot.spi.utils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -24,12 +24,14 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluator;
+import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluatorFactory;
 
 
 /**
  * Extracts names of the source fields from the schema
  */
-public class SourceFieldNameExtractor {
+public class SchemaFieldExtractorUtils {
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
   public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
 

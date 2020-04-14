@@ -96,6 +96,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
       struct.setFieldValue("cost", new DoubleWritable((Double) inputRecord.get("cost")));
       struct.setFieldValue("timestamp", new LongWritable((Long) inputRecord.get("timestamp")));
       mrRecordWriter.write(null, struct);
-    } mrRecordWriter.close(null);
+    }
+    mrRecordWriter.close(null);
   }
 }

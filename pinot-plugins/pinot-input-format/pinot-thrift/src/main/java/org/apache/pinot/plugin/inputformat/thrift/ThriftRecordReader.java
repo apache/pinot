@@ -30,7 +30,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -44,7 +44,6 @@ import org.apache.thrift.transport.TIOStreamTransport;
 public class ThriftRecordReader implements RecordReader {
   private File _dataFile;
   private Schema _schema;
-  private List<String> _sourceColumns;
   private ThriftRecordExtractor _recordExtractor;
   private Class<?> _thriftClass;
   private Map<String, Integer> _fieldIds = new HashMap<>();
@@ -95,11 +94,11 @@ public class ThriftRecordReader implements RecordReader {
       _fieldIds.put(tFieldIdEnum.getFieldName(), index);
       index++;
     }
-    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    List<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
     recordExtractorConfig.setFieldIds(_fieldIds);
     _recordExtractor = new ThriftRecordExtractor();
-    _recordExtractor.init(recordExtractorConfig);
+    _recordExtractor.init(sourceFields, recordExtractorConfig);
 
     init();
   }
@@ -125,7 +124,7 @@ public class ThriftRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new IOException("Caught exception while reading thrift object", e);
     }
-    _recordExtractor.extract(_sourceColumns, tObject, reuse);
+    _recordExtractor.extract(tObject, reuse);
     _hasNext = hasMoreToRead();
     return reuse;
   }

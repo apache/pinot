@@ -25,13 +25,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -41,7 +39,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class JSONRecordReader implements RecordReader {
   private File _dataFile;
   private Schema _schema;
-  private List<String> _sourceColumns;
   private JSONRecordExtractor _recordExtractor;
 
   private MappingIterator<Map<String, Object>> _iterator;
@@ -67,8 +64,9 @@ public class JSONRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
-    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    List<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     _recordExtractor = new JSONRecordExtractor();
+    _recordExtractor.init(sourceFields, null);
     init();
   }
 
@@ -87,7 +85,7 @@ public class JSONRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     Map<String, Object> record = _iterator.next();
-    _recordExtractor.extract(_sourceColumns, record, reuse);
+    _recordExtractor.extract(record, reuse);
     return reuse;
   }
 

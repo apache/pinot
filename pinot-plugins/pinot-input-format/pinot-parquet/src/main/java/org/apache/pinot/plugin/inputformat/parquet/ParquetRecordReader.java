@@ -29,7 +29,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
@@ -38,7 +38,6 @@ import org.apache.pinot.spi.data.function.evaluators.SourceFieldNameExtractor;
 public class ParquetRecordReader implements RecordReader {
   private Path _dataFilePath;
   private Schema _schema;
-  private List<String> _sourceColumns;
   private ParquetRecordExtractor _recordExtractor;
   private ParquetReader<GenericRecord> _reader;
   private GenericRecord _nextRecord;
@@ -50,8 +49,9 @@ public class ParquetRecordReader implements RecordReader {
     _schema = schema;
     ParquetUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
 
-    _sourceColumns = SourceFieldNameExtractor.extract(schema);
+    List<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     _recordExtractor = new ParquetRecordExtractor();
+    _recordExtractor.init(sourceFields, null);
 
     _reader = ParquetUtils.getParquetReader(_dataFilePath);
     _nextRecord = _reader.read();
@@ -73,7 +73,7 @@ public class ParquetRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-   _recordExtractor.extract(_sourceColumns, _nextRecord, reuse);
+   _recordExtractor.extract(_nextRecord, reuse);
     _nextRecord = _reader.read();
     return reuse;
   }
