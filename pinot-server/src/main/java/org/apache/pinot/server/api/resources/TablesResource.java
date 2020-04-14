@@ -205,7 +205,12 @@ public class TablesResource {
     try {
       String tableDir = tableDataManager.getTableDataDir().getAbsolutePath();
       // TODO Limit the number of concurrent downloads of segments because compression is an expensive operation.
-      String tarFilePath = TarGzCompressionUtils.createTarGzOfDirectory(tableDir + File.separator + segmentName);
+      // Store the tar.gz segment file in the server's segmentTarDir folder with a unique file name.
+      // Note that two clients asking the same segment file will result in the same tar.gz files being created twice.
+      // Will revisit for optimization if performance becomes an issue.
+      String tarFilePath = TarGzCompressionUtils.createTarGzOfDirectory(tableDir + File.separator + segmentName,
+          serverInstance.getInstanceDataManager().getSegmentFileDirectory() + File.separator + segmentName + "-"
+              + System.currentTimeMillis());
       File tarFile = new File(tarFilePath);
       tarFile.deleteOnExit();
       Response.ResponseBuilder builder = Response.ok();

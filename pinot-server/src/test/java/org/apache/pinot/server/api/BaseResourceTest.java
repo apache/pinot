@@ -84,6 +84,7 @@ public abstract class BaseResourceTest {
     // Mock the server instance
     ServerInstance serverInstance = mock(ServerInstance.class);
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
+    when(serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(FileUtils.getTempDirectoryPath());
 
     // Add the default tables and segments.
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
