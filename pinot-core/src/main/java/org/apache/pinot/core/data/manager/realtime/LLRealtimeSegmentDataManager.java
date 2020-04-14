@@ -270,6 +270,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
+  // Indicating if the segment is waiting to be upload to segment stores.
+  private boolean _waitingForUploadToSegmentStore = false;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -587,6 +589,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
+                // Commit the segment meta data to controller and asynchronously write the segment file to Pinot FS.
                 success = commitSegment(response.getControllerVipUrl(),
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
@@ -624,7 +627,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
   }
-
   /**
    * Fetches the completion mode for the segment completion for the given realtime table
    */
@@ -814,7 +816,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     SegmentCommitter segmentCommitter;
 
     if (isSplitCommit) {
-      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, controllerVipUrl);
+      SegmentUploader segmentUploader;
+      if (true) {
+        segmentUploader =
+            new ControllerVipBasedSegmentUploader(segmentLogger, _protocolHandler, params, controllerVipUrl);
+      } else {
+        segmentUploader = new BestEffortSegmentUploader(segmentLogger, _tableNameWithType,
+            _realtimeTableDataManager.getTableSegmentStoreRootDir());
+      }
+      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
     } else {
       segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
     }
