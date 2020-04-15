@@ -16,6 +16,8 @@
 
 package org.apache.pinot.thirdeye.tools;
 
+import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
@@ -80,6 +82,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.jfree.util.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -616,6 +619,107 @@ public class RunAdhocDatabaseQueriesTool {
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setAnomalyResultSource(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
       mergedResultDAO.save(anomaly);
+    }
+  }
+
+  /**
+   * Migrate all the existing subscription group watermarks from using end time to create time
+   */
+  private void migrateSubscriptionWatermarks() {
+    List<DetectionAlertConfigDTO> subscriptions = detectionAlertConfigDAO.findAll();
+    for (DetectionAlertConfigDTO subscription : subscriptions) {
+      Map<Long, Long> updatedVectorClocks = new HashMap<>();
+      Map<Long, Long> vectorClocks = subscription.getVectorClocks();
+      if (vectorClocks != null && vectorClocks.size() != 0) {
+        for (Map.Entry<Long, Long> clockEntry : vectorClocks.entrySet()) {
+          DetectionConfigDTO detectionConfigDTO = detectionConfigDAO.findById(clockEntry.getKey());
+          if (detectionConfigDTO == null) {
+            // skip the detection; doesn't exist
+            continue;
+          }
+
+          // find all recent anomalies (last 14 days) with end time <= watermark;
+          long lookback = TimeUnit.DAYS.toMillis(14);
+          Predicate predicate = Predicate.AND(
+              Predicate.LE("endTime", clockEntry.getValue()),
+              Predicate.GT("endTime", clockEntry.getValue() - lookback),
+              Predicate.EQ("detectionConfigId", detectionConfigDTO.getId()));
+          List<MergedAnomalyResultDTO> anomalies = mergedResultDAO.findByPredicate(predicate);
+
+          // find the max create time among anomalies
+          long createTimeMax = 0;
+          for (MergedAnomalyResultDTO anomaly : anomalies) {
+            createTimeMax = Math.max(createTimeMax, anomaly.getCreatedTime());
+          }
+
+          // update the watermark
+          if (createTimeMax > 0) {
+            updatedVectorClocks.put(clockEntry.getKey(), createTimeMax);
+          } else {
+            // If there are no anomalies or the anomaly create time is not available, then we will leave
+            // it as the original watermark.
+            updatedVectorClocks.put(clockEntry.getKey(), clockEntry.getValue());
+          }
+        }
+
+        subscription.setVectorClocks(updatedVectorClocks);
+        long updatedRows = detectionAlertConfigDAO.update(subscription);
+        if (updatedRows > 0) {
+          LOG.info(subscription.getId() + " - successfully updated watermarks");
+        } else {
+          LOG.info(subscription.getId() + " - failed to update watermarks");
+        }
+      }
+    }
+  }
+
+  /**
+   * Revert changes made in {@link RunAdhocDatabaseQueriesTool#migrateSubscriptionWatermarks()}
+   */
+  private void rollbackMigrateSubscriptionWatermarks() {
+    List<DetectionAlertConfigDTO> subscriptions = detectionAlertConfigDAO.findAll();
+
+    for (DetectionAlertConfigDTO subscription : subscriptions) {
+      Map<Long, Long> updatedVectorClocks = new HashMap<>();
+      Map<Long, Long> vectorClocks = subscription.getVectorClocks();
+      if (vectorClocks != null && vectorClocks.size() != 0) {
+        for (Map.Entry<Long, Long> clockEntry : vectorClocks.entrySet()) {
+          DetectionConfigDTO detectionConfigDTO = detectionConfigDAO.findById(clockEntry.getKey());
+          if (detectionConfigDTO == null) {
+            // skip the detection; doesn't exist
+            continue;
+          }
+
+          // find all recent anomalies (last 14 days) with end time <= watermark;
+          long lookback = TimeUnit.DAYS.toMillis(14);
+          Predicate predicate = Predicate.AND(
+              Predicate.LE("createTime", clockEntry.getValue()),
+              Predicate.GT("createTime", clockEntry.getValue() - lookback),
+              Predicate.EQ("detectionConfigId", detectionConfigDTO.getId()));
+          List<MergedAnomalyResultDTO> anomalies = mergedResultDAO.findByPredicate(predicate);
+
+          // find the max create time
+          long endTime = 0;
+          for (MergedAnomalyResultDTO anomaly : anomalies) {
+            endTime = Math.max(endTime, anomaly.getEndTime());
+          }
+
+          // update the watermark
+          if (endTime > 0) {
+            updatedVectorClocks.put(clockEntry.getKey(), endTime);
+          } else {
+            updatedVectorClocks.put(clockEntry.getKey(), clockEntry.getValue());
+          }
+        }
+
+        subscription.setVectorClocks(updatedVectorClocks);
+        long updatedRows = detectionAlertConfigDAO.update(subscription);
+        if (updatedRows > 0) {
+          LOG.info(subscription.getId() + " - successfully updated watermarks");
+        } else {
+          LOG.info(subscription.getId() + " - failed to update watermarks");
+        }
+      }
     }
   }
 
