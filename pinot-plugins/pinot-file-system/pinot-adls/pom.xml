@@ -29,7 +29,6 @@
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-adls</artifactId>
-  <groupId>org.apache.pinot.plugins</groupId>
   <name>Pinot Azure Data Lake Storage</name>
   <url>https://pinot.apache.org/</url>
   <properties>
