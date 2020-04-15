@@ -49,6 +49,8 @@ public interface DataProvider {
    * Returns a map of granular timeseries (keyed by slice) for a given set of slices.
    * The format of the DataFrame follows the standard convention of DataFrameUtils.
    *
+   * Note: The slices are treated left inclusive and right exclusive
+   *
    * @see MetricSlice
    * @see org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils
    *

@@ -28,6 +28,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.MockPipeline;
 import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
@@ -91,18 +92,18 @@ public class EntityAnomalyMergeWrapperTest {
 
     this.outputs = new ArrayList<>();
 
-    MergedAnomalyResultDTO parentAnomaly1 = makeAnomaly(1000, 1400);
-    this.childAnomaly1 = makeAnomaly(1000, 1050);
+    MergedAnomalyResultDTO parentAnomaly1 = DetectionTestUtils.makeAnomaly(1000, 1400);
+    this.childAnomaly1 = DetectionTestUtils.makeAnomaly(1000, 1050);
     this.childAnomaly1.setId(2000L);
-    this.childAnomaly2 =  makeAnomaly(1350, 1400);
+    this.childAnomaly2 =  DetectionTestUtils.makeAnomaly(1350, 1400);
     this.childAnomaly2.setId(3000L);
     setEntityChildMapping(parentAnomaly1, this.childAnomaly1);
     setEntityChildMapping(parentAnomaly1, this.childAnomaly2);
 
-    MergedAnomalyResultDTO parentAnomaly2 = makeAnomaly(1500, 2000);
-    this.childAnomaly3 = makeAnomaly(1350, 1550);
+    MergedAnomalyResultDTO parentAnomaly2 = DetectionTestUtils.makeAnomaly(1500, 2000);
+    this.childAnomaly3 = DetectionTestUtils.makeAnomaly(1350, 1550);
     this.childAnomaly3.setId(3000L);
-    this.childAnomaly4 = makeAnomaly(1950, 2000);
+    this.childAnomaly4 = DetectionTestUtils.makeAnomaly(1950, 2000);
     setEntityChildMapping(parentAnomaly2, this.childAnomaly3);
     setEntityChildMapping(parentAnomaly2, this.childAnomaly4);
 

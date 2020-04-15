@@ -27,5 +27,5 @@ public enum AnomalyType {
   // There is a trend change for underline metric.
   TREND_CHANGE,
   // The metric is not available within specified time.
-  NOT_AVAILABLE,
+  DATA_MISSING,
 }

@@ -35,7 +35,6 @@ import org.quartz.JobKey;
 
 import static org.apache.pinot.thirdeye.util.ThirdEyeUtils.getDetectionExpectedDelay;
 
-
 /**
  * Holds utility functions related to ThirdEye Tasks
  */
