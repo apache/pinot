@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -104,6 +105,9 @@ public abstract class BaseResourceTest {
   public void tearDown() {
     _adminApiApplication.stop();
     for (ImmutableSegment immutableSegment : _realtimeIndexSegments) {
+      immutableSegment.destroy();
+    }
+    for (ImmutableSegment immutableSegment : _offlineIndexSegments) {
       immutableSegment.destroy();
     }
     FileUtils.deleteQuietly(INDEX_DIR);

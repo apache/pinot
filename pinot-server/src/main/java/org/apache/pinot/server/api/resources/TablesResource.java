@@ -190,7 +190,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
-  @ApiOperation(value = "Download a segment", notes = "Download a segment in zipped tar format")
+  @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format")
   public Response downloadSegment(
       @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE") @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
