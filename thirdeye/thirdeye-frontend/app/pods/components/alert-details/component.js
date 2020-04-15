@@ -47,6 +47,7 @@ export default Component.extend({
   notifications: service('toast'),
   timeseries: null,
   analysisRange: [moment().subtract(2, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+  displayRange: [moment().subtract(2, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -174,6 +175,21 @@ export default Component.extend({
     'anomaliesCurrentSet',
     function() {
       return (this.get('anomaliesOldSet') && this.get('anomaliesCurrentSet'));
+    }
+  ),
+
+  /**
+   * Value to display in placeholder blob
+   * @type {String}
+   */
+  blobMessage: computed(
+    'getAnomaliesError',
+    function() {
+      let message = "Loading time series.";
+      if (this.get('getAnomaliesError')) {
+        message = "Error: can't get data.";
+      }
+      return message;
     }
   ),
 
@@ -346,8 +362,16 @@ export default Component.extend({
 
   axis: computed(
     'analysisRange',
+    'displayRange',
+    'selectedBaseline',
     function () {
-      const analysisRange = get(this, 'analysisRange');
+      const {
+        analysisRange,
+        displayRange,
+        selectedBaseline
+      } = this.getProperties('analysisRange', 'displayRange', 'selectedBaseline');
+
+      const useRange = (selectedBaseline === 'predicted') ? displayRange : analysisRange;
 
       return {
         y: {
@@ -364,8 +388,8 @@ export default Component.extend({
         x: {
           type: 'timeseries',
           show: true,
-          min: analysisRange[0],
-          max: analysisRange[1],
+          min: useRange[0],
+          max: useRange[1],
           tick: {
             fit: false,
             format: (d) => {
@@ -444,21 +468,56 @@ export default Component.extend({
     }
   ),
 
+  isTrainingDisplayed: computed(
+    'analysisRange',
+    'displayRange',
+    'selectedBaseline',
+    function() {
+      const {
+        analysisRange, displayRange, selectedBaseline
+      } = this.getProperties('analysisRange', 'displayRange', 'selectedBaseline');
+      return (analysisRange[0] !== displayRange[0] && selectedBaseline === 'predicted');
+    }
+  ),
+
+  trainingMessage: computed(
+    'analysisRange',
+    'displayRange',
+    'isTrainingMessage',
+    function() {
+      const {
+        analysisRange, displayRange
+      } = this.getProperties('analysisRange', 'displayRange');
+      return `Training + Forecast (${moment(displayRange[0]).format(TABLE_DATE_FORMAT)} - ${moment(analysisRange[1]).format(TABLE_DATE_FORMAT)})`;
+    }
+  ),
+
   series: computed(
     'filteredAnomaliesOld.@each',
     'filteredAnomaliesCurrent.@each',
     'timeseries',
     'baseline',
-    'analysisRange',
     'selectedRule',
     'metricUrn',
+    'isTrainingDisplayed',
     function () {
       const {
-        filteredAnomaliesOld, filteredAnomaliesCurrent, timeseries, baseline, showRules, isPreviewMode
+        filteredAnomaliesOld, filteredAnomaliesCurrent, timeseries, baseline,
+        analysisRange, displayRange, showRules, isPreviewMode, isTrainingDisplayed
       } = getProperties(this, 'filteredAnomaliesOld', 'filteredAnomaliesCurrent',
-        'timeseries', 'baseline', 'showRules', 'isPreviewMode');
+        'timeseries', 'baseline', 'analysisRange', 'displayRange', 'showRules',
+        'isPreviewMode', 'isTrainingDisplayed');
+
+      const region = !isTrainingDisplayed ? {} :
+        {
+          timestamps: [displayRange[0], analysisRange[0]],
+          values: [1, 1],
+          type: 'region',
+          axis: 'y2'
+        };
 
       const series = {};
+      series['training-region'] = region;
       // Should be displayed in Create Mode of Preview with one set of anomalies
       let anomaliesCurrentLabel = 'Current Settings Anomalies';
       let anomaliesOldLabel = 'Current Anomalies';
@@ -783,7 +842,7 @@ export default Component.extend({
         uiDateFormat: UI_DATE_FORMAT,
         activeRangeStart: moment(startDate).format(DISPLAY_DATE_FORMAT),
         activeRangeEnd: moment(endDate).format(DISPLAY_DATE_FORMAT),
-        timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration),
+        timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration, !this.get('isPreviewMode')),
         timePickerIncrement: TIME_PICKER_INCREMENT,
         predefinedRanges
       };
@@ -857,7 +916,8 @@ export default Component.extend({
     } catch (error) {
       const previewErrorMsg = (error.body && typeof error.body === 'object') ? error.body.message : error.message;
       const previewErrorInfo = (error.body && typeof error.body === 'object') ? error.body['more-info'] : error['more-info'];
-      notifications.error('Failed to get anomalies, please check warning above detection configuration', 'Error', toastOptions);
+      const previewPrompt = this.get('isPreviewMode') ? ' Check warning above detection config.' : '';
+      notifications.error(`Failed to get anomalies.${previewPrompt}`, 'Error', toastOptions);
       this.set('getAnomaliesError', true);
       if (this.get('isPreviewMode')) {
         this.get('sendPreviewError')({
@@ -886,6 +946,7 @@ export default Component.extend({
     if (!isPreviewMode) {
       this.setProperties({
         analysisRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+        displayRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
         duration: (timeWindowSize === 172800000) ? '48h' : 'custom',
         selectedDimension: 'Choose a dimension',
         // For now, we will only show predicted and bounds on daily and minutely metrics with no dimensions, for the Alert Overview page
@@ -898,6 +959,7 @@ export default Component.extend({
     } else {
       this.setProperties({
         analysisRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+        displayRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
         duration: 'custom',
         selectedBaseline: 'predicted'
       });
@@ -1108,7 +1170,6 @@ export default Component.extend({
       errorTimeseries: null,
       isLoadingTimeSeries: true
     });
-
     if (showRules) {
       const seriesSet = uniqueTimeSeries.find(series => {
         if (series.detectorName === selectedRule.detectorName && series.metricUrn === metricUrn) {
@@ -1120,7 +1181,8 @@ export default Component.extend({
           this.setProperties({
             timeseries: seriesSet.predictedTimeSeries,
             baseline: seriesSet.predictedTimeSeries,
-            isLoadingTimeSeries: false
+            isLoadingTimeSeries: false,
+            displayRange: [seriesSet.predictedTimeSeries.timestamp[0] || analysisRange[0], analysisRange[1]]
           });
         } else {
           const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
@@ -1130,7 +1192,8 @@ export default Component.extend({
               this.setProperties({
                 timeseries: seriesSet.predictedTimeSeries,
                 baseline: res,
-                isLoadingTimeSeries: false
+                isLoadingTimeSeries: false,
+                displayRange: [seriesSet.predictedTimeSeries.timestamp[0] || analysisRange[0], analysisRange[1]]
               });
             });
         }
@@ -1388,6 +1451,7 @@ export default Component.extend({
       const endDate = moment(end).valueOf();
       //Update the time range option selected
       set(this, 'analysisRange', [startDate, endDate]);
+      set(this, 'displayRange', [startDate, endDate]);
       set(this, 'duration', duration);
       // This makes sure we don't fetch if the preview is collapsed
       if(get(this, 'showDetails') && get(this, 'dataIsCurrent')){

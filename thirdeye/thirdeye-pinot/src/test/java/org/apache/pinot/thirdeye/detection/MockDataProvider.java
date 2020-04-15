@@ -80,6 +80,9 @@ public class MockDataProvider implements DataProvider {
       groupByExpr.add(COL_VALUE + ":sum");
 
       DataFrame out = this.timeseries.get(slice.withFilters(NO_FILTERS));
+      if (out == null) {
+        return result;
+      }
 
       if (!filters.isEmpty()) {
         out = out.filter(new Series.StringConditional() {
