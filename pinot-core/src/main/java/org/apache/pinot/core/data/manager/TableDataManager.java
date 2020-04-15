@@ -116,4 +116,10 @@ public interface TableDataManager {
    * Returns the table name managed by this instance.
    */
   String getTableName();
+
+  /**
+   * Returns the dir which contains the data segments.
+   * @return
+   */
+  File getTableDataDir();
 }

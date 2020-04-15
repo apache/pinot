@@ -211,4 +211,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public String getTableName() {
     return _tableNameWithType;
   }
+
+  @Override
+  public File getTableDataDir() {
+    return _indexDir;
+  }
 }
