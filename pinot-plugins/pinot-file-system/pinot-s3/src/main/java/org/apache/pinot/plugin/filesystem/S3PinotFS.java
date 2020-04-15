@@ -23,12 +23,15 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.exception.SdkServiceException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.internal.resource.S3BucketResource;
 import software.amazon.awssdk.services.s3.model.*;
@@ -42,8 +45,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -51,20 +56,24 @@ import static joptsimple.internal.Strings.isNullOrEmpty;
 import static org.glassfish.jersey.internal.guava.Preconditions.checkArgument;
 
 public class S3PinotFS extends PinotFS {
-    public static final String S3_KEY = "s3Key";
+    public static final String ACCESS_KEY = "accessKey";
+    public static final String SECRET_KEY = "secretKey";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
     private static final String DELIMITER = "/";
-    private static final int BUFFER_SIZE = 128 * 1024;
     private S3Client s3Client;
 
     @Override
     public void init(Configuration config) {
-        checkArgument(!isNullOrEmpty(config.getString(S3_KEY)));
-        String s3Key = config.getString(S3_KEY);
+        checkArgument(!isNullOrEmpty(config.getString(ACCESS_KEY)));
+        checkArgument(!isNullOrEmpty(config.getString(SECRET_KEY)));
+        String accessKey = config.getString(ACCESS_KEY);
+        String secretKey = config.getString(SECRET_KEY);
         try {
+            AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(accessKey, secretKey);
             s3Client = S3Client.builder()
-                    .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                    .region(Region.AP_SOUTHEAST_1)
+                    .credentialsProvider(StaticCredentialsProvider.create(awsBasicCredentials))
                     .build();
 
         } catch (S3Exception e) {
@@ -72,15 +81,15 @@ public class S3PinotFS extends PinotFS {
         }
     }
 
-    private HeadObjectResponse getS3ObjectMetadata(URI uri) throws IOException,NoSuchKeyException {
-        URI base = getBase(uri);
-        String path = sanitizePath(base.relativize(uri).getPath());
-        HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
-                .bucket(uri.getHost())
-                .key(path)
-                .build();
+    private HeadObjectResponse getS3ObjectMetadata(URI uri) throws IOException {
+            URI base = getBase(uri);
+            String path = sanitizePath(base.relativize(uri).getPath());
+            HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
+                    .bucket(uri.getHost())
+                    .key(path)
+                    .build();
 
-        return s3Client.headObject(headObjectRequest);
+            return s3Client.headObject(headObjectRequest);
     }
 
     private boolean isPathTerminatedByDelimiter(URI uri) {
@@ -171,14 +180,22 @@ public class S3PinotFS extends PinotFS {
 
     private boolean copyFile(URI srcUri, URI dstUri) throws IOException {
         try {
+            String encodedUrl = null;
+            try {
+                encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8.toString());
+            } catch (UnsupportedEncodingException e) {
+                LOGGER.info("URL could not be encoded: {}", e.getMessage());
+            }
+
+            String dstPath = sanitizePath(dstUri.getPath());
             CopyObjectRequest copyReq = CopyObjectRequest.builder()
-                    .copySource("srcUri")
+                    .copySource(encodedUrl)
                     .destinationBucket(dstUri.getHost())
-                    .destinationKey(dstUri.getPath())
+                    .destinationKey(dstPath)
                     .build();
 
             CopyObjectResponse copyObjectResponse = s3Client.copyObject(copyReq);
-            return true;
+            return copyObjectResponse.sdkHttpResponse().isSuccessful();
         }catch(S3Exception e){
             throw new IOException(e);
         }
@@ -197,12 +214,12 @@ public class S3PinotFS extends PinotFS {
 
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(uri.getHost())
-                    .key(uri.getPath())
+                    .key(path)
                     .build();
 
-            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(new byte[0]));
+            PutObjectResponse putObjectResponse = s3Client.putObject(putObjectRequest, RequestBody.fromBytes(new byte[0]));
 
-            return true;
+            return putObjectResponse.sdkHttpResponse().isSuccessful();
         } catch (Throwable t) {
             throw new IOException(t);
         }
@@ -212,9 +229,6 @@ public class S3PinotFS extends PinotFS {
     public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
         LOGGER.info("Deleting uri {} force {}", segmentUri, forceDelete);
         try {
-            if (!exists(segmentUri)) {
-                return false;
-            }
             if (isDirectory(segmentUri)) {
                 if (!forceDelete) {
                     checkState(isEmptyDirectory(segmentUri), "ForceDelete flag is not set and directory '%s' is not empty", segmentUri);
@@ -240,7 +254,7 @@ public class S3PinotFS extends PinotFS {
 
                     DeleteObjectResponse deleteObjectResponse = s3Client.deleteObject(deleteObjectRequest);
 
-                    deleteSucceeded &= (!existsFile(new URI(segmentUri.getScheme(), segmentUri.getHost(), segmentUri.getPath())));
+                    deleteSucceeded &= deleteObjectResponse.sdkHttpResponse().isSuccessful();
                 }
                 return deleteSucceeded;
             } else {
@@ -252,18 +266,15 @@ public class S3PinotFS extends PinotFS {
 
                 DeleteObjectResponse deleteObjectResponse = s3Client.deleteObject(deleteObjectRequest);
 
-                return !existsFile(new URI(segmentUri.getScheme(), segmentUri.getHost(), segmentUri.getPath()));
+                return deleteObjectResponse.sdkHttpResponse().isSuccessful();
             }
+        }catch(NoSuchKeyException e){
+            return false;
         } catch (S3Exception e) {
             throw e;
         } catch(Throwable t) {
             throw new IOException(t);
         }
-    }
-
-    @Override
-    public boolean move(URI srcUri, URI dstUri, boolean overwrite) throws IOException {
-        return super.move(srcUri, dstUri, overwrite);
     }
 
     @Override
@@ -305,13 +316,17 @@ public class S3PinotFS extends PinotFS {
 
     @Override
     public boolean exists(URI fileUri) throws IOException {
-        if (isDirectory(fileUri)) {
-            return true;
-        }
-        if (isPathTerminatedByDelimiter(fileUri)) {
+        try {
+            if (isDirectory(fileUri)) {
+                return true;
+            }
+            if (isPathTerminatedByDelimiter(fileUri)) {
+                return false;
+            }
+            return existsFile(fileUri);
+        }catch(NoSuchKeyException e){
             return false;
         }
-        return existsFile(fileUri);
     }
 
     @Override
@@ -334,7 +349,6 @@ public class S3PinotFS extends PinotFS {
         try {
             ImmutableList.Builder<String> builder = ImmutableList.builder();
             String prefix = normalizeToDirectoryPrefix(fileUri);
-
             ListObjectsV2Response listObjectsV2Response;
             ListObjectsV2Request.Builder listObjectsV2RequestBuilder = ListObjectsV2Request.builder()
                     .bucket(fileUri.getHost())
@@ -350,7 +364,8 @@ public class S3PinotFS extends PinotFS {
 
             listObjectsV2Response.contents().stream()
                     .forEach(object -> {
-                        if (!object.key().equals(fileUri.getPath())) {
+                        //Only add files and not directories
+                        if (!object.key().equals(fileUri.getPath()) && !object.key().endsWith(DELIMITER)) {
                             builder.add(object.key());
                         }
                     });
@@ -387,35 +402,28 @@ public class S3PinotFS extends PinotFS {
     }
 
     @Override
-    public boolean isDirectory(URI uri) throws IOException {
-        String prefix = normalizeToDirectoryPrefix(uri);
-        if (prefix.equals(DELIMITER)) {
-            return true;
-        }
-
-        try {
-            getS3ObjectMetadata(uri);
-            return true;
-        }catch(NoSuchKeyException e){
-
-        }
-
-        try {
-            ListObjectsV2Request listObjectsV2Request = ListObjectsV2Request.builder()
+    public boolean isDirectory(URI uri){
+        try{
+            String prefix = sanitizePath(uri.getPath());
+            if (prefix.equals(DELIMITER)) {
+                return true;
+            }
+            HeadObjectResponse s3ObjectMetadata;
+            HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
                     .bucket(uri.getHost())
-                    .prefix(prefix)
+                    .key(prefix)
                     .build();
-
-            ListObjectsV2Response listObjectsV2Response = s3Client.listObjectsV2(listObjectsV2Request);
-            return listObjectsV2Response.hasContents();
-        } catch (Throwable t) {
-            throw new IOException(t);
+            s3ObjectMetadata = s3Client.headObject(headObjectRequest);
+            return s3ObjectMetadata.contentType().contentEquals("application/x-directory");
+        }catch(NoSuchKeyException e){
+            LOGGER.error("Could not get directory entry for {}", uri);
+            return false;
         }
     }
 
     @Override
     public long lastModified(URI uri) throws IOException {
-        return getS3ObjectMetadata(uri).lastModified().getNano();
+        return getS3ObjectMetadata(uri).lastModified().toEpochMilli();
     }
 
     @Override
@@ -424,22 +432,29 @@ public class S3PinotFS extends PinotFS {
                 HeadObjectResponse s3ObjectMetadata = getS3ObjectMetadata(uri);
                 String encodedUrl = null;
                 try {
-                    encodedUrl = URLEncoder.encode(uri.getHost() + "/" + uri.getPath(), StandardCharsets.UTF_8.toString());
+                    encodedUrl = URLEncoder.encode(uri.getHost() + uri.getPath(), StandardCharsets.UTF_8.toString());
                 } catch (UnsupportedEncodingException e) {
                     LOGGER.info("URL could not be encoded: {}", e.getMessage());
                 }
 
+                String path = sanitizePath(uri.getPath());
+                Map<String, String> mp = new HashMap<>();
+                mp.put("lastModified", String.valueOf(System.currentTimeMillis()));
                 CopyObjectRequest request = CopyObjectRequest.builder()
                         .copySource(encodedUrl)
                         .destinationBucket(uri.getHost())
-                        .destinationKey(uri.getPath())
+                        .destinationKey(path)
+                        .metadata(mp)
+                        .metadataDirective(MetadataDirective.REPLACE)
                         .build();
 
+                System.out.println("COPY");
                 s3Client.copyObject(request);
-                long newUpdateTime = getS3ObjectMetadata(uri).lastModified().getNano();
-                return newUpdateTime > s3ObjectMetadata.lastModified().getNano();
+                long newUpdateTime = getS3ObjectMetadata(uri).lastModified().toEpochMilli();
+                return newUpdateTime > s3ObjectMetadata.lastModified().toEpochMilli();
         }catch(NoSuchKeyException e){
-            s3Client.putObject(PutObjectRequest.builder().bucket(uri.getHost()).key(uri.getPath()).build(),
+            String path = sanitizePath(uri.getPath());
+            s3Client.putObject(PutObjectRequest.builder().bucket(uri.getHost()).key(path).build(),
                     RequestBody.fromBytes(new byte[0]));
             return true;
         }catch(S3Exception e) {
@@ -450,17 +465,17 @@ public class S3PinotFS extends PinotFS {
     @Override
     public InputStream open(URI uri) throws IOException {
         try{
+            String path = sanitizePath(uri.getPath());
             GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                     .bucket(uri.getHost())
-                    .key(uri.getPath())
+                    .key(path)
                     .build();
 
             ResponseBytes responseBytes =  s3Client.getObjectAsBytes(getObjectRequest);
             return responseBytes.asInputStream();
-        }catch(SdkServiceException e){
-
+        }catch(S3Exception e){
+            throw e;
         }
-        return null;
     }
 
     @Override
