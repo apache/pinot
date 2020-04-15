@@ -264,7 +264,7 @@ public class HelixServerStarter {
               _instanceId, realtimeConsumptionCatchupWaitMs));
     }
     LOGGER.info("Registering service status handler");
-    ServiceStatus.setServiceStatusCallback(
+    ServiceStatus.addServiceStatusCallback(HelixServerStarter.class.getName(),
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 

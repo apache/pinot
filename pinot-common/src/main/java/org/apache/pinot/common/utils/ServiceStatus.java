@@ -24,7 +24,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+
+import com.google.common.collect.ImmutableList;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -65,18 +68,49 @@ public class ServiceStatus {
     String getStatusDescription();
   }
 
+  private static Map<String, ServiceStatusCallback> serviceStatusCallbackMap = new ConcurrentHashMap<>();
+
   private static ServiceStatusCallback serviceStatusCallback = null;
 
   public static void setServiceStatusCallback(ServiceStatusCallback serviceStatusCallback) {
     ServiceStatus.serviceStatusCallback = serviceStatusCallback;
   }
 
+  public static void addServiceStatusCallback(String name, ServiceStatusCallback serviceStatusCallback) {
+    if (ServiceStatus.serviceStatusCallback == null) {
+      ServiceStatus.serviceStatusCallback = serviceStatusCallback;
+    } else {
+      MultipleCallbackServiceStatusCallback callback1 = new MultipleCallbackServiceStatusCallback(
+          ImmutableList.of(serviceStatusCallback, ServiceStatus.serviceStatusCallback));
+      ServiceStatus.setServiceStatusCallback(callback1);
+      if (ServiceStatus.serviceStatusCallbackMap.containsKey(name)) {
+        MultipleCallbackServiceStatusCallback callback2 = new MultipleCallbackServiceStatusCallback(
+            ImmutableList.of(serviceStatusCallback, ServiceStatus.serviceStatusCallbackMap.get(name)));
+        ServiceStatus.serviceStatusCallbackMap.put(name, callback2);
+      } else {
+        ServiceStatus.serviceStatusCallbackMap.put(name, serviceStatusCallback);
+      }
+    }
+  }
+
   public static Status getServiceStatus() {
-    if (serviceStatusCallback == null) {
+    return getServiceStatus(serviceStatusCallback);
+  }
+
+  public static Status getServiceStatus(String name) {
+    if (serviceStatusCallbackMap.containsKey(name)) {
+      return getServiceStatus(serviceStatusCallbackMap.get(name));
+    } else {
+      return Status.STARTING;
+    }
+  }
+
+  private static Status getServiceStatus(ServiceStatusCallback callback) {
+    if (callback == null) {
       return Status.STARTING;
     } else {
       try {
-        return serviceStatusCallback.getServiceStatus();
+        return callback.getServiceStatus();
       } catch (Exception e) {
         LOGGER.warn("Caught exception while reading the service status", e);
         return Status.BAD;
@@ -85,11 +119,23 @@ public class ServiceStatus {
   }
 
   public static String getStatusDescription() {
-    if (serviceStatusCallback == null) {
+    return getStatusDescription(serviceStatusCallback);
+  }
+
+  public static String getStatusDescription(String name) {
+    if (serviceStatusCallbackMap.containsKey(name)) {
+      return getStatusDescription(serviceStatusCallbackMap.get(name));
+    } else {
+      return STATUS_DESCRIPTION_INIT;
+    }
+  }
+
+  private static String getStatusDescription(ServiceStatusCallback callback) {
+    if (callback == null) {
       return STATUS_DESCRIPTION_INIT;
     } else {
       try {
-        return serviceStatusCallback.getStatusDescription();
+        return callback.getStatusDescription();
       } catch (Exception e) {
         return "Exception: " + e.getMessage();
       }

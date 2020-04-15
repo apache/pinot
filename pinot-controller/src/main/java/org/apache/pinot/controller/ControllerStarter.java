@@ -241,7 +241,7 @@ public class ControllerStarter {
     }
 
     ServiceStatus
-        .setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
+        .addServiceStatusCallback(ControllerStarter.class.getName(), new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
   }
 
   private void setUpHelixController() {

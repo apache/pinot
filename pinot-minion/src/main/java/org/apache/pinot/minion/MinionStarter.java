@@ -169,7 +169,7 @@ public class MinionStarter {
 
     // Initialize health check callback
     LOGGER.info("Initializing health check callback");
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.ServiceStatusCallback() {
+    ServiceStatus.addServiceStatusCallback(MinionStarter.class.getName(), new ServiceStatus.ServiceStatusCallback() {
       @Override
       public ServiceStatus.Status getServiceStatus() {
         // TODO: add health check here
