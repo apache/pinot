@@ -68,6 +68,7 @@ jobs:
     - stage: deploy
       script:
         - travis_wait 40 ./.travis/.travis_nightly_build.sh
+        - travis show | grep --extended-regexp --only-matching '[0-9\.]+ (failed|errored)' | awk '{print $1}' | xargs --max-args=1 --no-run-if-empty travis restart
 
 env:
   global:
