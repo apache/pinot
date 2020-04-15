@@ -22,16 +22,15 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
@@ -40,7 +39,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class JSONRecordReader implements RecordReader {
   private File _dataFile;
   private Schema _schema;
-  private List<FieldSpec> _fieldSpecs;
+  private JSONRecordExtractor _recordExtractor;
 
   private MappingIterator<Map<String, Object>> _iterator;
 
@@ -65,7 +64,9 @@ public class JSONRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
+    _recordExtractor = new JSONRecordExtractor();
+    _recordExtractor.init(sourceFields, null);
     init();
   }
 
@@ -84,14 +85,7 @@ public class JSONRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     Map<String, Object> record = _iterator.next();
-    for (FieldSpec fieldSpec : _fieldSpecs) {
-      String fieldName = fieldSpec.getName();
-      Object value = record.get(fieldName);
-      // Allow default value for non-time columns
-      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
-      }
-    }
+    _recordExtractor.extract(record, reuse);
     return reuse;
   }
 

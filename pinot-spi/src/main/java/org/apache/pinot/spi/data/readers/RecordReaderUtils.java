@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import com.google.common.base.Preconditions;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -28,17 +27,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class RecordReaderUtils {
@@ -67,167 +59,65 @@ public class RecordReaderUtils {
   }
 
   /**
-   * Extracts all field specs from the given schema.
-   * <p>For time field spec:
-   * <ul>
-   *   <li>If incoming and outgoing time column name are the same, use incoming time field spec</li>
-   *   <li>If incoming and outgoing time column name are different, put both of them as time field spec</li>
-   *   <li>
-   *     We keep both incoming and outgoing time column to handle cases where the input file contains time values that
-   *     are already converted
-   *   </li>
-   * </ul>
+   * Converts the value to a multi-values value or a single values value
    */
-  public static List<FieldSpec> extractFieldSpecs(Schema schema) {
-    List<FieldSpec> fieldSpecs = new ArrayList<>();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
-        TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-        fieldSpecs.add(new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec()));
-        if (!timeFieldSpec.getOutgoingTimeColumnName().equals(timeFieldSpec.getIncomingTimeColumnName())) {
-          fieldSpecs.add(new TimeFieldSpec(timeFieldSpec.getOutgoingGranularitySpec()));
-        }
-      } else {
-        fieldSpecs.add(fieldSpec);
-      }
-    }
-    return fieldSpecs;
-  }
+  public static @Nullable Object convert(@Nullable Object value) {
 
-  /**
-   * Converts the value based on the given field spec.
-   */
-  public static Object convert(FieldSpec fieldSpec, @Nullable Object value) {
-    if (fieldSpec.isSingleValueField()) {
-      return convertSingleValue(fieldSpec, value);
-    } else {
-      return convertMultiValue(fieldSpec, (Collection) value);
-    }
-  }
-
-  /**
-   * Converts the value to a single-valued value based on the given field spec.
-   */
-  public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable Object value) {
     if (value == null) {
       return null;
     }
-    DataType dataType = fieldSpec.getDataType();
-    if (dataType == FieldSpec.DataType.BYTES) {
-      // Avro ByteBuffer maps to byte[]
-      if (value instanceof ByteBuffer) {
-        ByteBuffer byteBufferValue = (ByteBuffer) value;
+    if (value instanceof Collection) {
+      return convertMultiValue((Collection) value);
+    } else {
+      return convertSingleValue(value);
+    }
+  }
 
-        // Use byteBufferValue.remaining() instead of byteBufferValue.capacity() so that it still works when buffer is
-        // over-sized
-        byte[] bytesValue = new byte[byteBufferValue.remaining()];
-        byteBufferValue.get(bytesValue);
-        return bytesValue;
-      } else {
-        Preconditions
-            .checkState(value instanceof byte[], "For BYTES data type, value must be either ByteBuffer or byte[]");
-        return value;
-      }
+  /**
+   * Converts the value to a single-valued value
+   */
+  public static @Nullable Object convertSingleValue(@Nullable Object value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value instanceof ByteBuffer) {
+      ByteBuffer byteBufferValue = (ByteBuffer) value;
+
+      // Use byteBufferValue.remaining() instead of byteBufferValue.capacity() so that it still works when buffer is
+      // over-sized
+      byte[] bytesValue = new byte[byteBufferValue.remaining()];
+      byteBufferValue.get(bytesValue);
+      return bytesValue;
     }
     if (value instanceof Number) {
-      Number numberValue = (Number) value;
-      switch (dataType) {
-        case INT:
-          return numberValue.intValue();
-        case LONG:
-          return numberValue.longValue();
-        case FLOAT:
-          return numberValue.floatValue();
-        case DOUBLE:
-          return numberValue.doubleValue();
-        case STRING:
-          return numberValue.toString();
-        default:
-          throw new IllegalStateException("Illegal data type: " + dataType);
-      }
+      return value;
     }
-    return convertSingleValue(fieldSpec, value.toString());
+    return value.toString();
   }
 
   /**
-   * Converts the string value to a single-valued value based on the given field spec.
+   * Converts the value to a multi-valued value
    */
-  public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable String stringValue) {
-    if (stringValue == null) {
-      return null;
-    }
-    DataType dataType = fieldSpec.getDataType();
-    // Treat empty string as null for data types other than STRING
-    if (stringValue.isEmpty() && dataType != DataType.STRING) {
-      return null;
-    }
-    switch (dataType) {
-      case INT:
-        return Integer.parseInt(stringValue);
-      case LONG:
-        return Long.parseLong(stringValue);
-      case FLOAT:
-        return Float.parseFloat(stringValue);
-      case DOUBLE:
-        return Double.parseDouble(stringValue);
-      case STRING:
-        return stringValue;
-      case BYTES:
-        return BytesUtils.toBytes(stringValue);
-      default:
-        throw new IllegalStateException("Illegal data type: " + dataType);
-    }
-  }
-
-  /**
-   * Converts the values to a multi-valued value based on the given field spec.
-   */
-  public static Object convertMultiValue(FieldSpec fieldSpec, @Nullable Collection values) {
+  public static @Nullable Object convertMultiValue(@Nullable Collection values) {
     if (values == null || values.isEmpty()) {
       return null;
-    } else {
-      int numValues = values.size();
-      Object[] array = new Object[numValues];
-      int index = 0;
-      for (Object value : values) {
-        Object convertedValue = convertSingleValue(fieldSpec, value);
-        if (convertedValue != null) {
-          array[index++] = convertedValue;
-        }
-      }
-      if (index == numValues) {
-        return array;
-      } else if (index == 0) {
-        return null;
-      } else {
-        return Arrays.copyOf(array, index);
+    }
+    int numValues = values.size();
+    Object[] array = new Object[numValues];
+    int index = 0;
+    for (Object value : values) {
+      Object convertedValue = convertSingleValue(value);
+      if (convertedValue != null && !convertedValue.toString().equals("")) {
+        array[index++] = convertedValue;
       }
     }
-  }
-
-  /**
-   * Converts the string values to a multi-valued value based on the given field spec.
-   */
-  public static Object convertMultiValue(FieldSpec fieldSpec, @Nullable String[] stringValues) {
-    if (stringValues == null || stringValues.length == 0) {
+    if (index == numValues) {
+      return array;
+    } else if (index == 0) {
       return null;
     } else {
-      int numValues = stringValues.length;
-      Object[] array = new Object[numValues];
-      int index = 0;
-      for (String stringValue : stringValues) {
-        Object convertedValue = convertSingleValue(fieldSpec, stringValue);
-        if (convertedValue != null) {
-          array[index++] = convertedValue;
-        }
-      }
-      if (index == numValues) {
-        return array;
-      } else if (index == 0) {
-        return null;
-      } else {
-        return Arrays.copyOf(array, index);
-      }
+      return Arrays.copyOf(array, index);
     }
   }
 }

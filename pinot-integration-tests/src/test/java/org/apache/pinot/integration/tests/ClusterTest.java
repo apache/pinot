@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -69,6 +70,7 @@ import org.apache.pinot.spi.config.TableTaskConfig;
 import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.config.TenantConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -346,8 +348,7 @@ public abstract class ClusterTest extends ControllerTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;
     private org.apache.avro.Schema _avroSchema;
-    private Schema _pinotSchema;
-    private RecordExtractor<GenericData.Record> _recordExtractor;
+    private RecordExtractor _recordExtractor;
     private DecoderFactory _decoderFactory = new DecoderFactory();
     private DatumReader<GenericData.Record> _reader;
 
@@ -358,8 +359,9 @@ public abstract class ClusterTest extends ControllerTest {
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
       reader.close();
+      Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
       _recordExtractor = new AvroRecordExtractor();
-      _pinotSchema = indexingSchema;
+      _recordExtractor.init(sourceFields, null);
       _reader = new GenericDatumReader<>(_avroSchema);
     }
 
@@ -373,7 +375,7 @@ public abstract class ClusterTest extends ControllerTest {
       try {
         GenericData.Record avroRecord =
             _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
-        return _recordExtractor.extract(_pinotSchema, avroRecord, destination);
+        return _recordExtractor.extract(avroRecord, destination);
       } catch (Exception e) {
         LOGGER.error("Caught exception", e);
         throw new RuntimeException(e);

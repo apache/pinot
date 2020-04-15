@@ -18,16 +18,29 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import org.apache.pinot.spi.data.Schema;
+import java.util.Set;
 
+
+/**
+ * Extracts fields from input records
+ * @param <T> The format of the input record
+ */
 public interface RecordExtractor<T> {
+
   /**
-   * TODO Add text to this javadoc
+   * Initialize the record extractor with its config
    *
-   * @param schema
-   * @param from
-   * @param to
-   * @return
+   * @param fields List of field names to extract from the provided input record
+   * @param recordExtractorConfig The record extractor config
    */
-  GenericRow extract(Schema schema, T from, GenericRow to);
+  void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig);
+
+  /**
+   * Extracts fields as listed in the sourceFieldNames from the given input record and sets them into the GenericRow
+   *
+   * @param from The input record
+   * @param to The output GenericRow
+   * @return The output GenericRow
+   */
+  GenericRow extract(T from, GenericRow to);
 }

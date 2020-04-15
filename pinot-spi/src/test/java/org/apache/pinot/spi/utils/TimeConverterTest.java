@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.time;
+package org.apache.pinot.spi.utils;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.FieldSpec;

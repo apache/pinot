@@ -38,8 +38,7 @@ public class CompositeTransformer implements RecordTransformer {
    * <p>NOTE: DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS
    * <ul>
    *   <li>
-   *     We put {@link ExpressionTransformer} after {@link TimeTransformer} so that expression can work on outgoing time
-   *     column
+   *     We put {@link ExpressionTransformer} before everyone else, so that we get the real columns for other transformers to work on
    *   </li>
    *   <li>
    *     We put {@link SanitizationTransformer} after {@link DataTypeTransformer} so that before sanitation, all values
@@ -49,8 +48,8 @@ public class CompositeTransformer implements RecordTransformer {
    */
   public static CompositeTransformer getDefaultTransformer(Schema schema) {
     return new CompositeTransformer(Arrays
-        .asList(new NullValueTransformer(schema), new TimeTransformer(schema), new ExpressionTransformer(schema),
-            new DataTypeTransformer(schema), new SanitizationTransformer(schema)));
+        .asList(new ExpressionTransformer(schema), new NullValueTransformer(schema), new DataTypeTransformer(schema),
+            new SanitizationTransformer(schema)));
   }
 
   /**

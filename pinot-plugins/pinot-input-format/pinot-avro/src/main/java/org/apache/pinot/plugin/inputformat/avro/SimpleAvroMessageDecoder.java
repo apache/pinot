@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
@@ -32,6 +33,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,13 +49,12 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private RecordExtractor<GenericData.Record> _avroRecordExtractor;
   private BinaryDecoder _binaryDecoderToReuse;
   private GenericData.Record _avroRecordToReuse;
-  private Schema _pinotSchema;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
-    _pinotSchema = indexingSchema;
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
     _datumReader = new GenericDatumReader<>(_avroSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
@@ -62,6 +63,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
     _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+    _avroRecordExtractor.init(sourceFields, null);
   }
 
   /**
@@ -88,6 +90,6 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       LOGGER.error("Caught exception while reading message using schema: {}", _avroSchema, e);
       return null;
     }
-    return _avroRecordExtractor.extract(_pinotSchema, _avroRecordToReuse, destination);
+    return _avroRecordExtractor.extract(_avroRecordToReuse, destination);
   }
 }
