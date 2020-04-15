@@ -54,10 +54,6 @@ public class RecordReaderSampleDataTest {
       .addSingleValueDimension("unknown_dimension", FieldSpec.DataType.STRING)
       .addMetric("met_impressionCount", FieldSpec.DataType.LONG).addMetric("unknown_metric", FieldSpec.DataType.DOUBLE)
       .build();
-  // Same incoming and outgoing time column name, should read value with the incoming time data type
-  private final Schema SCHEMA_SAME_INCOMING_OUTGOING = new Schema.SchemaBuilder()
-      .addTime("time_day", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "time_day", TimeUnit.DAYS, FieldSpec.DataType.INT)
-      .build();
   // Different incoming and outgoing time column name, should read both incoming and outgoing time
   private final Schema SCHEMA_DIFFERENT_INCOMING_OUTGOING = new Schema.SchemaBuilder()
       .addTime("time_day", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "column2", TimeUnit.DAYS, FieldSpec.DataType.INT)
@@ -111,37 +107,6 @@ public class RecordReaderSampleDataTest {
 
           // Metric default column
           assertEquals(avroRecord.getValue("unknown_metric"), 0.0);
-        }
-      }
-      assertEquals(numRecords, 10001);
-    }
-  }
-
-  @Test
-  public void testSameIncomingOutgoing()
-      throws Exception {
-    try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA_SAME_INCOMING_OUTGOING, null);
-        RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_SAME_INCOMING_OUTGOING, null);
-        RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_SAME_INCOMING_OUTGOING, null)) {
-      int numRecords = 0;
-      while (avroRecordReader.hasNext()) {
-        assertTrue(csvRecordReader.hasNext());
-        assertTrue(jsonRecordReader.hasNext());
-        numRecords++;
-
-        GenericRow avroRecord = avroRecordReader.next();
-        GenericRow csvRecord = csvRecordReader.next();
-        GenericRow jsonRecord = jsonRecordReader.next();
-        checkEqualCSV(avroRecord, csvRecord);
-        checkEqual(avroRecord, jsonRecord);
-
-        // Check the values from the first record
-        if (numRecords == 1) {
-          // Should be in incoming time data type (LONG)
-          assertEquals(Long.valueOf(avroRecord.getValue("time_day").toString()), new Long(1072889503L));
         }
       }
       assertEquals(numRecords, 10001);
