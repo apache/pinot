@@ -90,6 +90,10 @@
       <destName>plugins/pinot-input-format/pinot-avro/pinot-avro-${project.version}-shaded.jar</destName>
     </file>
     <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-avro/target/pinot-confluent-avro-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-confluent-avro/pinot-confluent-avro-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
       <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-csv/target/pinot-csv-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-input-format/pinot-csv/pinot-csv-${project.version}-shaded.jar</destName>
     </file>
