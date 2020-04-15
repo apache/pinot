@@ -61,7 +61,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
 
     Schema avroSchema = createRecord("eventsRecord", null, null, false);
     List<Field> fields = Arrays
-        .asList(new Field("userID", createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
+        .asList(new Field("user_id", createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
             new Field("firstName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
             new Field("lastName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
             new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null, null),

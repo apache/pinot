@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -43,9 +44,10 @@ public class SchemaFieldExtractorUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SchemaFieldExtractorUtils.class);
 
   /**
-   * Extracts the source fields from the schema
+   * Extracts the source fields and destination fields from the schema
    * For field specs with a transform expression defined, use the arguments provided to the function
-   * Otherwise, use the column name as is
+   * By default, add the field spec name
+   *
    * TODO: for now, we assume that arguments to transform function are in the source i.e. there's no columns which are derived from transformed columns
    */
   public static List<String> extract(Schema schema) {
@@ -53,7 +55,21 @@ public class SchemaFieldExtractorUtils {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        if (expressionEvaluator != null) {
+          sourceFieldNames.addAll(expressionEvaluator.getArguments());
+        }
+        sourceFieldNames.add(fieldSpec.getName());
+      }
+    }
+    return new ArrayList<>(sourceFieldNames);
+  }
 
+  @VisibleForTesting
+  public static List<String> extractSource(Schema schema) {
+    Set<String> sourceFieldNames = new HashSet<>();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
         if (expressionEvaluator != null) {
           sourceFieldNames.addAll(expressionEvaluator.getArguments());
         } else {
@@ -67,8 +83,6 @@ public class SchemaFieldExtractorUtils {
   /**
    * Validates that for a field spec with transform function, the source column name and destination column name are exclusive
    * i.e. do not allow using source column name for destination column
-   * 1. Transform function of a field spec should not use the destination column
-   * 2. TimeFieldSpec - cannot have same name for incoming and outgoing field spec, if the specs are different
    */
   public static boolean validate(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -90,12 +104,21 @@ public class SchemaFieldExtractorUtils {
           TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
           TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
           TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
-          // different incoming and outgoing spec, but same name
-          if (outgoingGranularitySpec != null && !incomingGranularitySpec.equals(outgoingGranularitySpec)
-              && incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
-            LOGGER.error("Cannot convert from incoming field spec:{} to outgoing field spec:{} if name is the same",
-                incomingGranularitySpec, outgoingGranularitySpec);
-            return false;
+
+          if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
+            // different incoming and outgoing spec, but same name
+            if (incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
+              LOGGER.error("Cannot convert from incoming field spec:{} to outgoing field spec:{} if name is the same",
+                  incomingGranularitySpec, outgoingGranularitySpec);
+              return false;
+            } else {
+              if (!incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
+                  || !outgoingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
+                LOGGER.error(
+                    "When incoming and outgoing specs are different, cannot perform time conversion for time format other than EPOCH");
+                return false;
+              }
+            }
           }
         }
       }

@@ -66,7 +66,7 @@ public class ParquetRecordExtractorTest extends AbstractRecordExtractorTest {
       throws IOException {
     Schema avroSchema = createRecord("eventsRecord", null, null, false);
     List<Schema.Field> fields = Arrays
-        .asList(new Schema.Field("userID", createUnion(Lists.newArrayList(create(Schema.Type.INT), create(Schema.Type.NULL))), null, null),
+        .asList(new Schema.Field("user_id", createUnion(Lists.newArrayList(create(Schema.Type.INT), create(Schema.Type.NULL))), null, null),
             new Schema.Field("firstName", createUnion(Lists.newArrayList(create(Schema.Type.STRING), create(Schema.Type.NULL))), null, null),
             new Schema.Field("lastName", createUnion(Lists.newArrayList(create(Schema.Type.STRING), create(Schema.Type.NULL))), null, null),
             new Schema.Field("bids", createUnion(Lists.newArrayList(createArray(create(Schema.Type.INT)), create(

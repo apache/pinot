@@ -25,7 +25,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
@@ -118,5 +123,40 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("cost"), 1000.0);
     // convert to LONG
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch"), 437222L);
+  }
+
+  /**
+   * If destination field already exists in the row, do not execute transform function
+   */
+  @Test
+  public void testValueAlreadyExists() {
+    Schema pinotSchema = new Schema();
+    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("fullName", FieldSpec.DataType.STRING, true);
+    dimensionFieldSpec.setTransformFunction("Groovy({firstName + ' ' + lastName}, firstName, lastName)");
+    pinotSchema.addField(dimensionFieldSpec);
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(pinotSchema);
+
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("firstName", "John");
+    genericRow.putValue("lastName", "Denver");
+    genericRow.putValue("fullName", "John N Denver");
+
+    // no transformation
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("fullName"), "John N Denver");
+
+    pinotSchema = new Schema();
+    TimeFieldSpec timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"), new TimeGranularitySpec(
+        FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing"));
+    pinotSchema.addField(timeFieldSpec);
+    expressionTransformer = new ExpressionTransformer(pinotSchema);
+
+    genericRow = new GenericRow();
+    genericRow.putValue("incoming", "123456789");
+    genericRow.putValue("outgoing", "123");
+
+    // no transformation
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("outgoing"), "123");
   }
 }

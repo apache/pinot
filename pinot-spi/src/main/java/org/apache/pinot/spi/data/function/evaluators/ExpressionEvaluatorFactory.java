@@ -52,15 +52,15 @@ public class ExpressionEvaluatorFactory {
 
     String columnName = fieldSpec.getName();
     String transformExpression = fieldSpec.getTransformFunction();
-    if (transformExpression != null) {
+    if (transformExpression != null && !transformExpression.isEmpty()) {
 
       // if transform function expression present, use it to generate function evaluator
       try {
         expressionEvaluator = getExpressionEvaluator(transformExpression);
       } catch (Exception e) {
-        LOGGER.error(
-            "Caught exception while constructing expression evaluator for transform expression: {}, of column: {}, skipping",
-            transformExpression, columnName, e);
+        throw new IllegalStateException(
+            "Caught exception while constructing expression evaluator for transform expression:" + transformExpression
+                + ", of column:" + columnName);
       }
     } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
 
@@ -68,8 +68,7 @@ public class ExpressionEvaluatorFactory {
       TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
       TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
       TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
-      if (outgoingGranularitySpec != null && !incomingGranularitySpec.equals(outgoingGranularitySpec)
-          && !incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
+      if (!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
         expressionEvaluator = new DefaultTimeSpecEvaluator(incomingGranularitySpec, outgoingGranularitySpec);
       }
     } else if (columnName.endsWith(SchemaFieldExtractorUtils.MAP_KEY_COLUMN_SUFFIX)) {
@@ -87,16 +86,13 @@ public class ExpressionEvaluatorFactory {
       String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
       expressionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
     }
-
     return expressionEvaluator;
   }
 
   private static ExpressionEvaluator getExpressionEvaluator(String transformExpression) {
     ExpressionEvaluator expressionEvaluator = null;
-    if (transformExpression != null && !transformExpression.isEmpty()) {
-      if (transformExpression.startsWith(GroovyExpressionEvaluator.getGroovyExpressionPrefix())) {
-        expressionEvaluator = new GroovyExpressionEvaluator(transformExpression);
-      }
+    if (transformExpression.startsWith(GroovyExpressionEvaluator.getGroovyExpressionPrefix())) {
+      expressionEvaluator = new GroovyExpressionEvaluator(transformExpression);
     }
     return expressionEvaluator;
   }

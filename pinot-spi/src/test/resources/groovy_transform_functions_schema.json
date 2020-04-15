@@ -4,7 +4,7 @@
     {
       "name": "userId",
       "dataType": "LONG",
-      "transformFunction": "Groovy({userID}, userID)"
+      "transformFunction": "Groovy({user_id}, user_id)"
     },
     {
       "name": "fullName",

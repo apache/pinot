@@ -63,7 +63,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
   protected void createInputFile()
       throws IOException {
     TypeDescription schema = TypeDescription.createStruct();
-    schema.addField("userID", TypeDescription.createInt());
+    schema.addField("user_id", TypeDescription.createInt());
     schema.addField("firstName", TypeDescription.createString());
     schema.addField("lastName", TypeDescription.createString());
     TypeDescription typeBids = TypeDescription.createList(TypeDescription.createInt());
@@ -77,8 +77,8 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     OrcMapredRecordWriter mrRecordWriter = new OrcMapredRecordWriter(writer);
     for (Map<String, Object> inputRecord : _inputRecords) {
       OrcStruct struct = new OrcStruct(schema);
-      Integer userID = (Integer) inputRecord.get("userID");
-      struct.setFieldValue("userID", userID == null ? null : new IntWritable(userID));
+      Integer userID = (Integer) inputRecord.get("user_id");
+      struct.setFieldValue("user_id", userID == null ? null : new IntWritable(userID));
       String firstName = (String) inputRecord.get("firstName");
       struct.setFieldValue("firstName", firstName == null ? null : new Text(firstName));
       struct.setFieldValue("lastName", new Text((String) inputRecord.get("lastName")));

@@ -37,7 +37,6 @@ import org.testng.annotations.Test;
  */
 public class SchemaFieldExtractorUtilsTest {
 
-
   @Test
   public void testSourceFieldExtractorName() {
 
@@ -50,8 +49,8 @@ public class SchemaFieldExtractorUtilsTest {
     schema.addField(dimensionFieldSpec);
 
     List<String> extract = SchemaFieldExtractorUtils.extract(schema);
-    Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Arrays.asList("argument1", "argument2")));
+    Assert.assertEquals(extract.size(), 3);
+    Assert.assertTrue(extract.containsAll(Arrays.asList("d1", "argument1", "argument2")));
 
     // groovy function, no arguments
     schema = new Schema();
@@ -60,7 +59,8 @@ public class SchemaFieldExtractorUtilsTest {
     schema.addField(dimensionFieldSpec);
 
     extract = SchemaFieldExtractorUtils.extract(schema);
-    Assert.assertTrue(extract.isEmpty());
+    Assert.assertEquals(extract.size(), 1);
+    Assert.assertTrue(extract.contains("d1"));
 
     // Map implementation for Avro - map__KEYS indicates map is source column
     schema = new Schema();
@@ -68,8 +68,8 @@ public class SchemaFieldExtractorUtilsTest {
     schema.addField(dimensionFieldSpec);
 
     extract = SchemaFieldExtractorUtils.extract(schema);
-    Assert.assertEquals(extract.size(), 1);
-    Assert.assertTrue(extract.contains("map"));
+    Assert.assertEquals(extract.size(), 2);
+    Assert.assertTrue(extract.containsAll(Arrays.asList("map", "map__KEYS")));
 
     // Map implementation for Avro - map__VALUES indicates map is source column
     schema = new Schema();
@@ -77,11 +77,10 @@ public class SchemaFieldExtractorUtilsTest {
     schema.addField(dimensionFieldSpec);
 
     extract = SchemaFieldExtractorUtils.extract(schema);
-    Assert.assertEquals(extract.size(), 1);
-    Assert.assertTrue(extract.contains("map"));
+    Assert.assertEquals(extract.size(), 2);
+    Assert.assertTrue(extract.containsAll(Arrays.asList("map", "map__VALUES")));
 
     // Time field spec
-
     // only incoming
     schema = new Schema();
     TimeFieldSpec timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
@@ -91,18 +90,11 @@ public class SchemaFieldExtractorUtilsTest {
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("time"));
 
-    // incoming and outgoing same column name
-    schema = new Schema();
-    timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time", FieldSpec.DataType.LONG, TimeUnit.HOURS);
-    schema.addField(timeFieldSpec);
-
-    extract = SchemaFieldExtractorUtils.extract(schema);
-    Assert.assertEquals(extract.size(), 1);
-    Assert.assertTrue(extract.contains("time"));
-
     // incoming and outgoing different column name
     schema = new Schema();
-    timeFieldSpec = new TimeFieldSpec("in", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
+    timeFieldSpec =
+        new TimeFieldSpec("in", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out", FieldSpec.DataType.LONG,
+            TimeUnit.MILLISECONDS);
     schema.addField(timeFieldSpec);
 
     extract = SchemaFieldExtractorUtils.extract(schema);
@@ -134,8 +126,17 @@ public class SchemaFieldExtractorUtilsTest {
 
     // time field spec using same name for incoming and outgoing
     pinotSchema = new Schema();
-    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), new TimeGranularitySpec(
-        FieldSpec.DataType.INT, TimeUnit.DAYS, "time"));
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
+        new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"));
+    pinotSchema.addField(timeFieldSpec);
+    Assert.assertFalse(SchemaFieldExtractorUtils.validate(pinotSchema));
+
+    // time field spec using SIMPLE_DATE_FORMAT, not allowed when conversion is needed
+    pinotSchema = new Schema();
+    timeFieldSpec =
+        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
+                TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "outgoing"));
     pinotSchema.addField(timeFieldSpec);
     Assert.assertFalse(SchemaFieldExtractorUtils.validate(pinotSchema));
 
@@ -157,8 +158,9 @@ public class SchemaFieldExtractorUtilsTest {
 
     // valid time field spec
     pinotSchema = new Schema();
-    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"), new TimeGranularitySpec(
-        FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing"));
+    timeFieldSpec =
+        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing"));
     pinotSchema.addField(timeFieldSpec);
     Assert.assertTrue(SchemaFieldExtractorUtils.validate(pinotSchema));
   }

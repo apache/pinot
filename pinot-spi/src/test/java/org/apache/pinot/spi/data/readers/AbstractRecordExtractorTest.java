@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -52,7 +53,7 @@ public abstract class AbstractRecordExtractorTest {
       throws IOException {
     FileUtils.forceMkdir(_tempDir);
     _pinotSchema = getPinotSchema();
-    _sourceFieldNames = SchemaFieldExtractorUtils.extract(_pinotSchema);
+    _sourceFieldNames = SchemaFieldExtractorUtils.extractSource(_pinotSchema);
     _inputRecords = getInputRecords();
     createInputFile();
     _recordReader = createRecordReader();
@@ -83,7 +84,7 @@ public abstract class AbstractRecordExtractorTest {
     List<Map<String, Object>> inputRecords = new ArrayList<>(4);
     for (int i = 0; i < 4; i++) {
       Map<String, Object> record = new HashMap<>();
-      record.put("userID", userID[i]);
+      record.put("user_id", userID[i]);
       record.put("firstName", firstName[i]);
       record.put("lastName", lastName[i]);
       record.put("bids", bids.get(i));

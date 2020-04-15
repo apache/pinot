@@ -20,6 +20,7 @@ package org.apache.pinot.spi.data.function.evaluators;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -32,10 +33,10 @@ import org.apache.pinot.spi.utils.TimeUtils;
  * The {@code DefaultTimeSpecEvaluator} class will convert the time value based on the {@link TimeFieldSpec}.
  */
 public class DefaultTimeSpecEvaluator implements ExpressionEvaluator {
-  private String _incomingTimeColumn;
-  private String _outgoingTimeColumn;
-  private TimeConverter _incomingTimeConverter;
-  private TimeConverter _outgoingTimeConverter;
+  private final String _incomingTimeColumn;
+  private final String _outgoingTimeColumn;
+  private final TimeConverter _incomingTimeConverter;
+  private final TimeConverter _outgoingTimeConverter;
   private boolean _isValidated = false;
 
   public DefaultTimeSpecEvaluator(TimeGranularitySpec incomingGranularitySpec,
@@ -50,7 +51,7 @@ public class DefaultTimeSpecEvaluator implements ExpressionEvaluator {
 
   @Override
   public List<String> getArguments() {
-    return Lists.newArrayList(_incomingTimeColumn, _outgoingTimeColumn);
+    return Collections.singletonList(_incomingTimeColumn);
   }
 
   /**

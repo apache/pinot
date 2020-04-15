@@ -29,8 +29,10 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.fail;
 
 
+/**
+ * Tests to check transformation of time column using time field spec
+ */
 public class ExpressionTransformerTimeTest {
-
 
   @Test
   public void testTimeSpecConversion() {
@@ -168,13 +170,12 @@ public class ExpressionTransformerTimeTest {
     Assert.assertEquals(genericRow.getValue("time"), 20180101);
 
     // When incoming and outgoing spec are not the same, simple date format is not allowed
-    pinotSchema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
-            TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "incoming"),
-        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.SECONDS, "outgoing")).build();
     try {
-      new ExpressionTransformer(pinotSchema);
+      new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
+              TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "incoming"),
+          new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.SECONDS, "outgoing")).build();
       fail();
-    } catch (IllegalArgumentException e) {
+    } catch (Exception e) {
       // Expected
     }
   }
