@@ -38,6 +38,7 @@ import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
@@ -146,14 +147,21 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
    * Recursively find the anomalies having a groupKey and display them in the email
    */
   private void updateEntityToAnomalyDetailsMap(MergedAnomalyResultDTO anomaly, DetectionConfigDTO detectionConfig) {
+    Properties props = new Properties();
+    props.putAll(anomaly.getProperties());
+    double lift = BaseNotificationContent.getLift(anomaly.getAvgCurrentVal(), anomaly.getAvgBaselineVal());
     AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
         getAnomalyURL(anomaly, thirdEyeAnomalyConfig.getDashboardHost()),
-        anomaly.getAvgBaselineVal(),
-        anomaly.getAvgCurrentVal(), 0d, getDimensionsList(anomaly.getDimensionMap()),
+        getPredictedValue(anomaly),
+        getCurrentValue(anomaly),
+        getFormattedLiftValue(anomaly, lift),
+        getLiftDirection(lift),
+        0d, getDimensionsList(anomaly.getDimensionMap()),
         getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), getFeedbackValue(anomaly.getFeedback()),
         detectionConfig.getName(), detectionConfig.getDescription(), anomaly.getMetric(),
         getDateString(anomaly.getStartTime(), dateTimeZone), getDateString(anomaly.getEndTime(), dateTimeZone),
-        getTimezoneString(dateTimeZone), getIssueType(anomaly));
+        getTimezoneString(dateTimeZone), getIssueType(anomaly), anomaly.getType().getLabel(),
+        ThirdEyeStringUtils.encodeCompactedProperties(props));
 
     // Extract out the whitelisted metrics
     if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_SUB_ENTITY_NAME)

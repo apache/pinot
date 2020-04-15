@@ -14,13 +14,13 @@
   <tr>
     <td style="font-size: 16px; padding: 12px; background-color: #0073B1; color: #FFF; text-align: center;">
       <p>
-        <strong>2 anomalies</strong> were detected on the metrics listed below
+        <strong>5 anomalies</strong> were detected on the metrics listed below
       </p>
       <p>
-        between <strong>Nov 06, 10:00</strong> and <strong>Nov 07, 17:00</strong> (PDT)
+        between <strong>Jan 01, 00:00</strong> and <strong>Jan 07, 17:00</strong> (PDT)
       </p>
       <p>
-        <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="http://localhost:8080/dashboard/app/#/anomalies?anomalyIds=4,5">View all anomalies on ThirdEye</a>
+        <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="http://localhost:8080/dashboard/app/#/anomalies?anomalyIds=4,5,6,7,8">View all anomalies on ThirdEye</a>
       </p>
     </td>
   </tr>
@@ -48,19 +48,20 @@
             <table border="0" width="100%" align="center" style="width:100%; padding:0; margin:0; border-collapse: collapse;text-align:left;">
               <tr style="text-align:center; background-color: #F6F8FA; border-top: 2px solid #C7D1D8; border-bottom: 2px solid #C7D1D8;">
                 <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Start / Duration</th>
+                <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Type</th>
                 <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Dimensions</th>
                 <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Current</th>
                 <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Predicted</th>
               </tr>
               <tr style="border-bottom: 1px solid #C7D1D8;">
                 <td style="padding: 6px 12px;white-space: nowrap;">
-                  <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">Nov 06, 10:00 PDT</div>
+                  <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">Jan 06, 10:00 PDT</div>
                   <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">3 hours</span>
                   <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="http://localhost:8080/dashboard/app/#/rootcause?anomalyId=4"
                      target="_blank">(view)</a>
                 </td>
-                <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0">
-                </td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">Deviation</td>
+                <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0"></td>
                 <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">1.1</td>
                 <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">
                   1
@@ -69,17 +70,63 @@
               </tr>
               <tr style="border-bottom: 1px solid #C7D1D8;">
                 <td style="padding: 6px 12px;white-space: nowrap;">
-                  <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">Nov 07, 10:00 PDT</div>
+                  <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">Jan 07, 10:00 PDT</div>
                   <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">7 hours</span>
                   <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="http://localhost:8080/dashboard/app/#/rootcause?anomalyId=5"
                      target="_blank">(view)</a>
                 </td>
-                <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0">
-                </td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">Deviation</td>
+                <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0"></td>
                 <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">0.9</td>
                 <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">
-                  1
-                  <div style="font-size: 12px; color:#ee1620;">(-10.00 %)</div>
+                  -
+                </td>
+              </tr>
+
+              <tr style="border-bottom: 1px solid #C7D1D8;">
+                <td style="padding: 6px 12px;white-space: nowrap;">
+                  <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">Jan 01, 10:00 PDT</div>
+                  <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">151 hours</span>
+                  <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="http://localhost:8080/dashboard/app/#/rootcause?anomalyId=6"
+                     target="_blank">(view)</a>
+                </td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">Data Missing</td>
+                <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0"></td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">0</td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">
+                  3_DAYS
+                </td>
+              </tr>
+
+              <tr style="border-bottom: 1px solid #C7D1D8;">
+                <td style="padding: 6px 12px;white-space: nowrap;">
+                  <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">Jan 01, 00:00 PDT</div>
+                  <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">149.08 hours</span>
+                  <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="http://localhost:8080/dashboard/app/#/rootcause?anomalyId=7"
+                     target="_blank">(view)</a>
+                </td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">Data Missing</td>
+                <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0"></td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">0</td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">
+                  2_DAYS
+                  <div style="font-size: 12px; color:#3A8C18;">(+3days&5hours)</div>
+                </td>
+              </tr>
+
+              <tr style="border-bottom: 1px solid #C7D1D8;">
+                <td style="padding: 6px 12px;white-space: nowrap;">
+                  <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">Jan 01, 10:05 PDT</div>
+                  <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">4.92 hours</span>
+                  <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="http://localhost:8080/dashboard/app/#/rootcause?anomalyId=8"
+                     target="_blank">(view)</a>
+                </td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">Data Missing</td>
+                <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0"></td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">0</td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">
+                  3_HOURS
+                  <div style="font-size: 12px; color:#3A8C18;">(+4hours&55mins)</div>
                 </td>
               </tr>
             </table>

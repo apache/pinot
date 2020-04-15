@@ -94,6 +94,7 @@
                     <#if newTable>
                       <tr style="text-align:center; background-color: #F6F8FA; border-top: 2px solid #C7D1D8; border-bottom: 2px solid #C7D1D8;">
                         <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Start / Duration</th>
+                        <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Type</th>
                         <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Dimensions</th>
                         <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Current</th>
                         <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Predicted</th>
@@ -107,6 +108,7 @@
                         <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="${anomaly.anomalyURL}${anomaly.anomalyId}"
                            target="_blank">(view)</a>
                       </td>
+                      <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">${anomaly.anomalyType}</td>
                       <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0">
                         <#list anomaly.dimensions as dimension>
                           <span style="color: rgba(0,0,0,0.6); font-size: 12px; line-height: 16px;">${dimension}</span>
@@ -116,7 +118,9 @@
                       <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">${anomaly.currentVal}</td>
                       <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">
                         ${anomaly.baselineVal}
-                        <div style="font-size: 12px; color:${anomaly.positiveLift?string('#3A8C18','#ee1620')};">(${anomaly.positiveLift?string('+','')}${anomaly.lift})</div>
+                        <#if anomaly.lift?has_content>
+                          <div style="font-size: 12px; color:${anomaly.positiveLift?string('#3A8C18','#ee1620')};">(${anomaly.positiveLift?string('+','')}${anomaly.lift})</div>
+                        </#if>
                       </td>
                     </tr>
                   </#if>
