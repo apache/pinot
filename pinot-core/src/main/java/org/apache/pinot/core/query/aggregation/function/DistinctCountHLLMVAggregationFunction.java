@@ -19,14 +19,23 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggregationFunction {
+
+  /**
+   * Constructor for the class.
+   * @param column Column name to aggregate on.
+   */
+  public DistinctCountHLLMVAggregationFunction(String column) {
+    super(column);
+  }
 
   @Override
   public AggregationFunctionType getType() {
@@ -39,13 +48,14 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
     HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
 
-    DataType valueType = blockValSets[0].getValueType();
+    BlockValSet blockValSet = blockValSetMap.get(_column);
+    DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
-        int[][] intValuesArray = blockValSets[0].getIntValuesMV();
+        int[][] intValuesArray = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
           for (int value : intValuesArray[i]) {
             hyperLogLog.offer(value);
@@ -53,7 +63,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case LONG:
-        long[][] longValuesArray = blockValSets[0].getLongValuesMV();
+        long[][] longValuesArray = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           for (long value : longValuesArray[i]) {
             hyperLogLog.offer(value);
@@ -61,7 +71,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case FLOAT:
-        float[][] floatValuesArray = blockValSets[0].getFloatValuesMV();
+        float[][] floatValuesArray = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           for (float value : floatValuesArray[i]) {
             hyperLogLog.offer(value);
@@ -69,7 +79,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case DOUBLE:
-        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           for (double value : doubleValuesArray[i]) {
             hyperLogLog.offer(value);
@@ -77,7 +87,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case STRING:
-        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        String[][] stringValuesArray = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
           for (String value : stringValuesArray[i]) {
             hyperLogLog.offer(value);
@@ -92,11 +102,13 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    DataType valueType = blockValSets[0].getValueType();
+      Map<String, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_column);
+    DataType valueType = blockValSet.getValueType();
+
     switch (valueType) {
       case INT:
-        int[][] intValuesArray = blockValSets[0].getIntValuesMV();
+        int[][] intValuesArray = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
           HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (int value : intValuesArray[i]) {
@@ -105,7 +117,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case LONG:
-        long[][] longValuesArray = blockValSets[0].getLongValuesMV();
+        long[][] longValuesArray = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (long value : longValuesArray[i]) {
@@ -114,7 +126,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case FLOAT:
-        float[][] floatValuesArray = blockValSets[0].getFloatValuesMV();
+        float[][] floatValuesArray = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (float value : floatValuesArray[i]) {
@@ -123,7 +135,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case DOUBLE:
-        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (double value : doubleValuesArray[i]) {
@@ -132,7 +144,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case STRING:
-        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        String[][] stringValuesArray = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
           HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
           for (String value : stringValuesArray[i]) {
@@ -148,11 +160,13 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    DataType valueType = blockValSets[0].getValueType();
+      Map<String, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_column);
+    DataType valueType = blockValSet.getValueType();
+
     switch (valueType) {
       case INT:
-        int[][] intValuesArray = blockValSets[0].getIntValuesMV();
+        int[][] intValuesArray = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
           int[] intValues = intValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -164,7 +178,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case LONG:
-        long[][] longValuesArray = blockValSets[0].getLongValuesMV();
+        long[][] longValuesArray = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
           long[] longValues = longValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -176,7 +190,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case FLOAT:
-        float[][] floatValuesArray = blockValSets[0].getFloatValuesMV();
+        float[][] floatValuesArray = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
           float[] floatValues = floatValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -188,7 +202,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case DOUBLE:
-        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
           double[] doubleValues = doubleValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -200,7 +214,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         }
         break;
       case STRING:
-        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        String[][] stringValuesArray = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
           String[] stringValues = stringValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {

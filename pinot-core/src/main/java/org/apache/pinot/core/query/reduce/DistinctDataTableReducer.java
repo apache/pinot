@@ -40,7 +40,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.parsers.CompilerConstants;
 
 
 /**
@@ -164,8 +164,8 @@ public class DistinctDataTableReducer implements DataTableReducer {
 
   private String[] getDistinctColumns() {
     return _brokerRequest.getAggregationsInfo().get(0).getAggregationParams()
-        .get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO)
-        .split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+        .get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO)
+        .split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
   }
 
   private DataSchema getEmptyResultTableDataSchema() {

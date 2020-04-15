@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -29,6 +30,16 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
+
+  protected final String _column;
+
+  /**
+   * Constructor for the class.
+   * @param column Column name to aggregate on.
+   */
+  public MaxAggregationFunction(String column) {
+    _column = column;
+  }
 
   @Override
   public AggregationFunctionType getType() {
@@ -51,8 +62,8 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
     double max = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
@@ -65,8 +76,8 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+      Map<String, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       int groupKey = groupKeyArray[i];
@@ -78,8 +89,8 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+      Map<String, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

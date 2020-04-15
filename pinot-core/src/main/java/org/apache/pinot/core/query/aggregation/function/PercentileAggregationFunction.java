@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -33,9 +36,23 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   protected final int _percentile;
+  protected final String _column;
 
-  public PercentileAggregationFunction(int percentile) {
-    _percentile = percentile;
+  /**
+   * Constructor for the class.
+   *
+   * @param arguments List of arguments.
+   *                  <ul>
+   *                  <li> Arg 0: Column name to aggregate.</li>
+   *                  <li> Arg 1: Percentile to compute. </li>
+   *                  </ul>
+   */
+  public PercentileAggregationFunction(List<String> arguments) {
+    int numArgs = arguments.size();
+    Preconditions.checkArgument(numArgs == 2, getType() + " expects two argument, got: " + numArgs);
+
+    _column = arguments.get(0);
+    _percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
   }
 
   @Override
@@ -69,9 +86,9 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
     DoubleArrayList valueList = getValueList(aggregationResultHolder);
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       valueList.add(valueArray[i]);
     }
@@ -79,8 +96,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+      Map<String, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
       valueList.add(valueArray[i]);
@@ -89,8 +106,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+      Map<String, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

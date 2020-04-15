@@ -16,23 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.parsers;
 
-import org.apache.pinot.common.function.AggregationFunctionType;
+/**
+ * Class to host compiler related constants
+ */
+public class CompilerConstants {
+  public static final String AGGREGATION_FUNCTION_ARG_SEPARATOR = ":";
+  public static final String COLUMN_KEY_IN_AGGREGATION_INFO = "column";
 
+  // Private constructor to prevent instantiation
+  private CompilerConstants() {
 
-public class DistinctCountRawHLLMVAggregationFunction extends DistinctCountRawHLLAggregationFunction {
-
-  /**
-   * Constructor for the class.
-   * @param column Column name to aggregate on.
-   */
-  public DistinctCountRawHLLMVAggregationFunction(String column) {
-    super(new DistinctCountHLLMVAggregationFunction(column), column);
-  }
-
-  @Override
-  public AggregationFunctionType getType() {
-    return AggregationFunctionType.DISTINCTCOUNTRAWHLLMV;
   }
 }

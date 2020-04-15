@@ -41,8 +41,8 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 
 
@@ -121,7 +121,8 @@ public class PinotQuery2BrokerRequestConverter {
     List<AggregationInfo> aggregationInfoList = null;
     for (Expression expression : pinotQuery.getSelectList()) {
       ExpressionType type = expression.getType();
-      if (type == ExpressionType.FUNCTION && expression.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+      if (type == ExpressionType.FUNCTION && expression.getFunctionCall().getOperator()
+          .equalsIgnoreCase(SqlKind.AS.toString())) {
         expression = expression.getFunctionCall().getOperands().get(0);
         type = expression.getType();
       }
@@ -232,50 +233,32 @@ public class PinotQuery2BrokerRequestConverter {
       throw new Pql2CompilationException("Aggregation function expects non null argument");
     }
 
-    String columnName;
+    String argumentString;
     String functionName = function.getOperator();
 
-    if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
-      // DISTINCT can support multiple arguments
-      if (operands.size() == 1) {
-        // single column DISTINCT
-        columnName = getColumnExpression(operands.get(0));
-      } else {
-        // multi column DISTINCT
-        Set<String> expressions = new HashSet<>();
-        StringBuilder sb = new StringBuilder();
-        int numOperands = operands.size();
-        for (int i = 0; i < numOperands; i++) {
-          Expression expression = operands.get(i);
-          String columnExpression = getColumnExpression(expression);
-          if (expressions.add(columnExpression)) {
-            // deduplicate the columns
-            if (i != 0) {
-              sb.append(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
-            }
-            sb.append(getColumnExpression(expression));
-          }
-        }
-        columnName = sb.toString();
-      }
+    if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+      argumentString = "*";
     } else {
-      // other aggregation functions support exactly one argument
-      if (operands.size() != 1) {
-        throw new Pql2CompilationException(
-            "Aggregation function" + function.getOperator() + " expects 1 argument. found: " + operands);
+      Set<String> expressions = new HashSet<>();
+      StringBuilder sb = new StringBuilder();
+      int numOperands = operands.size();
+      for (int i = 0; i < numOperands; i++) {
+        Expression expression = operands.get(i);
+        String columnExpression = getColumnExpression(expression);
+        if (expressions.add(columnExpression)) {
+          // deduplicate the columns
+          if (i != 0) {
+            sb.append(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
+          }
+          sb.append(getColumnExpression(expression));
+        }
       }
-
-      if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-        columnName = "*";
-      } else {
-        Expression functionParam = operands.get(0);
-        columnName = getColumnExpression(functionParam);
-      }
+      argumentString = sb.toString();
     }
 
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(functionName);
-    aggregationInfo.putToAggregationParams(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO, columnName);
+    aggregationInfo.putToAggregationParams(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO, argumentString);
     aggregationInfo.setIsInSelectList(true);
     return aggregationInfo;
   }

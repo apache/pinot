@@ -273,9 +273,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(actualValues, expectedValues);
       }
       {
-        // Test selecting some columns with transform, filter, order-by and limit
+        // Test selecting some columns with transform, filter, order-by and limit. Spaces in 'add' are intentional
+        // to ensure that AggregationFunction arguments are standardized (to remove spaces).
         String query =
-            "SELECT DISTINCT(ADD(intColumn, floatColumn), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10";
+            "SELECT DISTINCT(ADD ( intColumn,  floatColumn  ), stringColumn) FROM testTable WHERE longColumn < 60 ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10";
 
         // Check data schema
         DistinctTable distinctTable = getDistinctTableInnerSegment(query);

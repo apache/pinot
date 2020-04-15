@@ -71,7 +71,7 @@ import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -443,15 +443,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       for (AggregationInfo info : brokerRequest.getAggregationsInfo()) {
         if (info.getAggregationParams() != null && !info.getAggregationType()
             .equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          String column = info.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO);
-          String[] expressions = column.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+          String column = info.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO);
+          String[] expressions = column.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
           String[] newExpressions = new String[expressions.length];
           for (int i = 0; i < expressions.length; i++) {
             String expression = expressions[i];
             newExpressions[i] = fixColumnNameCase(tableCache, actualTableName, expression);
           }
-          String newColumns = StringUtil.join(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR, newExpressions);
-          info.getAggregationParams().put(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO, newColumns);
+          String newColumns = StringUtil.join(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR, newExpressions);
+          info.getAggregationParams().put(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO, newColumns);
         }
       }
       if (brokerRequest.isSetGroupBy()) {
@@ -714,8 +714,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           }
           if (brokerRequest.isSetOrderBy()) {
             String column =
-                aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO);
-            String[] columns = column.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+                aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO);
+            String[] columns = column.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
             Set<String> set = new HashSet<>(Arrays.asList(columns));
             List<SelectionSort> orderByColumns = brokerRequest.getOrderBy();
             for (SelectionSort selectionSort : orderByColumns) {

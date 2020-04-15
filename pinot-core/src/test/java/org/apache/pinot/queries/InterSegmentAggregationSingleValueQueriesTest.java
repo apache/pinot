@@ -24,7 +24,6 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -424,7 +423,6 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
    */
   @Test
   public void testInterSegmentDistinctSingleColumn() {
-    Pql2Compiler.ENABLE_DISTINCT = true;
     final String query = "SELECT DISTINCT(column1) FROM testTable LIMIT 1000000";
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     final SelectionResults selectionResults = brokerResponse.getSelectionResults();
@@ -441,7 +439,6 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
    */
   @Test
   public void testInterSegmentDistinctMultiColumn() {
-    Pql2Compiler.ENABLE_DISTINCT = true;
     final String query = "SELECT DISTINCT(column1, column3) FROM testTable LIMIT 1000000";
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     final SelectionResults selectionResults = brokerResponse.getSelectionResults();

@@ -52,7 +52,6 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -450,9 +449,6 @@ public class CalciteSqlParser {
 
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {
     List<Expression> selectExpr = new ArrayList<>();
-    if (!Pql2Compiler.ENABLE_DISTINCT) {
-      throw new SqlCompilationException("Support for DISTINCT is currently disabled in Pinot");
-    }
     selectExpr.add(convertDistinctAndSelectListToFunctionExpression(selectList));
     return selectExpr;
   }

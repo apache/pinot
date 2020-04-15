@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -28,9 +28,20 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMaxRangePair, Double> {
+
+  protected final String _column;
+
+  /**
+   * Constructor for the class.
+   * @param column Column name to aggregate on.
+   */
+  public MinMaxRangeAggregationFunction(String column) {
+    _column = column;
+  }
 
   @Override
   public AggregationFunctionType getType() {
@@ -53,11 +64,13 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
     double min = Double.POSITIVE_INFINITY;
     double max = Double.NEGATIVE_INFINITY;
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+
+    BlockValSet blockValSet = blockValSetMap.get(_column);
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {
         double value = doubleValues[i];
         if (value < min) {
@@ -69,7 +82,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
       }
     } else {
       // Serialized MinMaxRangePair
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
         double minValue = minMaxRangePair.getMin();
@@ -96,16 +109,17 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+      Map<String, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_column);
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {
         double value = doubleValues[i];
         setGroupByResult(groupKeyArray[i], groupByResultHolder, value, value);
       }
     } else {
       // Serialized MinMaxRangePair
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
         setGroupByResult(groupKeyArray[i], groupByResultHolder, minMaxRangePair.getMin(), minMaxRangePair.getMax());
@@ -115,9 +129,10 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+      Map<String, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_column);
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {
         double value = doubleValues[i];
         for (int groupKey : groupKeysArray[i]) {
@@ -126,7 +141,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
       }
     } else {
       // Serialized MinMaxRangePair
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
         double min = minMaxRangePair.getMin();
