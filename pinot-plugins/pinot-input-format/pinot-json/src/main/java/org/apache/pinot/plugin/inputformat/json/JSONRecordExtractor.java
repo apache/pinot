@@ -18,16 +18,14 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
 /**
@@ -35,10 +33,10 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
  */
 public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>> {
 
-  private List<String> _fields;
+  private Set<String> _fields;
 
   @Override
-  public void init(List<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
   }
 

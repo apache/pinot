@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -33,7 +33,7 @@ public interface RecordExtractor<T> {
    * @param fields List of field names to extract from the provided input record
    * @param recordExtractorConfig The record extractor config
    */
-  void init(List<String> fields, RecordExtractorConfig recordExtractorConfig);
+  void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig);
 
   /**
    * Extracts fields as listed in the sourceFieldNames from the given input record and sets them into the GenericRow

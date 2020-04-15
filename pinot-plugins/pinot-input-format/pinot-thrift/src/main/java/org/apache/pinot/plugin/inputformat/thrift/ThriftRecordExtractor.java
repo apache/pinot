@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -33,10 +33,10 @@ import org.apache.thrift.TBase;
 public class ThriftRecordExtractor implements RecordExtractor<TBase> {
 
   private Map<String, Integer> _fieldIds;
-  private List<String> _fields;
+  private Set<String> _fields;
 
   @Override
-  public void init(List<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
     _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
   }

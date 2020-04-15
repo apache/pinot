@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.orc;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.io.BooleanWritable;
@@ -52,10 +53,10 @@ public class ORCRecordExtractor implements RecordExtractor<VectorizedRowBatch> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ORCRecordExtractor.class);
 
   private TypeDescription _orcSchema;
-  private List<String> _fields;
+  private Set<String> _fields;
 
   @Override
-  public void init(List<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
     _orcSchema = ((ORCRecordExtractorConfig) recordExtractorConfig).getOrcSchema();
   }

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
@@ -39,19 +40,21 @@ import org.slf4j.LoggerFactory;
 public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final String JSON_RECORD_EXTRACTOR_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
-    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(indexingSchema));
-    String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
-    if (recordExtractorClass == null) {
-      recordExtractorClass = "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
+    String recordExtractorClass = null;
+    if (props != null) {
+      recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     }
-    // FIXME: pinot-input-format/pinot-json is not available in pinot-stream-ingestion/pinot-kafka-base
-    //  Did not face this issue in KafkaAvroMessageDecoder, because all the AvroMessageDecoders are in pinot-input-format/pinot-avro
+    if (recordExtractorClass == null) {
+      recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
+    }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     _jsonRecordExtractor.init(sourceFields, null);
   }

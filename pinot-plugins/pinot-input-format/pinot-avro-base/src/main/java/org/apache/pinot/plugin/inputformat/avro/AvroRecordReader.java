@@ -20,8 +20,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
@@ -57,7 +56,7 @@ public class AvroRecordReader implements RecordReader {
       _avroReader.close();
       throw e;
     }
-    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     _recordExtractor = new AvroRecordExtractor();
     _recordExtractor.init(sourceFields, null);
   }

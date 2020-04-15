@@ -20,8 +20,7 @@ package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
@@ -49,8 +48,7 @@ public class ParquetRecordReader implements RecordReader {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     _schema = schema;
     ParquetUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
-
-    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     _recordExtractor = new ParquetRecordExtractor();
     _recordExtractor.init(sourceFields, null);
 

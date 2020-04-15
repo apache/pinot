@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
-import java.util.List;
+import java.util.Set;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -32,10 +32,10 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 public class CSVRecordExtractor implements RecordExtractor<CSVRecord> {
 
   private char _multiValueDelimiter;
-  private List<String> _fields;
+  private Set<String> _fields;
 
   @Override
-  public void init(List<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
     _multiValueDelimiter = ((CSVRecordExtractorConfig) recordExtractorConfig).getMultiValueDelimiter();
   }

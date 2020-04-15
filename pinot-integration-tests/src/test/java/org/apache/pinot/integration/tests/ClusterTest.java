@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -358,7 +359,7 @@ public abstract class ClusterTest extends ControllerTest {
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
       reader.close();
-      List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(indexingSchema));
+      Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
       _recordExtractor = new AvroRecordExtractor();
       _recordExtractor.init(sourceFields, null);
       _reader = new GenericDatumReader<>(_avroSchema);
