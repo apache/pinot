@@ -50,7 +50,7 @@ public class SchemaFieldExtractorUtils {
    *
    * TODO: for now, we assume that arguments to transform function are in the source i.e. there's no columns which are derived from transformed columns
    */
-  public static List<String> extract(Schema schema) {
+  public static Set<String> extract(Schema schema) {
     Set<String> sourceFieldNames = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -61,11 +61,11 @@ public class SchemaFieldExtractorUtils {
         sourceFieldNames.add(fieldSpec.getName());
       }
     }
-    return new ArrayList<>(sourceFieldNames);
+    return sourceFieldNames;
   }
 
   @VisibleForTesting
-  public static List<String> extractSource(Schema schema) {
+  public static Set<String> extractSource(Schema schema) {
     Set<String> sourceFieldNames = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -77,7 +77,7 @@ public class SchemaFieldExtractorUtils {
         }
       }
     }
-    return new ArrayList<>(sourceFieldNames);
+    return sourceFieldNames;
   }
 
   /**
@@ -85,43 +85,48 @@ public class SchemaFieldExtractorUtils {
    * i.e. do not allow using source column name for destination column
    */
   public static boolean validate(Schema schema) {
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        String column = fieldSpec.getName();
-        String transformFunction = fieldSpec.getTransformFunction();
-        if (transformFunction != null) {
-          ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-          if (expressionEvaluator != null) {
-            List<String> arguments = expressionEvaluator.getArguments();
-            // output column used as input
-            if (arguments.contains(column)) {
-              LOGGER.error("The arguments of transform function: {}, should not contain the destination column: {}",
-                  transformFunction, column);
-              return false;
-            }
-          }
-        } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
-          TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-          TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
-          TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
-
-          if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
-            // different incoming and outgoing spec, but same name
-            if (incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
-              LOGGER.error("Cannot convert from incoming field spec:{} to outgoing field spec:{} if name is the same",
-                  incomingGranularitySpec, outgoingGranularitySpec);
-              return false;
-            } else {
-              if (!incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
-                  || !outgoingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-                LOGGER.error(
-                    "When incoming and outgoing specs are different, cannot perform time conversion for time format other than EPOCH");
+    try {
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        if (!fieldSpec.isVirtualColumn()) {
+          String column = fieldSpec.getName();
+          String transformFunction = fieldSpec.getTransformFunction();
+          if (transformFunction != null) {
+            ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+            if (expressionEvaluator != null) {
+              List<String> arguments = expressionEvaluator.getArguments();
+              // output column used as input
+              if (arguments.contains(column)) {
+                LOGGER.error("The arguments of transform function: {}, should not contain the destination column: {}",
+                    transformFunction, column);
                 return false;
+              }
+            }
+          } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
+            TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+            TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
+            TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+
+            if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
+              // different incoming and outgoing spec, but same name
+              if (incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
+                LOGGER.error("Cannot convert from incoming field spec:{} to outgoing field spec:{} if name is the same",
+                    incomingGranularitySpec, outgoingGranularitySpec);
+                return false;
+              } else {
+                if (!incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()) || !outgoingGranularitySpec.getTimeFormat()
+                    .equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
+                  LOGGER.error(
+                      "When incoming and outgoing specs are different, cannot perform time conversion for time format other than EPOCH");
+                  return false;
+                }
               }
             }
           }
         }
       }
+    } catch (Exception e) {
+      LOGGER.error("Exception in validating schema {}", schema.getSchemaName(), e);
+      return false;
     }
     return true;
   }

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -64,7 +65,7 @@ public class JSONRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
-    List<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
+    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
     _recordExtractor = new JSONRecordExtractor();
     _recordExtractor.init(sourceFields, null);
     init();

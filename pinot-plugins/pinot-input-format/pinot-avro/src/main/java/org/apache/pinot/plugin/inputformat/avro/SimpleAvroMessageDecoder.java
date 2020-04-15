@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.concurrent.NotThreadSafe;
@@ -54,7 +55,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
-    List<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
+    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(indexingSchema));
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
     _datumReader = new GenericDatumReader<>(_avroSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);

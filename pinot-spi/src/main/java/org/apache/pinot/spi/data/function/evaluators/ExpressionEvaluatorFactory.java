@@ -68,9 +68,16 @@ public class ExpressionEvaluatorFactory {
       TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
       TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
       TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
-      if (!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
-        expressionEvaluator = new DefaultTimeSpecEvaluator(incomingGranularitySpec, outgoingGranularitySpec);
+      if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
+        if (!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
+          expressionEvaluator = new DefaultTimeSpecEvaluator(incomingGranularitySpec, outgoingGranularitySpec);
+        } else {
+          throw new IllegalStateException(
+              "Invalid timeSpec - Incoming and outgoing field specs are different, but name " + incomingGranularitySpec
+                  .getName() + " is same");
+        }
       }
+
     } else if (columnName.endsWith(SchemaFieldExtractorUtils.MAP_KEY_COLUMN_SUFFIX)) {
 
       // for backward compatible handling of Map type (currently only in Avro)

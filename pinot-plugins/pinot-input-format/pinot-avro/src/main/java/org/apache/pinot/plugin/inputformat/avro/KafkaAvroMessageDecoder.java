@@ -106,7 +106,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
         LOGGER.info("Populated schema cache with schema for {}", hashKey);
       }
     }
-    List<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
+    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(indexingSchema));
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     // Backward compatibility to support Avro by default
     if (recordExtractorClass == null) {

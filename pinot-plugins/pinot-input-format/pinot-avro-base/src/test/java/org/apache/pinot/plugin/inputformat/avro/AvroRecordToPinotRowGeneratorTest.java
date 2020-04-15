@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -46,10 +47,10 @@ public class AvroRecordToPinotRowGeneratorTest {
         new org.apache.pinot.spi.data.Schema.SchemaBuilder().setSchemaName("testSchema")
             .addTime("incomingTime", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG, "outgoingTime", TimeUnit.DAYS,
                 FieldSpec.DataType.INT).build();
-    List<String> sourceFieldNames = SchemaFieldExtractorUtils.extract(pinotSchema);
+    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(pinotSchema));
 
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
-    avroRecordExtractor.init(sourceFieldNames, null);
+    avroRecordExtractor.init(sourceFields, null);
     GenericRow genericRow = new GenericRow();
     avroRecordExtractor.extract(avroRecord, genericRow);
 

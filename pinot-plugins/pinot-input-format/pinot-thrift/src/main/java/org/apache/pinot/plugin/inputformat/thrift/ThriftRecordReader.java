@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.thrift;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,7 +95,7 @@ public class ThriftRecordReader implements RecordReader {
       _fieldIds.put(tFieldIdEnum.getFieldName(), index);
       index++;
     }
-    List<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
+    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
     ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
     recordExtractorConfig.setFieldIds(_fieldIds);
     _recordExtractor = new ThriftRecordExtractor();

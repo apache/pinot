@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.stream.kafka;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
-    List<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
+    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(indexingSchema));
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     if (recordExtractorClass == null) {
       recordExtractorClass = "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";

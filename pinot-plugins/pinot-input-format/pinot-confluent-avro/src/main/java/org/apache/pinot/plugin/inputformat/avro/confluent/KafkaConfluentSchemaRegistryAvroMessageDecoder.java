@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
@@ -52,7 +53,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
         checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
         String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
         Preconditions.checkNotNull(indexingSchema, "Schema must be provided");
-        List<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
+        List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(indexingSchema));
         SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000);
         _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
         Preconditions.checkNotNull(topicName, "Topic must be provided");

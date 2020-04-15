@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.orc;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
@@ -69,7 +70,7 @@ public class ORCRecordReader implements RecordReader {
 
     // Create a row batch with max size 1
     _reusableVectorizedRowBatch = _orcSchema.createRowBatch(1);
-    List<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
+    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
     ORCRecordExtractorConfig recordExtractorConfig = new ORCRecordExtractorConfig();
     recordExtractorConfig.setOrcSchema(_orcSchema);
     _recordExtractor = new ORCRecordExtractor();

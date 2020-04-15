@@ -358,7 +358,7 @@ public abstract class ClusterTest extends ControllerTest {
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
       reader.close();
-      List<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
+      List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(indexingSchema));
       _recordExtractor = new AvroRecordExtractor();
       _recordExtractor.init(sourceFields, null);
       _reader = new GenericDatumReader<>(_avroSchema);

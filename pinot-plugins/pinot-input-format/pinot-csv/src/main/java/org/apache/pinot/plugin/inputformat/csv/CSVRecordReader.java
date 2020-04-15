@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.csv;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -95,7 +96,7 @@ public class CSVRecordReader implements RecordReader {
       _format = format;
       _multiValueDelimiter = config.getMultiValueDelimiter();
     }
-    List<String> sourceFields = SchemaFieldExtractorUtils.extract(_schema);
+    List<String> sourceFields = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
     _recordExtractor = new CSVRecordExtractor();
     CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
     recordExtractorConfig.setMultiValueDelimiter(_multiValueDelimiter);

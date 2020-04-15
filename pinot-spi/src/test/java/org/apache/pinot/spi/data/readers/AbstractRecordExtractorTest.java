@@ -53,7 +53,7 @@ public abstract class AbstractRecordExtractorTest {
       throws IOException {
     FileUtils.forceMkdir(_tempDir);
     _pinotSchema = getPinotSchema();
-    _sourceFieldNames = SchemaFieldExtractorUtils.extractSource(_pinotSchema);
+    _sourceFieldNames = new ArrayList<>(SchemaFieldExtractorUtils.extractSource(_pinotSchema));
     _inputRecords = getInputRecords();
     createInputFile();
     _recordReader = createRecordReader();
