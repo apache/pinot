@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator.impl.fwd;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
@@ -27,7 +28,7 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCreator {
-  private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
+  private static final int TARGET_MAX_CHUNK_SIZE = 1024*1024;
 
   private final VarByteChunkSingleValueWriter _indexWriter;
 
@@ -35,7 +36,13 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
       String column, int totalDocs, int maxLength)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, maxLength);
+    _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, getNumDocsPerChunk(maxLength), maxLength);
+  }
+
+  @VisibleForTesting
+  public static int getNumDocsPerChunk(int lengthOfLongestEntry) {
+    int overheadPerEntry = lengthOfLongestEntry + VarByteChunkSingleValueWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+    return Math.max(TARGET_MAX_CHUNK_SIZE / overheadPerEntry, 1);
   }
 
   @Override

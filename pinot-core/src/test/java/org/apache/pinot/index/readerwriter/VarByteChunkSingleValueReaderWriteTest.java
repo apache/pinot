@@ -29,6 +29,7 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -135,5 +136,70 @@ public class VarByteChunkSingleValueReaderWriteTest {
         Assert.assertEquals(actual, expected[i % expected.length]);
       }
     }
+  }
+
+  @Test
+  public void testVarCharWithDifferentSizes() throws Exception {
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 10, 1000);
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 10, 1000);
+
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 100, 1000);
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 100, 1000);
+
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 1000, 1000);
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 1000, 1000);
+
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 10000, 100);
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 10000, 100);
+
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 100000, 10);
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 100000, 10);
+
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 1000000, 10);
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 1000000, 10);
+
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.SNAPPY, 2000000, 10);
+    testLargeVarcharHelper(ChunkCompressorFactory.CompressionType.PASS_THROUGH, 2000000, 10);
+  }
+
+  private void testLargeVarcharHelper(ChunkCompressorFactory.CompressionType compressionType, int numChars, int numDocs)
+      throws Exception {
+    String[] expected = new String[numDocs];
+    Random random = new Random();
+
+    File outFile = new File(TEST_FILE);
+    FileUtils.deleteQuietly(outFile);
+
+    int maxStringLengthInBytes = 0;
+    for (int i = 0; i < numDocs; i++) {
+      expected[i] = RandomStringUtils.random(random.nextInt(numChars));
+      maxStringLengthInBytes = Math.max(maxStringLengthInBytes, expected[i].getBytes(UTF_8).length);
+    }
+
+    int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes);
+    VarByteChunkSingleValueWriter writer =
+        new VarByteChunkSingleValueWriter(outFile, compressionType, numDocs, numDocsPerChunk,
+            maxStringLengthInBytes);
+
+    for (int i = 0; i < numDocs; i += 2) {
+      writer.setString(i, expected[i]);
+      writer.setBytes(i + 1, expected[i].getBytes(UTF_8));
+    }
+
+    writer.close();
+
+    try (VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
+      ChunkReaderContext context = reader.createContext();
+
+      for (int i = 0; i < numDocs; i += 2) {
+        String actual = reader.getString(i, context);
+        Assert.assertEquals(actual, expected[i]);
+        Assert.assertEquals(actual.getBytes(UTF_8), expected[i].getBytes(UTF_8));
+        Assert.assertEquals(reader.getBytes(i + 1), expected[i].getBytes(UTF_8));
+      }
+    }
+
+    FileUtils.deleteQuietly(outFile);
   }
 }
