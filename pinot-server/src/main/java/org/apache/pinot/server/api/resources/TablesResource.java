@@ -55,6 +55,8 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.server.api.access.AccessControl;
+import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +70,9 @@ public class TablesResource {
 
   @Inject
   ServerInstance serverInstance;
+
+  @Inject
+  private AccessControlFactory _accessControlFactory;
 
   @GET
   @Path("/tables")
@@ -197,6 +202,19 @@ public class TablesResource {
       @Context HttpHeaders httpHeaders)
       throws Exception {
     LOGGER.info("Received a request to download segment {} for table {}", segmentName, tableNameWithType);
+    // Validate data access
+    boolean hasDataAccess;
+    try {
+      AccessControl accessControl = _accessControlFactory.create();
+      hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableNameWithType);
+    } catch (Exception e) {
+      throw new WebApplicationException(
+          "Caught exception while validating access to table: " + tableNameWithType, Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    if (!hasDataAccess) {
+      throw new WebApplicationException("No data access to table: " + tableNameWithType, Response.Status.FORBIDDEN);
+    }
+
     TableDataManager tableDataManager = checkGetTableDataManager(tableNameWithType);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {

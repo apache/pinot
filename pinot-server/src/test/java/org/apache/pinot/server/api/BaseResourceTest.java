@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -42,6 +41,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.server.api.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -86,7 +86,6 @@ public abstract class BaseResourceTest {
     ServerInstance serverInstance = mock(ServerInstance.class);
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(FileUtils.getTempDirectoryPath());
-
     // Add the default tables and segments.
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
@@ -96,7 +95,7 @@ public abstract class BaseResourceTest {
     setUpSegment(realtimeTableName, "default", _realtimeIndexSegments);
     setUpSegment(offlineTableName, "default", _offlineIndexSegments);
 
-    _adminApiApplication = new AdminApiApplication(serverInstance);
+    _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory());
     _adminApiApplication.start(CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
     _webTarget = ClientBuilder.newClient().target(_adminApiApplication.getBaseUri());
   }

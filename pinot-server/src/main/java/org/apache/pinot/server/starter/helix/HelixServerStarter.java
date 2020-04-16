@@ -59,6 +59,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -153,8 +154,18 @@ public class HelixServerStarter {
     updateInstanceConfigIfNeeded(host, port);
 
     // Start restlet server for admin API endpoint
+    String accessControlFactoryClass =
+        _serverConf.getString(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+    LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);
+    final AccessControlFactory accessControlFactory;
+    try {
+      accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while creating new AccessControlFactory instance", e);
+    }
+
     int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
-    _adminApiApplication = new AdminApiApplication(_serverInstance);
+    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory);
     _adminApiApplication.start(adminApiPort);
     setAdminApiPort(adminApiPort);
 
