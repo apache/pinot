@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.spi.data.function.evaluators;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
+import groovy.lang.Script;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -54,21 +54,21 @@ public class GroovyExpressionEvaluator implements ExpressionEvaluator {
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
 
-  private List<String> _arguments;
-  private String _script;
+  private final List<String> _arguments;
+  private final Binding _binding;
+  private final Script _script;
 
   public GroovyExpressionEvaluator(String transformExpression) {
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(transformExpression);
-    if (matcher.matches()) {
-      _script = matcher.group(SCRIPT_GROUP_NAME);
-
-      String arguments = matcher.group(ARGUMENTS_GROUP_NAME);
-      if (arguments != null) {
-        _arguments = Splitter.on(ARGUMENTS_SEPARATOR).trimResults().splitToList(arguments);
-      } else {
-        _arguments = Collections.emptyList();
-      }
+    Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", transformExpression);
+    String arguments = matcher.group(ARGUMENTS_GROUP_NAME);
+    if (arguments != null) {
+      _arguments = Splitter.on(ARGUMENTS_SEPARATOR).trimResults().splitToList(arguments);
+    } else {
+      _arguments = Collections.emptyList();
     }
+    _binding = new Binding();
+    _script = new GroovyShell(_binding).parse(matcher.group(SCRIPT_GROUP_NAME));
   }
 
   public static String getGroovyExpressionPrefix() {
@@ -82,21 +82,14 @@ public class GroovyExpressionEvaluator implements ExpressionEvaluator {
 
   @Override
   public Object evaluate(GenericRow genericRow) {
-    Map<String, Object> params = new HashMap<>();
     for (String argument : _arguments) {
       Object value = genericRow.getValue(argument);
       if (value == null) {
-        // TODO: disallow evaluation of any of the params is null? Or give complete control to function?
+        // FIXME: if any param is null a) exit OR b) assume function handles it ?
         return null;
       }
-      params.put(argument, value);
+      _binding.setVariable(argument, value);
     }
-
-    Binding binding = new Binding();
-    for (String argument : _arguments) {
-      binding.setVariable(argument, params.get(argument));
-    }
-    GroovyShell shell = new GroovyShell(binding);
-    return shell.evaluate(_script);
+    return _script.run();
   }
 }
