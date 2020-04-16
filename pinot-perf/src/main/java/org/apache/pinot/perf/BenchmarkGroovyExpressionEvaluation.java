@@ -49,20 +49,34 @@ public class BenchmarkGroovyExpressionEvaluation {
   private final GroovyClassLoader _groovyClassLoader = new GroovyClassLoader();
   private final Random _random = new Random();
 
-  private String _concatScript;
+  private String _concatScriptText;
   private GroovyCodeSource _concatCodeSource;
-  private String _maxScript;
+  private String _maxScriptText;
   private GroovyCodeSource _maxCodeSource;
 
-  @Setup
-  public void setup() {
-    _concatScript = "firstName + ' ' + lastName";
-    _concatCodeSource =
-        new GroovyCodeSource(_concatScript, Math.abs(_concatScript.hashCode()) + ".groovy", GroovyShell.DEFAULT_CODE_BASE);
+  private Binding _concatBinding;
+  private Script _concatScript;
+  private Script _concatGCLScript;
+  private Binding _maxBinding;
+  private Script _maxScript;
+  private Script _maxGCLScript;
 
-    _maxScript = "longList.max{ it.toBigDecimal() }";
-    _maxCodeSource = new GroovyCodeSource(_maxScript, Math.abs(_maxScript.hashCode()) + ".groovy",
+  @Setup
+  public void setup()
+      throws IllegalAccessException, InstantiationException {
+    _concatScriptText = "firstName + ' ' + lastName";
+    _concatBinding = new Binding();
+    _concatScript = new GroovyShell(_concatBinding).parse(_concatScriptText);
+    _concatCodeSource = new GroovyCodeSource(_concatScriptText, Math.abs(_concatScriptText.hashCode()) + ".groovy",
         GroovyShell.DEFAULT_CODE_BASE);
+    _concatGCLScript = (Script) _groovyClassLoader.parseClass(_concatCodeSource).newInstance();
+
+    _maxScriptText = "longList.max{ it.toBigDecimal() }";
+    _maxBinding = new Binding();
+    _maxScript = new GroovyShell(_maxBinding).parse(_maxScriptText);
+    _maxCodeSource = new GroovyCodeSource(_maxScriptText, Math.abs(_maxScriptText.hashCode()) + ".groovy",
+        GroovyShell.DEFAULT_CODE_BASE);
+    _maxGCLScript = (Script) _groovyClassLoader.parseClass(_maxCodeSource).newInstance();
   }
 
   private String getFirstName() {
@@ -99,8 +113,7 @@ public class BenchmarkGroovyExpressionEvaluation {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void groovyCodeSourceConcat()
-      throws InstantiationException, IllegalAccessException {
+  public void groovyCodeSourceConcat() {
     getFullNameGroovyCodeSource(getFirstName(), getLastName());
   }
 
@@ -123,8 +136,7 @@ public class BenchmarkGroovyExpressionEvaluation {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void groovyCodeSourceMax()
-      throws InstantiationException, IllegalAccessException {
+  public void groovyCodeSourceMax() {
     List<String> longList = getLongList();
     getMaxGroovyCodeSource(longList);
   }
@@ -134,21 +146,16 @@ public class BenchmarkGroovyExpressionEvaluation {
   }
 
   private Object getFullNameGroovyShell(String firstName, String lastName) {
-    Binding binding = new Binding();
-    binding.setVariable("firstName", firstName);
-    binding.setVariable("lastName", lastName);
-    GroovyShell shell = new GroovyShell(binding);
-    return shell.evaluate(_concatScript);
+    _concatBinding.setVariable("firstName", firstName);
+    _concatBinding.setVariable("lastName", lastName);
+    return _concatScript.run();
   }
 
-  private Object getFullNameGroovyCodeSource(String firstName, String lastName)
-      throws IllegalAccessException, InstantiationException {
-    Script scriptInstance = (Script) _groovyClassLoader.parseClass(_concatCodeSource).newInstance();
-    Binding binding = new Binding();
-    binding.setVariable("firstName", firstName);
-    binding.setVariable("lastName", lastName);
-    scriptInstance.setBinding(binding);
-    return scriptInstance.run();
+  private Object getFullNameGroovyCodeSource(String firstName, String lastName) {
+    _concatBinding.setVariable("firstName", firstName);
+    _concatBinding.setVariable("lastName", lastName);
+    _concatGCLScript.setBinding(_concatBinding);
+    return _concatGCLScript.run();
   }
 
   private int getMaxJava(List<String> longList) {
@@ -163,19 +170,14 @@ public class BenchmarkGroovyExpressionEvaluation {
   }
 
   private Object getMaxGroovyShell(List<String> longList) {
-    Binding binding = new Binding();
-    binding.setVariable("longList", longList);
-    GroovyShell shell = new GroovyShell(binding);
-    return shell.evaluate(_maxScript);
+    _maxBinding.setVariable("longList", longList);
+    return _maxScript.run();
   }
 
-  private Object getMaxGroovyCodeSource(List<String> longList)
-      throws IllegalAccessException, InstantiationException {
-    Script scriptInstance = (Script) _groovyClassLoader.parseClass(_maxCodeSource).newInstance();
-    Binding binding = new Binding();
-    binding.setVariable("longList", longList);
-    scriptInstance.setBinding(binding);
-    return scriptInstance.run();
+  private Object getMaxGroovyCodeSource(List<String> longList) {
+    _maxBinding.setVariable("longList", longList);
+    _maxGCLScript.setBinding(_maxBinding);
+    return _maxGCLScript.run();
   }
 
   public static void main(String[] args)
