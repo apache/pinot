@@ -96,9 +96,8 @@ public class S3PinotFS extends PinotFS {
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
         awsCredentialsProvider =
-            AwsCredentialsProviderChain.builder().addCredentialsProvider(ProfileCredentialsProvider.create())
-                .addCredentialsProvider(EnvironmentVariableCredentialsProvider.create())
-                .addCredentialsProvider(SystemPropertyCredentialsProvider.create()).build();
+            AwsCredentialsProviderChain.builder().addCredentialsProvider(SystemPropertyCredentialsProvider.create())
+                .addCredentialsProvider(EnvironmentVariableCredentialsProvider.create()).build();
       }
 
       _s3Client = S3Client.builder().region(Region.of(region)).credentialsProvider(awsCredentialsProvider).build();
