@@ -19,6 +19,9 @@
 package org.apache.pinot.spi.config.api;
 
 import java.io.IOException;
+
+import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 

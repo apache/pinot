@@ -22,14 +22,14 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.spi.config.ReplicaGroupStrategyConfig;
-import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.TableType;
-import org.apache.pinot.spi.config.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.config.assignment.InstanceReplicaGroupPartitionConfig;
-import org.apache.pinot.spi.config.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 
 
 public class InstanceAssignmentConfigUtils {

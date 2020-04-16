@@ -19,7 +19,7 @@
 package org.apache.pinot.tools;
 
 import java.io.File;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.readers.FileFormat;
 
 

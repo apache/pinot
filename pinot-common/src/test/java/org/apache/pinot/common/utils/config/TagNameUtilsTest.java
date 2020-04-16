@@ -20,8 +20,8 @@ package org.apache.pinot.common.utils.config;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.spi.config.TagOverrideConfig;
-import org.apache.pinot.spi.config.TenantConfig;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 

@@ -16,28 +16,42 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.assignment;
+package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
-import java.util.List;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class InstanceConstraintConfig extends BaseJsonConfig {
-
-  @JsonPropertyDescription("Name of the instance constraints to be applied (mandatory)")
-  private final List<String> _constraints;
+public class ColumnPartitionConfig extends BaseJsonConfig {
+  private final String _functionName;
+  private final int _numPartitions;
 
   @JsonCreator
-  public InstanceConstraintConfig(@JsonProperty(value = "constraints", required = true) List<String> constraints) {
-    Preconditions.checkArgument(constraints != null, "'constraints' must be configured");
-    _constraints = constraints;
+  public ColumnPartitionConfig(@JsonProperty(value = "functionName", required = true) String functionName,
+      @JsonProperty(value = "numPartitions", required = true) int numPartitions) {
+    Preconditions.checkArgument(functionName != null, "'functionName' must be configured");
+    Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
+    _functionName = functionName;
+    _numPartitions = numPartitions;
   }
 
-  public List<String> getConstraints() {
-    return _constraints;
+  /**
+   * Returns the partition function name for the column.
+   *
+   * @return Partition function name.
+   */
+  public String getFunctionName() {
+    return _functionName;
+  }
+
+  /**
+   * Returns the number of partitions for this column.
+   *
+   * @return Number of partitions.
+   */
+  public int getNumPartitions() {
+    return _numPartitions;
   }
 }

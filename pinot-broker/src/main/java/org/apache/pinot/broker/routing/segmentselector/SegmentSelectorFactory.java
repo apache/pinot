@@ -17,8 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.broker.routing.segmentselector;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 
 
 public class SegmentSelectorFactory {

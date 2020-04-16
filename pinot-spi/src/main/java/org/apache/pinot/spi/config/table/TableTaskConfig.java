@@ -16,29 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config;
+package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
+import org.apache.pinot.spi.config.BaseJsonConfig;
+
+import java.util.Map;
 
 
-/**
- * Class representing configurations related to realtime segment completion.
- */
-public class CompletionConfig extends BaseJsonConfig {
-
-  @JsonPropertyDescription("Mode to use when completing segment. DEFAULT for default strategy (build segment if segment is equivalent to the committed segment, else download). DOWNLOAD for always download the segment, never build.")
-  private final String _completionMode;
+public class TableTaskConfig extends BaseJsonConfig {
+  private final Map<String, Map<String, String>> _taskTypeConfigsMap;
 
   @JsonCreator
-  public CompletionConfig(@JsonProperty(value = "completionMode", required = true) String completionMode) {
-    Preconditions.checkArgument(completionMode != null, "'completionMode' must be configured");
-    _completionMode = completionMode;
+  public TableTaskConfig(
+      @JsonProperty(value = "taskTypeConfigsMap", required = true) Map<String, Map<String, String>> taskTypeConfigsMap) {
+    Preconditions.checkArgument(taskTypeConfigsMap != null, "'taskTypeConfigsMap' must be configured");
+    _taskTypeConfigsMap = taskTypeConfigsMap;
   }
 
-  public String getCompletionMode() {
-    return _completionMode;
+  @JsonProperty
+  public Map<String, Map<String, String>> getTaskTypeConfigsMap() {
+    return _taskTypeConfigsMap;
+  }
+
+  public boolean isTaskTypeEnabled(String taskType) {
+    return _taskTypeConfigsMap.containsKey(taskType);
+  }
+
+  public Map<String, String> getConfigsForTaskType(String taskType) {
+    return _taskTypeConfigsMap.get(taskType);
   }
 }

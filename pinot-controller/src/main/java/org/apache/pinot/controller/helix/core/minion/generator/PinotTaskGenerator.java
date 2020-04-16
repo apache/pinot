@@ -22,7 +22,7 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.JobConfig;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**

@@ -25,7 +25,7 @@ import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import org.apache.pinot.spi.config.StarTreeIndexConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 
 
 /**

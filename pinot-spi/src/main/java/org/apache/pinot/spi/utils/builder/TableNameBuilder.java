@@ -19,7 +19,7 @@
 package org.apache.pinot.spi.utils.builder;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.TableType;
 
 
 public class TableNameBuilder {

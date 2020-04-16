@@ -16,8 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.api;
+package org.apache.pinot.spi.config.table;
 
-public enum InstanceType {
-  CONTROLLER, BROKER, SERVER, MINION
+public enum TableType {
+  OFFLINE, REALTIME
 }
