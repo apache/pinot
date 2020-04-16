@@ -141,20 +141,31 @@ public class SchemaFieldExtractorUtilsTest {
     pinotSchema.addField(timeFieldSpec);
     Assert.assertFalse(SchemaFieldExtractorUtils.validate(pinotSchema));
 
+    // incorrect groovy function syntax
+    pinotSchema = new Schema();
+    dimensionFieldSpec = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
+    dimensionFieldSpec.setTransformFunction("Groovy(function, argument3)");
+    pinotSchema.addField(dimensionFieldSpec);
+    Assert.assertFalse(SchemaFieldExtractorUtils.validate(pinotSchema));
+
+    // valid schema, empty arguments
+    pinotSchema = new Schema();
+    dimensionFieldSpec = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
+    dimensionFieldSpec.setTransformFunction("Groovy({function})");
+    pinotSchema.addField(dimensionFieldSpec);
+    Assert.assertTrue(SchemaFieldExtractorUtils.validate(pinotSchema));
+
     // valid schema
     pinotSchema = new Schema();
     dimensionFieldSpec = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
     dimensionFieldSpec.setTransformFunction("Groovy({function}, argument1, argument2, argument3)");
     pinotSchema.addField(dimensionFieldSpec);
-
     metricFieldSpec = new MetricFieldSpec("m1", FieldSpec.DataType.LONG);
     metricFieldSpec.setTransformFunction("Groovy({function}, m2, m3)");
     pinotSchema.addField(metricFieldSpec);
-
     timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
     timeFieldSpec.setTransformFunction("Groovy({function}, millis)");
     pinotSchema.addField(timeFieldSpec);
-
     Assert.assertTrue(SchemaFieldExtractorUtils.validate(pinotSchema));
 
     // valid time field spec
