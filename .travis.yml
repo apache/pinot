@@ -5,6 +5,7 @@ dist: trusty
 
 before_install:
   - sudo apt-get update && sudo apt-get install -y --no-install-recommends gdb
+  - sudo apt-get install travis
   - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
   - export PATH=$PATH:~/bin
   - jq --version
@@ -68,7 +69,7 @@ jobs:
     - stage: deploy
       script:
         - travis_wait 40 ./.travis/.travis_nightly_build.sh
-        - travis show | grep --extended-regexp --only-matching '[0-9\.]+ (failed|errored)' | awk '{print $1}' | xargs --max-args=1 --no-run-if-empty travis restart
+        - if [ $? -eq 1 ]; then travis restart ${TRAVIS_JOB_NUMBER}; fi
 
 env:
   global:
