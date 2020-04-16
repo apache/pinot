@@ -20,14 +20,17 @@ package org.apache.pinot.spi.data.function.evaluators;
 
 import com.google.common.base.Splitter;
 import groovy.lang.Binding;
+import groovy.lang.GroovyClassLoader;
+import groovy.lang.GroovyCodeSource;
 import groovy.lang.GroovyShell;
+import groovy.lang.Script;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -46,6 +49,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class GroovyExpressionEvaluator implements ExpressionEvaluator {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroovyExpressionEvaluator.class);
+
   private static final String GROOVY_EXPRESSION_PREFIX = "Groovy";
   private static final String GROOVY_FUNCTION_REGEX = "Groovy\\(\\{(?<script>.+)}(,(?<arguments>.+))?\\)";
   private static final Pattern GROOVY_FUNCTION_PATTERN =
@@ -55,12 +60,17 @@ public class GroovyExpressionEvaluator implements ExpressionEvaluator {
   private static final String ARGUMENTS_SEPARATOR = ",";
 
   private List<String> _arguments;
-  private String _script;
+  private GroovyCodeSource _groovyCodeSource;
+
+  private static final GroovyClassLoader GROOVY_CLASS_LOADER = new GroovyClassLoader();
+  private static final String GROOVY_SCRIPT_SUFFIX = ".groovy";
 
   public GroovyExpressionEvaluator(String transformExpression) {
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(transformExpression);
     if (matcher.matches()) {
-      _script = matcher.group(SCRIPT_GROUP_NAME);
+      String script = matcher.group(SCRIPT_GROUP_NAME);
+      String scriptName = script.hashCode() + GROOVY_SCRIPT_SUFFIX;
+      _groovyCodeSource = new GroovyCodeSource(script, scriptName, GroovyShell.DEFAULT_CODE_BASE);
 
       String arguments = matcher.group(ARGUMENTS_GROUP_NAME);
       if (arguments != null) {
@@ -82,21 +92,24 @@ public class GroovyExpressionEvaluator implements ExpressionEvaluator {
 
   @Override
   public Object evaluate(GenericRow genericRow) {
-    Map<String, Object> params = new HashMap<>();
-    for (String argument : _arguments) {
-      Object value = genericRow.getValue(argument);
-      if (value == null) {
-        // TODO: disallow evaluation of any of the params is null? Or give complete control to function?
-        return null;
-      }
-      params.put(argument, value);
-    }
-
     Binding binding = new Binding();
     for (String argument : _arguments) {
-      binding.setVariable(argument, params.get(argument));
+      Object value = genericRow.getValue(argument);
+      // FIXME: if any param is null a) exit OR b) assume function handles it ?
+      if (value == null) {
+        return null;
+      }
+      binding.setVariable(argument, value);
     }
-    GroovyShell shell = new GroovyShell(binding);
-    return shell.evaluate(_script);
+    Object result = null;
+    try {
+      Script script = (Script) GROOVY_CLASS_LOADER.parseClass(_groovyCodeSource).newInstance();
+      script.setBinding(binding);
+      result = script.run();
+    } catch (InstantiationException | IllegalAccessException e) {
+      LOGGER.error("Caught exception when executing Groovy script:[{}] with binding:[{}]. Skipping.",
+          _groovyCodeSource.getScriptText(), binding.toString(), e);
+    }
+    return result;
   }
 }
