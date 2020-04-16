@@ -77,12 +77,14 @@ import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.services.ServiceStartable;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ControllerStarter {
+public class ControllerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
 
   private static final String METRICS_REGISTRY_NAME = "pinot.controller.metrics";
@@ -216,6 +218,22 @@ public class ControllerStarter {
     return _taskManager;
   }
 
+  @Override
+  public ServiceRole getServiceRole() {
+    return ServiceRole.CONTROLLER;
+  }
+
+  @Override
+  public String getInstanceId() {
+    return _helixParticipantInstanceId;
+  }
+
+  @Override
+  public Configuration getConfig() {
+    return _config;
+  }
+
+  @Override
   public void start() {
     LOGGER.info("Starting Pinot controller in mode: {}.", _controllerMode.name());
     Utils.logVersions();
@@ -241,7 +259,7 @@ public class ControllerStarter {
     }
 
     ServiceStatus
-        .addServiceStatusCallback(ControllerStarter.class.getName(), new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
+        .setServiceStatusCallback(_helixParticipantInstanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
   }
 
   private void setUpHelixController() {
@@ -527,6 +545,7 @@ public class ControllerStarter {
     return periodicTasks;
   }
 
+  @Override
   public void stop() {
     switch (_controllerMode) {
       case DUAL:
@@ -540,6 +559,11 @@ public class ControllerStarter {
         stopHelixController();
         break;
     }
+    LOGGER.info("Deregistering service status handler");
+    ServiceStatus.removeServiceStatusCallback(_helixParticipantInstanceId);
+    LOGGER.info("Shutdown Controller Metrics Registry");
+    _metricsRegistry.shutdown();
+    LOGGER.info("Finish shutting down Pinot controller for {}", _helixParticipantInstanceId);
   }
 
   private void stopHelixController() {

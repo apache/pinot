@@ -56,6 +56,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
       throws Exception {
     HelixServerStarter helixServerStarter =
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
+    helixServerStarter.start();
     helixServerStarter.stop();
 
     assertEquals(helixServerStarter.getInstanceId(), expectedInstanceId);

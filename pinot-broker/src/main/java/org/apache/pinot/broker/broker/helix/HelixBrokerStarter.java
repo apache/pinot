@@ -59,12 +59,14 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings("unused")
-public class HelixBrokerStarter {
+public class HelixBrokerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
 
   private final Configuration _brokerConf;
@@ -153,6 +155,22 @@ public class HelixBrokerStarter {
     _liveInstanceChangeHandlers.add(liveInstanceChangeHandler);
   }
 
+  @Override
+  public ServiceRole getServiceRole() {
+    return ServiceRole.BROKER;
+  }
+
+  @Override
+  public String getInstanceId() {
+    return _brokerId;
+  }
+
+  @Override
+  public Configuration getConfig() {
+    return _brokerConf;
+  }
+
+  @Override
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot broker");
@@ -273,7 +291,7 @@ public class HelixBrokerStarter {
         Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
-    ServiceStatus.addServiceStatusCallback(HelixBrokerStarter.class.getName(), new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
+    ServiceStatus.setServiceStatusCallback(_brokerId, new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
         .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
@@ -293,7 +311,8 @@ public class HelixBrokerStarter {
     }
   }
 
-  public void shutdown() {
+  @Override
+  public void stop() {
     LOGGER.info("Shutting down Pinot broker");
 
     LOGGER.info("Disconnecting participant Helix manager");
@@ -321,7 +340,12 @@ public class HelixBrokerStarter {
     LOGGER.info("Disconnecting spectator Helix manager");
     _spectatorHelixManager.disconnect();
 
-    LOGGER.info("Finish shutting down Pinot broker");
+    LOGGER.info("Deregistering service status handler");
+    ServiceStatus.removeServiceStatusCallback(_brokerId);
+    LOGGER.info("Shutdown Broker Metrics Registry");
+    _metricsRegistry.shutdown();
+    LOGGER.info("Finish shutting down Pinot broker for {}", _brokerId);
+
   }
 
   public HelixManager getSpectatorHelixManager() {

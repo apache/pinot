@@ -19,11 +19,13 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
-import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,30 +37,23 @@ import org.slf4j.LoggerFactory;
  */
 public class StartBrokerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
-
-  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
-  private String _brokerHost;
-
-  @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number to use for query.")
-  private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
-
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
-  private String _zkAddress = DEFAULT_ZK_ADDRESS;
-
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
-  private String _clusterName = "PinotCluster";
-
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.", forbids = {"-brokerHost", "-brokerPort"})
-  private String _configFileName;
-
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
+  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _brokerHost;
+  @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number to use for query.")
+  private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
+  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
+  private String _zkAddress = DEFAULT_ZK_ADDRESS;
+  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+  private String _clusterName = "PinotCluster";
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.", forbids = {"-brokerHost", "-brokerPort"})
+  private String _configFileName;
+  private HelixBrokerStarter _brokerStarter;
 
   public boolean getHelp() {
     return _help;
   }
-
-  private HelixBrokerStarter _brokerStarter;
 
   @Override
   public String getName() {
@@ -77,7 +72,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   @Override
   public void cleanup() {
     if (_brokerStarter != null) {
-      _brokerStarter.shutdown();
+      _brokerStarter.stop();
     }
   }
 
@@ -110,21 +105,11 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   public boolean execute()
       throws Exception {
     try {
-      Configuration brokerConf = readConfigFromFile(_configFileName);
-      if (brokerConf == null) {
-        if (_configFileName != null) {
-          LOGGER.error("Error: Unable to find file {}.", _configFileName);
-          return false;
-        }
-
-        brokerConf = new BaseConfiguration();
-        brokerConf.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
-      }
-
       LOGGER.info("Executing command: " + toString());
-      _brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, _zkAddress, _brokerHost);
-      _brokerStarter.start();
-
+      StartServiceManagerCommand startServiceManagerCommand =
+          new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.BROKER, getBrokerConf());
+      startServiceManagerCommand.execute();
       String pidFile = ".pinotAdminBroker-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;
@@ -133,5 +118,13 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
       System.exit(-1);
       return false;
     }
+  }
+
+  private Configuration getBrokerConf()
+      throws ConfigurationException {
+    if (_configFileName != null) {
+      return PinotConfigUtils.readConfigFromFile(_configFileName);
+    }
+    return PinotConfigUtils.generateBrokerConf(_brokerPort);
   }
 }

@@ -26,8 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
-
-import com.google.common.collect.ImmutableList;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -46,51 +44,23 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("unused")
 public class ServiceStatus {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ServiceStatus.class);
-
-  public enum Status {
-    STARTING, GOOD, BAD
-  }
-
   public static final String STATUS_DESCRIPTION_NONE = "None";
   public static final String STATUS_DESCRIPTION_INIT = "Init";
+  public static final String STATUS_DESCRIPTION_STARTED = "Started";
+  public static final String STATUS_DESCRIPTION_SHUTTING_DOWN = "ShuttingDown";
   public static final String STATUS_DESCRIPTION_NO_HELIX_STATE = "Helix state does not exist";
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServiceStatus.class);
   private static final int MAX_RESOURCE_NAMES_TO_LOG = 5;
+  private static final Map<String, ServiceStatusCallback> serviceStatusCallbackMap = new ConcurrentHashMap<>();
+  private static final ServiceStatusCallback serviceStatusCallback =
+      new MapBasedMultipleCallbackServiceStatusCallback(serviceStatusCallbackMap);
 
-  /**
-   * Callback that returns the status of the service.
-   */
-  public interface ServiceStatusCallback {
-
-    Status getServiceStatus();
-
-    String getStatusDescription();
+  public static void setServiceStatusCallback(String name, ServiceStatusCallback serviceStatusCallback) {
+    ServiceStatus.serviceStatusCallbackMap.put(name, serviceStatusCallback);
   }
 
-  private static Map<String, ServiceStatusCallback> serviceStatusCallbackMap = new ConcurrentHashMap<>();
-
-  private static ServiceStatusCallback serviceStatusCallback = null;
-
-  public static void setServiceStatusCallback(ServiceStatusCallback serviceStatusCallback) {
-    ServiceStatus.serviceStatusCallback = serviceStatusCallback;
-  }
-
-  public static void addServiceStatusCallback(String name, ServiceStatusCallback serviceStatusCallback) {
-    if (ServiceStatus.serviceStatusCallback == null) {
-      ServiceStatus.serviceStatusCallback = serviceStatusCallback;
-    } else {
-      MultipleCallbackServiceStatusCallback callback1 = new MultipleCallbackServiceStatusCallback(
-          ImmutableList.of(serviceStatusCallback, ServiceStatus.serviceStatusCallback));
-      ServiceStatus.setServiceStatusCallback(callback1);
-      if (ServiceStatus.serviceStatusCallbackMap.containsKey(name)) {
-        MultipleCallbackServiceStatusCallback callback2 = new MultipleCallbackServiceStatusCallback(
-            ImmutableList.of(serviceStatusCallback, ServiceStatus.serviceStatusCallbackMap.get(name)));
-        ServiceStatus.serviceStatusCallbackMap.put(name, callback2);
-      } else {
-        ServiceStatus.serviceStatusCallbackMap.put(name, serviceStatusCallback);
-      }
-    }
+  public static void removeServiceStatusCallback(String name) {
+    ServiceStatus.serviceStatusCallbackMap.remove(name);
   }
 
   public static Status getServiceStatus() {
@@ -101,20 +71,16 @@ public class ServiceStatus {
     if (serviceStatusCallbackMap.containsKey(name)) {
       return getServiceStatus(serviceStatusCallbackMap.get(name));
     } else {
-      return Status.STARTING;
+      return Status.NOT_STARTED;
     }
   }
 
   private static Status getServiceStatus(ServiceStatusCallback callback) {
-    if (callback == null) {
-      return Status.STARTING;
-    } else {
-      try {
-        return callback.getServiceStatus();
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while reading the service status", e);
-        return Status.BAD;
-      }
+    try {
+      return callback.getServiceStatus();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while reading the service status", e);
+      return Status.BAD;
     }
   }
 
@@ -126,20 +92,41 @@ public class ServiceStatus {
     if (serviceStatusCallbackMap.containsKey(name)) {
       return getStatusDescription(serviceStatusCallbackMap.get(name));
     } else {
-      return STATUS_DESCRIPTION_INIT;
+      return STATUS_DESCRIPTION_NONE;
     }
   }
 
   private static String getStatusDescription(ServiceStatusCallback callback) {
-    if (callback == null) {
-      return STATUS_DESCRIPTION_INIT;
-    } else {
-      try {
-        return callback.getStatusDescription();
-      } catch (Exception e) {
-        return "Exception: " + e.getMessage();
-      }
+    try {
+      return callback.getStatusDescription();
+    } catch (Exception e) {
+      return "Exception: " + e.getMessage();
     }
+  }
+
+  public static Map<String, Map<String, String>> getServiceStatusMap() {
+    Map<String, Map<String, String>> results = new HashMap<>();
+    serviceStatusCallbackMap.forEach((k, v) -> {
+      Map<String, String> result = new HashMap<>();
+      result.put("StatusDescription", v.getStatusDescription());
+      result.put("ServiceStatus", v.getServiceStatus().toString());
+      results.put(k, result);
+    });
+    return results;
+  }
+
+  public enum Status {
+    NOT_STARTED, STARTING, GOOD, BAD, SHUTTING_DOWN
+  }
+
+  /**
+   * Callback that returns the status of the service.
+   */
+  public interface ServiceStatusCallback {
+
+    Status getServiceStatus();
+
+    String getStatusDescription();
   }
 
   public static class MultipleCallbackServiceStatusCallback implements ServiceStatusCallback {
@@ -174,6 +161,44 @@ public class ServiceStatus {
     }
   }
 
+  public static class MapBasedMultipleCallbackServiceStatusCallback implements ServiceStatusCallback {
+    private final Map<String, ? extends ServiceStatusCallback> _statusCallbacks;
+
+    public MapBasedMultipleCallbackServiceStatusCallback(Map<String, ? extends ServiceStatusCallback> statusCallbacks) {
+      _statusCallbacks = statusCallbacks;
+    }
+
+    @Override
+    public Status getServiceStatus() {
+      if (_statusCallbacks.isEmpty()) {
+        return Status.STARTING;
+      }
+      // Iterate through all callbacks, returning the first non GOOD one as the service status
+      for (ServiceStatusCallback statusCallback : _statusCallbacks.values()) {
+        final Status serviceStatus = statusCallback.getServiceStatus();
+        if (serviceStatus != Status.GOOD) {
+          return serviceStatus;
+        }
+      }
+
+      // All callbacks report good, therefore we're good too
+      return Status.GOOD;
+    }
+
+    @Override
+    public String getStatusDescription() {
+      if (_statusCallbacks.isEmpty()) {
+        return STATUS_DESCRIPTION_INIT;
+      }
+      StringBuilder statusDescription = new StringBuilder();
+      for (ServiceStatusCallback statusCallback : _statusCallbacks.values()) {
+        statusDescription.append(statusCallback.getClass().getSimpleName()).append(":")
+            .append(statusCallback.getStatusDescription()).append(";");
+      }
+      return statusDescription.toString();
+    }
+  }
+
   /**
    * Service status callback that checks whether realtime consumption has caught up
    * TODO: In this initial version, we are simply adding a configurable static wait time
@@ -184,9 +209,9 @@ public class ServiceStatus {
    */
   public static class RealtimeConsumptionCatchupServiceStatusCallback implements ServiceStatusCallback {
 
-    String _statusDescription = STATUS_DESCRIPTION_INIT;
-    private Status _serviceStatus = Status.STARTING;
     private final long _endWaitTime;
+    private final Status _serviceStatus = Status.STARTING;
+    String _statusDescription = STATUS_DESCRIPTION_INIT;
 
     /**
      * Realtime consumption catchup service which adds a static wait time for consuming segments to catchup
@@ -235,10 +260,9 @@ public class ServiceStatus {
 
     private final Set<String> _resourcesToMonitor;
     private final int _numTotalResourcesToMonitor;
-    private Iterator<String> _resourceIterator = null;
     // Minimum number of resources to be in converged state before we declare the service state as STARTED
     private final int _minResourcesStartCount;
-
+    private Iterator<String> _resourceIterator = null;
     private String _statusDescription = STATUS_DESCRIPTION_INIT;
 
     IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,

@@ -19,11 +19,15 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,31 +39,22 @@ import org.slf4j.LoggerFactory;
  */
 public class StartControllerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);
-
-  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
-  private String _controllerHost;
-
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
-  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-
-  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
-  private String _dataDir = TMP_DIR + "PinotController";
-
-  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
-  private String _zkAddress = DEFAULT_ZK_ADDRESS;
-
-  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
-  private String _clusterName = DEFAULT_CLUSTER_NAME;
-
   @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
   private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
-
-  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
-  private String _configFileName;
-
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
-
+  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _controllerHost;
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
+  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
+  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
+  private String _dataDir = TMP_DIR + "PinotController";
+  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
+  private String _zkAddress = DEFAULT_ZK_ADDRESS;
+  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+  private String _clusterName = DEFAULT_CLUSTER_NAME;
+  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
+  private String _configFileName;
   // This can be set via the set method, or via config file input.
   private boolean _tenantIsolation = true;
 
@@ -127,42 +122,12 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   public boolean execute()
       throws Exception {
     try {
-      if (_controllerHost == null) {
-        _controllerHost = NetUtil.getHostAddress();
-      }
-
-      ControllerConf conf = readConfigFromFile(_configFileName);
-      if (conf == null) {
-        if (_configFileName != null) {
-          LOGGER.error("Error: Unable to find file {}.", _configFileName);
-          return false;
-        }
-
-        conf = new ControllerConf();
-
-        conf.setControllerHost(_controllerHost);
-        conf.setControllerPort(_controllerPort);
-        conf.setDataDir(_dataDir);
-        conf.setZkStr(_zkAddress);
-
-        conf.setHelixClusterName(_clusterName);
-        conf.setControllerVipHost(_controllerHost);
-        conf.setTenantIsolationEnabled(_tenantIsolation);
-
-        conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
-        conf.setOfflineSegmentIntervalCheckerFrequencyInSeconds(3600);
-        conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);
-        conf.setBrokerResourceValidationFrequencyInSeconds(3600);
-
-        conf.setControllerMode(_controllerMode);
-      }
-
       LOGGER.info("Executing command: " + toString());
-      final ControllerStarter starter = new ControllerStarter(conf);
-
-      starter.start();
-
-      String pidFile = ".pinotAdminController-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+      StartServiceManagerCommand startServiceManagerCommand =
+          new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
+              .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.CONTROLLER, getControllerConf());
+      startServiceManagerCommand.execute();
+      String pidFile = ".pinotAdminController-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;
     } catch (Exception e) {
@@ -172,47 +137,19 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     }
   }
 
-  @Override
-  ControllerConf readConfigFromFile(String configFileName)
-      throws ConfigurationException {
-    ControllerConf conf = null;
-
-    if (configFileName == null) {
-      return null;
+  private Configuration getControllerConf()
+      throws ConfigurationException, SocketException, UnknownHostException {
+    ControllerConf conf;
+    if (_configFileName != null) {
+      conf = PinotConfigUtils.generateControllerConf(_configFileName);
+    } else {
+      if (_controllerHost == null) {
+        _controllerHost = NetUtil.getHostAddress();
+      }
+      conf = PinotConfigUtils
+          .generateControllerConf(_zkAddress, _clusterName, _controllerHost, _controllerPort, _dataDir, _controllerMode,
+              _tenantIsolation);
     }
-
-    File configFile = new File(_configFileName);
-    if (!configFile.exists()) {
-      return null;
-    }
-
-    conf = new ControllerConf(configFile);
-    conf.setPinotFSFactoryClasses(null);
-    return (validateConfig(conf)) ? conf : null;
-  }
-
-  private boolean validateConfig(ControllerConf conf) {
-    if (conf == null) {
-      LOGGER.error("Error: Null conf object.");
-      return false;
-    }
-
-    if (conf.getControllerPort() == null) {
-      LOGGER.error("Error: missing controller port, please specify 'controller.port' property in config file.");
-      return false;
-    }
-
-    if (conf.getZkStr() == null) {
-      LOGGER.error("Error: missing Zookeeper address, please specify 'controller.zk.str' property in config file.");
-      return false;
-    }
-
-    if (conf.getHelixClusterName() == null) {
-      LOGGER.error(
-          "Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
-      return false;
-    }
-
-    return true;
+    return conf;
   }
 }
