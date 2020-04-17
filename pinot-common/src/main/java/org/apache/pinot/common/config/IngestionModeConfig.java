@@ -42,18 +42,25 @@ public class IngestionModeConfig {
   private List<String> _primaryKeys;
   // offset key refers to the column name that we are going to store the offset value to
   private String _offsetKey;
+  // validFrom key refers to the column name that we are going to store the validFrom value to
+  private String _validFromKey;
+  // validFrom key refers to the column name that we are going to store the validFrom value to
+  private String _validUntilKey;
 
   public static final String UPSERT_TABLE_CONFIG_VALUE = "upsert";
   public static final String APPEND_TABLE_CONFIG_VALUE = "append";
 
   public static final IngestionModeConfig DEFAULT_APPEND_INGESTION_MODE =
-      new IngestionModeConfig(APPEND_TABLE_CONFIG_VALUE, null, null);
+      new IngestionModeConfig(APPEND_TABLE_CONFIG_VALUE, null, null, null,
+          null);
 
   @JsonCreator
   public IngestionModeConfig(
       @JsonProperty(value="ingestionMode") @Nullable String ingestionMode,
       @JsonProperty(value="primaryKeys") @Nullable List<String> primaryKeys,
-      @JsonProperty(value="offsetKey") @Nullable String offsetKey) {
+      @JsonProperty(value="offsetKey") @Nullable String offsetKey,
+      @JsonProperty(value="validFromKey") @Nullable String validFromKey,
+      @JsonProperty(value="validUntilKey") @Nullable String validUntilKey) {
     if (StringUtils.isEmpty(ingestionMode)) {
       _ingestionMode = APPEND_TABLE_CONFIG_VALUE;
     } else {
@@ -65,12 +72,14 @@ public class IngestionModeConfig {
       _primaryKeys = primaryKeys;
     }
     _offsetKey = offsetKey;
+    _validFromKey = validFromKey;
+    _validUntilKey = validUntilKey;
+
     if (UPSERT_TABLE_CONFIG_VALUE.equals(_ingestionMode)) {
       Preconditions.checkState(_primaryKeys.size() == 1,
           "pinot upsert require one and only one primary key");
       Preconditions.checkState(StringUtils.isNotEmpty(_offsetKey),
           "pinot upsert require one offset key");
-
     }
   }
 
@@ -96,6 +105,16 @@ public class IngestionModeConfig {
   @Nullable
   public String getOffsetKey() {
     return _offsetKey;
+  }
+
+  @Nullable
+  public String getValidFromKey() {
+    return _validFromKey;
+  }
+
+  @Nullable
+  public String getValidUntilKey() {
+    return _validUntilKey;
   }
 
   public JsonNode toJsonNode() {

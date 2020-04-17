@@ -329,7 +329,7 @@ public class TableConfigTest {
     {
       // with ingestionMode config
       IngestionModeConfig ingestionModeConfig = new IngestionModeConfig(IngestionModeConfig.APPEND_TABLE_CONFIG_VALUE,
-          null, null);
+          null, null, null, null);
 
       TableConfig tableConfig = tableConfigBuilder.setIngestionModeConfig(
           ingestionModeConfig).build();
@@ -339,7 +339,7 @@ public class TableConfigTest {
       checkTableConfigWithIngestionConfig(TableConfig.fromZnRecord(tableConfig.toZNRecord()), tableConfig);
 
       ingestionModeConfig = new IngestionModeConfig(IngestionModeConfig.UPSERT_TABLE_CONFIG_VALUE,
-          ImmutableList.of("primaryKey"), "offsetKey");
+          ImmutableList.of("primaryKey"), "offsetKey", "$validFrom", "$validUntil");
       tableConfig = tableConfigBuilder.setIngestionModeConfig(
           ingestionModeConfig).build();
 
