@@ -32,17 +32,17 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,6 +114,8 @@ public class TableRebalancer {
         .getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES, RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
     boolean includeConsuming = rebalanceConfig
         .getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING);
+    boolean bootstrap =
+        rebalanceConfig.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
     boolean downtime =
         rebalanceConfig.getBoolean(RebalanceConfigConstants.DOWNTIME, RebalanceConfigConstants.DEFAULT_DOWNTIME);
     int minReplicasToKeepUpForNoDowntime = rebalanceConfig
@@ -122,9 +124,9 @@ public class TableRebalancer {
     boolean bestEfforts = rebalanceConfig
         .getBoolean(RebalanceConfigConstants.BEST_EFFORTS, RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
     LOGGER.info(
-        "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, bestEfforts: {}",
-        tableNameWithType, dryRun, reassignInstances, includeConsuming, downtime, minReplicasToKeepUpForNoDowntime,
-        bestEfforts);
+        "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, bestEfforts: {}",
+        tableNameWithType, dryRun, reassignInstances, includeConsuming, bootstrap, downtime,
+        minReplicasToKeepUpForNoDowntime, bestEfforts);
 
     // Validate table config
     try {

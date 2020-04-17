@@ -20,10 +20,10 @@ package org.apache.pinot.controller.helix;
 
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
+import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
 
 
 public class ControllerRequestURLBuilder {

@@ -23,158 +23,113 @@ import java.util.List;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.util.SortedRangeIntersection;
-import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AndBlockDocIdSet.class);
+  private final List<FilterBlockDocIdSet> _children;
 
-  private List<FilterBlockDocIdSet> blockDocIdSets;
-  private int minDocId = Integer.MIN_VALUE;
-  private int maxDocId = Integer.MAX_VALUE;
-  MutableRoaringBitmap answer = null;
-  boolean validate = false;
+  private int _minDocId = Integer.MIN_VALUE;
+  // Inclusive
+  // TODO: Make it exclusive
+  private int _maxDocId = Integer.MAX_VALUE;
 
-  public AndBlockDocIdSet(List<FilterBlockDocIdSet> blockDocIdSets) {
-    this.blockDocIdSets = blockDocIdSets;
-    updateMinMaxRange();
-  }
+  public AndBlockDocIdSet(List<FilterBlockDocIdSet> children) {
+    _children = children;
 
-  private void updateMinMaxRange() {
-    for (FilterBlockDocIdSet blockDocIdSet : blockDocIdSets) {
-      minDocId = Math.max(minDocId, blockDocIdSet.getMinDocId());
-      maxDocId = Math.min(maxDocId, blockDocIdSet.getMaxDocId());
+    // Gather start/end doc id from the children
+    for (FilterBlockDocIdSet child : _children) {
+      _minDocId = Math.max(_minDocId, child.getMinDocId());
+      _maxDocId = Math.min(_maxDocId, child.getMaxDocId());
     }
-    for (FilterBlockDocIdSet blockDocIdSet : blockDocIdSets) {
-      blockDocIdSet.setStartDocId(minDocId);
-      blockDocIdSet.setEndDocId(maxDocId);
+
+    // Update the start/end doc id for the children
+    for (FilterBlockDocIdSet child : _children) {
+      child.setStartDocId(_minDocId);
+      child.setEndDocId(_maxDocId);
     }
   }
 
   @Override
+  public int getMinDocId() {
+    return _minDocId;
+  }
+
+  @Override
+  public int getMaxDocId() {
+    return _maxDocId;
+  }
+
+  @Override
+  public void setStartDocId(int startDocId) {
+    if (startDocId > _minDocId) {
+      _minDocId = startDocId;
+      // Update the start doc id for the children
+      for (FilterBlockDocIdSet child : _children) {
+        child.setStartDocId(startDocId);
+      }
+    }
+  }
+
+  @Override
+  public void setEndDocId(int endDocId) {
+    if (endDocId < _maxDocId) {
+      _maxDocId = endDocId;
+      // Update the end doc id for the children
+      for (FilterBlockDocIdSet child : _children) {
+        child.setEndDocId(endDocId);
+      }
+    }
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    long numEntriesScannedInFilter = 0L;
+    for (FilterBlockDocIdSet child : _children) {
+      numEntriesScannedInFilter += child.getNumEntriesScannedInFilter();
+    }
+    return numEntriesScannedInFilter;
+  }
+
+  // TODO: Optimize this
+  @Override
   public BlockDocIdIterator iterator() {
-    //TODO: Remove this validation code once we have enough testing
-    if (validate) {
-      BlockDocIdIterator slowIterator = slowIterator();
-      BlockDocIdIterator fastIterator = fastIterator();
-      List<Integer> matchedIds = new ArrayList<>();
-      while (true) {
-        int docId1 = slowIterator.next();
-        int docId2 = fastIterator.next();
-        if (docId1 != docId2) {
-          LOGGER.error("ERROR docId1:" + docId1 + " docId2:" + docId2);
-        } else {
-          matchedIds.add(docId1);
-        }
-        if (docId1 == Constants.EOF || docId2 == Constants.EOF) {
-          break;
-        }
-      }
-      answer = null;
-    }
-    return fastIterator();
-  }
-
-  public BlockDocIdIterator slowIterator() {
-    List<BlockDocIdIterator> rawIterators = new ArrayList<>();
-    boolean useBitmapBasedIntersection = false;
-    for (BlockDocIdSet docIdSet : blockDocIdSets) {
-      if (docIdSet instanceof BitmapDocIdSet) {
-        useBitmapBasedIntersection = true;
-      }
-    }
-    BlockDocIdIterator[] docIdIterators;
-    if (useBitmapBasedIntersection) {
-      List<ImmutableRoaringBitmap> allBitmaps = new ArrayList<ImmutableRoaringBitmap>();
-      for (BlockDocIdSet docIdSet : blockDocIdSets) {
-        if (docIdSet instanceof SortedDocIdSet) {
-          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-          SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
-          List<IntPair> pairs = sortedDocIdSet.getRaw();
-          for (IntPair pair : pairs) {
-            bitmap.add(pair.getLeft(), pair.getRight() + 1); // add takes [start, end) i.e inclusive
-            // start, exclusive end.
-          }
-          allBitmaps.add(bitmap);
-        } else if (docIdSet instanceof BitmapDocIdSet) {
-          BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) docIdSet;
-          ImmutableRoaringBitmap childBitmap = bitmapDocIdSet.getRaw();
-          allBitmaps.add(childBitmap);
-        } else {
-          BlockDocIdIterator iterator = docIdSet.iterator();
-          rawIterators.add(iterator);
-        }
-      }
-      IntIterator intIterator;
-      if (allBitmaps.size() > 1) {
-        MutableRoaringBitmap answer = (MutableRoaringBitmap) allBitmaps.get(0).clone();
-        for (int i = 1; i < allBitmaps.size(); i++) {
-          answer.and(allBitmaps.get(i));
-        }
-        intIterator = answer.getIntIterator();
-      } else {
-        intIterator = allBitmaps.get(0).getIntIterator();
-      }
-
-      BitmapDocIdIterator singleBitmapBlockIdIterator = new BitmapDocIdIterator(intIterator);
-      singleBitmapBlockIdIterator.setStartDocId(minDocId);
-      singleBitmapBlockIdIterator.setEndDocId(maxDocId);
-      rawIterators.add(0, singleBitmapBlockIdIterator);
-      docIdIterators = new BlockDocIdIterator[rawIterators.size()];
-      rawIterators.toArray(docIdIterators);
-    } else {
-      docIdIterators = new BlockDocIdIterator[blockDocIdSets.size()];
-      for (int srcId = 0; srcId < blockDocIdSets.size(); srcId++) {
-        docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
-      }
-    }
-    return new AndDocIdIterator(docIdIterators);
-  }
-
-  public BlockDocIdIterator fastIterator() {
-    long start = System.currentTimeMillis();
     List<List<IntPair>> sortedRangeSets = new ArrayList<>();
-    List<ImmutableRoaringBitmap> childBitmaps = new ArrayList<ImmutableRoaringBitmap>();
-    List<FilterBlockDocIdSet> scanBasedDocIdSets = new ArrayList<>();
+    List<ImmutableRoaringBitmap> childBitmaps = new ArrayList<>();
+    List<ScanBasedDocIdSet> scanBasedDocIdSets = new ArrayList<>();
     List<BlockDocIdIterator> remainingIterators = new ArrayList<>();
 
-    for (BlockDocIdSet docIdSet : blockDocIdSets) {
-      if (docIdSet instanceof SortedDocIdSet) {
-        SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
+    for (BlockDocIdSet child : _children) {
+      if (child instanceof SortedDocIdSet) {
+        SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) child;
         List<IntPair> pairs = sortedDocIdSet.getRaw();
         sortedRangeSets.add(pairs);
-      } else if (docIdSet instanceof BitmapDocIdSet) {
-        BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) docIdSet;
+      } else if (child instanceof BitmapDocIdSet) {
+        BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) child;
         ImmutableRoaringBitmap childBitmap = bitmapDocIdSet.getRaw();
         childBitmaps.add(childBitmap);
-      } else if (docIdSet instanceof ScanBasedSingleValueDocIdSet) {
-        scanBasedDocIdSets.add((ScanBasedSingleValueDocIdSet) docIdSet);
-      } else if (docIdSet instanceof ScanBasedMultiValueDocIdSet) {
-        scanBasedDocIdSets.add((ScanBasedMultiValueDocIdSet) docIdSet);
+      } else if (child instanceof ScanBasedDocIdSet) {
+        scanBasedDocIdSets.add((ScanBasedDocIdSet) child);
       } else {
         // TODO:handle child OR/AND as bitmap if possible
-        remainingIterators.add(docIdSet.iterator());
+        remainingIterators.add(child.iterator());
       }
     }
     if (childBitmaps.size() == 0 && sortedRangeSets.size() == 0) {
       // When one or more of the operands are operators themselves, then we don't have a sorted or
       // bitmap index. In that case, just use the AndDocIdIterator to iterate over all of of the subtree.
-      BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[blockDocIdSets.size()];
-      for (int srcId = 0; srcId < blockDocIdSets.size(); srcId++) {
-        docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
+      BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[_children.size()];
+      for (int srcId = 0; srcId < _children.size(); srcId++) {
+        docIdIterators[srcId] = _children.get(srcId).iterator();
       }
       return new AndDocIdIterator(docIdIterators);
     } else {
+      MutableRoaringBitmap answer = null;
+
       // handle sorted ranges
       // TODO: will be nice to re-order sorted and bitmap index based on size
       if (sortedRangeSets.size() > 0) {
@@ -200,17 +155,10 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
         }
       }
 
-      // At this point, we must have 'answer' to be non-null.
-      assert (answer != null) : "sortedRangeSets=" + sortedRangeSets.size() + ",childBitmaps=" + childBitmaps.size();
-
       // handle raw iterators
-      for (FilterBlockDocIdSet scanBasedDocIdSet : scanBasedDocIdSets) {
-        ScanBasedDocIdIterator iterator = (ScanBasedDocIdIterator) scanBasedDocIdSet.iterator();
-        MutableRoaringBitmap scanAnswer = iterator.applyAnd(answer);
-        answer.and(scanAnswer);
+      for (ScanBasedDocIdSet scanBasedDocIdSet : scanBasedDocIdSets) {
+        answer = scanBasedDocIdSet.iterator().applyAnd(answer);
       }
-      long end = System.currentTimeMillis();
-      LOGGER.debug("Time to evaluate and Filter:{}", (end - start));
       // if other iterators exists resort to iterator style intersection
       BlockDocIdIterator answerDocIdIterator = new RangelessBitmapDocIdIterator(answer.getIntIterator());
       if (remainingIterators.size() == 0) {
@@ -226,40 +174,8 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public <T> T getRaw() {
-    return (T) answer;
-  }
-
-  @Override
-  public int getMinDocId() {
-    return minDocId;
-  }
-
-  @Override
-  public int getMaxDocId() {
-    return maxDocId;
-  }
-
-  @Override
-  public void setStartDocId(int startDocId) {
-    minDocId = Math.max(minDocId, startDocId);
-    updateMinMaxRange();
-  }
-
-  @Override
-  public void setEndDocId(int endDocId) {
-    maxDocId = Math.min(maxDocId, endDocId);
-    updateMinMaxRange();
-  }
-
-  @Override
-  public long getNumEntriesScannedInFilter() {
-    long numEntriesScannedInFilter = 0L;
-    for (FilterBlockDocIdSet blockDocIdSet : blockDocIdSets) {
-      numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
-    }
-    return numEntriesScannedInFilter;
+    throw new UnsupportedOperationException();
   }
 }

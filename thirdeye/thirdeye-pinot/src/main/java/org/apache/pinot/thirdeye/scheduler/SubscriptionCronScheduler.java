@@ -56,6 +56,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
   private static final Logger LOG = LoggerFactory.getLogger(SubscriptionCronScheduler.class);
+
   private static final int DEFAULT_ALERT_DELAY = 1;
   private static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
 

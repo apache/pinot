@@ -25,13 +25,14 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -70,7 +71,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     }
 
     TableConfig tableConfig =
-        new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setLLC(true).setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
             .build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
@@ -165,19 +166,26 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
     }
 
+    // Add an OFFLINE segment on some bad instances
+    String offlineSegmentName = "offlineSegment";
+    Map<String, String> offlineSegmentInstanceStateMap = SegmentAssignmentUtils
+        .getInstanceStateMap(SegmentAssignmentTestUtils.getNameList("badInstance_", NUM_REPLICAS),
+            RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+    currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
+
     // Rebalance without COMPLETED instance partitions should not change the segment assignment
     Map<InstancePartitionsType, InstancePartitions> noRelocationInstancePartitionsMap = new TreeMap<>();
     noRelocationInstancePartitionsMap
         .put(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
-    Map<String, Map<String, String>> newAssignment = _segmentAssignment
-        .rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, new BaseConfiguration());
-    assertEquals(newAssignment, currentAssignment);
+    assertEquals(_segmentAssignment
+            .rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, new BaseConfiguration()),
+        currentAssignment);
 
     // Rebalance with COMPLETED instance partitions should relocate all COMPLETED (ONLINE) segments to the COMPLETED
     // instances
-    newAssignment =
+    Map<String, Map<String, String>> newAssignment =
         _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, new BaseConfiguration());
-    assertEquals(newAssignment.size(), NUM_SEGMENTS);
+    assertEquals(newAssignment.size(), NUM_SEGMENTS + 1);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) {
         // COMPLETED (ONLINE) segments
@@ -204,23 +212,45 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
 
     // Rebalance with COMPLETED instance partitions including CONSUMING segments should give the same assignment
-    BaseConfiguration config = new BaseConfiguration();
-    config.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
-    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, config), newAssignment);
+    BaseConfiguration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
+    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, rebalanceConfig),
+        newAssignment);
 
     // Rebalance without COMPLETED instance partitions again should change the segment assignment back
     assertEquals(
         _segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, new BaseConfiguration()),
         currentAssignment);
 
-    // Rebalance should not change the assignment for the OFFLINE segments
-    String offlineSegmentName = "offlineSegment";
-    Map<String, String> offlineSegmentInstanceStateMap = SegmentAssignmentUtils
-        .getInstanceStateMap(SegmentAssignmentTestUtils.getNameList("badInstance_", NUM_REPLICAS),
-            RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
-    currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
-    newAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
-    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, config), newAssignment);
+    // Bootstrap table without COMPLETED instance partitions should be the same as regular rebalance
+    rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    assertEquals(
+        _segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, rebalanceConfig),
+        currentAssignment);
+    assertEquals(_segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, rebalanceConfig),
+        currentAssignment);
+
+    // Bootstrap table with COMPLETED instance partitions should reassign all COMPLETED segments based on their
+    // alphabetical order
+    newAssignment = _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, rebalanceConfig);
+    int numCompletedInstancesPerReplicaGroup = NUM_COMPLETED_INSTANCES / NUM_REPLICAS;
+    int index = 0;
+    for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+        int expectedInstanceId = index++ % numCompletedInstancesPerReplicaGroup;
+        for (int i = 0; i < NUM_REPLICAS; i++) {
+          String expectedInstance =
+              COMPLETED_INSTANCES.get(expectedInstanceId + i * numCompletedInstancesPerReplicaGroup);
+          assertEquals(instanceStateMap.get(expectedInstance), RealtimeSegmentOnlineOfflineStateModel.ONLINE);
+        }
+      } else {
+        // CONSUMING and OFFLINE segments should not be reassigned
+        assertEquals(instanceStateMap, currentAssignment.get(segmentName));
+      }
+    }
   }
 
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,

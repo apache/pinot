@@ -30,11 +30,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * up on scan based iterator to check if docId matches
  */
 public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
-  /**
-   * @param docId
-   * @return true if the doc id matches
-   */
-  boolean isMatch(int docId);
 
   MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer);
 

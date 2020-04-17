@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -30,6 +31,16 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 public class CountAggregationFunction implements AggregationFunction<Long, Long> {
   private static final String COLUMN_NAME = AggregationFunctionType.COUNT.getName() + "_star";
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
+
+  protected final String _column;
+
+  /**
+   * Constructor for the class.
+   * @param column Column name to aggregate on.
+   */
+  public CountAggregationFunction(String column) {
+    _column = column;
+  }
 
   @Override
   public AggregationFunctionType getType() {
@@ -62,12 +73,12 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    if (blockValSets.length == 0) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+    if (blockValSetMap.size() == 0) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
     } else {
       // Star-tree pre-aggregated values
-      long[] valueArray = blockValSets[0].getLongValuesSV();
+      long[] valueArray = blockValSetMap.get(_column).getLongValuesSV();
       long count = 0;
       for (int i = 0; i < length; i++) {
         count += valueArray[i];
@@ -78,15 +89,15 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    if (blockValSets.length == 0) {
+      Map<String, BlockValSet> blockValSetMap) {
+    if (blockValSetMap.size() == 0) {
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
         groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
       }
     } else {
       // Star-tree pre-aggregated values
-      long[] valueArray = blockValSets[0].getLongValuesSV();
+      long[] valueArray = blockValSetMap.get(_column).getLongValuesSV();
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
         groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
@@ -96,8 +107,8 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    if (blockValSets.length == 0) {
+      Map<String, BlockValSet> blockValSetMap) {
+    if (blockValSetMap.size() == 0) {
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
@@ -105,7 +116,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
       }
     } else {
       // Star-tree pre-aggregated values
-      long[] valueArray = blockValSets[0].getLongValuesSV();
+      long[] valueArray = blockValSetMap.get(_column).getLongValuesSV();
       for (int i = 0; i < length; i++) {
         long value = valueArray[i];
         for (int groupKey : groupKeysArray[i]) {

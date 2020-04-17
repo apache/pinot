@@ -67,11 +67,10 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
       long numSegmentsMatched = brokerResponse.getNumSegmentsMatched();
       assertTrue(numSegmentsMatched >= NUM_SERVERS && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS);
       long numDocsScanned = brokerResponse.getNumDocsScanned();
-      assertTrue(
-          numDocsScanned >= NUM_SERVERS * limit && numDocsScanned <= numThreadsPerServer * NUM_SERVERS * limit);
+      assertTrue(numDocsScanned >= NUM_SERVERS * limit && numDocsScanned <= numThreadsPerServer * NUM_SERVERS * limit);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-      assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-          numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
+      assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), numDocsScanned * numColumnsInSelection);
+      // Total number of documents should not be affected by early-termination
       assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
 
       brokerResponse = getBrokerResponseForSqlQuery(query);
@@ -83,11 +82,10 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
       numSegmentsMatched = brokerResponse.getNumSegmentsMatched();
       assertTrue(numSegmentsMatched >= NUM_SERVERS && numSegmentsMatched <= numThreadsPerServer * NUM_SERVERS);
       numDocsScanned = brokerResponse.getNumDocsScanned();
-      assertTrue(
-          numDocsScanned >= NUM_SERVERS * limit && numDocsScanned <= numThreadsPerServer * NUM_SERVERS * limit);
+      assertTrue(numDocsScanned >= NUM_SERVERS * limit && numDocsScanned <= numThreadsPerServer * NUM_SERVERS * limit);
       assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-      assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-          numThreadsPerServer * NUM_SERVERS * limit * numColumnsInSelection);
+      assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), numDocsScanned * numColumnsInSelection);
+      // Total number of documents should not be affected by early-termination
       assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
     }
   }
@@ -108,7 +106,7 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
     assertEquals(brokerResponse.getNumDocsScanned(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-        numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT * numColumnsInSelection);
+        brokerResponse.getNumDocsScanned() * numColumnsInSelection);
     assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
 
     brokerResponse = getBrokerResponseForSqlQuery(query);
@@ -119,7 +117,7 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
     assertEquals(brokerResponse.getNumDocsScanned(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-        numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT * numColumnsInSelection);
+        brokerResponse.getNumDocsScanned() * numColumnsInSelection);
     assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
   }
 }

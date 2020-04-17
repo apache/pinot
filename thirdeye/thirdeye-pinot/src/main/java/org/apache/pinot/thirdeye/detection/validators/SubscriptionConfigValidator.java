@@ -116,6 +116,11 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
     Preconditions.checkNotNull(oldAlertConfig);
 
     Preconditions.checkArgument(updatedAlertConfig.getId().equals(oldAlertConfig.getId()));
+    Long newHighWatermark = updatedAlertConfig.getHighWaterMark();
+    Long oldHighWatermark = oldAlertConfig.getHighWaterMark();
+    if (newHighWatermark != null && oldHighWatermark != null && newHighWatermark.longValue() != oldHighWatermark) {
+      throw new IllegalArgumentException("HighWaterMark has been modified. This is not allowed");
+    }
     if (updatedAlertConfig.getVectorClocks() != null) {
       for (Map.Entry<Long, Long> vectorClock : updatedAlertConfig.getVectorClocks().entrySet()) {
         if (!oldAlertConfig.getVectorClocks().containsKey(vectorClock.getKey())

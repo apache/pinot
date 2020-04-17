@@ -43,10 +43,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public class LuceneDocIdCollector implements Collector {
 
-  private final MutableRoaringBitmap docIDs;
+  private final MutableRoaringBitmap _docIds;
+  private final LuceneTextIndexReader.DocIdTranslator _docIdTranslator;
 
-  public LuceneDocIdCollector(MutableRoaringBitmap docIDs) {
-    this.docIDs = docIDs;
+  public LuceneDocIdCollector(MutableRoaringBitmap docIds, LuceneTextIndexReader.DocIdTranslator docIdTranslator) {
+    _docIds = docIds;
+    _docIdTranslator = docIdTranslator;
   }
 
   @Override
@@ -65,8 +67,7 @@ public class LuceneDocIdCollector implements Collector {
 
       @Override
       public void collect(int doc) throws IOException {
-        docIDs.add(doc);
-
+        _docIds.add(_docIdTranslator.getPinotDocId(doc));
       }
     };
   }

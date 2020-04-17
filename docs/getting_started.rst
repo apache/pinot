@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 .. _getting-started:
 
 Getting Started
@@ -80,7 +82,7 @@ Pinot uses PQL, a SQL-like query language, to query data. Here are some sample q
 The full reference for the PQL query language is present in the :ref:`pql` section of the Pinot documentation.
 
 Trying out Streaming quickstart demo
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Pinot can ingest data from streaming sources such as Kafka.
 

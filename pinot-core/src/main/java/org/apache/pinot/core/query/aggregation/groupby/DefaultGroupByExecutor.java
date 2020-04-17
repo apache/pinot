@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.GroupBy;
@@ -153,16 +155,18 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
     if (function.getType() == AggregationFunctionType.COUNT) {
       if (_hasMVGroupByExpression) {
-        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder);
+        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, Collections.emptyMap());
       } else {
-        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder);
+        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, Collections.emptyMap());
       }
     } else {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_aggregationExpressions[functionIndex]);
+      TransformExpressionTree aggregationExpression = _aggregationExpressions[functionIndex];
+      Map<String, BlockValSet> blockValSetMap = Collections
+          .singletonMap(aggregationExpression.toString(), transformBlock.getBlockValueSet(aggregationExpression));
       if (_hasMVGroupByExpression) {
-        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValueSet);
+        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValSetMap);
       } else {
-        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValueSet);
+        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValSetMap);
       }
     }
   }

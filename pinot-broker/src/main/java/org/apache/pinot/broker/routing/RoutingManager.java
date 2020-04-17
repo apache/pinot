@@ -46,8 +46,6 @@ import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -56,6 +54,9 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.config.QueryConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +73,11 @@ import org.slf4j.LoggerFactory;
  *   <li>{@link #routingExists(String)}: Returns whether the routing exists for a table</li>
  *   <li>{@link #getRoutingTable(BrokerRequest)}: Returns the routing table for a query</li>
  *   <li>{@link #getTimeBoundaryInfo(String)}: Returns the time boundary info for a table</li>
+ *   <li>{@link #getQueryTimeoutMs(String)}: Returns the table-level query timeout in milliseconds for a table</li>
  * </ul>
+ *
+ * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
+ *       lookups.
  */
 public class RoutingManager implements ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutingManager.class);
@@ -104,7 +109,7 @@ public class RoutingManager implements ClusterChangeHandler {
   @Override
   public synchronized void processClusterChange(HelixConstants.ChangeType changeType) {
     Preconditions.checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW
-        || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: " + changeType);
+        || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: %s", changeType);
     if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
       processExternalViewChange();
     } else {
@@ -289,7 +294,7 @@ public class RoutingManager implements ClusterChangeHandler {
     LOGGER.info("Building routing for table: {}", tableNameWithType);
 
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
     ExternalView externalView = getExternalView(tableNameWithType);
     int externalViewVersion;
@@ -303,7 +308,7 @@ public class RoutingManager implements ClusterChangeHandler {
     }
 
     Set<String> onlineSegments = getOnlineSegments(tableNameWithType);
-    Preconditions.checkState(onlineSegments != null, "Failed to find ideal state for table: {}", tableNameWithType);
+    Preconditions.checkState(onlineSegments != null, "Failed to find ideal state for table: %s", tableNameWithType);
 
     Set<String> enabledInstances = _enabledServerInstanceMap.keySet();
 
@@ -338,14 +343,14 @@ public class RoutingManager implements ClusterChangeHandler {
         // ensure no overlapping data getting queried
         TableConfig offlineTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
         Preconditions
-            .checkState(offlineTableConfig != null, "Failed to find table config for table: {}", offlineTableName);
+            .checkState(offlineTableConfig != null, "Failed to find table config for table: %s", offlineTableName);
         // NOTE: External view might be null for new created tables. In such case, create an empty one.
         ExternalView offlineTableExternalView = getExternalView(offlineTableName);
         if (offlineTableExternalView == null) {
           offlineTableExternalView = new ExternalView(offlineTableName);
         }
         Set<String> offlineTableOnlineSegments = getOnlineSegments(offlineTableName);
-        Preconditions.checkState(offlineTableOnlineSegments != null, "Failed to find ideal state for table: {}",
+        Preconditions.checkState(offlineTableOnlineSegments != null, "Failed to find ideal state for table: %s",
             offlineTableName);
         TimeBoundaryManager offlineTableTimeBoundaryManager =
             new TimeBoundaryManager(offlineTableConfig, _propertyStore);
@@ -354,9 +359,12 @@ public class RoutingManager implements ClusterChangeHandler {
       }
     }
 
+    QueryConfig queryConfig = tableConfig.getQueryConfig();
+    Long queryTimeoutMs = queryConfig != null ? queryConfig.getTimeoutMs() : null;
+
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, segmentSelector, segmentPruners, instanceSelector, externalViewVersion,
-            timeBoundaryManager);
+            timeBoundaryManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -450,11 +458,22 @@ public class RoutingManager implements ClusterChangeHandler {
     return timeBoundaryManager != null ? timeBoundaryManager.getTimeBoundaryInfo() : null;
   }
 
+  /**
+   * Returns the table-level query timeout in milliseconds for the given table, or {@code null} if the timeout is not
+   * configured in the table config.
+   */
+  @Nullable
+  public Long getQueryTimeoutMs(String tableNameWithType) {
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    return routingEntry != null ? routingEntry.getQueryTimeoutMs() : null;
+  }
+
   private static class RoutingEntry {
     final String _tableNameWithType;
     final SegmentSelector _segmentSelector;
     final List<SegmentPruner> _segmentPruners;
     final InstanceSelector _instanceSelector;
+    final Long _queryTimeoutMs;
 
     // Cache the ExternalView version for the last update
     transient int _lastUpdateExternalViewVersion;
@@ -463,13 +482,14 @@ public class RoutingManager implements ClusterChangeHandler {
 
     RoutingEntry(String tableNameWithType, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
-        @Nullable TimeBoundaryManager timeBoundaryManager) {
+        @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
       _segmentSelector = segmentSelector;
       _segmentPruners = segmentPruners;
       _instanceSelector = instanceSelector;
       _lastUpdateExternalViewVersion = lastUpdateExternalViewVersion;
       _timeBoundaryManager = timeBoundaryManager;
+      _queryTimeoutMs = queryTimeoutMs;
     }
 
     String getTableNameWithType() {
@@ -487,6 +507,10 @@ public class RoutingManager implements ClusterChangeHandler {
     @Nullable
     TimeBoundaryManager getTimeBoundaryManager() {
       return _timeBoundaryManager;
+    }
+
+    Long getQueryTimeoutMs() {
+      return _queryTimeoutMs;
     }
 
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some

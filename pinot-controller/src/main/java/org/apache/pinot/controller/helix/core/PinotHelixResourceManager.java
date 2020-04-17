@@ -58,25 +58,15 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.Instance;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableCustomConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.Tenant;
-import org.apache.pinot.common.config.TenantConfig;
-import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.messages.QueryQuotaUpdateMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -84,9 +74,11 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.SchemaUtils;
+import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import org.apache.pinot.common.utils.helix.TableCache;
@@ -103,8 +95,18 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableCustomConfig;
+import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.TenantConfig;
+import org.apache.pinot.spi.config.api.Instance;
+import org.apache.pinot.spi.config.api.Tenant;
+import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
@@ -350,11 +352,11 @@ public class PinotHelixResourceManager {
    */
   public synchronized PinotResourceManagerResponse addInstance(Instance instance) {
     List<String> instances = getAllInstances();
-    String instanceIdToAdd = instance.getInstanceId();
+    String instanceIdToAdd = InstanceUtils.getHelixInstanceId(instance);
     if (instances.contains(instanceIdToAdd)) {
       return PinotResourceManagerResponse.failure("Instance " + instanceIdToAdd + " already exists");
     } else {
-      _helixAdmin.addInstance(_helixClusterName, instance.toInstanceConfig());
+      _helixAdmin.addInstance(_helixClusterName, InstanceUtils.toHelixInstanceConfig(instance));
       return PinotResourceManagerResponse.SUCCESS;
     }
   }
@@ -1080,7 +1082,8 @@ public class PinotHelixResourceManager {
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, offlineIdealState);
 
         // lets add table configs
-        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
+        ZKMetadataProvider
+            .setOfflineTableConfig(_propertyStore, tableNameWithType, TableConfigUtils.toZNRecord(tableConfig));
 
         // Assign instances
         assignInstances(tableConfig, true);
@@ -1105,7 +1108,8 @@ public class PinotHelixResourceManager {
         }
 
         // lets add table configs
-        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
+        ZKMetadataProvider
+            .setRealtimeTableConfig(_propertyStore, tableNameWithType, TableConfigUtils.toZNRecord(tableConfig));
 
         // Assign instances before setting up the real-time cluster so that new LLC CONSUMING segment can be assigned
         // based on the instance partitions
@@ -1310,7 +1314,8 @@ public class PinotHelixResourceManager {
     TableType tableType = tableConfig.getTableType();
     switch (tableType) {
       case OFFLINE:
-        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
+        ZKMetadataProvider
+            .setOfflineTableConfig(_propertyStore, tableNameWithType, TableConfigUtils.toZNRecord(tableConfig));
 
         // Update IdealState replication
         IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
@@ -1331,7 +1336,8 @@ public class PinotHelixResourceManager {
       case REALTIME:
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         verifyIndexingConfig(tableNameWithType, indexingConfig);
-        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
+        ZKMetadataProvider
+            .setRealtimeTableConfig(_propertyStore, tableNameWithType, TableConfigUtils.toZNRecord(tableConfig));
 
         // Assign instances before setting up the real-time cluster so that new LLC CONSUMING segment can be assigned
         // based on the instance partitions
@@ -1345,7 +1351,7 @@ public class PinotHelixResourceManager {
     }
 
     // Send update query quota message if quota is specified
-    sendUpdateQueryQuotaMessage(tableConfig);
+    sendTableConfigRefreshMessage(tableNameWithType);
   }
 
   public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs)
@@ -1690,9 +1696,9 @@ public class PinotHelixResourceManager {
    * it will not get the message.
    */
   private void sendSegmentRefreshMessage(String offlineTableName, String segmentName) {
-    SegmentRefreshMessage refreshMessage = new SegmentRefreshMessage(offlineTableName, segmentName);
+    SegmentRefreshMessage segmentRefreshMessage = new SegmentRefreshMessage(offlineTableName, segmentName);
 
-    // Send refresh message to servers
+    // Send segment refresh message to servers
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
@@ -1701,55 +1707,50 @@ public class PinotHelixResourceManager {
     recipientCriteria.setSessionSpecific(true);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     // Send message with no callback and infinite timeout on the recipient
-    int numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
+    int numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
     if (numMessagesSent > 0) {
       // TODO: Would be nice if we can get the name of the instances to which messages were sent
-      LOGGER.info("Sent {} refresh messages to servers for segment: {} of table: {}", numMessagesSent, segmentName,
-          offlineTableName);
+      LOGGER.info("Sent {} segment refresh messages to servers for segment: {} of table: {}", numMessagesSent,
+          segmentName, offlineTableName);
     } else {
       // May be the case when none of the servers are up yet. That is OK, because when they come up they will get the
       // new version of the segment.
-      LOGGER.warn("No refresh message sent to servers for segment: {} of table: {}", segmentName, offlineTableName);
+      LOGGER.warn("No segment refresh message sent to servers for segment: {} of table: {}", segmentName,
+          offlineTableName);
     }
 
-    // Send refresh message to brokers
+    // Send segment refresh message to brokers
     recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
     recipientCriteria.setPartition(offlineTableName);
-    numMessagesSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
+    numMessagesSent = messagingService.send(recipientCriteria, segmentRefreshMessage, null, -1);
     if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} refresh messages to brokers for segment: {} of table: {}", numMessagesSent, segmentName,
-          offlineTableName);
+      // TODO: Would be nice if we can get the name of the instances to which messages were sent
+      LOGGER.info("Sent {} segment refresh messages to brokers for segment: {} of table: {}", numMessagesSent,
+          segmentName, offlineTableName);
     } else {
-      LOGGER.warn("No refresh message sent to brokers for segment: {} of table: {}", segmentName, offlineTableName);
+      LOGGER.warn("No segment refresh message sent to brokers for segment: {} of table: {}", segmentName,
+          offlineTableName);
     }
   }
 
-  private void sendUpdateQueryQuotaMessage(TableConfig tableConfig) {
-    String tableNameWithType = tableConfig.getTableName();
-    QueryQuotaUpdateMessage refreshMessage = new QueryQuotaUpdateMessage(tableNameWithType);
+  private void sendTableConfigRefreshMessage(String tableNameWithType) {
+    TableConfigRefreshMessage tableConfigRefreshMessage = new TableConfigRefreshMessage(tableNameWithType);
 
+    // Send table config refresh message to brokers
     Criteria recipientCriteria = new Criteria();
-    // Currently Helix does not support send message to a Spectator. So we walk around the problem by sending the
-    // message to participants. Note that brokers are also participants.
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
     recipientCriteria.setSessionSpecific(true);
-    // The brokerResource field in the EXTERNALVIEW stores the table name in the Partition subfield.
     recipientCriteria.setPartition(tableNameWithType);
-
-    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    LOGGER.info("Sending query quota update message for table {}:{} to recipients {}",
-        tableNameWithType, refreshMessage, recipientCriteria);
-    // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
-    int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, -1);
-    if (nMsgsSent > 0) {
-      // TODO Would be nice if we can get the name of the instances to which messages were sent.
-      LOGGER.info("Sent {} query quota update msgs for table {}", nMsgsSent, tableNameWithType);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, tableConfigRefreshMessage, null, -1);
+    if (numMessagesSent > 0) {
+      // TODO: Would be nice if we can get the name of the instances to which messages were sent
+      LOGGER.info("Sent {} table config refresh messages to brokers for table: {}", numMessagesSent, tableNameWithType);
     } else {
-      // May be the case when none of the brokers are up yet. That is OK, because when they come up they will get
-      // the latest query quota info from table config.
-      LOGGER.warn("Unable to send query quota update message for table {}, nMsgs={}", tableNameWithType, nMsgsSent);
+      LOGGER.warn("No table config refresh message sent to brokers for table: {}", tableNameWithType);
     }
   }
 

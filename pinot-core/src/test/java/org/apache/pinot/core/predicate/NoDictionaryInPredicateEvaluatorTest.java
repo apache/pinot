@@ -32,14 +32,13 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.common.predicate.InPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.NotInPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -49,7 +48,6 @@ import org.testng.annotations.Test;
  * Unit test for all implementations of no-dictionary based predicate evaluators.
  */
 public class NoDictionaryInPredicateEvaluatorTest {
-
   private static final String COLUMN_NAME = "column";
   private static final int NUM_PREDICATE_VALUES = 100;
   private static final int NUM_MULTI_VALUES = 10;
@@ -95,8 +93,8 @@ public class NoDictionaryInPredicateEvaluatorTest {
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
         Integer.parseInt(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
-    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES, new MutableInt(0)));
-    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES, new MutableInt(0)));
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
   }
 
   @Test

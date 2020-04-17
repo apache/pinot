@@ -22,33 +22,36 @@ import java.util.Arrays;
 
 
 /**
- * Defines the key component of the record
+ * Defines the key component of the record.
+ * <p>Key can be used as the key in a map, and may only contain single-value columns.
+ * <p>For each data type, the value should be stored as:
+ * <ul>
+ *   <li>INT: Integer</li>
+ *   <li>LONG: Long</li>
+ *   <li>FLOAT: Float</li>
+ *   <li>DOUBLE: Double</li>
+ *   <li>STRING: String</li>
+ *   <li>BYTES: ByteArray</li>
+ * </ul>
+ *
+ * TODO: Consider replacing Key with Record as the concept is very close and the implementation is the same
  */
 public class Key {
-  private Object[] _columns;
+  private final Object[] _values;
 
-  public Key(Object[] columns) {
-    _columns = columns;
+  public Key(Object[] values) {
+    _values = values;
   }
 
-  public Object[] getColumns() {
-    return _columns;
-  }
-
+  // NOTE: Not check class for performance concern
+  @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   @Override
   public boolean equals(Object o) {
-    Key that = (Key) o;
-    return Arrays.deepEquals(_columns, that._columns);
+    return Arrays.equals(_values, ((Key) o)._values);
   }
 
   @Override
   public int hashCode() {
-    return Arrays.deepHashCode(_columns);
+    return Arrays.hashCode(_values);
   }
-
-  @Override
-  public String toString() {
-    return Arrays.deepToString(_columns);
-  }
-
 }

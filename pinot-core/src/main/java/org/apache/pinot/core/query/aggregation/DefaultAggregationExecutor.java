@@ -19,15 +19,17 @@
 package org.apache.pinot.core.query.aggregation;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.parsers.CompilerConstants;
 
 
 public class DefaultAggregationExecutor implements AggregationExecutor {
@@ -48,7 +50,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       _resultHolders[0] = _functions[0].createAggregationResultHolder();
       String multiColumnExpression = functionContexts[0].getColumn();
       String[] distinctColumnExpressions =
-          multiColumnExpression.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+          multiColumnExpression.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
       _expressions = new TransformExpressionTree[distinctColumnExpressions.length];
       for (int i = 0; i < distinctColumnExpressions.length; i++) {
         _expressions[i] = TransformExpressionTree.compileToExpressionTree(distinctColumnExpressions[i]);
@@ -76,22 +78,22 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       AggregationResultHolder resultHolder = _resultHolders[i];
       if (function.getType() == AggregationFunctionType.COUNT) {
         // handle count(*) function
-        function.aggregate(length, resultHolder);
+        function.aggregate(length, resultHolder, Collections.emptyMap());
       } else if (function.getType() == AggregationFunctionType.DISTINCT) {
         // handle distinct (col1, col2..) function
         // unlike other aggregate functions, distinct can work on multiple columns
         // so we get all the projected columns (ProjectionBlockValSet) from TransformBlock
         // for each column and then pass them over to distinct function since the uniqueness
         // will be determined across tuples and not on a per column basis
-        BlockValSet[] blockValSets = new BlockValSet[_expressions.length];
+        Map<String, BlockValSet> blockValSetMap = new HashMap<>();
         for (int j = 0; j < _expressions.length; j++) {
-          blockValSets[j] = transformBlock.getBlockValueSet(_expressions[j]);
+          blockValSetMap.put(_expressions[j].toString(), transformBlock.getBlockValueSet(_expressions[j]));
         }
-        DistinctAggregationFunction distinctFunction = (DistinctAggregationFunction) function;
-        distinctFunction.aggregate(length, resultHolder, blockValSets);
+        function.aggregate(length, resultHolder, blockValSetMap);
       } else {
         // handle rest of the aggregate functions -- sum, min, max etc
-        function.aggregate(length, resultHolder, transformBlock.getBlockValueSet(_expressions[i]));
+        function.aggregate(length, resultHolder,
+            Collections.singletonMap(_expressions[i].toString(), transformBlock.getBlockValueSet(_expressions[i])));
       }
     }
   }

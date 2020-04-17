@@ -173,6 +173,15 @@ public class DetectionUtils {
     return anomaly;
   }
 
+  public static MergedAnomalyResultDTO makeAnomaly(long start, long end,  long configId) {
+    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
+    anomaly.setStartTime(start);
+    anomaly.setEndTime(end);
+    anomaly.setDetectionConfigId(configId);
+
+    return anomaly;
+  }
+
   public static void setEntityChildMapping(MergedAnomalyResultDTO parent, MergedAnomalyResultDTO child1) {
     if (child1 != null) {
       parent.getChildren().add(child1);
@@ -338,8 +347,8 @@ public class DetectionUtils {
    * Verify if this detection has data availability checks enabled
    */
   public static boolean isDataAvailabilityCheckEnabled(DetectionConfigDTO detectionConfig) {
-    return detectionConfig.getDataAvailabilityProperties() != null
-        && !detectionConfig.getDataAvailabilityProperties().isEmpty();
+    return detectionConfig.getDataSLAProperties() != null
+        && !detectionConfig.getDataSLAProperties().isEmpty();
   }
 
   public static long makeTimeout(long deadline) {

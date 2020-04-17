@@ -25,11 +25,11 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.config.RoutingConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.spi.config.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.RoutingConfig;
+import org.apache.pinot.spi.config.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

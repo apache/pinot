@@ -35,13 +35,14 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
-import org.apache.pinot.spi.utils.DataSize;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
 import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.getFileName;
 import static org.apache.pinot.plugin.ingestion.batch.hadoop.HadoopSegmentGenerationJobRunner.SEGMENT_GENERATION_JOB_SPEC;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
 import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
@@ -124,7 +125,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       FileUtils.forceMkdir(localOutputTempDir);
 
       //copy input path to local
-      File localInputDataFile = new File(localInputTempDir, new File(inputFileURI).getName());
+      File localInputDataFile = new File(localInputTempDir, getFileName(inputFileURI));
       PinotFSFactory.create(inputFileURI.getScheme()).copyToLocalFile(inputFileURI, localInputDataFile);
 
       //create task spec
@@ -166,7 +167,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
       long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
       long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
       LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
-          DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize));
+          DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize));
       //move segment to output PinotFS
       URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
           .resolve(segmentTarFileName);

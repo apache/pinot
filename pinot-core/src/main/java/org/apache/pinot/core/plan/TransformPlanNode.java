@@ -31,7 +31,7 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +67,7 @@ public class TransformPlanNode implements PlanNode {
         if (aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
           // 'DISTINCT(col1, col2 ...)' is modeled as one single aggregation function
           String[] distinctColumns = AggregationFunctionUtils.getColumn(aggregationInfo)
-              .split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+              .split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
           columns.addAll(Arrays.asList(distinctColumns));
         } else if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
           columns.add(AggregationFunctionUtils.getColumn(aggregationInfo));

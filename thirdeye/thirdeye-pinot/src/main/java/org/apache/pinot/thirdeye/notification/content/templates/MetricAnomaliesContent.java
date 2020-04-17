@@ -25,6 +25,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.Properties;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
@@ -43,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,10 +127,15 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
         id = config.getId();
       }
 
+      Properties props = new Properties();
+      props.putAll(anomaly.getProperties());
+      double lift = BaseNotificationContent.getLift(anomaly.getAvgCurrentVal(), anomaly.getAvgBaselineVal());
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
           getAnomalyURL(anomaly, this.thirdEyeAnomalyConfig.getDashboardHost()),
-          anomaly.getAvgBaselineVal(),
-          anomaly.getAvgCurrentVal(),
+          getPredictedValue(anomaly),
+          getCurrentValue(anomaly),
+          getFormattedLiftValue(anomaly, lift),
+          getLiftDirection(lift),
           0d,
           getDimensionsList(anomaly.getDimensionMap()),
           getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
@@ -139,7 +146,9 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
           getDateString(anomaly.getStartTime(), dateTimeZone),
           getDateString(anomaly.getEndTime(), dateTimeZone),
           getTimezoneString(dateTimeZone),
-          getIssueType(anomaly)
+          getIssueType(anomaly),
+          anomaly.getType().getLabel(),
+          ThirdEyeStringUtils.encodeCompactedProperties(props)
       );
 
       // dimension filters / values

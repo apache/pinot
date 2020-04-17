@@ -30,7 +30,6 @@ import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -849,7 +848,6 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
    */
   @Test
   public void testInterSegmentDistinct() {
-    Pql2Compiler.ENABLE_DISTINCT = true;
     String query = "SELECT DISTINCT(column1) FROM testTable LIMIT 1000000";
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);

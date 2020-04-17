@@ -155,7 +155,7 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
     if (DetectionUtils.isDataAvailabilityCheckEnabled((DetectionConfigDTO) config)) {
       JobDetail dataSLAJob = JobBuilder.newJob(DetectionDataSLAJob.class).withIdentity(key).build();
       this.scheduler.scheduleJob(dataSLAJob, trigger);
-      LOG.info(String.format("scheduled data availability jobs %s", dataSLAJob.getKey().getName()));
+      LOG.info(String.format("scheduled data sla jobs %s", dataSLAJob.getKey().getName()));
     }
   }
 

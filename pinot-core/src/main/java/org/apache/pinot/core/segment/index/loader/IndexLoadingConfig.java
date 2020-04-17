@@ -27,13 +27,13 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.config.FieldConfig;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import org.apache.pinot.spi.config.FieldConfig;
+import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.config.TableConfig;
 
 
 /**
@@ -59,6 +59,9 @@ public class IndexLoadingConfig {
   private boolean _isRealtimeOffheapAllocation;
   private boolean _isDirectRealtimeOffheapAllocation;
   private boolean _enableSplitCommitEndWithMetadata;
+
+  // constructed from FieldConfig
+  private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
       @Nonnull TableConfig tableConfig) {
@@ -91,6 +94,13 @@ public class IndexLoadingConfig {
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
     if (noDictionaryColumns != null) {
       _noDictionaryColumns.addAll(noDictionaryColumns);
+    }
+
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        _columnProperties.put(fieldConfig.getName(), fieldConfig.getProperties());
+      }
     }
 
     extractTextIndexColumnsFromTableConfig(tableConfig);
@@ -136,10 +146,10 @@ public class IndexLoadingConfig {
       for (FieldConfig fieldConfig : fieldConfigList) {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !_noDictionaryColumns.contains(fieldConfig.getName())) {
+          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !_noDictionaryColumns.contains(column)) {
             throw new UnsupportedOperationException("Text index is currently not supported on dictionary encoded column: " + column);
           }
-          _textIndexColumns.add(fieldConfig.getName());
+          _textIndexColumns.add(column);
         }
       }
     }
@@ -194,6 +204,11 @@ public class IndexLoadingConfig {
   @Nonnull
   public Set<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
+  }
+
+  @Nonnull
+  public Map<String, Map<String, String>> getColumnProperties() {
+    return _columnProperties;
   }
 
   /**

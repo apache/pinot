@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 .. _pluggable-storage:
 
 Pluggable Storage
@@ -38,7 +40,7 @@ In order to add a new type of storage backend (say, Amazon s3) implement the fol
 S3FS extends `PinotFS <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/filesystem/PinotFS.java>`_
 
 Configurations for Realtime Tables
-^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 The example here uses the existing org.apache.pinot.filesystem.HadoopPinotFS to store realtime segments in a HDFS filesytem. In the Pinot controller config, add the following new configs:
 
 .. code-block:: none
@@ -61,7 +63,7 @@ In the Pinot controller config, add the following new configs:
 Note: currently there is a bug in the controller (`issue <https://github.com/apache/incubator-pinot/issues/3847>`), for now you can cherrypick the PR https://github.com/apache/incubator-pinot/pull/3849 to fix the issue as tested already. The PR is under review now.
 
 Configurations for Offline Tables
-^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 These properties for the stream implementation are to be set in your controller and server configurations.
 
 In your controller and server configs, please set the FS class you would like to support. pinot.controller.storage.factory.class.${YOUR_URI_SCHEME} to the full path of the FS class you would like to include

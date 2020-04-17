@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.util;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 
 
@@ -26,30 +28,51 @@ import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
  * Wrapper class to read query options
  */
 public class QueryOptions {
+  private final Long _timeoutMs;
+  private final boolean _groupByModeSQL;
+  private final boolean _responseFormatSQL;
+  private final boolean _preserveType;
 
-  private String _groupByMode = Request.PQL;
-  private String _responseFormat = Request.PQL;
-  private boolean _preserveType = false;
-
-  public QueryOptions(Map<String, String> queryOptions) {
+  public QueryOptions(@Nullable Map<String, String> queryOptions) {
     if (queryOptions != null) {
-      _groupByMode = queryOptions.getOrDefault(Request.QueryOptionKey.GROUP_BY_MODE, Request.PQL);
-      _responseFormat = queryOptions.getOrDefault(Request.QueryOptionKey.RESPONSE_FORMAT, Request.PQL);
-
-      String preserveTypeString = queryOptions.getOrDefault(Request.QueryOptionKey.PRESERVE_TYPE, "false");
-      _preserveType = Boolean.valueOf(preserveTypeString);
+      _timeoutMs = getTimeoutMs(queryOptions);
+      _groupByModeSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.GROUP_BY_MODE));
+      _responseFormatSQL = Request.SQL.equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.RESPONSE_FORMAT));
+      _preserveType = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.PRESERVE_TYPE));
+    } else {
+      _timeoutMs = null;
+      _groupByModeSQL = false;
+      _responseFormatSQL = false;
+      _preserveType = false;
     }
   }
 
+  @Nullable
+  public Long getTimeoutMs() {
+    return _timeoutMs;
+  }
+
   public boolean isGroupByModeSQL() {
-    return _groupByMode.equalsIgnoreCase(Request.SQL);
+    return _groupByModeSQL;
   }
 
   public boolean isResponseFormatSQL() {
-      return _responseFormat.equalsIgnoreCase(Request.SQL);
+    return _responseFormatSQL;
   }
 
   public boolean isPreserveType() {
     return _preserveType;
+  }
+
+  @Nullable
+  public static Long getTimeoutMs(Map<String, String> queryOptions) {
+    String timeoutMsString = queryOptions.get(Request.QueryOptionKey.TIMEOUT_MS);
+    if (timeoutMsString != null) {
+      long timeoutMs = Long.parseLong(timeoutMsString);
+      Preconditions.checkState(timeoutMs > 0, "Query timeout must be positive, got: %s", timeoutMs);
+      return timeoutMs;
+    } else {
+      return null;
+    }
   }
 }

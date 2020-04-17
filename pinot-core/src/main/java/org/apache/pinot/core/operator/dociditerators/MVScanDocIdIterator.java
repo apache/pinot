@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.Arrays;
-import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.common.BlockValSet;
@@ -38,7 +37,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private PredicateEvaluator evaluator;
 
   private String datasourceName;
-  private MutableInt _numEntriesScanned = new MutableInt(0);
+  private int _numEntriesScanned;
 
   public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
@@ -76,16 +75,6 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
-  public boolean isMatch(int docId) {
-    if (currentDocId == Constants.EOF) {
-      return false;
-    }
-    valueIterator.skipTo(docId);
-    int length = valueIterator.nextIntVal(intArray);
-    return evaluator.applyMV(intArray, length, _numEntriesScanned);
-  }
-
-  @Override
   public int advance(int targetDocId) {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
@@ -113,7 +102,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
       int length = valueIterator.nextIntVal(intArray);
-      if (evaluator.applyMV(intArray, length, _numEntriesScanned)) {
+      _numEntriesScanned += length;
+      if (evaluator.applyMV(intArray, length)) {
         return currentDocId;
       }
     }
@@ -145,7 +135,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       if (docId >= startDocId) {
         valueIterator.skipTo(docId);
         length = valueIterator.nextIntVal(intArray);
-        if (evaluator.applyMV(intArray, length, _numEntriesScanned)) {
+        _numEntriesScanned += length;
+        if (evaluator.applyMV(intArray, length)) {
           result.add(docId);
         }
       }
@@ -155,6 +146,6 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public int getNumEntriesScanned() {
-    return _numEntriesScanned.intValue();
+    return _numEntriesScanned;
   }
 }

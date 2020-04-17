@@ -33,6 +33,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class DataTableImplV2 implements DataTable {
@@ -386,6 +388,12 @@ public class DataTableImplV2 implements DataTable {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     int dictId = _fixedSizeData.getInt();
     return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
+  }
+
+  @Override
+  public ByteArray getBytes(int rowId, int colId) {
+    // NOTE: DataTable V2 uses String to store BYTES value
+    return BytesUtils.toByteArray(getString(rowId, colId));
   }
 
   @Override

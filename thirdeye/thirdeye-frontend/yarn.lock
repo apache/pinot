@@ -5344,6 +5344,13 @@ ember-cli-lodash-subset@^2.0.1:
   resolved "https://registry.yarnpkg.com/ember-cli-lodash-subset/-/ember-cli-lodash-subset-2.0.1.tgz#20cb68a790fe0fde2488ddfd8efbb7df6fe766f2"
   integrity sha1-IMtop5D+D94kiN39jvu332/nZvI=
 
+ember-cli-material-design-icons@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/ember-cli-material-design-icons/-/ember-cli-material-design-icons-2.0.0.tgz#040586bc9cad59467ae340b567985008debbc10d"
+  integrity sha512-DEEEe/oGYfDiX/V2iCEpV3sSKExQCGSGTakEULDzpn1nLUGQL7ZRKMcTjrR89aCrLVd9esq9FEoclWK1wUeZJA==
+  dependencies:
+    ember-cli-babel "^5.1.5"
+
 ember-cli-mirage@1.1.2:
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/ember-cli-mirage/-/ember-cli-mirage-1.1.2.tgz#582598aa599649601401b79a021b4ded5155907f"

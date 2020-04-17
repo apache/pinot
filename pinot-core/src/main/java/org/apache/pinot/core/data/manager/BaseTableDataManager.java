@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -35,6 +34,7 @@ import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.config.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,5 +210,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public String getTableName() {
     return _tableNameWithType;
+  }
+
+  @Override
+  public File getTableDataDir() {
+    return _indexDir;
   }
 }

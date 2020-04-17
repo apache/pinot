@@ -23,11 +23,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.broker.routing.segmentselector.RealtimeSegmentSelector.FORCE_HLC;

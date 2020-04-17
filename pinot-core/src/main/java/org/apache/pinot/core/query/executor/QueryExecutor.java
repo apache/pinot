@@ -54,9 +54,4 @@ public interface QueryExecutor {
    * Processes the query with the given executor service.
    */
   DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService);
-
-  /**
-   * Sets the timeout for the given table, instead of using the global timeout.
-   */
-  void setTableTimeoutMs(String tableNameWithType, long timeOutMs);
 }

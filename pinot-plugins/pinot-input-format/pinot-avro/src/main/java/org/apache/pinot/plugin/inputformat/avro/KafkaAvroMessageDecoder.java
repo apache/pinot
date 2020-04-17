@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.generic.GenericData;
@@ -40,6 +41,7 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -54,7 +56,6 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_SCHEMA_NAME = "schema.registry.schema.name";
   private org.apache.avro.Schema _defaultAvroSchema;
-  private Schema _pinotSchema;
   private MD5AvroSchemaMap _md5ToAvroSchemaMap;
 
   // A global cache for schemas across all threads.
@@ -105,13 +106,14 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
         LOGGER.info("Populated schema cache with schema for {}", hashKey);
       }
     }
-    _pinotSchema = indexingSchema;
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     // Backward compatibility to support Avro by default
     if (recordExtractorClass == null) {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
     this._avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+    _avroRecordExtractor.init(sourceFields, null);
     this._decoderFactory = new DecoderFactory();
     _md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
@@ -162,7 +164,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     try {
       GenericData.Record avroRecord = reader.read(null,
           _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
-      return _avroRecordExtractor.extract(_pinotSchema, avroRecord, destination);
+      return _avroRecordExtractor.extract(avroRecord, destination);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message using schema {}{}",
           (schema == null ? "null" : schema.getName()),

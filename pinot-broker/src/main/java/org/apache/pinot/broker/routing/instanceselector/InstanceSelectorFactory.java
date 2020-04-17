@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import org.apache.pinot.common.config.RoutingConfig;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.spi.config.RoutingConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

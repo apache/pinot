@@ -25,7 +25,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
@@ -37,6 +36,7 @@ import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
@@ -44,10 +44,10 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
  * Base class for queries tests.
  */
 public abstract class BaseQueriesTest {
-  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
-  private static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
+  protected static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
+  protected static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
+  protected static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
+  protected static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
 
   protected abstract String getFilter();
 

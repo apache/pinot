@@ -37,7 +37,7 @@
         <exclude>**/*.log</exclude>
         <exclude>**/.idea/**</exclude>
         <exclude>thirdeye/**</exclude>
-        <exclude>.travis*</exclude>
+        <exclude>**/.travis/**</exclude>
         <exclude>.codecov*</exclude>
         <exclude>.gitignore</exclude>
         <exclude>contrib/**</exclude>

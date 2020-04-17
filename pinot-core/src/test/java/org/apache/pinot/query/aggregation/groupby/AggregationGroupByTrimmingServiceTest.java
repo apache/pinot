@@ -20,6 +20,7 @@ package org.apache.pinot.query.aggregation.groupby;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.parsers.CompilerConstants;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -44,10 +46,9 @@ public class AggregationGroupByTrimmingServiceTest {
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
 
-  private AggregationInfo aggregationInfo = new AggregationInfo().setAggregationType("SUM");
-  private static final AggregationFunction SUM = AggregationFunctionFactory.getAggregationFunction(new AggregationInfo().setAggregationType("SUM"), new BrokerRequest());
-  private static final AggregationFunction DISTINCTCOUNT =
-      AggregationFunctionFactory.getAggregationFunction(new AggregationInfo().setAggregationType("DISTINCTCOUNT"), new BrokerRequest());
+  private static final AggregationFunction SUM = createAggregationFunction("SUM", "sumColumn");
+  private static final AggregationFunction DISTINCTCOUNT = createAggregationFunction("DISTINCTCOUNT", "distinctColumn");
+
   private static final AggregationFunction[] AGGREGATION_FUNCTIONS = {SUM, DISTINCTCOUNT};
   private static final int NUM_GROUP_KEYS = 3;
   private static final int GROUP_BY_TOP_N = 100;
@@ -141,5 +142,13 @@ public class AggregationGroupByTrimmingServiceTest {
       groupStringBuilder.append(group.get(i));
     }
     return groupStringBuilder.toString();
+  }
+
+  private static AggregationFunction createAggregationFunction(String aggregationType, String column) {
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(aggregationType);
+    aggregationInfo
+        .setAggregationParams(Collections.singletonMap(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO, column));
+    return AggregationFunctionFactory.getAggregationFunction(aggregationInfo, new BrokerRequest());
   }
 }

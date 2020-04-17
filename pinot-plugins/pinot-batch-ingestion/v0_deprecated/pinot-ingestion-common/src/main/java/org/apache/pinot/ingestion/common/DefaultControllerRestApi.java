@@ -27,10 +27,10 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.ingestion.utils.PushLocation;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -66,7 +66,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
             .getRetrieveTableConfigHttpURI(pushLocation.getHost(), pushLocation.getPort(), _rawTableName));
         JsonNode offlineJsonTableConfig = JsonUtils.stringToJsonNode(response.getResponse()).get(OFFLINE);
         if (offlineJsonTableConfig != null) {
-          TableConfig offlineTableConfig = TableConfig.fromJsonConfig(offlineJsonTableConfig);
+          TableConfig offlineTableConfig = JsonUtils.jsonNodeToObject(offlineJsonTableConfig, TableConfig.class);
           LOGGER.info("Got table config: {}", offlineTableConfig);
           return offlineTableConfig;
         }
@@ -121,7 +121,9 @@ public class DefaultControllerRestApi implements ControllerRestApi {
             LOGGER.error("Caught exception while pushing segment: {} to location: {}, retry {}/{}", segmentName,
                 pushLocation, retry, _retry, e);
             if (retry == _retry) {
-              throw new RuntimeException(String.format("Failed to push segment %s to %s with %d retries",segmentName, pushLocation, retry), e);
+              throw new RuntimeException(
+                  String.format("Failed to push segment %s to %s with %d retries", segmentName, pushLocation, retry),
+                  e);
             }
             try {
               // Exponential back-off, max sleep time is 64 seconds.

@@ -25,9 +25,12 @@ import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.testng.Assert;
 
 
 public class CSVRecordReaderTest extends AbstractRecordReaderTest {
@@ -65,5 +68,32 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
         csvPrinter.printRecord(record);
       }
     }
+  }
+
+  @Override
+  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap)
+      throws Exception {
+    for (Map<String, Object> expectedRecord : expectedRecordsMap) {
+      GenericRow actualRecord = recordReader.next();
+      org.apache.pinot.spi.data.Schema pinotSchema = recordReader.getSchema();
+      for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+        String fieldSpecName = fieldSpec.getName();
+        if (fieldSpec.isSingleValueField()) {
+          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(), expectedRecord.get(fieldSpecName).toString());
+        } else {
+          List expectedRecords = (List) expectedRecord.get(fieldSpecName);
+          if (expectedRecords.size() == 1) {
+            Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(), expectedRecords.get(0).toString());
+          } else {
+            Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
+            Assert.assertEquals(actualRecords.length, expectedRecords.size());
+            for (int i = 0; i < actualRecords.length; i++) {
+              Assert.assertEquals(actualRecords[i].toString(), expectedRecords.get(i).toString());
+            }
+          }
+        }
+      }
+    }
+    Assert.assertFalse(recordReader.hasNext());
   }
 }

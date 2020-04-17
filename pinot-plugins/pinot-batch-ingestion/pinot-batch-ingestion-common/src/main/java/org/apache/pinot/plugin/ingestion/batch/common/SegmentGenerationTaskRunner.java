@@ -26,13 +26,13 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -63,7 +63,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
 
   public String run()
       throws Exception {
-    TableConfig tableConfig = TableConfig.fromJsonConfig(_taskSpec.getTableConfig());
+    TableConfig tableConfig = JsonUtils.jsonNodeToObject(_taskSpec.getTableConfig(), TableConfig.class);
     String tableName = tableConfig.getTableName();
     Schema schema = _taskSpec.getSchema();
 
@@ -106,7 +106,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
 
   private SegmentNameGenerator getSegmentNameGerator()
       throws IOException {
-    TableConfig tableConfig = TableConfig.fromJsonConfig(_taskSpec.getTableConfig());
+    TableConfig tableConfig = JsonUtils.jsonNodeToObject(_taskSpec.getTableConfig(), TableConfig.class);
     String tableName = tableConfig.getTableName();
 
     Schema schema = _taskSpec.getSchema();

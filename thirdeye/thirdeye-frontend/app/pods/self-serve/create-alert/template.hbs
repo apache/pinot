@@ -27,7 +27,7 @@
       </div>
       <div class="col-xs-12 col-sm-8">
         <label for="select-metric" class="control-label te-label te-label--taller required">Select a metric to monitor, or
-          {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
+          {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary-grey thirdeye-link-secondary-grey--inside"}}
             Import from InGraphs
           {{/link-to}}
           {{!-- or
@@ -36,7 +36,7 @@
           {{/link-to}} --}}
         </label>
         <div class="te-form__sub-label te-form__sub-label--raised">
-          Please contact <a class="thirdeye-link-secondary" target="_blank" href="{{metricHelpMailto}}">ask_thirdeye</a>
+          Please contact <a class="thirdeye-link-secondary-grey" target="_blank" href="{{metricHelpMailto}}">ask_thirdeye</a>
           if you need to onboard non-additive UMP or derived metrics
         </div>
         {{#power-select
@@ -432,6 +432,12 @@
         isEditMode=false
         detectionYaml=detectionYaml
         setDetectionYaml=(action "updateDetectionYaml")
+        detectionError=detectionError
+        detectionErrorMsg=detectionErrorMsg
+        detectionErrorInfo=detectionErrorInfo
+        previewError=previewError
+        previewErrorMsg=previewErrorMsg
+        previewErrorInfo=previewErrorInfo
       }}
       {{/detection-yaml}}
 
@@ -449,6 +455,7 @@
                 isPreviewMode=true
                 alertYaml=detectionYaml
                 dataIsCurrent=alertDataIsCurrent
+                sendPreviewError=(action "setPreviewError")
               }}
                 {{yield}}
               {{/alert-details}}
@@ -475,7 +482,7 @@
     </fieldset>
     <fieldset class="te-form__section-submit">
       {{bs-button
-        defaultText="Create alert"
+        defaultText="Create"
         type="primary"
         buttonType="submit"
         disabled=disableYamlSave

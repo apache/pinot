@@ -18,18 +18,31 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import org.apache.avro.generic.GenericData;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.AbstractBaseRecordExtractor;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
-public class AvroRecordExtractor extends AbstractBaseRecordExtractor<GenericData.Record> {
+
+/**
+ * Extractor for Avro Records
+ */
+public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
+  private Set<String> _fields;
+
   @Override
-  public GenericRow extract(Schema schema, GenericData.Record from, GenericRow to) {
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      FieldSpec incomingFieldSpec = getFieldSpecToUse(schema, fieldSpec);
-      AvroUtils.extractField(incomingFieldSpec, from, to);
+  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+    _fields = fields;
+  }
+
+  @Override
+  public GenericRow extract(GenericRecord from, GenericRow to) {
+    for (String fieldName : _fields) {
+      Object value = from.get(fieldName);
+      Object convertedValue = AvroUtils.convert(value);
+      to.putValue(fieldName, convertedValue);
     }
     return to;
   }

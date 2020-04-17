@@ -19,7 +19,7 @@
 package org.apache.pinot.minion.executor;
 
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**

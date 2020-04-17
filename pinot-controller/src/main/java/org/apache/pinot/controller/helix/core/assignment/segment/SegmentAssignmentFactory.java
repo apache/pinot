@@ -19,8 +19,8 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
 
 
 /**

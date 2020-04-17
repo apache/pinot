@@ -23,9 +23,19 @@ package org.apache.pinot.thirdeye.anomaly;
  */
 public enum AnomalyType {
   // Metric deviates from normal behavior. This is the default type.
-  DEVIATION,
+  DEVIATION ("Deviation"),
   // There is a trend change for underline metric.
-  TREND_CHANGE,
+  TREND_CHANGE ("Trend Change"),
   // The metric is not available within specified time.
-  NOT_AVAILABLE,
+  DATA_MISSING ("Data Missing");
+
+  private String label;
+
+  AnomalyType(String label) {
+    this.label = label;
+  }
+
+  public String getLabel() {
+    return label;
+  }
 }

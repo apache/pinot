@@ -23,25 +23,34 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.io.File;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
@@ -55,6 +64,7 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
+  private static final String PEER_SEGMENT_DOWNLOAD_DIR = "peerSegmentDownloadDir";
 
   @Inject
   ServerInstance serverInstance;
@@ -173,6 +183,53 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
+    }
+  }
+
+  // TODO Add access control similar to PinotSegmentUploadDownloadRestletResource for segment download.
+  @GET
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  @Path("/segments/{tableNameWithType}/{segmentName}")
+  @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
+  public Response downloadSegment(
+      @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE") @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @Context HttpHeaders httpHeaders)
+      throws Exception {
+    LOGGER.info("Received a request to download segment {} for table {}", segmentName, tableNameWithType);
+    TableDataManager tableDataManager = checkGetTableDataManager(tableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+    try {
+      // TODO Limit the number of concurrent downloads of segments because compression is an expensive operation.
+      // Store the tar.gz segment file in the server's segmentTarDir folder with a unique file name.
+      // Note that two clients asking the same segment file will result in the same tar.gz files being created twice.
+      // Will revisit for optimization if performance becomes an issue.
+      File tmpSegmentTarDir = new File(serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
+      tmpSegmentTarDir.mkdir();
+
+      String tarFilePath = TarGzCompressionUtils
+          .createTarGzOfDirectory(new File(tableDataManager.getTableDataDir(), segmentName).getAbsolutePath(),
+              new File(tmpSegmentTarDir, tableNameWithType+ "_" + segmentName + "_" + UUID.randomUUID()).getAbsolutePath());
+      File tarFile = new File(tarFilePath);
+      tarFile.deleteOnExit();
+      Response.ResponseBuilder builder = Response.ok();
+      builder.entity((StreamingOutput) output -> {
+        try {
+          Files.copy(tarFile.toPath(), output);
+        } finally {
+          FileUtils.deleteQuietly(tarFile);
+        }
+      });
+      builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + tarFile.getName());
+      builder.header(HttpHeaders.CONTENT_LENGTH, tarFile.length());
+      return builder.build();
+    } finally {
+      tableDataManager.releaseSegment(segmentDataManager);
     }
   }
 }

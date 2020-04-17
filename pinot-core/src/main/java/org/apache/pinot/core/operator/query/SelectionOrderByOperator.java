@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -50,7 +49,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private final TransformResultMetadata[] _expressionMetadata;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
-  private final PriorityQueue<Serializable[]> _rows;
+  private final PriorityQueue<Object[]> _rows;
 
   private int _numDocsScanned = 0;
 
@@ -79,7 +78,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         getComparator(selection.getSelectionSortSequence()));
   }
 
-  private Comparator<Serializable[]> getComparator(List<SelectionSort> sortSequence) {
+  private Comparator<Object[]> getComparator(List<SelectionSort> sortSequence) {
     // Compare all single-value columns
     int numOrderByExpressions = sortSequence.size();
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
@@ -104,8 +103,10 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     return (o1, o2) -> {
       for (int i = 0; i < numValuesToCompare; i++) {
         int index = valueIndices[i];
-        Serializable v1 = o1[index];
-        Serializable v2 = o2[index];
+
+        // TODO: Evaluate the performance of casting to Comparable and avoid the switch
+        Object v1 = o1[index];
+        Object v2 = o2[index];
         int result;
         switch (dataTypes[i]) {
           case INT:
@@ -124,8 +125,9 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
             result = ((String) v1).compareTo((String) v2);
             break;
           case BYTES:
-            result = ByteArray.compare((byte[]) v1, (byte[]) v2);
+            result = ((ByteArray) v1).compareTo((ByteArray) v2);
             break;
+          // NOTE: Multi-value columns are not comparable, so we should not reach here
           default:
             throw new IllegalStateException();
         }

@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.startree.executor;
 
+import java.util.Collections;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -37,9 +39,16 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
  * </ul>
  */
 public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
+  // StarTree converts column names from min(col) to min__col, this is to store the original mapping.
+  private final String[] _functionArgs;
 
   public StarTreeAggregationExecutor(AggregationFunctionContext[] functionContexts) {
     super(StarTreeUtils.createStarTreeFunctionContexts(functionContexts));
+
+    _functionArgs = new String[functionContexts.length];
+    for (int i = 0; i < functionContexts.length; i++) {
+      _functionArgs[i] = functionContexts[i].getColumn();
+    }
   }
 
   @Override
@@ -49,12 +58,11 @@ public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
       AggregationFunction function = _functions[i];
       AggregationResultHolder resultHolder = _resultHolders[i];
 
-      if (function.getType() == AggregationFunctionType.COUNT) {
-        function.aggregate(length, resultHolder,
-            transformBlock.getBlockValueSet(AggregationFunctionColumnPair.COUNT_STAR_COLUMN_NAME));
-      } else {
-        function.aggregate(length, resultHolder, transformBlock.getBlockValueSet(_expressions[i].getValue()));
-      }
+      BlockValSet blockValueSet = (function.getType() == AggregationFunctionType.COUNT) ? transformBlock
+          .getBlockValueSet(AggregationFunctionColumnPair.COUNT_STAR_COLUMN_NAME) :
+
+          transformBlock.getBlockValueSet(_expressions[i].getValue());
+      function.aggregate(length, resultHolder, Collections.singletonMap(_functionArgs[i], blockValueSet));
     }
   }
 }

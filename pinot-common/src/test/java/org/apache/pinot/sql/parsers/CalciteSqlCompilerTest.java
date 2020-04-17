@@ -33,9 +33,9 @@ import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -601,8 +601,6 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testSqlDistinctQueryCompilation() {
-    Pql2Compiler.ENABLE_DISTINCT = true;
-
     // test single column DISTINCT
     String sql = "SELECT DISTINCT c1 FROM foo";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
@@ -624,7 +622,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(aggregationInfos.size(), 1);
     AggregationInfo aggregationInfo = aggregationInfos.get(0);
     Assert.assertEquals(aggregationInfo.getAggregationType(), AggregationFunctionType.DISTINCT.getName());
-    Assert.assertEquals(aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO),
+    Assert.assertEquals(aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO),
         "c1");
 
     // test multi column DISTINCT
@@ -650,7 +648,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(aggregationInfos.size(), 1);
     aggregationInfo = aggregationInfos.get(0);
     Assert.assertEquals(aggregationInfo.getAggregationType(), AggregationFunctionType.DISTINCT.getName());
-    Assert.assertEquals(aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO),
+    Assert.assertEquals(aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO),
         "c1:c2");
 
     // test multi column DISTINCT with filter
@@ -684,7 +682,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(aggregationInfos.size(), 1);
     aggregationInfo = aggregationInfos.get(0);
     Assert.assertEquals(aggregationInfo.getAggregationType(), AggregationFunctionType.DISTINCT.getName());
-    Assert.assertEquals(aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO),
+    Assert.assertEquals(aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO),
         "c1:c2:c3");
 
     // not supported by Calcite SQL (this is in compliance with SQL standard)
@@ -811,7 +809,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(aggregationInfos.size(), 1);
     aggregationInfo = aggregationInfos.get(0);
     Assert.assertEquals(aggregationInfo.getAggregationType(), AggregationFunctionType.DISTINCT.getName());
-    Assert.assertEquals(aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO),
+    Assert.assertEquals(aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO),
         "add(col1,col2)");
 
     // multi-column distinct with multiple transform functions
@@ -865,7 +863,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(aggregationInfos.size(), 1);
     aggregationInfo = aggregationInfos.get(0);
     Assert.assertEquals(aggregationInfo.getAggregationType(), AggregationFunctionType.DISTINCT.getName());
-    Assert.assertEquals(aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO),
+    Assert.assertEquals(aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO),
         "add(div(col1,col2),mul(col3,col4)):sub(col3,col4)");
 
     // multi-column distinct with multiple transform columns and additional identifiers
@@ -926,7 +924,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(aggregationInfos.size(), 1);
     aggregationInfo = aggregationInfos.get(0);
     Assert.assertEquals(aggregationInfo.getAggregationType(), AggregationFunctionType.DISTINCT.getName());
-    Assert.assertEquals(aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO),
+    Assert.assertEquals(aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO),
         "add(div(col1,col2),mul(col3,col4)):sub(col3,col4):col5:col6");
   }
 
@@ -1353,5 +1351,54 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals("SUM", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
     Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator());
     Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator());
+  }
+
+  @Test
+  public void testDistinctCountRewrite() {
+    String query = "SELECT count(distinct bar) FROM foo";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctCount");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT count(distinct bar) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctCount");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT count(distinct bar), distinctCount(bar) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctCount");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getFunctionCall().getOperator(), "distinctCount");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT count(distinct bar), count(*), sum(a),min(a),max(b) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctCount");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
+
+    query = "SELECT count(distinct bar) AS distinct_bar, count(*), sum(a),min(a),max(b) FROM foo GROUP BY city";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "AS");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "distinctCount");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "bar");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
+        "distinct_bar");
   }
 }

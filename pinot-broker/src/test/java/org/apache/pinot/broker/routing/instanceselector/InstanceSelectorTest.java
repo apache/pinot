@@ -27,11 +27,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.model.ExternalView;
-import org.apache.pinot.common.config.RoutingConfig;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.config.RoutingConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableType;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ERROR;
@@ -66,12 +66,12 @@ public class InstanceSelectorTest {
 
     // Should be backward-compatible with legacy config
     when(routingConfig.getInstanceSelectorType()).thenReturn(null);
-    when(tableConfig.getTableType()).thenReturn(CommonConstants.Helix.TableType.OFFLINE);
+    when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
     when(routingConfig.getRoutingTableBuilderName())
         .thenReturn(InstanceSelectorFactory.LEGACY_REPLICA_GROUP_OFFLINE_ROUTING);
     assertTrue(InstanceSelectorFactory
         .getInstanceSelector(tableConfig, brokerMetrics) instanceof ReplicaGroupInstanceSelector);
-    when(tableConfig.getTableType()).thenReturn(CommonConstants.Helix.TableType.REALTIME);
+    when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName())
         .thenReturn(InstanceSelectorFactory.LEGACY_REPLICA_GROUP_REALTIME_ROUTING);
     assertTrue(InstanceSelectorFactory

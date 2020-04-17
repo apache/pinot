@@ -80,7 +80,9 @@ pinotFSSpecs:
     #   org.apache.pinot.spi.filesystem.LocalPinotFS is used for local filesystem
     #   org.apache.pinot.plugin.filesystem.AzurePinotFS is used for Azure Data Lake
     #   org.apache.pinot.plugin.filesystem.HadoopPinotFS is used for HDFS
-    className: org.apache.pinot.spi.filesystem.LocalPinotFS
+    className: org.apache.pinot.plugin.filesystem.HadoopPinotFS
+    configs:
+      'hadoop.conf.path': ''
 
 # recordReaderSpec: defines all record reader
 recordReaderSpec:

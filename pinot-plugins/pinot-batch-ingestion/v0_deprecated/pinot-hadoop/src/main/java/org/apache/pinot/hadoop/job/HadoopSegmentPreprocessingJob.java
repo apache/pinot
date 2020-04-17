@@ -48,12 +48,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableCustomConfig;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.hadoop.io.CombineAvroKeyInputFormat;
 import org.apache.pinot.hadoop.job.mappers.SegmentPreprocessingMapper;
@@ -63,6 +57,12 @@ import org.apache.pinot.hadoop.utils.PinotHadoopJobPreparationHelper;
 import org.apache.pinot.ingestion.common.ControllerRestApi;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentPreprocessingJob;
+import org.apache.pinot.spi.config.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.config.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TableCustomConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,9 +220,11 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     // Fetch sorting info from table config.
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     List<String> sortedColumns = indexingConfig.getSortedColumn();
-    Preconditions.checkArgument(sortedColumns.size() <= 1, "There should be at most 1 sorted column in the table.");
-    if (sortedColumns.size() == 1) {
-      _sortedColumn = sortedColumns.get(0);
+    if (sortedColumns != null) {
+      Preconditions.checkArgument(sortedColumns.size() <= 1, "There should be at most 1 sorted column in the table.");
+      if (sortedColumns.size() == 1) {
+        _sortedColumn = sortedColumns.get(0);
+      }
     }
   }
 

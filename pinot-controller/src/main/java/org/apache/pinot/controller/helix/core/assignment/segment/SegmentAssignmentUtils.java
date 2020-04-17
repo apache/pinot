@@ -87,6 +87,55 @@ public class SegmentAssignmentUtils {
   }
 
   /**
+   * Assigns the segment for the non-replica-group based segment assignment strategy and returns the assigned instances.
+   */
+  static List<String> assignSegmentWithoutReplicaGroup(Map<String, Map<String, String>> currentAssignment,
+      InstancePartitions instancePartitions, int replication) {
+    List<String> instances =
+        SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, replication);
+    int[] numSegmentsAssignedPerInstance = getNumSegmentsAssignedPerInstance(currentAssignment, instances);
+    int numInstances = numSegmentsAssignedPerInstance.length;
+    PriorityQueue<Pairs.IntPair> heap = new PriorityQueue<>(numInstances, Pairs.intPairComparator());
+    for (int instanceId = 0; instanceId < numInstances; instanceId++) {
+      heap.add(new Pairs.IntPair(numSegmentsAssignedPerInstance[instanceId], instanceId));
+    }
+    List<String> instancesAssigned = new ArrayList<>(replication);
+    for (int i = 0; i < replication; i++) {
+      instancesAssigned.add(instances.get(heap.remove().getRight()));
+    }
+    return instancesAssigned;
+  }
+
+  /**
+   * Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
+   */
+  static List<String> assignSegmentWithReplicaGroup(Map<String, Map<String, String>> currentAssignment,
+      InstancePartitions instancePartitions, int partitionId) {
+    // First assign the segment to replica-group 0
+    List<String> instances = instancePartitions.getInstances(partitionId, 0);
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, instances);
+    int minNumSegmentsAssigned = numSegmentsAssignedPerInstance[0];
+    int instanceIdWithLeastSegmentsAssigned = 0;
+    int numInstances = numSegmentsAssignedPerInstance.length;
+    for (int instanceId = 1; instanceId < numInstances; instanceId++) {
+      if (numSegmentsAssignedPerInstance[instanceId] < minNumSegmentsAssigned) {
+        minNumSegmentsAssigned = numSegmentsAssignedPerInstance[instanceId];
+        instanceIdWithLeastSegmentsAssigned = instanceId;
+      }
+    }
+
+    // Mirror the assignment to all replica-groups
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
+    for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+      instancesAssigned
+          .add(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
+    }
+    return instancesAssigned;
+  }
+
+  /**
    * Rebalances the table with Helix AutoRebalanceStrategy.
    */
   static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(
@@ -114,10 +163,10 @@ public class SegmentAssignmentUtils {
    */
   static Map<String, Map<String, String>> rebalanceReplicaGroupBasedTable(
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions,
-      Map<Integer, Set<String>> partitionIdToSegmentsMap) {
+      Map<Integer, List<String>> partitionIdToSegmentsMap) {
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
     int numPartitions = instancePartitions.getNumPartitions();
-    for (Map.Entry<Integer, Set<String>> entry : partitionIdToSegmentsMap.entrySet()) {
+    for (Map.Entry<Integer, List<String>> entry : partitionIdToSegmentsMap.entrySet()) {
       // Uniformly spray the segment partitions over the instance partitions
       int partitionId = entry.getKey() % numPartitions;
       SegmentAssignmentUtils
@@ -147,7 +196,7 @@ public class SegmentAssignmentUtils {
    * </ul>
    */
   static void rebalanceReplicaGroupBasedPartition(Map<String, Map<String, String>> currentAssignment,
-      InstancePartitions instancePartitions, int partitionId, Set<String> segments,
+      InstancePartitions instancePartitions, int partitionId, List<String> segments,
       Map<String, Map<String, String>> newAssignment) {
     // Fetch instances in replica-group 0
     List<String> instances = instancePartitions.getInstances(partitionId, 0);
@@ -162,14 +211,9 @@ public class SegmentAssignmentUtils {
     // Do not move segment if target number of segments is not reached, track the segments need to be moved
     int[] numSegmentsAssignedPerInstance = new int[numInstances];
     List<String> segmentsNotAssigned = new ArrayList<>();
-    for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      // Skip segments not in the partition
-      if (!segments.contains(segmentName)) {
-        continue;
-      }
+    for (String segmentName : segments) {
       boolean segmentAssigned = false;
-      for (String instanceName : entry.getValue().keySet()) {
+      for (String instanceName : currentAssignment.get(segmentName).keySet()) {
         Integer instanceId = instanceNameToIdMap.get(instanceName);
         if (instanceId != null && numSegmentsAssignedPerInstance[instanceId] < targetNumSegmentsPerInstance) {
           newAssignment
@@ -261,9 +305,9 @@ public class SegmentAssignmentUtils {
       for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> instanceStateMap = entry.getValue();
-        if (instanceStateMap.values().contains(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+        if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
           _completedSegmentAssignment.put(segmentName, instanceStateMap);
-        } else if (instanceStateMap.values().contains(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+        } else if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
           _consumingSegmentAssignment.put(segmentName, instanceStateMap);
         } else {
           _offlineSegmentAssignment.put(segmentName, instanceStateMap);

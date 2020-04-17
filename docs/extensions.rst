@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 Extending Pinot
 ===============
 This section provides an overview of options to extend Pinot code to make Pinot work for environments not covered by default.

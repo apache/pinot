@@ -17,6 +17,7 @@
 package org.apache.pinot.thirdeye.notification.content.templates;
 
 import java.util.Properties;
+import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
@@ -145,24 +146,67 @@ public class TestMetricAnomaliesContent {
     List<AnomalyResult> anomalies = new ArrayList<>();
     DetectionConfigDTO detectionConfigDTO = DaoTestUtils.getTestDetectionConfig(provider, detectionConfigFile);
     detectionConfigDAO.save(detectionConfigDTO);
+
     MergedAnomalyResultDTO anomaly = DaoTestUtils.getTestMergedAnomalyResult(
-        new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
-        new DateTime(2017, 11, 6, 13, 0, dateTimeZone).getMillis(),
-        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
+        new DateTime(2020, 1, 6, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2020, 1, 6, 13, 0, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2020, 1, 6, 10, 0, dateTimeZone).getMillis());
     anomaly.setDetectionConfigId(detectionConfigDTO.getId());
     anomaly.setAvgCurrentVal(1.1);
     anomaly.setAvgBaselineVal(1.0);
     anomaly.setMetricUrn("thirdeye:metric:1");
     mergedAnomalyResultDAO.save(anomaly);
     anomalies.add(anomaly);
+
     anomaly = DaoTestUtils.getTestMergedAnomalyResult(
-        new DateTime(2017, 11, 7, 10, 0, dateTimeZone).getMillis(),
-        new DateTime(2017, 11, 7, 17, 0, dateTimeZone).getMillis(),
-        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
+        new DateTime(2020, 1, 7, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2020, 1, 7, 17, 0, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2020, 1, 6, 10, 0, dateTimeZone).getMillis());
     anomaly.setDetectionConfigId(detectionConfigDTO.getId());
     anomaly.setAvgCurrentVal(0.9);
-    anomaly.setAvgBaselineVal(1.0);
+    anomaly.setAvgBaselineVal(Double.NaN);
     anomaly.setMetricUrn("thirdeye:metric:2");
+    mergedAnomalyResultDAO.save(anomaly);
+    anomalies.add(anomaly);
+
+    anomaly = DaoTestUtils.getTestMergedAnomalyResult(
+        new DateTime(2020, 1, 1, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2020, 1, 7, 17, 0, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2020, 1, 7, 17, 1, dateTimeZone).getMillis());
+    anomaly.setDetectionConfigId(detectionConfigDTO.getId());
+    anomaly.setType(AnomalyType.DATA_MISSING);
+    anomaly.setMetricUrn("thirdeye:metric:3");
+    Map<String, String> props = new HashMap<>();
+    props.put("sla", "3_DAYS");
+    anomaly.setProperties(props);
+    mergedAnomalyResultDAO.save(anomaly);
+    anomalies.add(anomaly);
+
+    anomaly = DaoTestUtils.getTestMergedAnomalyResult(
+        new DateTime(2020, 1, 1, 0, 0, dateTimeZone).getMillis(),
+        new DateTime(2020, 1, 7, 5, 5, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2020, 1, 7, 5, 6, dateTimeZone).getMillis());
+    anomaly.setDetectionConfigId(detectionConfigDTO.getId());
+    anomaly.setType(AnomalyType.DATA_MISSING);
+    anomaly.setMetricUrn("thirdeye:metric:3");
+    props = new HashMap<>();
+    props.put("datasetLastRefreshTime", "" + new DateTime(2020, 1, 4, 0, 0, dateTimeZone).getMillis());
+    props.put("sla", "2_DAYS");
+    anomaly.setProperties(props);
+    mergedAnomalyResultDAO.save(anomaly);
+    anomalies.add(anomaly);
+
+    anomaly = DaoTestUtils.getTestMergedAnomalyResult(
+        new DateTime(2020, 1, 1, 10, 5, dateTimeZone).getMillis(),
+        new DateTime(2020, 1, 1, 15, 0, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2020, 1, 1, 16, 0, dateTimeZone).getMillis());
+    anomaly.setDetectionConfigId(detectionConfigDTO.getId());
+    anomaly.setType(AnomalyType.DATA_MISSING);
+    anomaly.setMetricUrn("thirdeye:metric:3");
+    props = new HashMap<>();
+    props.put("datasetLastRefreshTime", "" + new DateTime(2020, 1, 1, 10, 5, dateTimeZone).getMillis());
+    props.put("sla", "3_HOURS");
+    anomaly.setProperties(props);
     mergedAnomalyResultDAO.save(anomaly);
     anomalies.add(anomaly);
 

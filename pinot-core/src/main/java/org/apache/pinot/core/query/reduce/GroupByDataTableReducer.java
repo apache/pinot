@@ -55,7 +55,6 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmin
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -315,7 +314,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
         DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         BiFunction<Integer, Integer, Object> function;
         switch (columnDataType) {
-
           case INT:
             function = dataTable::getInt;
             break;
@@ -332,11 +330,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
             function = dataTable::getString;
             break;
           case BYTES:
-            // FIXME: support BYTES in DataTable instead of converting to string
-            function = (row, col) -> BytesUtils.toByteArray(dataTable.getString(row, col));
+            function = dataTable::getBytes;
             break;
-          default:
+          case OBJECT:
             function = dataTable::getObject;
+            break;
+          // Add other aggregation intermediate result / group-by column type supports here
+          default:
+            throw new IllegalStateException();
         }
         functions[i] = function;
       }

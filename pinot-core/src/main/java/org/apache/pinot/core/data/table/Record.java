@@ -22,35 +22,46 @@ import java.util.Arrays;
 
 
 /**
- * Defines a single record in Pinot
+ * Defines a single record in Pinot.
+ * <p>Record may contain both single-value and multi-value columns. In order to use the record as the key in a map, it
+ * can only contain single-value columns (to avoid using Arrays.deepEquals() and Arrays.deepHashCode() for performance
+ * concern).
+ * <p>For each data type, the value should be stored as:
+ * <ul>
+ *   <li>INT: Integer</li>
+ *   <li>LONG: Long</li>
+ *   <li>FLOAT: Float</li>
+ *   <li>DOUBLE: Double</li>
+ *   <li>STRING: String</li>
+ *   <li>BYTES: ByteArray</li>
+ *   <li>OBJECT (intermediate aggregation result): Object</li>
+ *   <li>INT_ARRAY: int[]</li>
+ *   <li>LONG_ARRAY: long[]</li>
+ *   <li>FLOAT_ARRAY: float[]</li>
+ *   <li>DOUBLE_ARRAY: double[]</li>
+ *   <li>STRING_ARRAY: String[]</li>
+ * </ul>
  */
 public class Record {
-  private Object[] _values;
+  private final Object[] _values;
 
   public Record(Object[] values) {
     _values = values;
   }
 
-  /**
-   * Returns the column values contained in the Record
-   */
   public Object[] getValues() {
     return _values;
   }
 
-  @Override
-  public String toString() {
-    return Arrays.deepToString(_values);
-  }
-
+  // NOTE: Not check class for performance concern
+  @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   @Override
   public boolean equals(Object o) {
-    Record that = (Record) o;
-    return Arrays.deepEquals(_values, that._values);
+    return Arrays.equals(_values, ((Record) o)._values);
   }
 
   @Override
   public int hashCode() {
-    return Arrays.deepHashCode(_values);
+    return Arrays.hashCode(_values);
   }
 }

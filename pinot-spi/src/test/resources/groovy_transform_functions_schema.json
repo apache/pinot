@@ -1,0 +1,44 @@
+{
+  "schemaName": "events",
+  "dimensionFieldSpecs": [
+    {
+      "name": "userId",
+      "dataType": "LONG",
+      "transformFunction": "Groovy({user_id}, user_id)"
+    },
+    {
+      "name": "fullName",
+      "dataType": "STRING",
+      "transformFunction": "Groovy({firstName+' '+lastName}, firstName, lastName)"
+    },
+    {
+      "name": "bids",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "maxBid",
+      "dataType": "INT",
+      "transformFunction": "Groovy({bids.max{ it.toBigDecimal() }}, bids)"
+    },
+    {
+      "name": "campaignInfo",
+      "dataType": "BYTES"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "cost",
+      "dataType": "DOUBLE"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "name": "hoursSinceEpoch",
+      "dataType": "LONG",
+      "timeFormat" : "EPOCH",
+      "timeType": "HOURS"
+    },
+    "transformFunction": "Groovy({timestamp/(1000*60*60)}, timestamp)"
+  }
+}

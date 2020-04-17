@@ -238,9 +238,10 @@ public class DataAvailabilityTaskSchedulerTest {
     List<Long> metrics1 = Collections.singletonList(metricId1);
     long oneDayAgo = TEST_TIME - TimeUnit.DAYS.toMillis(1);
     DetectionConfigDTO detection = generateDetectionConfig(1, metrics1, oneDayAgo, 0);
+    Map<String, Object> metricSla = new HashMap<>();
     Map<String, Object> props = new HashMap<>();
-    props.put("test_SLA", "7_DAYS");
-    detection.setDataAvailabilityProperties(props);
+    props.put("testMetricUrn", metricSla);
+    detection.setDataSLAProperties(props);
     long detection1 = detectionConfigDAO.save(detection);
     long halfHourAgo = TEST_TIME - TimeUnit.MINUTES.toMillis(30);
     createDataset(1, TEST_TIME, halfHourAgo);

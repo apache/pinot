@@ -16,26 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.plugin.filesystem;
 
 import com.google.common.base.Strings;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
@@ -46,6 +47,7 @@ public class HadoopPinotFS extends PinotFS {
   private static final String PRINCIPAL = "hadoop.kerberos.principle";
   private static final String KEYTAB = "hadoop.kerberos.keytab";
   private static final String HADOOP_CONF_PATH = "hadoop.conf.path";
+  private static final String WRITE_CHECKSUM = "hadoop.write.checksum";
 
   private org.apache.hadoop.fs.FileSystem _hadoopFS = null;
   private org.apache.hadoop.conf.Configuration _hadoopConf;
@@ -60,6 +62,7 @@ public class HadoopPinotFS extends PinotFS {
       _hadoopConf = getConf(config.getString(HADOOP_CONF_PATH));
       authenticate(_hadoopConf, config);
       _hadoopFS = org.apache.hadoop.fs.FileSystem.get(_hadoopConf);
+      _hadoopFS.setWriteChecksum((config.getBoolean(WRITE_CHECKSUM, false)));
       LOGGER.info("successfully initialized HadoopPinotFS");
     } catch (IOException e) {
       throw new RuntimeException("Could not initialize HadoopPinotFS", e);
@@ -97,13 +100,24 @@ public class HadoopPinotFS extends PinotFS {
       throws IOException {
     Path source = new Path(srcUri);
     Path target = new Path(dstUri);
-    RemoteIterator<LocatedFileStatus> sourceFiles = _hadoopFS.listFiles(source, true);
+    RemoteIterator<FileStatus> sourceFiles = _hadoopFS.listStatusIterator(source);
     if (sourceFiles != null) {
       while (sourceFiles.hasNext()) {
-        boolean succeeded =
-            FileUtil.copy(_hadoopFS, sourceFiles.next().getPath(), _hadoopFS, target, true, _hadoopConf);
-        if (!succeeded) {
-          return false;
+        FileStatus sourceFile = sourceFiles.next();
+        Path sourceFilePath = sourceFile.getPath();
+        if (sourceFile.isFile()) {
+          try {
+            FileUtil.copy(_hadoopFS, sourceFilePath, _hadoopFS, new Path(target, sourceFilePath.getName()), false,
+                _hadoopConf);
+          } catch (FileNotFoundException e) {
+            LOGGER.warn("Not found file {}, skipping copying it...", sourceFilePath, e);
+          }
+        } else if (sourceFile.isDirectory()) {
+          try {
+            copy(sourceFilePath.toUri(), new Path(target, sourceFilePath.getName()).toUri());
+          } catch (FileNotFoundException e) {
+            LOGGER.warn("Not found directory {}, skipping copying it...", sourceFilePath, e);
+          }
         }
       }
     }
@@ -172,7 +186,7 @@ public class HadoopPinotFS extends PinotFS {
       LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath, dstFile.length(),
           System.currentTimeMillis() - startMs);
     } catch (IOException e) {
-      LOGGER.warn("failed to fetch segment {} from hdfs, might retry", srcUri, e);
+      LOGGER.warn("failed to fetch segment {} from hdfs to {}, might retry", srcUri, dstFile, e);
       throw e;
     }
   }

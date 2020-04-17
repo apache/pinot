@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.3.0-SNAPSHOT</version>
+  <version>${revision}${sha1}</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -97,8 +97,18 @@
   <!-- Apache project inception year for generating correct NOTICE file for jar bundle. -->
   <inceptionYear>2018</inceptionYear>
 
+  <distributionManagement>
+    <repository>
+      <id>bintray-linkedin-maven</id>
+      <name>linkedin-maven</name>
+      <url>https://api.bintray.com/maven/linkedin/maven/pinot/;publish=1;override=1</url>
+    </repository>
+  </distributionManagement>
+
   <properties>
     <pinot.root>${basedir}</pinot.root>
+    <revision>0.4.0</revision>
+    <sha1>-SNAPSHOT</sha1>
     <build.profile.id>dev</build.profile.id>
     <jdk.version>1.8</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -133,7 +143,7 @@
     <netty.version>4.1.42.Final</netty.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g</argLine>
+    <argLine>-Xms4g -Xmx4g</argLine>
 
     <!-- handle kafka imports
     kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
@@ -316,6 +326,11 @@
         <artifactId>equalsverifier</artifactId>
         <version>1.7.2</version>
         <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.groovy</groupId>
+        <artifactId>groovy-all</artifactId>
+        <version>2.4.8</version>
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>
@@ -888,6 +903,11 @@
         <version>2.1</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.maven.surefire</groupId>
+        <artifactId>surefire-testng</artifactId>
+        <version>2.19</version>
+      </dependency>
+      <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
         <version>2.10.0</version>
@@ -917,6 +937,12 @@
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
         <version>1.5</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.glassfish.grizzly</groupId>
+            <artifactId>grizzly-http-server</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <!-- hadoop-common & jmh-core use common-math3 -->
       <dependency>
@@ -1095,7 +1121,7 @@
           </executions>
           <configuration>
             <rules>
-              <dependencyConvergence/>
+              <dependencyConvergence />
             </rules>
           </configuration>
         </plugin>
@@ -1258,6 +1284,7 @@
 
             <!-- Top level directories -->
             <exclude>thirdeye/**</exclude>
+            <exclude>website/**</exclude>
 
             <!-- Docker image configs -->
             <exclude>docker/images/pinot-thirdeye/**</exclude>
@@ -1359,6 +1386,9 @@
             <!-- Top level -->
             <exclude>.codecov*</exclude>
 
+            <!-- Top level Directory -->
+            <exclude>website/**</exclude>
+
             <!-- Test Resources -->
             <exclude>**/test/resources/**</exclude>
 
@@ -1390,10 +1420,8 @@
         <configuration>
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <transformers>
-            <transformer
-                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-            <transformer
-                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
             </transformer>
           </transformers>

@@ -28,12 +28,13 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.TenantConfig;
+import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**

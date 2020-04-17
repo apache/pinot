@@ -18,12 +18,18 @@
  */
 package org.apache.pinot.plugin.stream.kafka;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import org.apache.pinot.spi.data.FieldSpec;
+import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
@@ -33,32 +39,32 @@ import org.slf4j.LoggerFactory;
 
 public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final String JSON_RECORD_EXTRACTOR_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
-  private Schema _schema;
-  private FieldSpec _incomingTimeFieldSpec;
+  private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
-    _schema = indexingSchema;
-
-    // For time field, we use the incoming time field spec
-    TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
-    if (timeFieldSpec != null) {
-      _incomingTimeFieldSpec = new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec());
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
+    String recordExtractorClass = null;
+    if (props != null) {
+      recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     }
+    if (recordExtractorClass == null) {
+      recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
+    }
+    _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+    _jsonRecordExtractor.init(sourceFields, null);
   }
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-        FieldSpec incomingFieldSpec =
-            fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
-        String column = incomingFieldSpec.getName();
-        destination.putValue(column, JsonUtils.extractValue(message.get(column), incomingFieldSpec));
-      }
+      Map<String, Object> from = OBJECT_MAPPER.convertValue(message, new TypeReference<Map<String, Object>>(){});
+      _jsonRecordExtractor.extract(from, destination);
       return destination;
     } catch (Exception e) {
       LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}", new String(payload), e);

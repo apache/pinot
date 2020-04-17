@@ -25,7 +25,8 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.3.0-SNAPSHOT</version>
+    <version>${revision}${sha1}</version>
+    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-server</artifactId>
   <name>Pinot Server</name>
@@ -206,6 +207,10 @@
         <exclusion>
           <groupId>com.fasterxml.jackson.module</groupId>
           <artifactId>jackson-module-jaxb-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>javax.ws.rs</groupId>
+          <artifactId>jsr311-api</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

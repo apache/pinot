@@ -44,6 +44,8 @@ import org.apache.pinot.core.common.BlockDocIdSet;
  *     Call <code>iterator()</code> to get all documents that are selected
  *   </li>
  * </ul>
+ *
+ * TODO: Revisit to see whether these methods can accelerate the filtering
  */
 public interface FilterBlockDocIdSet extends BlockDocIdSet {
 
@@ -54,6 +56,7 @@ public interface FilterBlockDocIdSet extends BlockDocIdSet {
 
   /**
    * Returns the maximum document id (inclusive) the set can possibly contain.
+   * TODO: Change it to exclusive
    */
   int getMaxDocId();
 
@@ -64,6 +67,7 @@ public interface FilterBlockDocIdSet extends BlockDocIdSet {
 
   /**
    * Sets the end document id (inclusive) that need to be processed.
+   * TODO: Change it to exclusive
    */
   void setEndDocId(int endDocId);
 

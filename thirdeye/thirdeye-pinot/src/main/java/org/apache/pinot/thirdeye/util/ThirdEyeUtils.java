@@ -38,6 +38,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,6 +64,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -94,6 +96,7 @@ public abstract class ThirdEyeUtils {
   private static final String TWO_DECIMALS_FORMAT = "#,###.##";
   private static final String MAX_DECIMALS_FORMAT = "#,###.#####";
   private static final String DECIMALS_FORMAT_TOKEN = "#";
+  private static final String PROP_DETECTOR_COMPONENT_NAME_DELIMETER = ",";
 
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
   private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
@@ -706,6 +709,16 @@ public abstract class ThirdEyeUtils {
   }
 
   /**
+   * Check if the anomaly is detected by multiple components
+   * @param anomaly the anomaly
+   * @return if the anomaly is detected by multiple components
+   */
+  public static boolean isDetectedByMultipleComponents(MergedAnomalyResultDTO anomaly) {
+    String componentName = anomaly.getProperties().getOrDefault(PROP_DETECTOR_COMPONENT_NAME, "");
+    return componentName.contains(PROP_DETECTOR_COMPONENT_NAME_DELIMETER);
+  }
+
+  /**
    * Combine two components with comma separated.
    * For example, will combine "component1" and "component2" into "component1, component2".
    *
@@ -715,13 +728,9 @@ public abstract class ThirdEyeUtils {
    */
   private static String combineComponents(String component1, String component2) {
     List<String> components = new ArrayList<>();
-    for (String component : component1.split(",")) {
-      components.add(component);
-    }
-    for (String component : component2.split(",")) {
-      components.add(component);
-    }
-    return String.join(",", components.stream().distinct().collect(Collectors.toList()));
+    components.addAll(Arrays.asList(component1.split(PROP_DETECTOR_COMPONENT_NAME_DELIMETER)));
+    components.addAll(Arrays.asList(component2.split(PROP_DETECTOR_COMPONENT_NAME_DELIMETER)));
+    return components.stream().distinct().collect(Collectors.joining(PROP_DETECTOR_COMPONENT_NAME_DELIMETER));
   }
 
   /**

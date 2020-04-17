@@ -103,7 +103,8 @@ public class ChildKeepingMergeWrapperTest {
     MockPipelineLoader mockLoader = new MockPipelineLoader(this.runs, this.outputs);
 
     this.provider = new MockDataProvider()
-        .setLoader(mockLoader);
+        .setLoader(mockLoader)
+        .setAnomalies(Collections.emptyList());
   }
 
   @Test
@@ -292,7 +293,7 @@ public class ChildKeepingMergeWrapperTest {
     MockPipelineLoader mockLoader = new MockPipelineLoader(this.runs, Collections.singletonList(new MockPipelineOutput(Collections.singletonList(anomaly), -1L)));
 
     DataProvider provider = new MockDataProvider()
-        .setLoader(mockLoader);
+        .setLoader(mockLoader).setAnomalies(Collections.emptyList());
 
     DetectionPipelineResult output = new ChildKeepingMergeWrapper(provider, config, 1000, 3000).run();
     List<MergedAnomalyResultDTO> anomalyResults = output.getAnomalies();

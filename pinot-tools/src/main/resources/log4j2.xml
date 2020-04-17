@@ -48,6 +48,9 @@
       <AppenderRef ref="console"/>
     </Root>
     <Logger name="org.apache.pinot" level="info" additivity="false"/>
+    <Logger name="org.apache.pinot" level="error" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
     <Logger name="org.apache.pinot.tools" level="info" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>

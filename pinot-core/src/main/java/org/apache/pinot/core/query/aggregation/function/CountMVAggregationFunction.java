@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -25,6 +26,14 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
+
+  /**
+   * Constructor for the class.
+   * @param column Column name to aggregate on.
+   */
+  public CountMVAggregationFunction(String column) {
+    super(column);
+  }
 
   @Override
   public AggregationFunctionType getType() {
@@ -47,8 +56,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    int[] valueArray = blockValSets[0].getNumMVEntries();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+    int[] valueArray = blockValSetMap.get(_column).getNumMVEntries();
     long count = 0L;
     for (int i = 0; i < length; i++) {
       count += valueArray[i];
@@ -58,8 +67,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    int[] valueArray = blockValSets[0].getNumMVEntries();
+      Map<String, BlockValSet> blockValSetMap) {
+    int[] valueArray = blockValSetMap.get(_column).getNumMVEntries();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
@@ -68,8 +77,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    int[] valueArray = blockValSets[0].getNumMVEntries();
+      Map<String, BlockValSet> blockValSetMap) {
+    int[] valueArray = blockValSetMap.get(_column).getNumMVEntries();
     for (int i = 0; i < length; i++) {
       int value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

@@ -26,7 +26,8 @@
   <parent>
     <artifactId>pinot-file-system</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.3.0-SNAPSHOT</version>
+    <version>${revision}${sha1}</version>
+    <relativePath>..</relativePath>
   </parent>
 
   <artifactId>pinot-gcs</artifactId>
@@ -44,7 +45,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-storage</artifactId>
-      <version>1.101.0</version>
+      <version>1.102.0</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.guava</groupId>
@@ -123,6 +124,11 @@
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
       <artifactId>jersey-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-nio</artifactId>
+      <version>0.120.0-alpha</version>
     </dependency>
   </dependencies>
 </project>
