@@ -39,8 +39,12 @@ public class PinotFSFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSFactory.class);
   private static final String LOCAL_PINOT_FS_SCHEME = "file";
   private static final String CLASS = "class";
+  private static final Map<String, PinotFS> PINOT_FS_MAP = new HashMap<String, PinotFS>() {
+    {
+      put(LOCAL_PINOT_FS_SCHEME, new LocalPinotFS());
+    }
+  };
 
-  private static Map<String, PinotFS> PINOT_FS_MAP = new HashMap<>();
 
   public static void register(String scheme, String fsClassName, Configuration configuration) {
     try {
@@ -65,11 +69,6 @@ public class PinotFSFactory {
       String fsClassName = (String) fsConfig.getProperty(CLASS + "." + key);
       LOGGER.info("Got scheme {}, classname {}, starting to initialize", key, fsClassName);
       register(key, fsClassName, fsConfig.subset(key));
-    }
-
-    if (!PINOT_FS_MAP.containsKey(LOCAL_PINOT_FS_SCHEME)) {
-      LOGGER.info("LocalPinotFS not configured, adding as default");
-      PINOT_FS_MAP.put(LOCAL_PINOT_FS_SCHEME, new LocalPinotFS());
     }
   }
 
