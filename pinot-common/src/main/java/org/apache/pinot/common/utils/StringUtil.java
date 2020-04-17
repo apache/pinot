@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import org.apache.commons.lang.StringUtils;
 
 
+// TODO: Use pinot-spi StringUtils instead
 public class StringUtil {
   private static final char NULL_CHARACTER = '\0';
   private static final String charSet = "UTF-8";
