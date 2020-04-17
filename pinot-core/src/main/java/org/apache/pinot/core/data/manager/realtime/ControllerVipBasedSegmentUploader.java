@@ -41,14 +41,14 @@ public class ControllerVipBasedSegmentUploader implements SegmentUploader {
   }
 
   @Override
-  public UploadStatus segmentUpload(File segmentFile) {
+  public SegmentUploadStatus segmentUpload(File segmentFile) {
     SegmentCompletionProtocol.Response segmentCommitUploadResponse =
         _protocolHandler.segmentCommitUpload(_params, segmentFile, _controllerVipUrl);
     if (!segmentCommitUploadResponse.getStatus()
         .equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
       _segmentLogger.warn("Segment upload failed with response {}", segmentCommitUploadResponse.toJsonString());
-      return new UploadStatus(false, null);
+      return new SegmentUploadStatus(false, null);
     }
-    return new UploadStatus(true, segmentCommitUploadResponse.getSegmentLocation());
+    return new SegmentUploadStatus(true, segmentCommitUploadResponse.getSegmentLocation());
   }
 }

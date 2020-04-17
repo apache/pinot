@@ -40,9 +40,9 @@ public class BestEffortSegmentUploader implements SegmentUploader {
   }
 
   @Override
-  public UploadStatus segmentUpload(File segmentFile) {
+  public SegmentUploadStatus segmentUpload(File segmentFile) {
     if (_segmentStoreUriStr == null) {
-      return new UploadStatus(true, "SERVER:///");
+      return new SegmentUploadStatus(true, "SERVER:///");
     }
     try {
       PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
@@ -52,10 +52,10 @@ public class BestEffortSegmentUploader implements SegmentUploader {
         pinotFS.delete(destUri, true);
       }
       pinotFS.copyFromLocalFile(segmentFile, destUri);
-      return new UploadStatus(true, destUri.toString());
+      return new SegmentUploadStatus(true, destUri.toString());
     } catch (Exception e) {
       _segmentLogger.error("Failed copy segment tar file to segment store {}: {}", segmentFile.getName(), e);
     }
-    return new UploadStatus(true, "SERVER:///");
+    return new SegmentUploadStatus(true, "SERVER:///");
   }
 }

@@ -816,14 +816,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     SegmentCommitter segmentCommitter;
 
     if (isSplitCommit) {
-      SegmentUploader segmentUploader;
-      if (true) {
-        segmentUploader =
+      // TODO: make segement uploader used in the segment committer configurable.
+      SegmentUploader segmentUploader =
             new ControllerVipBasedSegmentUploader(segmentLogger, _protocolHandler, params, controllerVipUrl);
-      } else {
-        segmentUploader = new BestEffortSegmentUploader(segmentLogger, _tableNameWithType,
-            _realtimeTableDataManager.getTableSegmentStoreRootDir());
-      }
       segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
     } else {
       segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);

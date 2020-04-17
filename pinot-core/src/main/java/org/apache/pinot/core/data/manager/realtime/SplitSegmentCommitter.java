@@ -57,11 +57,11 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    UploadStatus uploadStatus = _segmentUploader.segmentUpload(segmentTarFile);
-    if (!uploadStatus.isUploadSuccessful()) {
+    SegmentUploadStatus segmentUploadStatus = _segmentUploader.segmentUpload(segmentTarFile);
+    if (!segmentUploadStatus.isUploadSuccessful()) {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
-    _params.withSegmentLocation(uploadStatus.getSegmentLocation());
+    _params.withSegmentLocation(segmentUploadStatus.getSegmentLocation());
 
     SegmentCompletionProtocol.Response commitEndResponse;
     if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {

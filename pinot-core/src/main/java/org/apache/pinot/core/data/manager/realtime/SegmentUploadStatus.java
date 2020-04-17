@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-public class UploadStatus {
+public class SegmentUploadStatus {
   // True if and only if the upload is successful.
   private boolean uploadSuccessful;
   // Segment location uri string when the upload is successful.
   private String segmentLocation;
 
-  public UploadStatus(boolean uploadSuccessful, String segmentLocation) {
+  public SegmentUploadStatus(boolean uploadSuccessful, String segmentLocation) {
     this.uploadSuccessful = uploadSuccessful;
     this.segmentLocation = segmentLocation;
   }
