@@ -48,13 +48,13 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + column;
+  public String getColumnName() {
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + _column;
   }
 
   @Override
-  public String getResultColumnName(String column) {
-    return AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + _percentile + "mv(" + column + ")";
+  public String getResultColumnName() {
+    return AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + _percentile + "mv(" + _column + ")";
   }
 
   @Override

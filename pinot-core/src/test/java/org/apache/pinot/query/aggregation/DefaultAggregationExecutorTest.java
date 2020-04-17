@@ -20,6 +20,7 @@ package org.apache.pinot.query.aggregation;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -113,10 +114,7 @@ public class DefaultAggregationExecutorTest {
       AggregationInfo aggregationInfo = new AggregationInfo();
       aggregationInfo.setAggregationType(AGGREGATION_FUNCTIONS[i]);
 
-      Map<String, String> params = new HashMap<>();
-      params.put("column", _columns[i]);
-
-      aggregationInfo.setAggregationParams(params);
+      aggregationInfo.setAggregationFunctionArgs(Collections.singletonList(_columns[i]));
       _aggregationInfoList.add(aggregationInfo);
     }
   }

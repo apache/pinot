@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
@@ -80,10 +80,10 @@ public class FunctionCallAstNode extends BaseAstNode {
   }
 
   AggregationInfo buildAggregationInfo() {
-    String expression;
+    List<String> functionArgs = new ArrayList<>();
     // COUNT aggregation function always works on '*'
     if (_name.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      expression = "*";
+      functionArgs.add("*");
     } else {
       List<? extends AstNode> children = getChildren();
       if (children == null || children.isEmpty()) {
@@ -98,25 +98,26 @@ public class FunctionCallAstNode extends BaseAstNode {
             "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name as argument to DISTINCT function");
       }
 
-      Set<String> expressions = new HashSet<>();
-      StringBuilder distinctColumnExpr = new StringBuilder();
-      int numChildren = children.size();
-      for (int i = 0; i < numChildren; ++i) {
-        expression = TransformExpressionTree.getStandardExpression(children.get(i));
-        if (expressions.add(expression)) {
-          // deduplicate the columns
-          if (i != 0) {
-            distinctColumnExpr.append(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
+      // Need to de-dup the args for Distinct.
+      if (_name.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+        Set<String> expressionsSet = new HashSet<>();
+        for (AstNode child : children) {
+          String expression = TransformExpressionTree.getStandardExpression(child);
+
+          if (expressionsSet.add(expression)) {
+            functionArgs.add(expression);
           }
-          distinctColumnExpr.append(expression);
+        }
+      } else {
+        for (AstNode child : children) {
+          functionArgs.add(TransformExpressionTree.getStandardExpression(child));
         }
       }
-      expression = distinctColumnExpr.toString();
     }
 
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(_name);
-    aggregationInfo.putToAggregationParams(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO, expression);
+    aggregationInfo.setAggregationFunctionArgs(functionArgs);
     aggregationInfo.setIsInSelectList(_isInSelectList);
 
     return aggregationInfo;

@@ -49,9 +49,7 @@ public class Aggregation {
     _addCountStar = false;
 
     for (AggregationInfo aggregationInfo : _aggregationsInfo) {
-      Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
-      for (Map.Entry<String, String> entry : aggregationParams.entrySet()) {
-        String column = entry.getValue();
+      for (String column : aggregationInfo.getAggregationFunctionArgs()) {
         // Apparently in case of multiple group by's '*' is replaced by empty/null in brokerRequest.
         if (column == null || column.isEmpty() || column.equals("*")) {
           _addCountStar = true;

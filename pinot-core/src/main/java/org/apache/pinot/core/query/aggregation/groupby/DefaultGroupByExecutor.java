@@ -79,7 +79,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       AggregationFunction function = functionContexts[i].getAggregationFunction();
       _functions[i] = function;
       if (function.getType() != AggregationFunctionType.COUNT) {
-        _aggregationExpressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumn());
+        _aggregationExpressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumnName());
       }
     }
 

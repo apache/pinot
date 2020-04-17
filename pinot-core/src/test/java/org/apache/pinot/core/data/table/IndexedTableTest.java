@@ -20,10 +20,8 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -53,14 +51,15 @@ public class IndexedTableTest {
             ColumnDataType.DOUBLE});
 
     AggregationInfo agg1 = new AggregationInfo();
-    Map<String, String> params1 = new HashMap<>();
-    params1.put("column", "m1");
-    agg1.setAggregationParams(params1);
+    List<String> args1 = new ArrayList<>(1);
+    args1.add("m1");
+    agg1.setAggregationFunctionArgs(args1);
     agg1.setAggregationType("sum");
+
     AggregationInfo agg2 = new AggregationInfo();
-    Map<String, String> params2 = new HashMap<>();
-    params2.put("column", "m2");
-    agg2.setAggregationParams(params2);
+    List<String> args2 = new ArrayList<>(1);
+    args2.add("m2");
+    agg2.setAggregationFunctionArgs(args2);
     agg2.setAggregationType("max");
     List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
 
@@ -136,14 +135,15 @@ public class IndexedTableTest {
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
 
     AggregationInfo agg1 = new AggregationInfo();
-    Map<String, String> params1 = new HashMap<>();
-    params1.put("column", "m1");
-    agg1.setAggregationParams(params1);
+    List<String> args1 = new ArrayList<>(1);
+    args1.add("m1");
+    agg1.setAggregationFunctionArgs(args1);
     agg1.setAggregationType("sum");
+
     AggregationInfo agg2 = new AggregationInfo();
-    Map<String, String> params2 = new HashMap<>();
-    params2.put("column", "m2");
-    agg2.setAggregationParams(params2);
+    List<String> args2 = new ArrayList<>(1);
+    args2.add("m2");
+    agg2.setAggregationFunctionArgs(args2);
     agg2.setAggregationType("max");
     List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
 
@@ -311,14 +311,15 @@ public class IndexedTableTest {
             ColumnDataType.DOUBLE});
 
     AggregationInfo agg1 = new AggregationInfo();
-    Map<String, String> params1 = new HashMap<>();
-    params1.put("column", "m1");
-    agg1.setAggregationParams(params1);
+    List<String> args1 = new ArrayList<>(1);
+    args1.add("m1");
+    agg1.setAggregationFunctionArgs(args1);
     agg1.setAggregationType("sum");
+
     AggregationInfo agg2 = new AggregationInfo();
-    Map<String, String> params2 = new HashMap<>();
-    params2.put("column", "m2");
-    agg2.setAggregationParams(params2);
+    List<String> args2 = new ArrayList<>(1);
+    args2.add("m2");
+    agg2.setAggregationFunctionArgs(args2);
     agg2.setAggregationType("max");
     List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
 

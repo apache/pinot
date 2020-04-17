@@ -37,10 +37,10 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
-import org.apache.pinot.parsers.CompilerConstants;
 
 
 /**
@@ -77,7 +77,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
         brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, Collections.emptyList()));
       } else {
         brokerResponseNative
-            .setSelectionResults(new SelectionResults(Arrays.asList(getDistinctColumns()), Collections.emptyList()));
+            .setSelectionResults(new SelectionResults(getDistinctColumns(), Collections.emptyList()));
       }
       return;
     }
@@ -162,14 +162,12 @@ public class DistinctDataTableReducer implements DataTableReducer {
     return new ResultTable(dataSchema, rows);
   }
 
-  private String[] getDistinctColumns() {
-    return _brokerRequest.getAggregationsInfo().get(0).getAggregationParams()
-        .get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO)
-        .split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
+  private List<String> getDistinctColumns() {
+    return AggregationFunctionUtils.getAggregationArgs(_brokerRequest.getAggregationsInfo().get(0));
   }
 
   private DataSchema getEmptyResultTableDataSchema() {
-    String[] columns = getDistinctColumns();
+    String[] columns = getDistinctColumns().toArray(new String[0]);
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columns.length];
     Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
     return new DataSchema(columns, columnDataTypes);

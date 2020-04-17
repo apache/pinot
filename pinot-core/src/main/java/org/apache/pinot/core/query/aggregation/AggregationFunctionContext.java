@@ -18,19 +18,28 @@
  */
 package org.apache.pinot.core.query.aggregation;
 
+import com.google.common.base.Preconditions;
+import java.util.List;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
 
 /**
  * This class caches miscellaneous data to perform efficient aggregation.
+ *
+ * TODO: Remove this class, as it no longer provides any value after aggregation functions now store
+ * their arguments.
  */
 public class AggregationFunctionContext {
   private final AggregationFunction _aggregationFunction;
-  private final String _column;
+  private final List<String> _arguments;
+  private final String columnName;
 
-  public AggregationFunctionContext(AggregationFunction aggregationFunction, String column) {
+  public AggregationFunctionContext(AggregationFunction aggregationFunction, List<String> arguments) {
+    Preconditions.checkArgument(arguments.size() >= 1, "Aggregation functions require at least one argument.");
     _aggregationFunction = aggregationFunction;
-    _column = column;
+    _arguments = arguments;
+    columnName = AggregationFunctionUtils.concatArgs(arguments);
   }
 
   /**
@@ -41,10 +50,21 @@ public class AggregationFunctionContext {
   }
 
   /**
-   * Returns the aggregation column (could be column name or UDF expression).
+   * Returns the arguments for the aggregation function.
+   *
+   * @return List of Strings containing the arguments for the aggregation function.
    */
-  public String getColumn() {
-    return _column;
+  public List<String> getArguments() {
+    return _arguments;
+  }
+
+  /**
+   * Returns the column for aggregation function.
+   *
+   * @return Aggregation Column (could be column name or UDF expression).
+   */
+  public String getColumnName() {
+    return columnName;
   }
 
   /**
@@ -52,7 +72,7 @@ public class AggregationFunctionContext {
    * <p>E.g. AVG(foo) -> avg_foo
    */
   public String getAggregationColumnName() {
-    return _aggregationFunction.getColumnName(_column);
+    return _aggregationFunction.getColumnName();
   }
 
   /**
@@ -60,6 +80,6 @@ public class AggregationFunctionContext {
    * <p>E.g. AVGMV(foo) -> avgMV(foo)
    */
   public String getResultColumnName() {
-    return _aggregationFunction.getResultColumnName(_column);
+    return _aggregationFunction.getResultColumnName();
   }
 }

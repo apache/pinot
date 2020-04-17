@@ -59,7 +59,7 @@ public class HavingQueryTree extends QueryTree {
       stringBuffer.append(_operator);
     } else {
       stringBuffer.append(_aggregationInfo.getAggregationType()).append("(")
-          .append(_aggregationInfo.getAggregationParams().toString()).append(")").append(" ").append(_operator)
+          .append(_aggregationInfo.getAggregationFunctionArgs().toString()).append(")").append(" ").append(_operator)
           .append(" ").append(_value);
     }
     if (_children != null) {

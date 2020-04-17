@@ -35,7 +35,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.parsers.CompilerConstants;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -147,8 +146,7 @@ public class AggregationGroupByTrimmingServiceTest {
   private static AggregationFunction createAggregationFunction(String aggregationType, String column) {
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(aggregationType);
-    aggregationInfo
-        .setAggregationParams(Collections.singletonMap(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO, column));
+    aggregationInfo.setAggregationFunctionArgs(Collections.singletonList(column));
     return AggregationFunctionFactory.getAggregationFunction(aggregationInfo, new BrokerRequest());
   }
 }

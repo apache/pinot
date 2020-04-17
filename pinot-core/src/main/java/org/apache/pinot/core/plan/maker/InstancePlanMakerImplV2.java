@@ -205,7 +205,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
     if (functionType
         .isOfType(AggregationFunctionType.MIN, AggregationFunctionType.MAX, AggregationFunctionType.MINMAXRANGE)) {
-      String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
+      String expression = AggregationFunctionUtils.getAggregationArgs(aggregationInfo).get(0);
       if (TransformExpressionTree.compileToExpressionTree(expression).isColumn()) {
         Dictionary dictionary = indexSegment.getDataSource(expression).getDictionary();
         return dictionary != null && dictionary.isSorted();

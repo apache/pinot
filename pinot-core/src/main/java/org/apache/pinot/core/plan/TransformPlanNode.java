@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,7 +30,6 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,11 +64,10 @@ public class TransformPlanNode implements PlanNode {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
         if (aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
           // 'DISTINCT(col1, col2 ...)' is modeled as one single aggregation function
-          String[] distinctColumns = AggregationFunctionUtils.getColumn(aggregationInfo)
-              .split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
-          columns.addAll(Arrays.asList(distinctColumns));
+          List<String> distinctColumns = AggregationFunctionUtils.getAggregationArgs(aggregationInfo);
+          columns.addAll(distinctColumns);
         } else if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          columns.add(AggregationFunctionUtils.getColumn(aggregationInfo));
+          columns.addAll(AggregationFunctionUtils.getAggregationArgs(aggregationInfo));
         }
       }
       // Extract group-by expressions

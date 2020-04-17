@@ -48,13 +48,13 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "MV_" + column;
+  public String getColumnName() {
+    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "MV_" + _column;
   }
 
   @Override
-  public String getResultColumnName(String column) {
-    return AggregationFunctionType.PERCENTILE.getName().toLowerCase() + _percentile + "mv(" + column + ")";
+  public String getResultColumnName() {
+    return AggregationFunctionType.PERCENTILE.getName().toLowerCase() + _percentile + "mv(" + _column + ")";
   }
 
   @Override

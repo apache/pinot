@@ -61,24 +61,27 @@ public class TableResizerTest {
     dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)", "distinctcount(m3)", "avg(m4)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.OBJECT});
     AggregationInfo agg1 = new AggregationInfo();
-    Map<String, String> params1 = new HashMap<>(1);
-    params1.put("column", "m1");
-    agg1.setAggregationParams(params1);
+    List<String> args1 = new ArrayList<>(1);
+    args1.add("m1");
+    agg1.setAggregationFunctionArgs(args1);
     agg1.setAggregationType("sum");
+
     AggregationInfo agg2 = new AggregationInfo();
-    Map<String, String> params2 = new HashMap<>(1);
-    params2.put("column", "m2");
-    agg2.setAggregationParams(params2);
+    List<String> args2 = new ArrayList<>(1);
+    args2.add("m2");
+    agg2.setAggregationFunctionArgs(args2);
     agg2.setAggregationType("max");
+
     AggregationInfo agg3 = new AggregationInfo();
-    Map<String, String> params3 = new HashMap<>(1);
-    params3.put("column", "m3");
-    agg3.setAggregationParams(params3);
+    List<String> args3 = new ArrayList<>(1);
+    args3.add("m3");
+    agg3.setAggregationFunctionArgs(args3);
     agg3.setAggregationType("distinctcount");
+
     AggregationInfo agg4 = new AggregationInfo();
-    Map<String, String> params4 = new HashMap<>(1);
-    params4.put("column", "m4");
-    agg4.setAggregationParams(params4);
+    List<String> args4 = new ArrayList<>(1);
+    args4.add("m4");
+    agg4.setAggregationFunctionArgs(args4);
     agg4.setAggregationType("avg");
     aggregationInfos = Lists.newArrayList(agg1, agg2, agg3, agg4);
 

@@ -89,8 +89,7 @@ public class BrokerRequestComparisonUtils {
           return false;
         }
       } else if (br2.getGroupBy() != null) {
-        LOGGER.error("tGroupBy did not match, br1.getGroupBy() = null, br2.getGroupBy() = {}",
-            br2.getGroupBy());
+        LOGGER.error("tGroupBy did not match, br1.getGroupBy() = null, br2.getGroupBy() = {}", br2.getGroupBy());
         return false;
       }
       if (br1.getAggregationsInfo() != null) {
@@ -114,8 +113,7 @@ public class BrokerRequestComparisonUtils {
             return false;
           }
         } else if (br2.getOrderBy() != null) {
-          LOGGER.error("OrderBy did not match, br1.getOrderBy() = null, br2.getOrderBy() = {}",
-              br2.getOrderBy());
+          LOGGER.error("OrderBy did not match, br1.getOrderBy() = null, br2.getOrderBy() = {}", br2.getOrderBy());
           return false;
         }
       }
@@ -178,22 +176,19 @@ public class BrokerRequestComparisonUtils {
       LOGGER.error("Failed to validate AggregationInfo: AggregationType doesn't match.\n\t{}\n\t{}", agg1, agg2);
       return false;
     }
-    if (agg1.getAggregationParamsSize() != agg2.getAggregationParamsSize()) {
-      LOGGER.error("Failed to validate AggregationInfo: AggregationParamsSize doesn't match.\n\t{}\n\t{}", agg1, agg2);
+    if (agg1.getAggregationFunctionArgsSize() != agg2.getAggregationFunctionArgsSize()) {
+      LOGGER.error("Failed to validate AggregationInfo: AggregationFunctionArgs doesn't match.\n\t{}\n\t{}", agg1, agg2);
       return false;
     }
-    for (int i = 0; i < agg1.getAggregationParamsSize(); i++) {
-      for (String key : agg1.getAggregationParams().keySet()) {
-        if (!agg1.getAggregationParams().get(key).equals(agg2.getAggregationParams().get(key))) {
-          LOGGER
-              .error("Failed to validate AggregationInfo: AggregationParams at key {} doesn't match.\n\t{}\n\t{}", key,
-                  agg1.getAggregationParams().get(key), agg2.getAggregationParams().get(key));
-          return false;
-        }
+    for (int i = 0; i < agg1.getAggregationFunctionArgsSize(); i++) {
+      if (!agg1.getAggregationFunctionArgs().get(i).equals(agg2.getAggregationFunctionArgs().get(i))) {
+        LOGGER.error("Failed to validate AggregationInfo: AggregationFunctionArg mis-match.\n\t{}\n\t{}",
+            agg1.getAggregationFunctionArgs().get(i), agg1.getAggregationFunctionArgs().get(i));
+        return false;
       }
     }
     return true;
-  }
+}
 
   private static boolean validateGroupBy(GroupBy groupBy1, GroupBy groupBy2) {
     if (groupBy1.getTopN() != groupBy2.getTopN()) {

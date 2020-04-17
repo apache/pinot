@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import javax.annotation.Nullable;
@@ -41,18 +42,38 @@ public class AggregationFunctionUtils {
 
   /**
    * Extracts the aggregation column (could be column name or UDF expression) from the {@link AggregationInfo}.
+   *
+   *
    */
-  public static String getColumn(AggregationInfo aggregationInfo) {
-    return aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO);
+  /**
+   * Returns the arguments for {@link AggregationFunction} as List of Strings.
+   * For backward compatibility, it uses the new Thrift field aggregationFunctionArgs if found, or else,
+   * falls back to the previous aggregationParams based approach.
+   *
+   * @param aggregationInfo Aggregation Info
+   * @return List of aggregation function arguments
+   */
+  public static List<String> getAggregationArgs(AggregationInfo aggregationInfo) {
+    List<String> aggregationFunctionArgs = aggregationInfo.getAggregationFunctionArgs();
+    if (aggregationFunctionArgs != null) {
+      return aggregationFunctionArgs;
+    }
+
+    String params = aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO);
+    return Arrays.asList(params.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR));
   }
 
   /**
    * Creates an {@link AggregationFunctionColumnPair} from the {@link AggregationInfo}.
+   * Asserts that the function only expects one argument.
    */
   public static AggregationFunctionColumnPair getFunctionColumnPair(AggregationInfo aggregationInfo) {
+    List<String> aggregationArgs = getAggregationArgs(aggregationInfo);
+    int numArgs = aggregationArgs.size();
     AggregationFunctionType functionType =
         AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
-    return new AggregationFunctionColumnPair(functionType, getColumn(aggregationInfo));
+    Preconditions.checkState(numArgs == 1, "Expected one argument for '" + functionType + "', got: " + numArgs);
+    return new AggregationFunctionColumnPair(functionType, aggregationArgs.get(0));
   }
 
   public static boolean isDistinct(AggregationFunctionContext[] functionContexts) {
@@ -75,10 +96,10 @@ public class AggregationFunctionUtils {
    */
   public static AggregationFunctionContext getAggregationFunctionContext(AggregationInfo aggregationInfo,
       @Nullable BrokerRequest brokerRequest) {
-    String column = getColumn(aggregationInfo);
+    List<String> aggregationArgs = getAggregationArgs(aggregationInfo);
     AggregationFunction aggregationFunction =
         AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    return new AggregationFunctionContext(aggregationFunction, column);
+    return new AggregationFunctionContext(aggregationFunction, aggregationArgs);
   }
 
   public static AggregationFunctionContext[] getAggregationFunctionContexts(BrokerRequest brokerRequest) {
@@ -148,5 +169,16 @@ public class AggregationFunctionUtils {
     int percentile = Integer.parseInt(percentileString);
     Preconditions.checkState(percentile >= 0 && percentile <= 100);
     return percentile;
+  }
+
+  /**
+   * Helper function to concatenate arguments using separator.
+   *
+   * @param arguments Arguments to concatenate
+   * @return Concatenated String of arguments
+   */
+  public static String concatArgs(List<String> arguments) {
+    return (arguments.size() > 1) ? String.join(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR, arguments)
+        : arguments.get(0);
   }
 }

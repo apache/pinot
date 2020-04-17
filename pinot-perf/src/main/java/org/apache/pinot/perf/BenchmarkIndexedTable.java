@@ -20,10 +20,8 @@ package org.apache.pinot.perf;
 
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -40,7 +38,6 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.util.trace.TraceRunnable;
@@ -97,14 +94,15 @@ public class BenchmarkIndexedTable {
             DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
 
     AggregationInfo agg1 = new AggregationInfo();
-    Map<String, String> params1 = new HashMap<>();
-    params1.put("column", "m1");
-    agg1.setAggregationParams(params1);
+    List<String> args1 = new ArrayList<>();
+    args1.add("m1");
+    agg1.setAggregationFunctionArgs(args1);
     agg1.setAggregationType("sum");
+
     AggregationInfo agg2 = new AggregationInfo();
-    Map<String, String> params2 = new HashMap<>();
-    params2.put("column", "m2");
-    agg2.setAggregationParams(params2);
+    List<String> args2 = new ArrayList<>();
+    args2.add("m2");
+    agg2.setAggregationFunctionArgs(args2);
     agg2.setAggregationType("max");
     _aggregationInfos = Lists.newArrayList(agg1, agg2);
 
