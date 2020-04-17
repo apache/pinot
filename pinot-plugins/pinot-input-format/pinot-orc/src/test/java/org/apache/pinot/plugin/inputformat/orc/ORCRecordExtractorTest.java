@@ -24,25 +24,23 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
+import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
-import org.apache.orc.mapred.OrcList;
-import org.apache.orc.mapred.OrcMapredRecordWriter;
-import org.apache.orc.mapred.OrcStruct;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.StringUtils;
 
 
 /**
- * Tests the {@link ORCRecordExtractor} using a schema containing groovy transform functions
+ * Tests the {@link ORCRecordReader} using a schema containing groovy transform functions
  */
 public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
-
   private final File _dataFile = new File(_tempDir, "events.orc");
 
   /**
@@ -62,41 +60,61 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected void createInputFile()
       throws IOException {
-    TypeDescription schema = TypeDescription.createStruct();
-    schema.addField("user_id", TypeDescription.createInt());
-    schema.addField("firstName", TypeDescription.createString());
-    schema.addField("lastName", TypeDescription.createString());
-    TypeDescription typeBids = TypeDescription.createList(TypeDescription.createInt());
-    schema.addField("bids", typeBids);
-    schema.addField("campaignInfo", TypeDescription.createString());
-    schema.addField("cost", TypeDescription.createDouble());
-    schema.addField("timestamp", TypeDescription.createLong());
-
+    TypeDescription schema = TypeDescription.fromString(
+        "struct<user_id:int,firstName:string,lastName:string,bids:array<int>,campaignInfo:string,cost:double,timestamp:bigint>");
     Writer writer = OrcFile.createWriter(new Path(_dataFile.getAbsolutePath()),
         OrcFile.writerOptions(new Configuration()).setSchema(schema));
-    OrcMapredRecordWriter mrRecordWriter = new OrcMapredRecordWriter(writer);
-    for (Map<String, Object> inputRecord : _inputRecords) {
-      OrcStruct struct = new OrcStruct(schema);
-      Integer userID = (Integer) inputRecord.get("user_id");
-      struct.setFieldValue("user_id", userID == null ? null : new IntWritable(userID));
-      String firstName = (String) inputRecord.get("firstName");
-      struct.setFieldValue("firstName", firstName == null ? null : new Text(firstName));
-      struct.setFieldValue("lastName", new Text((String) inputRecord.get("lastName")));
-      List<Integer> bids = (List<Integer>) inputRecord.get("bids");
-      if (bids != null) {
-        OrcList<IntWritable> bidsList = new OrcList<>(typeBids);
-        for (Integer bid : bids) {
-          bidsList.add(new IntWritable(bid));
-        }
-        struct.setFieldValue("bids", bidsList);
+
+    int numRecords = _inputRecords.size();
+    VectorizedRowBatch rowBatch = schema.createRowBatch(numRecords);
+    LongColumnVector userIdVector = (LongColumnVector) rowBatch.cols[0];
+    userIdVector.noNulls = false;
+    BytesColumnVector firstNameVector = (BytesColumnVector) rowBatch.cols[1];
+    firstNameVector.noNulls = false;
+    BytesColumnVector lastNameVector = (BytesColumnVector) rowBatch.cols[2];
+    ListColumnVector bidsVector = (ListColumnVector) rowBatch.cols[3];
+    bidsVector.noNulls = false;
+    LongColumnVector bidsElementVector = (LongColumnVector) bidsVector.child;
+    bidsElementVector.ensureSize(6, false);
+    BytesColumnVector campaignInfoVector = (BytesColumnVector) rowBatch.cols[4];
+    DoubleColumnVector costVector = (DoubleColumnVector) rowBatch.cols[5];
+    LongColumnVector timestampVector = (LongColumnVector) rowBatch.cols[6];
+
+    for (int i = 0; i < numRecords; i++) {
+      Map<String, Object> record = _inputRecords.get(i);
+
+      Integer userId = (Integer) record.get("user_id");
+      if (userId != null) {
+        userIdVector.vector[i] = userId;
       } else {
-        struct.setFieldValue("bids", null);
+        userIdVector.isNull[i] = true;
       }
-      struct.setFieldValue("campaignInfo", new Text((String) inputRecord.get("campaignInfo")));
-      struct.setFieldValue("cost", new DoubleWritable((Double) inputRecord.get("cost")));
-      struct.setFieldValue("timestamp", new LongWritable((Long) inputRecord.get("timestamp")));
-      mrRecordWriter.write(null, struct);
+      String firstName = (String) record.get("firstName");
+      if (firstName != null) {
+        firstNameVector.setVal(i, StringUtils.encodeUtf8(firstName));
+      } else {
+        firstNameVector.isNull[i] = true;
+      }
+      lastNameVector.setVal(i, StringUtils.encodeUtf8((String) record.get("lastName")));
+      List<Integer> bids = (List<Integer>) record.get("bids");
+      if (bids != null) {
+        bidsVector.offsets[i] = bidsVector.childCount;
+        bidsVector.lengths[i] = bids.size();
+        for (int bid : bids) {
+          bidsElementVector.vector[bidsVector.childCount++] = bid;
+        }
+      } else {
+        bidsVector.isNull[i] = true;
+      }
+      campaignInfoVector.setVal(i, StringUtils.encodeUtf8((String) record.get("campaignInfo")));
+      costVector.vector[i] = (double) record.get("cost");
+      timestampVector.vector[i] = (long) record.get("timestamp");
+
+      rowBatch.size++;
     }
-    mrRecordWriter.close(null);
+
+    writer.addRowBatch(rowBatch);
+    rowBatch.reset();
+    writer.close();
   }
 }
