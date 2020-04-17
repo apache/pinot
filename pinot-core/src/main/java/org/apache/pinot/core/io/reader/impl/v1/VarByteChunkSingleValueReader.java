@@ -42,9 +42,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
    */
   public VarByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer) {
     super(pinotDataBuffer);
-
-    int chunkHeaderSize = _numDocsPerChunk * Integer.BYTES;
-    _maxChunkSize = chunkHeaderSize + (_lengthOfLongestEntry * _numDocsPerChunk);
+    _maxChunkSize = _numDocsPerChunk * (VarByteChunkSingleValueWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + _lengthOfLongestEntry);
   }
 
   @Override

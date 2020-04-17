@@ -44,6 +44,7 @@ import javax.annotation.Nonnull;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
@@ -162,8 +163,9 @@ public class TextIndexHandler {
     try (LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true)) {
       try (DataFileReader forwardIndexReader = getForwardIndexReader(columnMetadata)) {
         VarByteChunkSingleValueReader forwardIndex = (VarByteChunkSingleValueReader) forwardIndexReader;
+        ChunkReaderContext readerContext = forwardIndex.createContext();
         for (int docID = 0; docID < numDocs; docID++) {
-          Object docToAdd = forwardIndex.getString(docID);
+          Object docToAdd = forwardIndex.getString(docID, readerContext);
           textIndexCreator.addDoc(docToAdd, docID);
         }
         textIndexCreator.seal();
