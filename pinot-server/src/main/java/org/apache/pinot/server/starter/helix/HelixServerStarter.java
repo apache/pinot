@@ -156,7 +156,7 @@ public class HelixServerStarter {
     // Start restlet server for admin API endpoint
     String accessControlFactoryClass =
         _serverConf.getString(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
-    LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);
+    LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
     final AccessControlFactory accessControlFactory;
     try {
       accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
