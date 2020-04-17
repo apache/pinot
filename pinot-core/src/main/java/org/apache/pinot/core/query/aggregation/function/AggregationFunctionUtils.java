@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import java.io.Serializable;
 import java.util.List;
@@ -27,9 +28,8 @@ import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.parsers.CompilerConstants;
 
 
 /**
@@ -39,13 +39,11 @@ public class AggregationFunctionUtils {
   private AggregationFunctionUtils() {
   }
 
-  public static final String COLUMN_KEY = FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO;
-
   /**
    * Extracts the aggregation column (could be column name or UDF expression) from the {@link AggregationInfo}.
    */
   public static String getColumn(AggregationInfo aggregationInfo) {
-    return aggregationInfo.getAggregationParams().get(COLUMN_KEY);
+    return aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO);
   }
 
   /**
@@ -137,5 +135,18 @@ public class AggregationFunctionUtils {
     } else {
       return value.toString();
     }
+  }
+
+  /**
+   * Utility function to parse percentile value from string.
+   * Asserts that percentile value is within 0 and 100.
+   *
+   * @param percentileString Input String
+   * @return Percentile value parsed from String.
+   */
+  public static int parsePercentile(String percentileString) {
+    int percentile = Integer.parseInt(percentileString);
+    Preconditions.checkState(percentile >= 0 && percentile <= 100);
+    return percentile;
   }
 }

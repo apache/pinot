@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.startree.executor;
 
+import java.util.Collections;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -42,10 +45,18 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
  */
 public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
 
+  // StarTree converts column names from min(col) to min__col, this is to store the original mapping.
+  private final String[] _functionArgs;
+
   public StarTreeGroupByExecutor(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
       int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator) {
     super(StarTreeUtils.createStarTreeFunctionContexts(functionContexts), groupBy, maxInitialResultHolderCapacity,
         numGroupsLimit, transformOperator);
+
+    _functionArgs = new String[functionContexts.length];
+    for (int i = 0; i < functionContexts.length; i++) {
+      _functionArgs[i] = functionContexts[i].getColumn();
+    }
   }
 
   @Override
@@ -53,20 +64,19 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
     AggregationFunction function = _functions[functionIndex];
     GroupByResultHolder resultHolder = _resultHolders[functionIndex];
 
+    BlockValSet blockValueSet;
     if (function.getType() == AggregationFunctionType.COUNT) {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(AggregationFunctionColumnPair.COUNT_STAR_COLUMN_NAME);
-      if (_hasMVGroupByExpression) {
-        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValueSet);
-      } else {
-        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValueSet);
-      }
+      blockValueSet = transformBlock.getBlockValueSet(AggregationFunctionColumnPair.COUNT_STAR_COLUMN_NAME);
     } else {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_aggregationExpressions[functionIndex].getValue());
-      if (_hasMVGroupByExpression) {
-        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValueSet);
-      } else {
-        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValueSet);
-      }
+      TransformExpressionTree aggregationExpression = _aggregationExpressions[functionIndex];
+      blockValueSet = transformBlock.getBlockValueSet(aggregationExpression.getValue());
+    }
+
+    Map<String, BlockValSet> blockValSetMap = Collections.singletonMap(_functionArgs[functionIndex], blockValueSet);
+    if (_hasMVGroupByExpression) {
+      function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValSetMap);
+    } else {
+      function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValSetMap);
     }
   }
 }

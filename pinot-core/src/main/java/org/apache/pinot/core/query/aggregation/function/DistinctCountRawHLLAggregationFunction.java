@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -30,12 +31,20 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 public class DistinctCountRawHLLAggregationFunction implements AggregationFunction<HyperLogLog, SerializedHLL> {
   private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
-  public DistinctCountRawHLLAggregationFunction() {
-    this(new DistinctCountHLLAggregationFunction());
+  protected final String _column;
+
+  /**
+   * Constructor for the class.
+   * @param column Column name to aggregate on.
+   */
+  public DistinctCountRawHLLAggregationFunction(String column) {
+    this(new DistinctCountHLLAggregationFunction(column), column);
   }
 
-  DistinctCountRawHLLAggregationFunction(DistinctCountHLLAggregationFunction distinctCountHLLAggregationFunction) {
+  DistinctCountRawHLLAggregationFunction(DistinctCountHLLAggregationFunction distinctCountHLLAggregationFunction,
+      String column) {
     _distinctCountHLLAggregationFunction = distinctCountHLLAggregationFunction;
+    _column = column;
   }
 
   @Override
@@ -59,20 +68,22 @@ public class DistinctCountRawHLLAggregationFunction implements AggregationFuncti
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    _distinctCountHLLAggregationFunction.aggregate(length, aggregationResultHolder, blockValSets);
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<String, BlockValSet> blockValSetMap) {
+    _distinctCountHLLAggregationFunction.aggregate(length, aggregationResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    _distinctCountHLLAggregationFunction.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSets);
+      Map<String, BlockValSet> blockValSetMap) {
+    _distinctCountHLLAggregationFunction.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    _distinctCountHLLAggregationFunction.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSets);
+      Map<String, BlockValSet> blockValSetMap) {
+    _distinctCountHLLAggregationFunction
+        .aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override

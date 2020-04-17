@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.SelectionSort;
@@ -34,7 +35,6 @@ import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
 /**
@@ -46,8 +46,15 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   private final List<SelectionSort> _orderBy;
   private final int _capacity;
 
-  public DistinctAggregationFunction(String multiColumnExpression, List<SelectionSort> orderBy, int limit) {
-    _columns = multiColumnExpression.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+  /**
+   * Constructor for the class.
+   *
+   * @param columns Distinct columns to return
+   * @param orderBy Order By clause
+   * @param limit Limit clause
+   */
+  public DistinctAggregationFunction(List<String> columns, List<SelectionSort> orderBy, int limit) {
+    _columns = columns.toArray(new String[columns.size()]);
     _orderBy = orderBy;
     // NOTE: DISTINCT with order-by is similar to group-by with order-by, where we limit the maximum number of unique
     //       records (groups) for each query to reduce the memory footprint. The result might not be 100% accurate in
@@ -71,16 +78,23 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
     int numColumns = _columns.length;
-    Preconditions.checkState(blockValSets.length == numColumns, "Size mismatch: numBlockValSets = %s, numColumns = %s",
-        blockValSets.length, numColumns);
+    int numBlockValSets = blockValSetMap.size();
+    Preconditions.checkState(numBlockValSets == numColumns, "Size mismatch: numBlockValSets = %s, numColumns = %s",
+        numBlockValSets, numColumns);
 
     DistinctTable distinctTable = aggregationResultHolder.getResult();
+    BlockValSet[] blockValSets = new BlockValSet[numColumns];
+
+    for (int i = 0; i < numColumns; i++) {
+      blockValSets[i] = blockValSetMap.get(_columns[i]);
+    }
+
     if (distinctTable == null) {
       ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
       for (int i = 0; i < numColumns; i++) {
-        columnDataTypes[i] = ColumnDataType.fromDataTypeSV(blockValSets[i].getValueType());
+        columnDataTypes[i] = ColumnDataType.fromDataTypeSV(blockValSetMap.get(_columns[i]).getValueType());
       }
       DataSchema dataSchema = new DataSchema(_columns, columnDataTypes);
       distinctTable = new DistinctTable(dataSchema, _orderBy, _capacity);
@@ -148,13 +162,13 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
+      Map<String, BlockValSet> blockValSetMap) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
+      Map<String, BlockValSet> blockValSetMap) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 

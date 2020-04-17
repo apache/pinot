@@ -39,7 +39,6 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.QueryConfig;
 import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.config.TableType;
@@ -851,7 +850,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testDistinctQuery()
       throws Exception {
-    Pql2Compiler.ENABLE_DISTINCT = true;
     // by default 10 rows will be returned, so use high limit
     String pql = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
     String sql = "SELECT DISTINCT Carrier FROM mytable";
