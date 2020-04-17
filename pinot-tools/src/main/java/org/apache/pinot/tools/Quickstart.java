@@ -140,7 +140,7 @@ public class Quickstart {
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
+    File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request =
         new QuickstartTableRequest("baseballStats", schemaFile, tableConfigFile, ingestionJobSpecFile, quickStartDataDir, FileFormat.CSV);

@@ -122,7 +122,7 @@ public class HybridQuickstart {
     QuickstartTableRequest offlineRequest = prepareOfflineTableRequest();
     QuickstartTableRequest realtimeTableRequest = prepareRealtimeTableRequest();
 
-    File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
+    File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
     final QuickstartRunner runner =
         new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 1, 1, 1, tempDir);
