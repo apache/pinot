@@ -163,8 +163,8 @@ public class HelixServerStarter {
       accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Caught exception while creating new AccessControlFactory instance in class " + this.getClass()
-              .getSimpleName(), e);
+          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
+              + "'", e);
     }
 
     int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
