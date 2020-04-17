@@ -339,7 +339,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int totalDocs = _segmentMetadata.getTotalDocs();
     Object defaultValue = fieldSpec.getDefaultNullValue();
     String stringDefaultValue = (String) defaultValue;
-    int lengthOfLongestEntry = stringDefaultValue.getBytes(Charset.forName("UTF-8")).length;
+    int lengthOfLongestEntry = StringUtil.encodeUtf8(stringDefaultValue).length;
     int dictionaryElementSize = 0;
 
     SingleValueVarByteRawIndexCreator rawIndexCreator =

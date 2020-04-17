@@ -28,7 +28,7 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCreator {
-  private static final int TARGET_MAX_CHUNK_SIZE = 1024*1024;
+  private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
   private final VarByteChunkSingleValueWriter _indexWriter;
 

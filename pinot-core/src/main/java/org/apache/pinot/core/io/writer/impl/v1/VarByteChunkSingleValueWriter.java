@@ -62,6 +62,7 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
    * @param file File to write to.
    * @param compressionType Type of compression to use.
    * @param totalDocs Total number of docs to write.
+   * @param numDocsPerChunk Number of documents per chunk.
    * @param lengthOfLongestEntry Length of longest entry (in bytes).
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
