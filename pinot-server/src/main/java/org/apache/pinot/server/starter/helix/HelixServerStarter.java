@@ -65,6 +65,7 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -159,9 +160,11 @@ public class HelixServerStarter {
     LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
     final AccessControlFactory accessControlFactory;
     try {
-      accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
+      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while creating new AccessControlFactory instance", e);
+      throw new RuntimeException(
+          "Caught exception while creating new AccessControlFactory instance in class " + this.getClass()
+              .getSimpleName(), e);
     }
 
     int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
