@@ -27,7 +27,6 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProviderChain;
 import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.SystemPropertyCredentialsProvider;
 import software.amazon.awssdk.core.ResponseBytes;
@@ -66,10 +65,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.MetadataDirective;
 
-import static com.google.common.base.Preconditions.checkState;
-import static java.util.Objects.requireNonNull;
-import static joptsimple.internal.Strings.isNullOrEmpty;
-import static org.glassfish.jersey.internal.guava.Preconditions.checkArgument;
+import com.google.common.base.Preconditions;
 
 
 public class S3PinotFS extends PinotFS {
@@ -83,7 +79,7 @@ public class S3PinotFS extends PinotFS {
 
   @Override
   public void init(Configuration config) {
-    checkArgument(!isNullOrEmpty(config.getString(REGION)));
+    Preconditions.checkArgument(!isNullOrEmpty(config.getString(REGION)));
     String region = config.getString(REGION);
 
     AwsCredentialsProvider awsCredentialsProvider;
@@ -106,6 +102,10 @@ public class S3PinotFS extends PinotFS {
     }
   }
 
+  boolean isNullOrEmpty(String target) {
+    return target == null || "".equals(target);
+  }
+
   private HeadObjectResponse getS3ObjectMetadata(URI uri)
       throws IOException {
     URI base = getBase(uri);
@@ -121,7 +121,7 @@ public class S3PinotFS extends PinotFS {
 
   private String normalizeToDirectoryPrefix(URI uri)
       throws IOException {
-    requireNonNull(uri, "uri is null");
+    Preconditions.checkNotNull(uri, "uri is null");
     URI strippedUri = getBase(uri).relativize(uri);
     if (isPathTerminatedByDelimiter(strippedUri)) {
       return sanitizePath(strippedUri.getPath());
@@ -229,7 +229,7 @@ public class S3PinotFS extends PinotFS {
       throws IOException {
     LOGGER.info("mkdir {}", uri);
     try {
-      requireNonNull(uri, "uri is null");
+      Preconditions.checkNotNull(uri, "uri is null");
       String path = normalizeToDirectoryPrefix(uri);
       // Bucket root directory already exists and cannot be created
       if (path.equals(DELIMITER)) {
@@ -253,8 +253,9 @@ public class S3PinotFS extends PinotFS {
     try {
       if (isDirectory(segmentUri)) {
         if (!forceDelete) {
-          checkState(isEmptyDirectory(segmentUri), "ForceDelete flag is not set and directory '%s' is not empty",
-              segmentUri);
+          Preconditions
+              .checkState(isEmptyDirectory(segmentUri), "ForceDelete flag is not set and directory '%s' is not empty",
+                  segmentUri);
         }
         String prefix = normalizeToDirectoryPrefix(segmentUri);
         ListObjectsV2Response listObjectsV2Response;
@@ -309,7 +310,7 @@ public class S3PinotFS extends PinotFS {
   public boolean copy(URI srcUri, URI dstUri)
       throws IOException {
     LOGGER.info("Copying uri {} to uri {}", srcUri, dstUri);
-    checkState(exists(srcUri), "Source URI '%s' does not exist", srcUri);
+    Preconditions.checkState(exists(srcUri), "Source URI '%s' does not exist", srcUri);
     if (srcUri.equals(dstUri)) {
       return true;
     }
@@ -355,9 +356,9 @@ public class S3PinotFS extends PinotFS {
   public long length(URI fileUri)
       throws IOException {
     try {
-      checkState(!isPathTerminatedByDelimiter(fileUri), "URI is a directory");
+      Preconditions.checkState(!isPathTerminatedByDelimiter(fileUri), "URI is a directory");
       HeadObjectResponse s3ObjectMetadata = getS3ObjectMetadata(fileUri);
-      checkState((s3ObjectMetadata != null), "File '%s' does not exist", fileUri);
+      Preconditions.checkState((s3ObjectMetadata != null), "File '%s' does not exist", fileUri);
       if (s3ObjectMetadata.contentLength() == null) {
         return 0;
       }
