@@ -350,6 +350,73 @@ public class TableConfigTest {
     }
   }
 
+  @Test
+  public void testIngestionMode() {
+    // test append table no.1
+    IngestionModeConfig ingestionModeConfig = new IngestionModeConfig("abc", null,
+        null, null, null);
+    assertFalse(ingestionModeConfig.isForUpsert());
+
+    ingestionModeConfig = new IngestionModeConfig("append", null,
+        null, null, null);
+    assertFalse(ingestionModeConfig.isForUpsert());
+
+    ingestionModeConfig = new IngestionModeConfig("APPEND", null,
+        null, null, null);
+    assertFalse(ingestionModeConfig.isForUpsert());
+
+    // test append table no.2
+    ingestionModeConfig = new IngestionModeConfig(null, null, null,
+        null, null);
+    assertFalse(ingestionModeConfig.isForUpsert());
+
+    // test regular upsert table
+    ingestionModeConfig = new IngestionModeConfig("upsert", ImmutableList.of("primaryKey"),
+        "offset", "validFrom", "validUntil");
+    assertTrue(ingestionModeConfig.isForUpsert());
+    assertEquals(1, ingestionModeConfig.getPrimaryKeys().size());
+    assertEquals("primaryKey", ingestionModeConfig.getPrimaryKeys().get(0));
+    assertEquals("offset", ingestionModeConfig.getOffsetKey());
+    assertEquals("validFrom", ingestionModeConfig.getValidFromKey());
+    assertEquals("validUntil", ingestionModeConfig.getValidUntilKey());
+
+    ingestionModeConfig = new IngestionModeConfig("UPSERT", ImmutableList.of("primaryKey"),
+        "offset", "validFrom", "validUntil");
+    assertTrue(ingestionModeConfig.isForUpsert());
+
+    // test sanity check
+    try {
+      ingestionModeConfig = new IngestionModeConfig("UPSERT", null,
+          "offset", "validFrom", "validUntil");
+      fail();
+    } catch (RuntimeException ex) {}
+
+    try {
+      ingestionModeConfig = new IngestionModeConfig("UPSERT", ImmutableList.of("pk1", "pk2"),
+          "offset", "validFrom", "validUntil");
+      fail();
+    } catch (RuntimeException ex) {}
+
+    try {
+      ingestionModeConfig = new IngestionModeConfig("UPSERT", ImmutableList.of("pk1"),
+          null, "validFrom", "validUntil");
+      fail();
+    } catch (RuntimeException ex) {}
+
+    try {
+      ingestionModeConfig = new IngestionModeConfig("UPSERT", ImmutableList.of("pk1"),
+          "offset", null, "validUntil");
+      fail();
+    } catch (RuntimeException ex) {}
+
+    try {
+      ingestionModeConfig = new IngestionModeConfig("UPSERT", ImmutableList.of("pk1"),
+          "offset", "validFrom", null);
+      fail();
+    } catch (RuntimeException ex) {}
+
+  }
+
   private void compareConfigHavingFieldConfig(TableConfig toCompare, Map<String, String> properties,
       Map<String, String> properties1) {
     List<FieldConfig> fieldConfigs = toCompare.getFieldConfigList();

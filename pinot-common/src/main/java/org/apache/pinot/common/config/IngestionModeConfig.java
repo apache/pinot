@@ -80,6 +80,10 @@ public class IngestionModeConfig {
           "pinot upsert require one and only one primary key");
       Preconditions.checkState(StringUtils.isNotEmpty(_offsetKey),
           "pinot upsert require one offset key");
+      Preconditions.checkState(StringUtils.isNotEmpty(_validFromKey),
+          "pinot upsert require one validFrom key");
+      Preconditions.checkState(StringUtils.isNotEmpty(_validUntilKey),
+          "pinot upsert require one validUntil key");
     }
   }
 

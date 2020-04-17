@@ -24,8 +24,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-
-import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -68,11 +66,9 @@ public final class Schema {
 
   // Json ignored fields
   private transient final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
-  private transient final Map<String, FieldSpec> _physicalFieldSpecMap = new HashMap<>();
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
-
 
   public static Schema fromFile(File schemaFile)
       throws IOException {
@@ -195,9 +191,6 @@ public final class Schema {
     }
 
     _fieldSpecMap.put(columnName, fieldSpec);
-    if (!fieldSpec.isVirtualColumnField()) {
-      _physicalFieldSpecMap.put(columnName, fieldSpec);
-    }
   }
 
   @Deprecated
@@ -208,9 +201,6 @@ public final class Schema {
 
   public boolean removeField(String columnName) {
     FieldSpec existingFieldSpec = _fieldSpecMap.remove(columnName);
-    if (_physicalFieldSpecMap.containsKey(columnName)) {
-      _physicalFieldSpecMap.remove(columnName);
-    }
     if (existingFieldSpec != null) {
       FieldType fieldType = existingFieldSpec.getFieldType();
       switch (fieldType) {
@@ -269,12 +259,6 @@ public final class Schema {
   @JsonIgnore
   public Collection<FieldSpec> getAllFieldSpecs() {
     return _fieldSpecMap.values();
-  }
-
-  @JsonIgnore
-  @Nonnull
-  public Collection<FieldSpec> getAllPhysicalFieldSpecs() {
-    return _physicalFieldSpecMap.values();
   }
 
   public int size() {
@@ -373,7 +357,6 @@ public final class Schema {
       }
       jsonObject.set("dateTimeFieldSpecs", jsonArray);
     }
-
     return jsonObject;
   }
 
@@ -453,11 +436,6 @@ public final class Schema {
     }
 
     return true;
-  }
-
-  public boolean isVirtualColumn(String columnName) {
-    return columnName.startsWith("$") || (getFieldSpecFor(columnName).getVirtualColumnProvider() != null
-        && !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
   }
 
   public static class SchemaBuilder {
@@ -618,7 +596,6 @@ public final class Schema {
         .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
         .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
         .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
-
   }
 
   /**
@@ -628,6 +605,7 @@ public final class Schema {
    * @param oldSchema old schema
    * @return
    */
+
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
     if (!EqualityUtils.isEqual(_timeFieldSpec, oldSchema.getTimeFieldSpec()) || !EqualityUtils
         .isEqual(_dateTimeFieldSpecs, oldSchema.getDateTimeFieldSpecs())) {
