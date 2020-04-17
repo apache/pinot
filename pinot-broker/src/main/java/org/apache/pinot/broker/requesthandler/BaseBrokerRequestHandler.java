@@ -24,7 +24,6 @@ import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -66,12 +65,11 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
-import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.spi.config.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -441,17 +439,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if (brokerRequest.isSetAggregationsInfo()) {
       for (AggregationInfo info : brokerRequest.getAggregationsInfo()) {
-        if (info.getAggregationParams() != null && !info.getAggregationType()
-            .equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          String column = info.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO);
-          String[] expressions = column.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
-          String[] newExpressions = new String[expressions.length];
-          for (int i = 0; i < expressions.length; i++) {
-            String expression = expressions[i];
-            newExpressions[i] = fixColumnNameCase(tableCache, actualTableName, expression);
+        if (info.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+
+          // Always read from backward compatible api in AggregationFunctionUtils.
+          List<String> expressions = AggregationFunctionUtils.getAggregationExpressions(info);
+
+          List<String> newExpressions = new ArrayList<>(expressions.size());
+          for (String expression : expressions) {
+            newExpressions.add(fixColumnNameCase(tableCache, actualTableName, expression));
           }
-          String newColumns = StringUtil.join(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR, newExpressions);
-          info.getAggregationParams().put(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO, newColumns);
+          info.setExpressions(newExpressions);
         }
       }
       if (brokerRequest.isSetGroupBy()) {
@@ -713,10 +710,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             throw new UnsupportedOperationException("DISTINCT with GROUP BY is currently not supported");
           }
           if (brokerRequest.isSetOrderBy()) {
-            String column =
-                aggregationInfo.getAggregationParams().get(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO);
-            String[] columns = column.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
-            Set<String> set = new HashSet<>(Arrays.asList(columns));
+            List<String> columns = AggregationFunctionUtils.getAggregationExpressions(aggregationInfo);
+            Set<String> set = new HashSet<>(columns);
             List<SelectionSort> orderByColumns = brokerRequest.getOrderBy();
             for (SelectionSort selectionSort : orderByColumns) {
               if (!set.contains(selectionSort.getColumn())) {

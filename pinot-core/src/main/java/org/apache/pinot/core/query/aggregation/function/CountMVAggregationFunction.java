@@ -41,13 +41,13 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.COUNTMV.getName() + "_" + column;
+  public String getColumnName() {
+    return getType().getName() + "_" + _column;
   }
 
   @Override
-  public String getResultColumnName(String column) {
-    return AggregationFunctionType.COUNTMV.getName().toLowerCase() + "(" + column + ")";
+  public String getResultColumnName() {
+    return getType().getName().toLowerCase() + "(" + _column + ")";
   }
 
   @Override

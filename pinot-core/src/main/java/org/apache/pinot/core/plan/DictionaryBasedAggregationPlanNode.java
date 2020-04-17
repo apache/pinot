@@ -54,7 +54,7 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
     _aggregationFunctionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest);
 
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
-      String column = aggregationFunctionContext.getColumn();
+      String column = aggregationFunctionContext.getColumnName();
       if (!_dictionaryMap.containsKey(column)) {
         _dictionaryMap.put(column, _indexSegment.getDataSource(column).getDictionary());
       }
