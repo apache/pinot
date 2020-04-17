@@ -89,8 +89,6 @@ class Tables extends Component {
             .then((data) => {
                 // console.log(JSON.stringify(data));
                 this.treeData = Utils.populateNode(data,1, 'properties');
-                console.log('hi')
-                console.log(this.treeData['children'])
                 this.setState({instances: this.tables, treeData: this.treeData})
                 
             })
@@ -111,19 +109,15 @@ class Tables extends Component {
     render() {
         return (
             <div>
-          
+                 
                 <MaterialTable
                     title="Table Details"
                     columns={[
                         { title: 'Table Name', field: 'name' },
                         { title: 'Reported Size', field: 'reportedSizeInBytes' },
                         { title: 'Estimated Size', field: 'estimatedSizeInBytes'},
-                        { title: 'Properties', render: rowData => <TreeView
-                        defaultCollapseIcon={<ExpandMoreIcon />}
-                        defaultExpandIcon={<ChevronRightIcon />}
-                        defaultExpanded={['2']}>
-                        {Utils.renderTree(this.state.treeData)}
-                        </TreeView>}
+                       
+                        
                         
                         
                     ]}
@@ -150,8 +144,27 @@ class Tables extends Component {
                     }}
                 />
                 
+                
+                <MaterialTable
+                    title="Table Configuration"
+                    columns={[
+                        { title: 'Properties', render: rowData => <TreeView
+                        defaultCollapseIcon={<ExpandMoreIcon />}
+                        defaultExpandIcon={<ChevronRightIcon />}
+                        defaultExpanded={['2']}>
+                        {Utils.renderTree(this.state.treeData)}
+                        </TreeView>}
+                    ]}
+                    data={this.tables}
+                    options={{
+                        headerStyle: Utils.getTableHeaderStyles(),
+                        search: true
+                    }}
+                />
+                
                
-            </div>
+                </div>
+        
         );
     }
 
