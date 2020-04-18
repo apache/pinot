@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -73,25 +72,21 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
   public static final String PROP_NOTIFY = "notify";
   public static final String PROP_REF_LINKS = "referenceLinks";
   public static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
-  private static final String PROP_SEND_ONCE = "sendOnce";
 
   final List<Map<String, Object>> dimensionRecipients;
   final List<Long> detectionConfigIds;
-  final boolean sendOnce;
 
   public DimensionsRecipientAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
     this.dimensionRecipients = ConfigUtils.getList(this.config.getProperties().get(PROP_DIMENSION_RECIPIENTS));
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
-    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
-  public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark) {
+  public DetectionAlertFilterResult run() {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    final long minId = getMinId(highWaterMark);
 
-    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
+    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds));
 
     // Prepare mapping from dimension-recipients to anomalies
     for (Map<String, Object> dimensionRecipient : this.dimensionRecipients) {
@@ -126,13 +121,5 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
     }
 
     return result;
-  }
-
-  private long getMinId(long highWaterMark) {
-    if (this.sendOnce) {
-      return highWaterMark + 1;
-    } else {
-      return 0;
-    }
   }
 }

@@ -46,7 +46,6 @@ public class DetectionAlertConfigBean extends AbstractBean {
   AlertConfigBean.SubjectType subjectType = AlertConfigBean.SubjectType.ALERT;
 
   Map<Long, Long> vectorClocks;
-  Long highWaterMark;
 
   Map<String, Object> properties;
 
@@ -117,14 +116,6 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.application = application;
   }
 
-  public Long getHighWaterMark() {
-    return highWaterMark;
-  }
-
-  public void setHighWaterMark(Long highWaterMark) {
-    this.highWaterMark = highWaterMark;
-  }
-
   public AlertConfigBean.SubjectType getSubjectType() {
     return subjectType;
   }
@@ -176,15 +167,15 @@ public class DetectionAlertConfigBean extends AbstractBean {
     DetectionAlertConfigBean that = (DetectionAlertConfigBean) o;
     return active == that.active && Objects.equals(name, that.name) && Objects.equals(from, that.from)
         && Objects.equals(cronExpression, that.cronExpression) && Objects.equals(application, that.application)
-        && subjectType == that.subjectType && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(
-        highWaterMark, that.highWaterMark) && Objects.equals(properties, that.properties)
-        && Objects.equals(alertSchemes, that.alertSchemes) && Objects.equals(alertSuppressors, that.alertSuppressors)
-        && Objects.equals(refLinks, that.refLinks) && Objects.equals(yaml, that.yaml);
+        && subjectType == that.subjectType && Objects.equals(vectorClocks, that.vectorClocks)
+        && Objects.equals(properties, that.properties) && Objects.equals(alertSchemes, that.alertSchemes)
+        && Objects.equals(alertSuppressors, that.alertSuppressors) && Objects.equals(refLinks, that.refLinks)
+        && Objects.equals(yaml, that.yaml);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(active, name, from, cronExpression, application, subjectType, vectorClocks,
-        highWaterMark, properties, alertSchemes, alertSuppressors, refLinks, yaml);
+    return Objects.hash(active, name, from, cronExpression, application, subjectType, vectorClocks, properties,
+        alertSchemes, alertSuppressors, refLinks, yaml);
   }
 }
