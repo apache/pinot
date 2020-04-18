@@ -20,7 +20,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -73,10 +73,9 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
   @Override
   protected org.apache.pinot.spi.data.Schema getPinotSchema()
       throws IOException {
-    URL resource =
-        AbstractRecordExtractorTest.class.getClassLoader().getResource("groovy_map_transform_functions_schema.json");
-    File schemaFile = new File(resource.getFile());
-    return org.apache.pinot.spi.data.Schema.fromFile(schemaFile);
+    InputStream schemaInputStream = AbstractRecordExtractorTest.class.getClassLoader()
+        .getResourceAsStream("groovy_map_transform_functions_schema.json");
+    return org.apache.pinot.spi.data.Schema.fromInputSteam(schemaInputStream);
   }
 
   /**
@@ -96,7 +95,6 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
   @Override
   protected void createInputFile()
       throws IOException {
-
     org.apache.avro.Schema avroSchema = createRecord("mapRecord", null, null, false);
     org.apache.avro.Schema intStringMapAvroSchema = createMap(create(Type.STRING));
     org.apache.avro.Schema stringIntMapAvroSchema = createMap(create(Type.INT));
