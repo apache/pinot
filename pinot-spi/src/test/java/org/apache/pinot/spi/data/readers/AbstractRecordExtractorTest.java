@@ -20,7 +20,7 @@ package org.apache.pinot.spi.data.readers;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -61,10 +61,9 @@ public abstract class AbstractRecordExtractorTest {
 
   protected Schema getPinotSchema()
       throws IOException {
-    URL resource =
-        AbstractRecordExtractorTest.class.getClassLoader().getResource("groovy_transform_functions_schema.json");
-    File schemaFile = new File(resource.getFile());
-    return Schema.fromFile(schemaFile);
+    InputStream schemaInputStream = AbstractRecordExtractorTest.class.getClassLoader()
+        .getResourceAsStream("groovy_transform_functions_schema.json");
+    return Schema.fromInputSteam(schemaInputStream);
   }
 
   protected List<Map<String, Object>> getInputRecords() {
