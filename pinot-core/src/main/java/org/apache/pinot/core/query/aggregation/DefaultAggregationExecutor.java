@@ -29,7 +29,6 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.parsers.CompilerConstants;
 
 
 public class DefaultAggregationExecutor implements AggregationExecutor {
@@ -48,12 +47,13 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       // so we need to build expression tree for each column
       _functions[0] = functionContexts[0].getAggregationFunction();
       _resultHolders[0] = _functions[0].createAggregationResultHolder();
-      String multiColumnExpression = functionContexts[0].getColumn();
-      String[] distinctColumnExpressions =
-          multiColumnExpression.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
-      _expressions = new TransformExpressionTree[distinctColumnExpressions.length];
-      for (int i = 0; i < distinctColumnExpressions.length; i++) {
-        _expressions[i] = TransformExpressionTree.compileToExpressionTree(distinctColumnExpressions[i]);
+
+      List<String> expressions = functionContexts[0].getExpressions();
+      _expressions = new TransformExpressionTree[expressions.size()];
+
+      for (int i = 0; i < _expressions.length; i++) {
+        _expressions[i] = TransformExpressionTree.compileToExpressionTree(expressions.get(i));
+
       }
     } else {
       _expressions = new TransformExpressionTree[_numFunctions];
@@ -64,7 +64,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
         if (function.getType() != AggregationFunctionType.COUNT) {
           // count(*) does not have a column so handle rest of the aggregate
           // functions -- sum, min, max etc
-          _expressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumn());
+          _expressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumnName());
         }
       }
     }

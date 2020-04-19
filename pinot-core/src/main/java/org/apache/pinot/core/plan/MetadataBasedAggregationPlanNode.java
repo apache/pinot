@@ -66,7 +66,7 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
       if (aggregationFunctionContext.getAggregationFunction().getType() != AggregationFunctionType.COUNT) {
-        String column = aggregationFunctionContext.getColumn();
+        String column = aggregationFunctionContext.getColumnName();
         if (!dataSourceMap.containsKey(column)) {
           dataSourceMap.put(column, _indexSegment.getDataSource(column));
         }

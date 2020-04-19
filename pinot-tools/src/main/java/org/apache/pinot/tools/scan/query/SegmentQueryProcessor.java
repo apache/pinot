@@ -141,9 +141,7 @@ class SegmentQueryProcessor {
     Set<String> allColumns = _metadata.getAllColumns();
     if (brokerRequest.isSetAggregationsInfo()) {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
-
-        for (String column : aggregationParams.values()) {
+        for (String column : aggregationInfo.getExpressions()) {
           if (column != null && !column.isEmpty() && !column.equals("*") && !allColumns.contains(column)) {
             LOGGER.debug("Skipping segment '{}', as it does not have column '{}'", _metadata.getName(), column);
             return true;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -109,8 +110,8 @@ public class StarTreeUtils {
   public static AggregationFunctionContext createStarTreeFunctionContext(AggregationFunctionContext functionContext) {
     AggregationFunction function = functionContext.getAggregationFunction();
     AggregationFunctionColumnPair functionColumnPair =
-        new AggregationFunctionColumnPair(function.getType(), functionContext.getColumn());
-    return new AggregationFunctionContext(function, functionColumnPair.toColumnName());
+        new AggregationFunctionColumnPair(function.getType(), functionContext.getColumnName());
+    return new AggregationFunctionContext(function, Arrays.asList(functionColumnPair.toColumnName()));
   }
 
   /**

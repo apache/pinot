@@ -19,11 +19,12 @@
 package org.apache.pinot.pql.parsers;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
@@ -41,7 +42,6 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 
@@ -206,8 +206,7 @@ public class PinotQuery2BrokerRequestConverter {
         return expression.getIdentifier().getName();
       case FUNCTION:
         Function functionCall = expression.getFunctionCall();
-        String functionString = standardizeFunction(functionCall);
-        return functionString;
+        return standardizeFunction(functionCall);
       default:
         throw new UnsupportedOperationException("Unknown Expression type: " + expression.getType());
     }
@@ -233,32 +232,32 @@ public class PinotQuery2BrokerRequestConverter {
       throw new Pql2CompilationException("Aggregation function expects non null argument");
     }
 
-    String argumentString;
+    List<String> args = new ArrayList<>(operands.size());
     String functionName = function.getOperator();
 
     if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      argumentString = "*";
+      args = Collections.singletonList("*");
     } else {
-      Set<String> expressions = new HashSet<>();
-      StringBuilder sb = new StringBuilder();
-      int numOperands = operands.size();
-      for (int i = 0; i < numOperands; i++) {
-        Expression expression = operands.get(i);
-        String columnExpression = getColumnExpression(expression);
-        if (expressions.add(columnExpression)) {
-          // deduplicate the columns
-          if (i != 0) {
-            sb.append(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR);
+      // Need to de-dup columns for distinct.
+      if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+        Set<String> expressionSet = new TreeSet<>();
+
+        for (Expression operand : operands) {
+          String expression = getColumnExpression(operand);
+          if (expressionSet.add(expression)) {
+            args.add(expression);
           }
-          sb.append(getColumnExpression(expression));
+        }
+      } else {
+        for (Expression operand : operands) {
+          args.add(getColumnExpression(operand));
         }
       }
-      argumentString = sb.toString();
     }
 
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(functionName);
-    aggregationInfo.putToAggregationParams(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO, argumentString);
+    aggregationInfo.setExpressions(args);
     aggregationInfo.setIsInSelectList(true);
     return aggregationInfo;
   }
@@ -284,7 +283,6 @@ public class PinotQuery2BrokerRequestConverter {
     List<Integer> childFilterIds = new ArrayList<>();
     switch (filterExpression.getType()) {
       case LITERAL:
-        break;
       case IDENTIFIER:
         break;
       case FUNCTION:
