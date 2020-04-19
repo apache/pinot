@@ -43,72 +43,14 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getDictionaryBufferFor(String column)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.DICTIONARY);
+  public PinotDataBuffer getBuffer(String column, ColumnIndexType type) throws IOException{
+    IndexKey key = new IndexKey(column, type);
     return getReadBufferFor(key);
   }
 
   @Override
-  public PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.DICTIONARY);
-    return getWriteBufferFor(key, sizeBytes);
-  }
-
-  @Override
-  public PinotDataBuffer getForwardIndexBufferFor(String column)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.FORWARD_INDEX);
-    return getReadBufferFor(key);
-  }
-
-  @Override
-  public PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.FORWARD_INDEX);
-    return getWriteBufferFor(key, sizeBytes);
-  }
-
-  @Override
-  public PinotDataBuffer getInvertedIndexBufferFor(String column)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.INVERTED_INDEX);
-    return getReadBufferFor(key);
-  }
-
-  @Override
-  public PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.INVERTED_INDEX);
-    return getWriteBufferFor(key, sizeBytes);
-  }
-
-  @Override
-  public PinotDataBuffer getBloomFilterBufferFor(String column)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.BLOOM_FILTER);
-    return getReadBufferFor(key);
-  }
-
-  @Override
-  public PinotDataBuffer newBloomFilterBuffer(String column, long sizeBytes)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.BLOOM_FILTER);
-    return getWriteBufferFor(key, sizeBytes);
-  }
-
-  @Override
-  public PinotDataBuffer getNullValueVectorBufferFor(String column)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.NULLVALUE_VECTOR);
-    return getReadBufferFor(key);
-  }
-
-  @Override
-  public PinotDataBuffer newNullValueVectorBuffer(String column, long sizeBytes)
-      throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.NULLVALUE_VECTOR);
+  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes) throws IOException{
+    IndexKey key = new IndexKey(column, type);
     return getWriteBufferFor(key, sizeBytes);
   }
 
@@ -143,8 +85,13 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       return indexBuffers.get(key);
     }
 
-    File filename = getFileFor(key.name, key.type);
-    PinotDataBuffer buffer = mapForReads(filename, key.type.toString() + ".reader");
+    File file = getFileFor(key.name, key.type);
+    if (!file.exists()) {
+      throw new RuntimeException(
+          "Could not find index for column: " + key.name + ", type: " + key.type + ", segment: " + segmentDirectory
+              .toString());
+    }
+    PinotDataBuffer buffer = mapForReads(file, key.type.toString() + ".reader");
     indexBuffers.put(key, buffer);
     return buffer;
   }

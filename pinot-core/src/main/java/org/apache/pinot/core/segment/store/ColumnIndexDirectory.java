@@ -71,99 +71,23 @@ abstract class ColumnIndexDirectory implements Closeable {
   }
 
   /**
-   * Get dictionary data buffer for a column
+   * Get data buffer of a specified indexType for a column
    * @param column column name
-   * @return in-memory ByteBuffer like buffer for data
+   * @param type index type
+   * @return ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer getDictionaryBufferFor(String column)
-      throws IOException;
-
-  /**
-   * Get forward index data buffer for a column
-   * @param column column name
-   * @return in-memory ByteBuffer like buffer for data
-   * @throws IOException
-   */
-  public abstract PinotDataBuffer getForwardIndexBufferFor(String column)
-      throws IOException;
-
-  /**
-   * Get inverted index data buffer for a column
-   * @param column column name
-   * @return in-memory ByteBuffer like buffer for data
-   * @throws IOException
-   */
-  public abstract PinotDataBuffer getInvertedIndexBufferFor(String column)
-      throws IOException;
-
-  /**
-   * Get inverted bloom filter buffer for a column
-   * @param column column name
-   * @return in-memory ByteBuffer like buffer for data
-   * @throws IOException
-   */
-  public abstract PinotDataBuffer getBloomFilterBufferFor(String column)
-      throws IOException;
-
-  /**
-   * Get null value vector buffer for a column
-   * @param column column name
-   * @return in-memory ByteBuffer like buffer for data
-   * @throws IOException
-   */
-  public abstract PinotDataBuffer getNullValueVectorBufferFor(String column)
-      throws IOException;
+  public abstract PinotDataBuffer getBuffer(String column, ColumnIndexType type) throws IOException;
 
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
    * @param column column name
+   * @param type index type
    * @param sizeBytes sizeBytes for the buffer allocation
-   * @return in-memory ByteBuffer like buffer for data
+   * @return ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
-      throws IOException;
-
-  /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
-   * @param column column name
-   * @param sizeBytes sizeBytes for the buffer allocation
-   * @return in-memory ByteBuffer like buffer for data
-   * @throws IOException
-   */
-  public abstract PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
-      throws IOException;
-
-  /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
-   * @param column column name
-   * @param sizeBytes sizeBytes for the buffer allocation
-   * @return in-memory ByteBuffer like buffer for data
-   * @throws IOException
-   */
-  public abstract PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
-      throws IOException;
-
-  /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
-   * @param column column name
-   * @param sizeBytes sizeBytes for the buffer allocation
-   * @return in-memory ByteBuffer like buffer for data
-   * @throws IOException
-   */
-  public abstract PinotDataBuffer newBloomFilterBuffer(String column, long sizeBytes)
-      throws IOException;
-
-  /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
-   * @param column column name
-   * @param sizeBytes sizeBytes for the buffer allocation
-   * @return in-memory ByteBuffer like buffer for data
-   * @throws IOException
-   */
-  public abstract PinotDataBuffer newNullValueVectorBuffer(String column, long sizeBytes)
-      throws IOException;
+  public abstract PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes) throws IOException;
 
   /**
    * Check if an index exists for a column
