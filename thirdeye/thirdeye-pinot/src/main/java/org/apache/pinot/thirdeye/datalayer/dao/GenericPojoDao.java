@@ -429,6 +429,7 @@ public class GenericPojoDao {
 
               E e = OBJECT_MAPPER.readValue(entity.getJsonVal(), beanClass);
               e.setId(entity.getId());
+              e.setUpdateTime(entity.getUpdateTime());
               ret.add(e);
             }
           }
@@ -461,6 +462,7 @@ public class GenericPojoDao {
             e = OBJECT_MAPPER.readValue(genericJsonEntity.getJsonVal(), pojoClass);
             e.setId(genericJsonEntity.getId());
             e.setVersion(genericJsonEntity.getVersion());
+            e.setUpdateTime(genericJsonEntity.getUpdateTime());
           }
           return e;
         }
@@ -492,6 +494,7 @@ public class GenericPojoDao {
               E e = OBJECT_MAPPER.readValue(genericJsonEntity.getJsonVal(), pojoClass);
               e.setId(genericJsonEntity.getId());
               e.setVersion(genericJsonEntity.getVersion());
+              e.setUpdateTime(genericJsonEntity.getUpdateTime());
               result.add(e);
             }
           }
@@ -599,6 +602,7 @@ public class GenericPojoDao {
                   E bean = OBJECT_MAPPER.readValue(entity.getJsonVal(), pojoClass);
                   bean.setId(entity.getId());
                   bean.setVersion(entity.getVersion());
+                  bean.setUpdateTime(entity.getUpdateTime());
                   ret.add(bean);
                 }
               }

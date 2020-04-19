@@ -19,6 +19,11 @@
 
 package org.apache.pinot.thirdeye.anomaly.monitor;
 
+import java.sql.Timestamp;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.HtmlEmail;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.util.EmailHelper;
 import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
@@ -26,6 +31,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
 import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
 import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
+import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
@@ -39,15 +45,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
+import org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.*;
+
 
 public class MonitorTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobRunner.class);
   private static final long MAX_TASK_TIME = TimeUnit.HOURS.toMillis(6);
+  private static final long MAX_FAILED_DISABLE_DAYS = 30;
+  private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
   private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -56,6 +69,7 @@ public class MonitorTaskRunner implements TaskRunner {
 
     MonitorTaskInfo monitorTaskInfo = (MonitorTaskInfo) taskInfo;
     MonitorType monitorType = monitorTaskInfo.getMonitorType();
+    thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
     if (monitorType.equals(MonitorType.UPDATE)) {
       executeMonitorUpdate(monitorTaskInfo);
     } else if (monitorType.equals(MonitorType.EXPIRE)) {
@@ -120,9 +134,60 @@ public class MonitorTaskRunner implements TaskRunner {
 
       // update detection health
       updateDetectionHealth();
+
+      // disable alerts that failed consecutively for a long time
+      disableLongFailedAlerts();
+
     } catch (Exception e) {
       LOG.error("Exception in monitor update task", e);
     }
+  }
+
+  /**
+   * Disable the alert if it was updated before {@MAX_TASK_FAIL_DAYS} but there is no success run since then.
+   */
+  private void disableLongFailedAlerts() {
+    DetectionConfigManager detectionDAO = DAO_REGISTRY.getDetectionConfigManager();
+    List<DetectionConfigDTO> detectionConfigs = detectionDAO.findAllActive();
+    long currentTimeMillis = System.currentTimeMillis();
+    long maxTaskFailMillis = TimeUnit.DAYS.toMillis(MAX_FAILED_DISABLE_DAYS);
+    for (DetectionConfigDTO config : detectionConfigs) {
+      try {
+        Timestamp updateTime = config.getUpdateTime();
+        if (updateTime != null && config.getHealth() != null && config.getHealth().getDetectionTaskStatus() != null) {
+          long lastTaskExecutionTime = config.getHealth().getDetectionTaskStatus().getLastTaskExecutionTime();
+          // lastTaskExecutionTime == -1L is used for backward compatibility. Currently we have many long failing alerts have -1L.
+          if (updateTime.getTime() <= currentTimeMillis - maxTaskFailMillis && (lastTaskExecutionTime == -1L
+              || lastTaskExecutionTime <= currentTimeMillis - maxTaskFailMillis)) {
+            config.setActive(false);
+            detectionDAO.update(config);
+            sendDisableAlertNotificationEmail(config);
+            LOG.info("Disabled alert {} since it failed more than {} days. " + "Task last update time: {}. Last success task execution time: {}",
+                config.getId(), MAX_FAILED_DISABLE_DAYS, config.getUpdateTime(), lastTaskExecutionTime);
+          }
+        }
+      } catch (Exception e) {
+        LOG.error("Exception in disabling alert ", e);
+      }
+    }
+  }
+
+  private void sendDisableAlertNotificationEmail(DetectionConfigDTO config) throws EmailException {
+    HtmlEmail email = new HtmlEmail();
+    String subject = String.format("ThirdEye alert disabled: %s", config.getName());
+    String textBody = String.format(
+        "Your alert has failed for %d days and was disabled. Please fix your alert and enable it again. \n" + "Here is the link for your alert: https://thirdeye.corp.linkedin.com/app/#/manage/explore/%d",
+        MAX_FAILED_DISABLE_DAYS, config.getId());
+    Set<String> recipients = EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress());
+    if (config.getCreatedBy() != null && !config.getCreatedBy().equals("no-auth-user")) {
+      recipients.add(config.getCreatedBy());
+    }
+    if (config.getUpdatedBy() != null && !config.getUpdatedBy().equals("no-auth-user")) {
+      recipients.add(config.getUpdatedBy());
+    }
+    EmailHelper.sendEmailWithTextBody(email,
+        SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)), subject,
+        textBody, thirdeyeConfig.getFailureFromAddress(), new DetectionAlertFilterRecipients(recipients));
   }
 
   private void updateDetectionHealth() {
