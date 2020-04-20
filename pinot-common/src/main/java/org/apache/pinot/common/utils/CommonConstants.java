@@ -256,6 +256,9 @@ public class CommonConstants {
 
     public static final String DEFAULT_METRICS_PREFIX = "pinot.server.";
     public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
+    public static final String ACCESS_CONTROL_FACTORY_CLASS = "pinot.server.admin.access.control.factory.class";
+    public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
+        "org.apache.pinot.server.api.access.AllowAllAccessFactory";
   }
 
   public static class Controller {
