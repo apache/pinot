@@ -24,7 +24,7 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
 
 
-// A segment uploader which uploads segments to the controller via the segment completion protocol's controller end
+// A segment uploader which uploads segments to the controller via the controller's segmentCommitUpload end point
 // point.
 public class ControllerVipBasedSegmentUploader implements SegmentUploader {
   private final SegmentCompletionProtocol.Request.Params _params;
