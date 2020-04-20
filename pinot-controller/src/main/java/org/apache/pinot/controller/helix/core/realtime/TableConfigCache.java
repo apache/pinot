@@ -28,7 +28,7 @@ import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**

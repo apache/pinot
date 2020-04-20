@@ -33,7 +33,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

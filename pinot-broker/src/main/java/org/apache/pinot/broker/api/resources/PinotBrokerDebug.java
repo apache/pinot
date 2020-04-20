@@ -39,7 +39,7 @@ import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 

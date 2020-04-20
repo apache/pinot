@@ -36,7 +36,7 @@ import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 

@@ -32,8 +32,8 @@ import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerato
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

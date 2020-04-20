@@ -20,6 +20,8 @@ package org.apache.pinot.spi.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 

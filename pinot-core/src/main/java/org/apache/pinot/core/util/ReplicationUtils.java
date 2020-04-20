@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.util;
 
-import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 

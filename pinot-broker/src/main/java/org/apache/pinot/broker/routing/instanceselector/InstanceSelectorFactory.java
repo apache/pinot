@@ -19,9 +19,9 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.spi.config.RoutingConfig;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

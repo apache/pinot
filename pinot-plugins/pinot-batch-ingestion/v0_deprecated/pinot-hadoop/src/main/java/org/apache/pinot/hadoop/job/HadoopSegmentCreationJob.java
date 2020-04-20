@@ -42,8 +42,8 @@ import org.apache.pinot.hadoop.utils.PinotHadoopJobPreparationHelper;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentCreationJob;
 import org.apache.pinot.ingestion.utils.JobPreparationHelper;
-import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 public class HadoopSegmentCreationJob extends SegmentCreationJob {

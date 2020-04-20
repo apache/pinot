@@ -57,12 +57,12 @@ import org.apache.pinot.hadoop.utils.PinotHadoopJobPreparationHelper;
 import org.apache.pinot.ingestion.common.ControllerRestApi;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentPreprocessingJob;
-import org.apache.pinot.spi.config.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.IndexingConfig;
-import org.apache.pinot.spi.config.SegmentPartitionConfig;
-import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.TableCustomConfig;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

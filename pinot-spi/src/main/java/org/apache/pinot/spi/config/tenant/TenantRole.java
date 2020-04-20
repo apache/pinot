@@ -16,8 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config;
+package org.apache.pinot.spi.config.tenant;
 
-public enum TableType {
-  OFFLINE, REALTIME
+public enum TenantRole {
+  SERVER, BROKER
 }

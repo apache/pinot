@@ -27,7 +27,7 @@ import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.TableType;
 
 
 /**

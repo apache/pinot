@@ -33,7 +33,7 @@ import org.apache.pinot.core.minion.segment.RecordPartitioner;
 import org.apache.pinot.core.minion.segment.RecordTransformer;
 import org.apache.pinot.core.minion.segment.ReducerRecordReader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.spi.config.IndexingConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
 

@@ -21,7 +21,7 @@ package org.apache.pinot.core.transport;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.TableType;
 
 
 public class ServerInstance {
