@@ -19,10 +19,14 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.annotation.DetectionTag;
@@ -52,8 +56,14 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
   private double maxValueDaily;
   private double maxValue;
   private double minValue;
+  private InputDataFetcher dataFetcher;
+
   @Override
   public boolean isQualified(MergedAnomalyResultDTO anomaly) {
+    MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
+    MetricConfigDTO metric = dataFetcher.fetchData(new InputDataSpec().withMetricIds(Collections.singleton(me.getId())))
+        .getMetrics()
+        .get(me.getId());
     double currentValue = anomaly.getAvgCurrentVal();
 
     Interval anomalyInterval = new Interval(anomaly.getStartTime(), anomaly.getEndTime());
@@ -64,18 +74,35 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
       return false;
     }
     if (!Double.isNaN(this.minValueHourly) && currentValue * hourlyMultiplier < this.minValueHourly) {
+      Preconditions.checkArgument(isAdditive(metric), String.format(
+          "Aggregation function for the metric %s is %s. It must be SUM or COUNT to be filtered based on minValueHourly, please use minValue instead.",
+          metric.getName(), metric.getDefaultAggFunction()));
       return false;
     }
     if (!Double.isNaN(this.maxValueHourly) && currentValue * hourlyMultiplier > this.maxValueHourly) {
+      Preconditions.checkArgument(isAdditive(metric), String.format(
+          "Aggregation function for the metric %s is %s. It must be SUM or COUNT to be filtered based on maxValueHourly, please use maxValue instead",
+          metric.getName(), metric.getDefaultAggFunction()));
       return false;
     }
     if (!Double.isNaN(this.minValueDaily) && currentValue * dailyMultiplier < this.minValueDaily) {
+      Preconditions.checkArgument(isAdditive(metric), String.format(
+          "Aggregation function for the metric %s is %s. It must be SUM or COUNT to be filtered based on minValueDaily, please use minValue instead.",
+          metric.getName(), metric.getDefaultAggFunction()));
       return false;
     }
     if (!Double.isNaN(this.maxValueDaily) && currentValue * dailyMultiplier > this.maxValueDaily) {
+      Preconditions.checkArgument(isAdditive(metric), String.format(
+          "Aggregation function for the metric %s is %s. It must be SUM or COUNT to be filtered based on maxValueDaily, please use maxValue instead.",
+          metric.getName(), metric.getDefaultAggFunction()));
       return false;
     }
     return true;
+  }
+
+  private boolean isAdditive(MetricConfigDTO metric) {
+    MetricAggFunction aggFunction = metric.getDefaultAggFunction();
+    return aggFunction.equals(MetricAggFunction.SUM) || aggFunction.equals(MetricAggFunction.COUNT);
   }
 
   @Override
@@ -86,5 +113,6 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
     this.maxValueDaily = spec.getMaxValueDaily();
     this.maxValue = spec.getMaxValue();
     this.minValue = spec.getMinValue();
+    this.dataFetcher = dataFetcher;
   }
 }
