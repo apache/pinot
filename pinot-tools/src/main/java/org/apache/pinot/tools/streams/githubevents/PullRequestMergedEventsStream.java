@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.streams.githubevents;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -34,6 +33,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
@@ -52,7 +52,6 @@ public class PullRequestMergedEventsStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
   private static final long SLEEP_MILLIS = 10_000;
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final ExecutorService _service;
   private boolean _keepStreaming = true;
 
@@ -160,7 +159,7 @@ public class PullRequestMergedEventsStream {
           switch (githubAPIResponse.statusCode) {
             case 200: // Read new events
               etag = githubAPIResponse.etag;
-              JsonNode jsonArray = OBJECT_MAPPER.reader().readTree(githubAPIResponse.responseString);
+              JsonNode jsonArray = JsonUtils.stringToJsonNode(githubAPIResponse.responseString);
               for (JsonNode eventElement : jsonArray) {
                 try {
                   GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
@@ -235,21 +234,21 @@ public class PullRequestMergedEventsStream {
           GitHubAPICaller.GitHubAPIResponse commitsResponse = _gitHubAPICaller.callAPI(commitsURL);
 
           if (commitsResponse.responseString != null) {
-            commits = OBJECT_MAPPER.reader().readTree(commitsResponse.responseString);
+            commits = JsonUtils.stringToJsonNode(commitsResponse.responseString);
           }
 
           JsonNode reviewComments = null;
           String reviewCommentsURL = pullRequest.get("review_comments_url").asText();
           GitHubAPICaller.GitHubAPIResponse reviewCommentsResponse = _gitHubAPICaller.callAPI(reviewCommentsURL);
           if (reviewCommentsResponse.responseString != null) {
-            reviewComments = OBJECT_MAPPER.reader().readTree(reviewCommentsResponse.responseString);
+            reviewComments = JsonUtils.stringToJsonNode(reviewCommentsResponse.responseString);
           }
 
           JsonNode comments = null;
           String commentsURL = pullRequest.get("comments_url").asText();
           GitHubAPICaller.GitHubAPIResponse commentsResponse = _gitHubAPICaller.callAPI(commentsURL);
           if (commentsResponse.responseString != null) {
-            comments = OBJECT_MAPPER.reader().readTree(commentsResponse.responseString);
+            comments = JsonUtils.stringToJsonNode(commentsResponse.responseString);
           }
 
           // get PullRequestMergeEvent

@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -331,13 +332,18 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
         @Override
         public void run() {
           for (int curr = 0; curr <= _retry; curr++) {
+            File localDir = new File(UUID.randomUUID().toString());
             try {
               SegmentGeneratorConfig config = new SegmentGeneratorConfig(segmentGeneratorConfig);
               URI dataFileUri = URI.create(dataFilePath);
               String[] splits = dataFilePath.split("/");
-              String localFile = splits[splits.length - 1];
-              pinotFS.copyToLocalFile(dataFileUri, new File(localFile));
-              config.setInputFilePath(localFile);
+              String fileName = splits[splits.length - 1];
+              if (!isDataFile(fileName)) {
+                return;
+              }
+              File localFile = new File(localDir, fileName);
+              pinotFS.copyToLocalFile(dataFileUri, localFile);
+              config.setInputFilePath(localFile.getAbsolutePath());
               config.setSegmentName(_segmentName + "_" + segCnt);
               Schema schema = Schema.fromFile(new File(_schemaFile));
               config.setSchema(schema);
@@ -358,7 +364,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
                   if (_readerConfigFile != null) {
                     readerConfig = JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class);
                   }
-                  csvRecordReader.init(new File(localFile), schema, readerConfig);
+                  csvRecordReader.init(localFile, schema, readerConfig);
                   driver.init(config, csvRecordReader);
                   break;
                 default:
@@ -380,6 +386,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
               } else {
                 LOGGER.error("Failed to create Pinot segment, retry: {}/{}", curr + 1, _retry);
               }
+            } finally {
+              FileUtils.deleteQuietly(localDir);
             }
           }
         }
@@ -416,6 +424,26 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       return true;
     } finally {
       FileUtils.deleteQuietly(localTempDir);
+    }
+  }
+
+  protected boolean isDataFile(String fileName) {
+    switch (_format) {
+      case AVRO:
+      case GZIPPED_AVRO:
+        return fileName.endsWith(".avro");
+      case CSV:
+        return fileName.endsWith(".csv");
+      case JSON:
+        return fileName.endsWith(".json");
+      case THRIFT:
+        return fileName.endsWith(".thrift");
+      case PARQUET:
+        return fileName.endsWith(".parquet");
+      case ORC:
+        return fileName.endsWith(".orc");
+      default:
+        throw new IllegalStateException("Unsupported file format for segment creation: " + _format);
     }
   }
 }
