@@ -43,13 +43,15 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getBuffer(String column, ColumnIndexType type) throws IOException{
+  public PinotDataBuffer getBuffer(String column, ColumnIndexType type)
+      throws IOException {
     IndexKey key = new IndexKey(column, type);
     return getReadBufferFor(key);
   }
 
   @Override
-  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes) throws IOException{
+  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
+      throws IOException {
     IndexKey key = new IndexKey(column, type);
     return getWriteBufferFor(key, sizeBytes);
   }

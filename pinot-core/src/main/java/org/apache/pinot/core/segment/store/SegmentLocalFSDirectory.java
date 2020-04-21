@@ -79,7 +79,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public void reloadMetadata() throws Exception {
+  public void reloadMetadata()
+      throws Exception {
     this.segmentMetadata = loadSegmentMetadata(segmentDirectory);
     columnIndexDirectory.metadata = this.segmentMetadata;
   }

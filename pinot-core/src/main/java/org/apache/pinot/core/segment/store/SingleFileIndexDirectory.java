@@ -104,7 +104,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     return allocNewBufferInternal(column, type, sizeBytes, type.name().toLowerCase() + ".create");
   }
 
-
   @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
     if (type == ColumnIndexType.TEXT_INDEX) {
@@ -124,7 +123,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     });
     if (textIndexFiles.length > 0) {
       Preconditions.checkState(textIndexFiles.length == 1,
-          "Illegal number of text index directories for columns " + column  + " segment directory " + segmentDirectory.getAbsolutePath());
+          "Illegal number of text index directories for columns " + column + " segment directory " + segmentDirectory
+              .getAbsolutePath());
       return true;
     }
     return false;
