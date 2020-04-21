@@ -102,6 +102,10 @@ public class S3PinotFS extends PinotFS {
     }
   }
 
+  public void init(S3Client s3Client) {
+    _s3Client = s3Client;
+  }
+
   boolean isNullOrEmpty(String target) {
     return target == null || "".equals(target);
   }
@@ -292,8 +296,8 @@ public class S3PinotFS extends PinotFS {
       return false;
     } catch (S3Exception e) {
       throw e;
-    } catch (Throwable t) {
-      throw new IOException(t);
+    } catch (Exception e) {
+      throw new IOException(e);
     }
   }
 
@@ -377,7 +381,11 @@ public class S3PinotFS extends PinotFS {
 
       ListObjectsV2Response listObjectsV2Response;
       ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
-          ListObjectsV2Request.builder().bucket(fileUri.getHost()).prefix(prefix);
+          ListObjectsV2Request.builder().bucket(fileUri.getHost());
+
+      if (!prefix.equals(DELIMITER)) {
+        listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.prefix(prefix);
+      }
 
       if (!recursive) {
         listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.delimiter(DELIMITER);
@@ -417,7 +425,7 @@ public class S3PinotFS extends PinotFS {
     String prefix = sanitizePath(base.relativize(dstUri).getPath());
     PutObjectRequest putObjectRequest = PutObjectRequest.builder().bucket(dstUri.getHost()).key(prefix).build();
 
-    PutObjectResponse putObjectResponse = _s3Client.putObject(putObjectRequest, srcFile.toPath());
+    _s3Client.putObject(putObjectRequest, srcFile.toPath());
   }
 
   @Override
@@ -429,11 +437,13 @@ public class S3PinotFS extends PinotFS {
         return true;
       }
       try {
-        HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(uri.getHost()).key(prefix).build();
+        HeadObjectRequest headObjectRequest =
+            HeadObjectRequest.builder().bucket(uri.getHost()).key(uri.getPath()).build();
         HeadObjectResponse s3ObjectMetadata = _s3Client.headObject(headObjectRequest);
+        System.out.println(s3ObjectMetadata);
         return s3ObjectMetadata.sdkHttpResponse().isSuccessful();
       } catch (NoSuchKeyException e) {
-
+        LOGGER.error("Could not get directory entry for {}", uri);
       }
 
       ListObjectsV2Request listObjectsV2Request =
