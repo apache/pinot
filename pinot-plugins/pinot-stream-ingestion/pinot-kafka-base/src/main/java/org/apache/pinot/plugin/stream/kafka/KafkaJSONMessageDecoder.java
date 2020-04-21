@@ -21,51 +21,28 @@ package org.apache.pinot.plugin.stream.kafka;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
+public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[], Map<String, Object>> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final String JSON_RECORD_EXTRACTOR_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
-
-  private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName)
-      throws Exception {
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
-    String recordExtractorClass = null;
-    if (props != null) {
-      recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
-    }
-    if (recordExtractorClass == null) {
-      recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
-    }
-    _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _jsonRecordExtractor.init(sourceFields, null);
+  public void init(Map<String, String> props, Schema indexingSchema, String topicName) {
   }
 
   @Override
-  public GenericRow decode(byte[] payload, GenericRow destination) {
+  public Map<String, Object> decode(byte[] payload) {
     try {
       JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      Map<String, Object> from = OBJECT_MAPPER.convertValue(message, new TypeReference<Map<String, Object>>(){});
-      _jsonRecordExtractor.extract(from, destination);
-      return destination;
+      return OBJECT_MAPPER.convertValue(message, new TypeReference<Map<String, Object>>(){});
     } catch (Exception e) {
       LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}", new String(payload), e);
       return null;
@@ -73,7 +50,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   }
 
   @Override
-  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+  public Map<String, Object> decode(byte[] payload, int offset, int length) {
+    return decode(Arrays.copyOfRange(payload, offset, offset + length));
   }
 }

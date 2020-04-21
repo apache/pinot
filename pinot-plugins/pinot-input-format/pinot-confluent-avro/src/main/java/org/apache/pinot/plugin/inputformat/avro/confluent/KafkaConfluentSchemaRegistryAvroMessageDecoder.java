@@ -26,11 +26,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import org.apache.avro.generic.GenericData.Record;
-import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
@@ -40,10 +36,9 @@ import static com.google.common.base.Preconditions.checkState;
  * Decodes avro messages with confluent schema registry.
  * First byte is MAGIC = 0, second 4 bytes are the schema id, the remainder is the value.
  */
-public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
+public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMessageDecoder<byte[], Record> {
     private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
     private KafkaAvroDeserializer _deserializer;
-    private RecordExtractor<Record> _avroRecordExtractor;
     private String _topicName;
 
     @Override
@@ -56,18 +51,15 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
         _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
         Preconditions.checkNotNull(topicName, "Topic must be provided");
         _topicName = topicName;
-        _avroRecordExtractor = PluginManager.get().createInstance(AvroRecordExtractor.class.getName());
-        _avroRecordExtractor.init(sourceFields, null);
     }
 
     @Override
-    public GenericRow decode(byte[] payload, GenericRow destination) {
-        Record avroRecord = (Record) _deserializer.deserialize(_topicName, payload);
-        return _avroRecordExtractor.extract(avroRecord, destination);
+    public Record decode(byte[] payload) {
+        return (Record) _deserializer.deserialize(_topicName, payload);
     }
 
     @Override
-    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-        return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+    public Record decode(byte[] payload, int offset, int length) {
+        return decode(Arrays.copyOfRange(payload, offset, offset + length));
     }
 }

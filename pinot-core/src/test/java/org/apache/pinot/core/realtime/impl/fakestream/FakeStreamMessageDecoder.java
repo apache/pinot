@@ -27,19 +27,19 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 /**
  * StreamMessageDecoder implementation for fake stream
  */
-public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
+public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[], GenericRow> {
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
 
   }
 
   @Override
-  public GenericRow decode(byte[] payload, GenericRow destination) {
+  public GenericRow decode(byte[] payload) {
     return null;
   }
 
   @Override
-  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+  public GenericRow decode(byte[] payload, int offset, int length) {
     return null;
   }
 }

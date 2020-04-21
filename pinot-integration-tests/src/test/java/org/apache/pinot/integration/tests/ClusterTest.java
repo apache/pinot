@@ -344,11 +344,10 @@ public abstract class ClusterTest extends ControllerTest {
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
   }
 
-  public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
+  public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[], GenericData.Record> {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;
     private org.apache.avro.Schema _avroSchema;
-    private RecordExtractor _recordExtractor;
     private DecoderFactory _decoderFactory = new DecoderFactory();
     private DatumReader<GenericData.Record> _reader;
 
@@ -359,23 +358,18 @@ public abstract class ClusterTest extends ControllerTest {
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
       reader.close();
-      Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
-      _recordExtractor = new AvroRecordExtractor();
-      _recordExtractor.init(sourceFields, null);
       _reader = new GenericDatumReader<>(_avroSchema);
     }
 
     @Override
-    public GenericRow decode(byte[] payload, GenericRow destination) {
-      return decode(payload, 0, payload.length, destination);
+    public GenericData.Record decode(byte[] payload) {
+      return decode(payload, 0, payload.length);
     }
 
     @Override
-    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+    public GenericData.Record decode(byte[] payload, int offset, int length) {
       try {
-        GenericData.Record avroRecord =
-            _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
-        return _recordExtractor.extract(avroRecord, destination);
+        return _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
       } catch (Exception e) {
         LOGGER.error("Caught exception", e);
         throw new RuntimeException(e);

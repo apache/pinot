@@ -30,7 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.generic.GenericData;
@@ -39,10 +38,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
@@ -50,7 +46,7 @@ import org.slf4j.LoggerFactory;
 
 
 @NotThreadSafe
-public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
+public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[], GenericData.Record> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
 
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
@@ -106,25 +102,17 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
         LOGGER.info("Populated schema cache with schema for {}", hashKey);
       }
     }
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
-    String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
-    // Backward compatibility to support Avro by default
-    if (recordExtractorClass == null) {
-      recordExtractorClass = AvroRecordExtractor.class.getName();
-    }
-    this._avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _avroRecordExtractor.init(sourceFields, null);
     this._decoderFactory = new DecoderFactory();
     _md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
 
   @Override
-  public GenericRow decode(byte[] payload, GenericRow destination) {
-    return decode(payload, 0, payload.length, destination);
+  public GenericData.Record decode(byte[] payload) {
+    return decode(payload, 0, payload.length);
   }
 
   @Override
-  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+  public GenericData.Record decode(byte[] payload, int offset, int length) {
     if (payload == null || payload.length == 0 || length == 0) {
       return null;
     }
@@ -162,9 +150,8 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
     try {
-      GenericData.Record avroRecord = reader.read(null,
+      return reader.read(null,
           _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
-      return _avroRecordExtractor.extract(avroRecord, destination);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message using schema {}{}",
           (schema == null ? "null" : schema.getName()),

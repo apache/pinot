@@ -31,7 +31,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public interface StreamMessageDecoder<T> {
+public interface StreamMessageDecoder<T, U> {
 
   static final String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
 
@@ -48,7 +48,7 @@ public interface StreamMessageDecoder<T> {
    * @param payload
    * @return
    */
-  GenericRow decode(T payload, GenericRow destination);
+  U decode(T payload);
 
   /**
    * Decodes a row.
@@ -56,8 +56,7 @@ public interface StreamMessageDecoder<T> {
    * @param payload The buffer from which to read the row.
    * @param offset The offset into the array from which the row contents starts
    * @param length The length of the row contents in bytes
-   * @param destination The {@link GenericRow} to write the decoded row into
    * @return A new row decoded from the buffer
    */
-  GenericRow decode(T payload, int offset, int length, GenericRow destination);
+  U decode(T payload, int offset, int length);
 }
