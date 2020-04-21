@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.tools.streams.githubevents;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -36,6 +33,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
@@ -54,12 +52,12 @@ public class PullRequestMergedEventsStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
   private static final long SLEEP_MILLIS = 10_000;
 
-  private ExecutorService _service;
+  private final ExecutorService _service;
   private boolean _keepStreaming = true;
 
-  private Schema _avroSchema;
-  private String _topicName;
-  private GitHubAPICaller _gitHubAPICaller;
+  private final Schema _avroSchema;
+  private final String _topicName;
+  private final GitHubAPICaller _gitHubAPICaller;
 
   private StreamDataProducer _producer;
 
@@ -91,6 +89,17 @@ public class PullRequestMergedEventsStream {
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public static void main(String[] args)
+      throws Exception {
+    String personalAccessToken = args[0];
+    String schemaFile = args[1];
+    String topic = "pullRequestMergedEvent";
+    PullRequestMergedEventsStream stream =
+        new PullRequestMergedEventsStream(schemaFile, topic, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+            personalAccessToken);
+    stream.execute();
   }
 
   /**
@@ -150,9 +159,8 @@ public class PullRequestMergedEventsStream {
           switch (githubAPIResponse.statusCode) {
             case 200: // Read new events
               etag = githubAPIResponse.etag;
-              JsonArray jsonArray = new JsonParser().parse(githubAPIResponse.responseString).getAsJsonArray();
-
-              for (JsonElement eventElement : jsonArray) {
+              JsonNode jsonArray = JsonUtils.stringToJsonNode(githubAPIResponse.responseString);
+              for (JsonNode eventElement : jsonArray) {
                 try {
                   GenericRecord genericRecord = convertToPullRequestMergedGenericRecord(eventElement);
                   if (genericRecord != null) {
@@ -206,41 +214,41 @@ public class PullRequestMergedEventsStream {
    * Find commits, review comments, comments corresponding to this pull request event.
    * Construct a PullRequestMergedEvent with the help of the event, commits, review comments and comments.
    * Converts PullRequestMergedEvent to GenericRecord
+   * @param event
    */
-  private GenericRecord convertToPullRequestMergedGenericRecord(JsonElement eventJson)
+  private GenericRecord convertToPullRequestMergedGenericRecord(JsonNode event)
       throws IOException {
     GenericRecord genericRecord = null;
-    JsonObject event = eventJson.getAsJsonObject();
-    String type = event.get("type").getAsString();
+    String type = event.get("type").asText();
 
     if ("PullRequestEvent".equals(type)) {
-      JsonObject payload = event.get("payload").getAsJsonObject();
+      JsonNode payload = event.get("payload");
       if (payload != null) {
-        String action = payload.get("action").getAsString();
-        JsonObject pullRequest = payload.get("pull_request").getAsJsonObject();
-        String merged = pullRequest.get("merged").getAsString();
+        String action = payload.get("action").asText();
+        JsonNode pullRequest = payload.get("pull_request");
+        String merged = pullRequest.get("merged").asText();
         if ("closed".equals(action) && "true".equals(merged)) { // valid pull request merge event
 
-          JsonArray commits = null;
-          String commitsURL = pullRequest.get("commits_url").getAsString();
+          JsonNode commits = null;
+          String commitsURL = pullRequest.get("commits_url").asText();
           GitHubAPICaller.GitHubAPIResponse commitsResponse = _gitHubAPICaller.callAPI(commitsURL);
 
           if (commitsResponse.responseString != null) {
-            commits = new JsonParser().parse(commitsResponse.responseString).getAsJsonArray();
+            commits = JsonUtils.stringToJsonNode(commitsResponse.responseString);
           }
 
-          JsonArray reviewComments = null;
-          String reviewCommentsURL = pullRequest.get("review_comments_url").getAsString();
+          JsonNode reviewComments = null;
+          String reviewCommentsURL = pullRequest.get("review_comments_url").asText();
           GitHubAPICaller.GitHubAPIResponse reviewCommentsResponse = _gitHubAPICaller.callAPI(reviewCommentsURL);
           if (reviewCommentsResponse.responseString != null) {
-            reviewComments = new JsonParser().parse(reviewCommentsResponse.responseString).getAsJsonArray();
+            reviewComments = JsonUtils.stringToJsonNode(reviewCommentsResponse.responseString);
           }
 
-          JsonArray comments = null;
-          String commentsURL = pullRequest.get("comments_url").getAsString();
+          JsonNode comments = null;
+          String commentsURL = pullRequest.get("comments_url").asText();
           GitHubAPICaller.GitHubAPIResponse commentsResponse = _gitHubAPICaller.callAPI(commentsURL);
           if (commentsResponse.responseString != null) {
-            comments = new JsonParser().parse(commentsResponse.responseString).getAsJsonArray();
+            comments = JsonUtils.stringToJsonNode(commentsResponse.responseString);
           }
 
           // get PullRequestMergeEvent
@@ -295,16 +303,5 @@ public class PullRequestMergedEventsStream {
     genericRecord.put("mergedTimeMillis", pullRequestMergedEvent.getMergedTimeMillis());
 
     return genericRecord;
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    String personalAccessToken = args[0];
-    String schemaFile = args[1];
-    String topic = "pullRequestMergedEvent";
-    PullRequestMergedEventsStream stream =
-        new PullRequestMergedEventsStream(schemaFile, topic, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-            personalAccessToken);
-    stream.execute();
   }
 }
