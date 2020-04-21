@@ -67,34 +67,26 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
     double currentValue = anomaly.getAvgCurrentVal();
 
     Interval anomalyInterval = new Interval(anomaly.getStartTime(), anomaly.getEndTime());
-    double hourlyMultiplier = TimeUnit.HOURS.toMillis(1) / (double) anomalyInterval.toDurationMillis();
-    double dailyMultiplier = TimeUnit.DAYS.toMillis(1) / (double) anomalyInterval.toDurationMillis();
+    // apply multiplier if the metric is aggregated by SUM or COUNT
+    double hourlyMultiplier =
+        isAdditive(metric) ? (TimeUnit.HOURS.toMillis(1) / (double) anomalyInterval.toDurationMillis()) : 1.0;
+    double dailyMultiplier =
+        isAdditive(metric) ? (TimeUnit.DAYS.toMillis(1) / (double) anomalyInterval.toDurationMillis()) : 1.0;
+
     if (!Double.isNaN(this.minValue) && currentValue < this.minValue
         || !Double.isNaN(this.maxValue) && currentValue > this.maxValue) {
       return false;
     }
     if (!Double.isNaN(this.minValueHourly) && currentValue * hourlyMultiplier < this.minValueHourly) {
-      Preconditions.checkArgument(isAdditive(metric), String.format(
-          "Aggregation function for the metric %s is %s. It must be SUM or COUNT to be filtered based on minValueHourly, please use minValue instead.",
-          metric.getName(), metric.getDefaultAggFunction()));
       return false;
     }
     if (!Double.isNaN(this.maxValueHourly) && currentValue * hourlyMultiplier > this.maxValueHourly) {
-      Preconditions.checkArgument(isAdditive(metric), String.format(
-          "Aggregation function for the metric %s is %s. It must be SUM or COUNT to be filtered based on maxValueHourly, please use maxValue instead",
-          metric.getName(), metric.getDefaultAggFunction()));
       return false;
     }
     if (!Double.isNaN(this.minValueDaily) && currentValue * dailyMultiplier < this.minValueDaily) {
-      Preconditions.checkArgument(isAdditive(metric), String.format(
-          "Aggregation function for the metric %s is %s. It must be SUM or COUNT to be filtered based on minValueDaily, please use minValue instead.",
-          metric.getName(), metric.getDefaultAggFunction()));
       return false;
     }
     if (!Double.isNaN(this.maxValueDaily) && currentValue * dailyMultiplier > this.maxValueDaily) {
-      Preconditions.checkArgument(isAdditive(metric), String.format(
-          "Aggregation function for the metric %s is %s. It must be SUM or COUNT to be filtered based on maxValueDaily, please use maxValue instead.",
-          metric.getName(), metric.getDefaultAggFunction()));
       return false;
     }
     return true;
