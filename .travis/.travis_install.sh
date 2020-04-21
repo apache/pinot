@@ -69,10 +69,10 @@ if [ $noThirdEyeChange -eq 0 ]; then
   echo "ThirdEye changes only"
   mvn install -B -DskipTests -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true ${DEPLOY_BUILD_OPTS} -pl pinot-common,pinot-core,pinot-api -am
   cd thirdeye/thirdeye-hadoop
-  mvn clean compile -B -DskipTests
+  mvn clean compile -B -DskipTests ${DEPLOY_BUILD_OPTS}
   cd ../..
   cd thirdeye/thirdeye-pinot
-  mvn clean compile -B -DskipTests
+  mvn clean compile -B -DskipTests ${DEPLOY_BUILD_OPTS}
   cd ../..
   #
   # skip thirdeye-frontend as re-build happens on test
