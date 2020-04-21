@@ -440,7 +440,7 @@ public class S3PinotFS extends PinotFS {
         HeadObjectRequest headObjectRequest =
             HeadObjectRequest.builder().bucket(uri.getHost()).key(uri.getPath()).build();
         HeadObjectResponse s3ObjectMetadata = _s3Client.headObject(headObjectRequest);
-        System.out.println(s3ObjectMetadata);
+
         return s3ObjectMetadata.sdkHttpResponse().isSuccessful();
       } catch (NoSuchKeyException e) {
         LOGGER.error("Could not get directory entry for {}", uri);

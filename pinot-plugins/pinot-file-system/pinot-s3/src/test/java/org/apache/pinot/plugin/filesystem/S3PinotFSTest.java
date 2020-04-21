@@ -162,9 +162,6 @@ public class S3PinotFSTest {
         listObjectsV2Response.contents().stream().map(x -> x.key().substring(1)).filter(x -> x.contains("delete"))
             .toArray(String[]::new);
 
-    for (String x : actualResponse) {
-      System.out.println(x);
-    }
     Assert.assertEquals(actualResponse.length, 2);
     Assert.assertTrue(Arrays.equals(actualResponse, expectedResultList.toArray()));
   }
