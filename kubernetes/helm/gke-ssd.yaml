@@ -22,5 +22,6 @@ kind: StorageClass
 metadata:
   name: default
 provisioner: kubernetes.io/gce-pd
+allowVolumeExpansion: true
 parameters:
   type: pd-ssd

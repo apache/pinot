@@ -23,6 +23,7 @@ metadata:
   name: pinot-server
   namespace: pinot-quickstart
 provisioner: kubernetes.io/gce-pd
+allowVolumeExpansion: true
 reclaimPolicy: Retain
 parameters:
   type: pd-ssd
