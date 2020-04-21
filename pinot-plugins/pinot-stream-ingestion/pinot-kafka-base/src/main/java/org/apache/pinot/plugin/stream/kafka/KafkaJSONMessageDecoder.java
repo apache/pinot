@@ -53,4 +53,9 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[], Map
   public Map<String, Object> decode(byte[] payload, int offset, int length) {
     return decode(Arrays.copyOfRange(payload, offset, offset + length));
   }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
+  }
 }

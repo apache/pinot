@@ -77,4 +77,9 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[], Ge
       return null;
     }
   }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return AvroRecordExtractor.class.getName();
+  }
 }

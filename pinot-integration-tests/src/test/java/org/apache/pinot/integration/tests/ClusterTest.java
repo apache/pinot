@@ -375,6 +375,11 @@ public abstract class ClusterTest extends ControllerTest {
         throw new RuntimeException(e);
       }
     }
+
+    @Override
+    public String getRecordExtractorClassName() {
+      return AvroRecordExtractor.class.getName();
+    }
   }
 
   protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,

@@ -20,12 +20,14 @@ package org.apache.pinot.plugin.stream.kafka09;
 
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.StreamRecordExtractorProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +38,7 @@ import org.slf4j.LoggerFactory;
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   private StreamMessageDecoder _messageDecoder;
+  private RecordExtractor _recordExtractor;
   private Logger INSTANCE_LOGGER;
 
   private String _clientId;
@@ -58,6 +61,8 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     _kafkaHighLevelStreamConfig = new KafkaHighLevelStreamConfig(streamConfig, tableName, groupId);
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
+    _recordExtractor =
+        StreamRecordExtractorProvider.create(_messageDecoder, streamConfig.getDecoderProperties(), schema);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory
@@ -77,7 +82,8 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
     if (kafkaIterator.hasNext()) {
       try {
-        destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);
+        Object decodedRecord = _messageDecoder.decode(kafkaIterator.next().message());
+        destination = _recordExtractor.extract(decodedRecord, destination);
         ++currentCount;
 
         final long now = System.currentTimeMillis();

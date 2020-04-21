@@ -42,4 +42,9 @@ public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[], Ge
   public GenericRow decode(byte[] payload, int offset, int length) {
     return null;
   }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return null;
+  }
 }

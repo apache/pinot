@@ -64,6 +64,7 @@ import org.apache.pinot.spi.config.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -74,6 +75,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamRecordExtractorProvider;
 import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -200,6 +202,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final StreamMessageDecoder _messageDecoder;
+  private final RecordExtractor _recordExtractor;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
@@ -458,12 +461,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // this can be overridden by the decoder if there is a better indicator in the message payload
       RowMetadata msgMetadata = messagesAndOffsets.getMetadataAtIndex(index);
 
-      GenericRow decodedRow = _messageDecoder
+      Object decodedRow = _messageDecoder
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
-              messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
+              messagesAndOffsets.getMessageLengthAtIndex(index));
       if (decodedRow != null) {
         try {
-          GenericRow transformedRow = _recordTransformer.transform(decodedRow);
+          GenericRow extractedRow = _recordExtractor.extract(decodedRow, reuse);
+          GenericRow transformedRow = _recordTransformer.transform(extractedRow);
 
           if (transformedRow != null) {
             realtimeRowsConsumedMeter = _serverMetrics
@@ -1143,6 +1147,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Create message decoder
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);
     _clientId = _streamTopic + "-" + _streamPartitionId;
+
+    // Create record extractor
+    _recordExtractor = StreamRecordExtractorProvider
+        .create(_messageDecoder, _partitionLevelStreamConfig.getDecoderProperties(), _schema);
 
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);

@@ -160,6 +160,11 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[], Gen
     }
   }
 
+  @Override
+  public String getRecordExtractorClassName() {
+    return AvroRecordExtractor.class.getName();
+  }
+
   private String hex(byte[] bytes) {
     StringBuilder builder = new StringBuilder(2 * bytes.length);
     for (byte aByte : bytes) {

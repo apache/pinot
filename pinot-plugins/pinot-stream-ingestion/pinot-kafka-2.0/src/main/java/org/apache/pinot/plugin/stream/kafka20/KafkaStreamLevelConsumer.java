@@ -30,10 +30,12 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamRecordExtractorProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +46,7 @@ import org.slf4j.LoggerFactory;
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   private StreamMessageDecoder _messageDecoder;
+  private RecordExtractor _recordExtractor;
   private Logger INSTANCE_LOGGER;
 
   private String _clientId;
@@ -70,6 +73,8 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     _kafkaStreamLevelStreamConfig = new KafkaStreamLevelStreamConfig(streamConfig, tableName, groupId);
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
+    _recordExtractor =
+        StreamRecordExtractorProvider.create(_messageDecoder, streamConfig.getDecoderProperties(), schema);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory
@@ -104,7 +109,8 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
       try {
         final ConsumerRecord<Bytes, Bytes> record = kafkaIterator.next();
         updateOffsets(record.partition(), record.offset());
-        destination = _messageDecoder.decode(record.value().get(), destination);
+        Object decodedRecord = _messageDecoder.decode(record.value().get());
+        destination = _recordExtractor.extract(decodedRecord, destination);
 
         ++currentCount;
 

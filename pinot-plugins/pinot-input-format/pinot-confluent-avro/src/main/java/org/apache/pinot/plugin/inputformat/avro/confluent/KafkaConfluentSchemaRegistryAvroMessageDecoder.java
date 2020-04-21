@@ -24,11 +24,10 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Set;
 import org.apache.avro.generic.GenericData.Record;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -46,7 +45,6 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
         checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
         String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
         Preconditions.checkNotNull(indexingSchema, "Schema must be provided");
-        Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
         SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000);
         _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
         Preconditions.checkNotNull(topicName, "Topic must be provided");
@@ -61,5 +59,10 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     @Override
     public Record decode(byte[] payload, int offset, int length) {
         return decode(Arrays.copyOfRange(payload, offset, offset + length));
+    }
+
+    @Override
+    public String getRecordExtractorClassName() {
+        return AvroRecordExtractor.class.getName();
     }
 }
