@@ -22,5 +22,5 @@ import java.io.File;
 
 
 public interface SegmentUploader {
-  SegmentUploadStatus segmentUpload(File segmentFile);
+  SegmentUploadStatus uploadSegment(File segmentFile);
 }
