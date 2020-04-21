@@ -36,32 +36,15 @@ import static org.mockito.Mockito.when;
 public class ColumnIndexDirectoryTestHelper {
   private static Logger LOGGER = LoggerFactory.getLogger(ColumnIndexDirectoryTestHelper.class);
 
-  static ColumnIndexType[] indexTypes = {ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX,
-  ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR};
+  static ColumnIndexType[] indexTypes =
+      {ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX, ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR};
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {
     String columnName = column + "." + Integer.toString(index);
     // skip star tree. It's managed differently
     ColumnIndexType indexType = indexTypes[index % indexTypes.length];
-    PinotDataBuffer buf = null;
-    switch (indexType) {
-      case DICTIONARY:
-        buf = columnDirectory.newDictionaryBuffer(columnName, size);
-        break;
-      case FORWARD_INDEX:
-        buf = columnDirectory.newForwardIndexBuffer(columnName, size);
-        break;
-      case INVERTED_INDEX:
-        buf = columnDirectory.newInvertedIndexBuffer(columnName, size);
-        break;
-      case BLOOM_FILTER:
-        buf = columnDirectory.newBloomFilterBuffer(columnName, size);
-        break;
-      case NULLVALUE_VECTOR:
-        buf = columnDirectory.newNullValueVectorBuffer(columnName, size);
-        break;
-    }
+    PinotDataBuffer buf = columnDirectory.newBuffer(columnName, indexType, size);
     return buf;
   }
 
@@ -70,24 +53,7 @@ public class ColumnIndexDirectoryTestHelper {
     String columnName = column + "." + Integer.toString(index);
     // skip star tree
     ColumnIndexType indexType = indexTypes[index % indexTypes.length];
-    PinotDataBuffer buf = null;
-    switch (indexType) {
-      case DICTIONARY:
-        buf = columnDirectory.getDictionaryBufferFor(columnName);
-        break;
-      case FORWARD_INDEX:
-        buf = columnDirectory.getForwardIndexBufferFor(columnName);
-        break;
-      case INVERTED_INDEX:
-        buf = columnDirectory.getInvertedIndexBufferFor(columnName);
-        break;
-      case BLOOM_FILTER:
-        buf = columnDirectory.getBloomFilterBufferFor(columnName);
-        break;
-      case NULLVALUE_VECTOR:
-        buf = columnDirectory.getNullValueVectorBufferFor(columnName);
-        break;
-    }
+    PinotDataBuffer buf = columnDirectory.getBuffer(columnName, indexType);
     return buf;
   }
 
@@ -153,7 +119,7 @@ public class ColumnIndexDirectoryTestHelper {
     when(meta.getNullValueVectorFileName(anyString())).thenAnswer(new Answer<String>() {
       @Override
       public String answer(InvocationOnMock invocationOnMock)
-              throws Throwable {
+          throws Throwable {
         return invocationOnMock.getArguments()[0] + ".nullvalue";
       }
     });

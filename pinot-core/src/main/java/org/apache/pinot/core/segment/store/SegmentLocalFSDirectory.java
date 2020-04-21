@@ -79,7 +79,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public void reloadMetadata() throws Exception {
+  public void reloadMetadata()
+      throws Exception {
     this.segmentMetadata = loadSegmentMetadata(segmentDirectory);
     columnIndexDirectory.metadata = this.segmentMetadata;
   }
@@ -224,25 +225,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   private PinotDataBuffer getIndexForColumn(String column, ColumnIndexType type)
       throws IOException {
     PinotDataBuffer buffer;
-    switch (type) {
-      case DICTIONARY:
-        buffer = columnIndexDirectory.getDictionaryBufferFor(column);
-        break;
-      case FORWARD_INDEX:
-        buffer = columnIndexDirectory.getForwardIndexBufferFor(column);
-        break;
-      case INVERTED_INDEX:
-        buffer = columnIndexDirectory.getInvertedIndexBufferFor(column);
-        break;
-      case BLOOM_FILTER:
-        buffer = columnIndexDirectory.getBloomFilterBufferFor(column);
-        break;
-      case NULLVALUE_VECTOR:
-        buffer = columnIndexDirectory.getNullValueVectorBufferFor(column);
-        break;
-      default:
-        throw new RuntimeException("Unknown index type: " + type.name());
-    }
+
+    buffer = columnIndexDirectory.getBuffer(column, type);
+
     if (readMode == ReadMode.mmap) {
       prefetchMmapData(buffer);
     }
@@ -347,21 +332,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
         throws IOException {
-      ColumnIndexType indexType = key.type;
-      switch (indexType) {
-        case DICTIONARY:
-          return columnIndexDirectory.newDictionaryBuffer(key.name, sizeBytes);
-        case FORWARD_INDEX:
-          return columnIndexDirectory.newForwardIndexBuffer(key.name, sizeBytes);
-        case INVERTED_INDEX:
-          return columnIndexDirectory.newInvertedIndexBuffer(key.name, sizeBytes);
-        case BLOOM_FILTER:
-          return columnIndexDirectory.newBloomFilterBuffer(key.name, sizeBytes);
-        case NULLVALUE_VECTOR:
-          return columnIndexDirectory.newNullValueVectorBuffer(key.name, sizeBytes);
-        default:
-          throw new RuntimeException("Unknown index type: " + indexType.name() + " for directory: " + segmentDirectory);
-      }
+      return columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
     }
 
     @Override
