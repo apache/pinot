@@ -1,9 +1,8 @@
 {
   "name": "thirdeye-frontend",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.0.0",
   "description": "Thirdeye Frontend WebApp",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "",
   "directories": {
     "doc": "doc",
@@ -76,7 +75,7 @@
     "ember-toggle": "^6.0.0",
     "ember-tooltips": "^2.9.0-beta.0",
     "ember-truth-helpers": "^2.1.0",
-    "eslint-plugin-ember": "^5.0.0",
+    "eslint-plugin-ember": "~5.0.0",
     "html2canvas": "^1.0.0-rc.5",
     "jspdf": "^1.5.3",
     "keyevent": "^1.1.0",
@@ -88,7 +87,7 @@
     "toastr": "^2.1.4"
   },
   "engines": {
-    "node": "10.*"
+    "node": "12.*"
   },
   "dependencies": {
     "bower": "^1.8.8",

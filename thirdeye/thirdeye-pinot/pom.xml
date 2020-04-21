@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.apache.pinot.thirdeye</groupId>
     <artifactId>thirdeye</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>${revision}${sha1}</version>
   </parent>
   <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye-pinot</artifactId>
@@ -447,6 +447,19 @@
             </property>
           </properties>
         </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>2.8.1</version>
+        <executions>
+          <execution>
+            <id>default-deploy</id>
+            <phase>deploy</phase>
+            <goals>
+              <goal>deploy</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

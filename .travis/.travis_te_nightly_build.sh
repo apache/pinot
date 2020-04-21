@@ -18,9 +18,20 @@
 # under the License.
 #
 
-# if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
-  export DEV_VERSION="-dev-${TRAVIS_BUILD_NUMBER}"
-  export DEPLOY_BUILD_OPTS="-Dsha1=-dev-${TRAVIS_BUILD_NUMBER}"
-# else
-#   export DEPLOY_BUILD_OPTS=""
-# fi
+if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
+  echo "Deploying ThirdEye to bintray"
+  cd thirdeye/
+  BUILD_VERSION=$(grep -E "<revision>(.*)</revision>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1)
+  echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
+  mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}" -q -B
+  mvn versions:commit -q -B
+  # Deploy ThirdEye to bintray
+  mvn deploy -s ../.travis/.ci.settings.xml -DskipTests -q
+  cd thirdeye-frontend/
+  # Deploy ThirdEye frontend to NPM
+  npm version ${BUILD_VERSION}${DEV_VERSION}
+  echo "_auth = $NPM_TOKEN" > ~/.npmrc
+  echo "email = $NPM_EMAIL" >> ~/.npmrc
+  npm config set //registry.npmjs.org/:_authToken ${NPM_TOKEN}
+  npm publish
+fi
