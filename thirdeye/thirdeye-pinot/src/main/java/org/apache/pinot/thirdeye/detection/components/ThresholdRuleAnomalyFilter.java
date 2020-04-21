@@ -19,29 +19,19 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
-import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
-import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.annotation.DetectionTag;
-import org.apache.pinot.thirdeye.detection.annotation.Param;
-import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
 import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleFilterSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyFilter;
-import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import java.util.Collections;
-import java.util.Map;
 import org.joda.time.Interval;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**
