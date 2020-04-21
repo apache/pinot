@@ -43,7 +43,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 /**
  * Record reader for Pinot segment.
  */
-public class PinotSegmentRecordReader implements RecordReader {
+public class PinotSegmentRecordReader implements RecordReader<GenericRow> {
   private final ImmutableSegment _immutableSegment;
   private final int _numDocs;
   private final Schema _schema;
@@ -164,6 +164,11 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public Schema getSchema() {
     return _schema;
+  }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return GenericRowRecordExtractor.class.getName();
   }
 
   @Override

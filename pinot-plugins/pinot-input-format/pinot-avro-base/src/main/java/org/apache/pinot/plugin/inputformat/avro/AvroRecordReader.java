@@ -86,6 +86,11 @@ public class AvroRecordReader implements RecordReader<GenericRecord> {
   }
 
   @Override
+  public String getRecordExtractorClassName() {
+    return AvroRecordExtractor.class.getName();
+  }
+
+  @Override
   public void close()
       throws IOException {
     _avroReader.close();

@@ -20,6 +20,7 @@ package org.apache.pinot.core.realtime.converter;
 
 import java.io.File;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.data.readers.GenericRowRecordExtractor;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -30,7 +31,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 /**
  * Record reader for Pinot realtime segment.
  */
-public class RealtimeSegmentRecordReader implements RecordReader {
+public class RealtimeSegmentRecordReader implements RecordReader<GenericRow> {
   private final MutableSegmentImpl _realtimeSegment;
   private final int _numDocs;
   private final Schema _schema;
@@ -87,6 +88,11 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   @Override
   public Schema getSchema() {
     return _schema;
+  }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return GenericRowRecordExtractor.class.getName();
   }
 
   @Override

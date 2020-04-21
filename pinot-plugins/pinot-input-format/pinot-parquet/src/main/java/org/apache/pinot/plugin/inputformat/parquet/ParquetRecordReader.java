@@ -83,6 +83,11 @@ public class ParquetRecordReader implements RecordReader<GenericRecord> {
   }
 
   @Override
+  public String getRecordExtractorClassName() {
+    return ParquetRecordExtractor.class.getName();
+  }
+
+  @Override
   public void close()
       throws IOException {
     _reader.close();

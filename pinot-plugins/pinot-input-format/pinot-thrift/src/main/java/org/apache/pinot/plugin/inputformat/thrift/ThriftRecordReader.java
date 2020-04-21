@@ -120,6 +120,11 @@ public class ThriftRecordReader implements RecordReader<TBase> {
   }
 
   @Override
+  public String getRecordExtractorClassName() {
+    return ThriftRecordExtractor.class.getName();
+  }
+
+  @Override
   public void close()
       throws IOException {
     _inputStream.close();

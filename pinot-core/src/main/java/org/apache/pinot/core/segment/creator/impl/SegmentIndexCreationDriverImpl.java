@@ -55,8 +55,12 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +74,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private SegmentGeneratorConfig config;
   private RecordReader recordReader;
+  private RecordExtractor _recordExtractor;
   private SegmentPreIndexStatsContainer segmentStats;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private SegmentCreator indexCreator;
@@ -125,8 +130,21 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  public void init(SegmentGeneratorConfig config, RecordReader recordReader) {
-    init(config, new RecordReaderSegmentCreationDataSource(recordReader));
+  /**
+   * Constructs the RecordExtractor
+   */
+  public RecordExtractor getRecordExtractor(SegmentGeneratorConfig config, RecordReader recordReader)
+      throws Exception {
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(config.getSchema());
+    String recordExtractorClassName = recordReader.getRecordExtractorClassName();
+    RecordExtractor recordExtractor = PluginManager.get().createInstance(recordExtractorClassName);
+    recordExtractor.init(sourceFields, config.getReaderConfig());
+    return recordExtractor;
+  }
+
+  public void init(SegmentGeneratorConfig config, RecordReader recordReader)
+      throws Exception {
+    init(config, new RecordReaderSegmentCreationDataSource(recordReader, getRecordExtractor(config, recordReader)));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) {
@@ -139,7 +157,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader = dataSource.getRecordReader();
     Preconditions.checkState(recordReader.hasNext(), "No record in data source");
     dataSchema = recordReader.getSchema();
-
+    _recordExtractor = dataSource.getRecordExtractor();
     _recordTransformer = recordTransformer;
 
     // Initialize stats collection
@@ -184,7 +202,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       while (recordReader.hasNext()) {
         long start = System.currentTimeMillis();
         reuse.clear();
-        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(reuse));
+        Object record = recordReader.next();
+        GenericRow extractedRow = _recordExtractor.extract(record, reuse);
+        GenericRow transformedRow = _recordTransformer.transform(extractedRow);
         long stop = System.currentTimeMillis();
         totalRecordReadTime += (stop - start);
         if (transformedRow != null) {

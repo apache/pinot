@@ -125,6 +125,11 @@ public class CSVRecordReader implements RecordReader<CSVRecord> {
   }
 
   @Override
+  public String getRecordExtractorClassName() {
+    return CSVRecordExtractor.class.getName();
+  }
+
+  @Override
   public void close()
       throws IOException {
     _parser.close();

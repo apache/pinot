@@ -95,6 +95,11 @@ public class JSONRecordReader implements RecordReader<Map<String, Object>> {
   }
 
   @Override
+  public String getRecordExtractorClassName() {
+    return JSONRecordExtractor.class.getName();
+  }
+
+  @Override
   public void close()
       throws IOException {
     _iterator.close();

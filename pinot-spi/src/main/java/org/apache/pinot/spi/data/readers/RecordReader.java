@@ -72,4 +72,9 @@ public interface RecordReader<T> extends Closeable {
    * Get the Pinot schema.
    */
   Schema getSchema();
+
+  /**
+   * Gets the RecordExtractor class name
+   */
+  String getRecordExtractorClassName();
 }

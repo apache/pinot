@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.creator;
 
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -37,9 +38,11 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderSegmentCreationDataSource.class);
 
   private final RecordReader _recordReader;
+  private final RecordExtractor _recordExtractor;
 
-  public RecordReaderSegmentCreationDataSource(RecordReader recordReader) {
+  public RecordReaderSegmentCreationDataSource(RecordReader recordReader, RecordExtractor recordExtractor) {
     _recordReader = recordReader;
+    _recordExtractor = recordExtractor;
   }
 
   @Override
@@ -55,7 +58,9 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
       GenericRow reuse = new GenericRow();
       while (_recordReader.hasNext()) {
         reuse.clear();
-        GenericRow transformedRow = recordTransformer.transform(_recordReader.next(reuse));
+        Object record = _recordReader.next();
+        GenericRow extractedRow = _recordExtractor.extract(record, reuse);
+        GenericRow transformedRow = recordTransformer.transform(extractedRow);
         if (transformedRow != null) {
           collector.collectRow(transformedRow);
         }
@@ -80,5 +85,10 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
     }
 
     return _recordReader;
+  }
+
+  @Override
+  public RecordExtractor getRecordExtractor() {
+    return _recordExtractor;
   }
 }

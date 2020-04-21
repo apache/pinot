@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.readers.GenericRowRecordExtractor;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -146,7 +147,7 @@ public class SegmentPurger {
     return _numRecordsModified;
   }
 
-  private class PurgeRecordReader implements RecordReader {
+  private class PurgeRecordReader implements RecordReader<GenericRow> {
     final PinotSegmentRecordReader _recordReader;
 
     // Reusable generic row to store the next row to return
@@ -235,6 +236,11 @@ public class SegmentPurger {
     @Override
     public Schema getSchema() {
       return _recordReader.getSchema();
+    }
+
+    @Override
+    public String getRecordExtractorClassName() {
+      return GenericRowRecordExtractor.class.getName();
     }
 
     @Override

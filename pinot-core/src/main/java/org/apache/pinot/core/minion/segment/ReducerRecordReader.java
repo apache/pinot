@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.data.readers.GenericRowRecordExtractor;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -33,7 +34,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 /**
  * Record reader for reducer stage of the segment conversion
  */
-public class ReducerRecordReader implements RecordReader {
+public class ReducerRecordReader implements RecordReader<GenericRow> {
 
   private PinotSegmentRecordReader _recordReader;
   private RecordAggregator _recordAggregator;
@@ -116,6 +117,11 @@ public class ReducerRecordReader implements RecordReader {
   @Override
   public Schema getSchema() {
     return _recordReader.getSchema();
+  }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return GenericRowRecordExtractor.class.getName();
   }
 
   @Override

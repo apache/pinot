@@ -30,7 +30,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 /**
  * Record reader for list of {@link GenericRow}.
  */
-public class GenericRowRecordReader implements RecordReader {
+public class GenericRowRecordReader implements RecordReader<GenericRow> {
   private final List<GenericRow> _rows;
   private final int _numRows;
   private final Schema _schema;
@@ -71,6 +71,11 @@ public class GenericRowRecordReader implements RecordReader {
   @Override
   public Schema getSchema() {
     return _schema;
+  }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return GenericRowRecordExtractor.class.getName();
   }
 
   @Override

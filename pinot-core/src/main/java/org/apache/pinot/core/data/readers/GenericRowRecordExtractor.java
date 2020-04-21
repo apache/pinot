@@ -16,19 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.creator;
+package org.apache.pinot.core.data.readers;
 
+import java.util.Set;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
- * Data source used to build segments.
+ * A no-op RecordExtractor which simply forwards the received GenericRow
  */
-public interface SegmentCreationDataSource {
-  SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig);
+public class GenericRowRecordExtractor implements RecordExtractor<GenericRow> {
+  @Override
+  public void init(Set<String> fields, RecordReaderConfig recordReaderConfig) {
 
-  RecordReader getRecordReader();
+  }
 
-  RecordExtractor getRecordExtractor();
+  @Override
+  public GenericRow extract(GenericRow from, GenericRow to) {
+    to.init(from);
+    return to;
+  }
 }

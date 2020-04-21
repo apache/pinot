@@ -36,7 +36,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 /**
  * Record reader for multiple pinot segments.
  */
-public class MultiplePinotSegmentRecordReader implements RecordReader {
+public class MultiplePinotSegmentRecordReader implements RecordReader<GenericRow> {
   private List<PinotSegmentRecordReader> _pinotSegmentRecordReaders;
   private PriorityQueue<GenericRowWithReader> _priorityQueue;
   private Schema _schema;
@@ -186,6 +186,11 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   @Override
   public Schema getSchema() {
     return _schema;
+  }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return GenericRowRecordExtractor.class.getName();
   }
 
   @Override
