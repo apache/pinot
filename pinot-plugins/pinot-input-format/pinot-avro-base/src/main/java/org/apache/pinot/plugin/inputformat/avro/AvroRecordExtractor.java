@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
@@ -33,7 +33,7 @@ public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
   private Set<String> _fields;
 
   @Override
-  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, @Nullable RecordReaderConfig recordReaderConfig) {
     _fields = fields;
   }
 

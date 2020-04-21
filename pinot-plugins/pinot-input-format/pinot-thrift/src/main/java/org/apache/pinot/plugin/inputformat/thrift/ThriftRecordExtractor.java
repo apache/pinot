@@ -18,13 +18,15 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.thrift.TBase;
+import org.apache.thrift.TFieldIdEnum;
 
 
 /**
@@ -32,13 +34,27 @@ import org.apache.thrift.TBase;
  */
 public class ThriftRecordExtractor implements RecordExtractor<TBase> {
 
-  private Map<String, Integer> _fieldIds;
+  private Map<String, Integer> _fieldIds = new HashMap<>();
   private Set<String> _fields;
 
   @Override
-  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, RecordReaderConfig recordReaderConfig) {
     _fields = fields;
-    _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
+
+    TBase tObject;
+    try {
+      Class<?> thriftClass =
+          this.getClass().getClassLoader().loadClass(((ThriftRecordReaderConfig) recordReaderConfig).getThriftClass());
+      tObject = (TBase) thriftClass.newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    int index = 1;
+    TFieldIdEnum tFieldIdEnum;
+    while ((tFieldIdEnum = tObject.fieldForId(index)) != null) {
+      _fieldIds.put(tFieldIdEnum.getFieldName(), index);
+      index++;
+    }
   }
 
   @Override

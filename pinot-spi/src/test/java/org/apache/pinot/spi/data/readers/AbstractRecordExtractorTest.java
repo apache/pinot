@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,9 +29,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -43,9 +44,10 @@ import org.testng.annotations.Test;
 public abstract class AbstractRecordExtractorTest {
 
   protected Schema _pinotSchema;
-  protected List<String> _sourceFieldNames;
+  protected Set<String> _sourceFieldNames;
   protected List<Map<String, Object>> _inputRecords;
   private RecordReader _recordReader;
+  private RecordExtractor _recordExtractor;
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordTransformationTest");
 
   @BeforeClass
@@ -53,10 +55,11 @@ public abstract class AbstractRecordExtractorTest {
       throws IOException {
     FileUtils.forceMkdir(_tempDir);
     _pinotSchema = getPinotSchema();
-    _sourceFieldNames = new ArrayList<>(SchemaFieldExtractorUtils.extractSource(_pinotSchema));
+    _sourceFieldNames = getSourceFields();
     _inputRecords = getInputRecords();
     createInputFile();
     _recordReader = createRecordReader();
+    _recordExtractor = createRecordExtractor();
   }
 
   protected Schema getPinotSchema()
@@ -64,6 +67,10 @@ public abstract class AbstractRecordExtractorTest {
     InputStream schemaInputStream = AbstractRecordExtractorTest.class.getClassLoader()
         .getResourceAsStream("groovy_transform_functions_schema.json");
     return Schema.fromInputSteam(schemaInputStream);
+  }
+
+  protected Set<String> getSourceFields() {
+    return Sets.newHashSet("user_id", "firstName", "lastName", "bids", "campaignInfo", "cost", "timestamp");
   }
 
   protected List<Map<String, Object>> getInputRecords() {
@@ -97,6 +104,9 @@ public abstract class AbstractRecordExtractorTest {
   }
 
   protected abstract RecordReader createRecordReader()
+      throws IOException;
+
+  protected abstract RecordExtractor createRecordExtractor()
       throws IOException;
 
   protected abstract void createInputFile()
@@ -138,10 +148,11 @@ public abstract class AbstractRecordExtractorTest {
   public void testRecordExtractor()
       throws IOException {
     _recordReader.rewind();
-    GenericRow genericRow = new GenericRow();
+    GenericRow reuse = new GenericRow();
     int i = 0;
     while (_recordReader.hasNext()) {
-      _recordReader.next(genericRow);
+      Object next = _recordReader.next();
+      GenericRow genericRow = _recordExtractor.extract(next, reuse);
       Map<String, Object> inputRecord = _inputRecords.get(i++);
       checkValue(inputRecord, genericRow);
     }

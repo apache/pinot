@@ -20,25 +20,21 @@ package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
  * Record reader for Parquet file.
  */
-public class ParquetRecordReader implements RecordReader {
+public class ParquetRecordReader implements RecordReader<GenericRecord> {
   private Path _dataFilePath;
   private Schema _schema;
-  private ParquetRecordExtractor _recordExtractor;
   private ParquetReader<GenericRecord> _reader;
   private GenericRecord _nextRecord;
 
@@ -48,9 +44,6 @@ public class ParquetRecordReader implements RecordReader {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     _schema = schema;
     ParquetUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
-    _recordExtractor = new ParquetRecordExtractor();
-    _recordExtractor.init(sourceFields, null);
 
     _reader = ParquetUtils.getParquetReader(_dataFilePath);
     _nextRecord = _reader.read();
@@ -62,19 +55,19 @@ public class ParquetRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
+  public GenericRecord next()
       throws IOException {
-    return next(new GenericRow());
+    GenericRecord returnRecord = _nextRecord;
+    _nextRecord = _reader.read();
+    return returnRecord;
   }
 
   // NOTE: hard to extract common code further
   @SuppressWarnings("Duplicates")
   @Override
-  public GenericRow next(GenericRow reuse)
+  public GenericRecord next(GenericRecord reuse)
       throws IOException {
-   _recordExtractor.extract(_nextRecord, reuse);
-    _nextRecord = _reader.read();
-    return reuse;
+    return next();
   }
 
   @Override

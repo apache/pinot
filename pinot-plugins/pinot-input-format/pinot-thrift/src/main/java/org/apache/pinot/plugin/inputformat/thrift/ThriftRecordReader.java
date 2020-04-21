@@ -21,18 +21,12 @@ package org.apache.pinot.plugin.inputformat.thrift;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.thrift.TBase;
-import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
@@ -41,12 +35,10 @@ import org.apache.thrift.transport.TIOStreamTransport;
 /**
  * Record reader for Thrift file.
  */
-public class ThriftRecordReader implements RecordReader {
+public class ThriftRecordReader implements RecordReader<TBase> {
   private File _dataFile;
   private Schema _schema;
-  private ThriftRecordExtractor _recordExtractor;
   private Class<?> _thriftClass;
-  private Map<String, Integer> _fieldIds = new HashMap<>();
 
   private InputStream _inputStream;
   private TProtocol _tProtocol;
@@ -81,24 +73,11 @@ public class ThriftRecordReader implements RecordReader {
     ThriftRecordReaderConfig recordReaderConfig = (ThriftRecordReaderConfig) config;
     _dataFile = dataFile;
     _schema = schema;
-    TBase tObject;
     try {
       _thriftClass = this.getClass().getClassLoader().loadClass(recordReaderConfig.getThriftClass());
-      tObject = (TBase) _thriftClass.newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    int index = 1;
-    TFieldIdEnum tFieldIdEnum;
-    while ((tFieldIdEnum = tObject.fieldForId(index)) != null) {
-      _fieldIds.put(tFieldIdEnum.getFieldName(), index);
-      index++;
-    }
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
-    ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
-    recordExtractorConfig.setFieldIds(_fieldIds);
-    _recordExtractor = new ThriftRecordExtractor();
-    _recordExtractor.init(sourceFields, recordExtractorConfig);
 
     init();
   }
@@ -109,13 +88,13 @@ public class ThriftRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
+  public TBase next(TBase reuse)
       throws IOException {
-    return next(new GenericRow());
+    return next();
   }
 
   @Override
-  public GenericRow next(GenericRow reuse)
+  public TBase next()
       throws IOException {
     TBase tObject;
     try {
@@ -124,9 +103,8 @@ public class ThriftRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new IOException("Caught exception while reading thrift object", e);
     }
-    _recordExtractor.extract(tObject, reuse);
     _hasNext = hasMoreToRead();
-    return reuse;
+    return tObject;
   }
 
   @Override

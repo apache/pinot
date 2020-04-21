@@ -23,7 +23,7 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
@@ -35,9 +35,9 @@ public class CSVRecordExtractor implements RecordExtractor<CSVRecord> {
   private Set<String> _fields;
 
   @Override
-  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, RecordReaderConfig recordReaderConfig) {
     _fields = fields;
-    _multiValueDelimiter = ((CSVRecordExtractorConfig) recordExtractorConfig).getMultiValueDelimiter();
+    _multiValueDelimiter = ((CSVRecordReaderConfig) recordReaderConfig).getMultiValueDelimiter();
   }
 
   @Override

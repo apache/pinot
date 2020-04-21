@@ -23,23 +23,19 @@ import com.fasterxml.jackson.databind.MappingIterator;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
  * Record reader for JSON file.
  */
-public class JSONRecordReader implements RecordReader {
+public class JSONRecordReader implements RecordReader<Map<String, Object>> {
   private File _dataFile;
   private Schema _schema;
-  private JSONRecordExtractor _recordExtractor;
 
   private MappingIterator<Map<String, Object>> _iterator;
 
@@ -64,9 +60,7 @@ public class JSONRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
-    _recordExtractor = new JSONRecordExtractor();
-    _recordExtractor.init(sourceFields, null);
+
     init();
   }
 
@@ -75,17 +69,16 @@ public class JSONRecordReader implements RecordReader {
     return _iterator.hasNext();
   }
 
-  @Override
-  public GenericRow next() {
-    return next(new GenericRow());
-  }
-
   // NOTE: hard to extract common code further
   @SuppressWarnings("Duplicates")
   @Override
-  public GenericRow next(GenericRow reuse) {
-    Map<String, Object> record = _iterator.next();
-    _recordExtractor.extract(record, reuse);
+  public Map<String, Object> next() {
+    return _iterator.next();
+  }
+
+  @Override
+  public Map<String, Object> next(Map<String, Object> reuse) {
+    reuse.putAll(_iterator.next());
     return reuse;
   }
 

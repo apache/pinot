@@ -21,32 +21,27 @@ package org.apache.pinot.plugin.inputformat.csv;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
  * Record reader for CSV file.
  */
-public class CSVRecordReader implements RecordReader {
+public class CSVRecordReader implements RecordReader<CSVRecord> {
   private File _dataFile;
   private Schema _schema;
   private CSVFormat _format;
-  private char _multiValueDelimiter;
 
   private CSVParser _parser;
   private Iterator<CSVRecord> _iterator;
-  private CSVRecordExtractor _recordExtractor;
 
   public CSVRecordReader() {
   }
@@ -59,7 +54,6 @@ public class CSVRecordReader implements RecordReader {
     CSVRecordReaderConfig config = (CSVRecordReaderConfig) recordReaderConfig;
     if (config == null) {
       _format = CSVFormat.DEFAULT.withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).withHeader();
-      _multiValueDelimiter = CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER;
     } else {
       CSVFormat format;
       String formatString = config.getFileFormat();
@@ -93,13 +87,7 @@ public class CSVRecordReader implements RecordReader {
         format = format.withHeader(StringUtils.split(csvHeader, delimiter));
       }
       _format = format;
-      _multiValueDelimiter = config.getMultiValueDelimiter();
     }
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
-    _recordExtractor = new CSVRecordExtractor();
-    CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
-    recordExtractorConfig.setMultiValueDelimiter(_multiValueDelimiter);
-    _recordExtractor.init(sourceFields, recordExtractorConfig);
     init();
   }
 
@@ -115,15 +103,13 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() {
-    return next(new GenericRow());
+  public CSVRecord next(CSVRecord reuse) {
+    return next();
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) {
-    CSVRecord record = _iterator.next();
-    _recordExtractor.extract(record, reuse);
-    return reuse;
+  public CSVRecord next() {
+    return _iterator.next();
   }
 
   @Override

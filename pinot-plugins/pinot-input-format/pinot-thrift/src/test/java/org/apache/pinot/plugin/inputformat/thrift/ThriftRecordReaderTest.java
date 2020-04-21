@@ -38,6 +38,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import org.testng.collections.Sets;
 
 
 /**
@@ -94,11 +95,17 @@ public class ThriftRecordReaderTest {
   @Test
   public void testReadData()
       throws IOException {
+    ThriftRecordReaderConfig readerConfig = getThriftRecordReaderConfig();
     ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSchema(), getThriftRecordReaderConfig());
+    recordReader.init(_tempFile, getSchema(), readerConfig);
+    ThriftRecordExtractorConfig extractorConfig = new ThriftRecordExtractorConfig();
+    extractorConfig.init(readerConfig);
+    ThriftRecordExtractor recordExtractor = new ThriftRecordExtractor();
+    recordExtractor.init(Sets.newHashSet(), extractorConfig);
+    GenericRow to = new GenericRow();
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
-      genericRows.add(recordReader.next());
+      genericRows.add(recordExtractor.extract(recordReader.next(), to));
     }
     recordReader.close();
     Assert.assertEquals(genericRows.size(), 2, "The number of rows return is incorrect");
@@ -113,17 +120,23 @@ public class ThriftRecordReaderTest {
   @Test
   public void testRewind()
       throws IOException {
+    ThriftRecordReaderConfig readerConfig = getThriftRecordReaderConfig();
     ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSchema(), getThriftRecordReaderConfig());
+    recordReader.init(_tempFile, getSchema(), readerConfig);
+    ThriftRecordExtractorConfig extractorConfig = new ThriftRecordExtractorConfig();
+    extractorConfig.init(readerConfig);
+    ThriftRecordExtractor recordExtractor = new ThriftRecordExtractor();
+    recordExtractor.init(Sets.newHashSet(), extractorConfig);
+    GenericRow to = new GenericRow();
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
-      genericRows.add(recordReader.next());
+      genericRows.add(recordExtractor.extract(recordReader.next(), to));
     }
 
     recordReader.rewind();
 
     while (recordReader.hasNext()) {
-      genericRows.add(recordReader.next());
+      genericRows.add(recordExtractor.extract(recordReader.next(), to));
     }
     recordReader.close();
     Assert.assertEquals(genericRows.size(), 4, "The number of rows return after the rewind is incorrect");

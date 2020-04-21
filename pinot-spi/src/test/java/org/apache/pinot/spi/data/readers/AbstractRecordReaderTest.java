@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -42,6 +43,8 @@ public abstract class AbstractRecordReaderTest {
   protected List<Map<String, Object>> _records;
   protected org.apache.pinot.spi.data.Schema _pinotSchema;
   private RecordReader _recordReader;
+  private RecordExtractor _recordExtractor;
+  private Set<String> _sourceFields;
 
   private static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
     List<Map<String, Object>> records = new ArrayList<>();
@@ -85,17 +88,19 @@ public abstract class AbstractRecordReaderTest {
     }
   }
 
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap)
+  protected void checkValue(RecordReader recordReader, RecordExtractor recordExtractor, List<Map<String, Object>> expectedRecordsMap)
       throws Exception {
+    GenericRow reuse = new GenericRow();
     for (Map<String, Object> expectedRecord : expectedRecordsMap) {
-      GenericRow actualRecord = recordReader.next();
+      Object next = recordReader.next();
+      GenericRow actualRow = recordExtractor.extract(next, reuse);
       org.apache.pinot.spi.data.Schema pinotSchema = recordReader.getSchema();
       for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
+          Assert.assertEquals(actualRow.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
         } else {
-          Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
+          Object[] actualRecords = (Object[]) actualRow.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           Assert.assertEquals(actualRecords.length, expectedRecords.size());
           for (int i = 0; i < actualRecords.length; i++) {
@@ -129,12 +134,14 @@ public abstract class AbstractRecordReaderTest {
     FileUtils.forceMkdir(_tempDir);
     // Generate Pinot schema
     _pinotSchema = getPinotSchema();
+    _sourceFields = _pinotSchema.getColumnNames();
     // Generate random records based on Pinot schema
     _records = generateRandomRecords(_pinotSchema);
     // Write generated random records to file
     writeRecordsToFile(_records);
     // Create and init RecordReader
     _recordReader = createRecordReader();
+    _recordExtractor = createRecordExtractor(_sourceFields);
   }
 
   @AfterClass
@@ -146,9 +153,9 @@ public abstract class AbstractRecordReaderTest {
   @Test
   public void testRecordReader()
       throws Exception {
-    checkValue(_recordReader, _records);
+    checkValue(_recordReader, _recordExtractor, _records);
     _recordReader.rewind();
-    checkValue(_recordReader, _records);
+    checkValue(_recordReader, _recordExtractor, _records);
   }
 
   /**
@@ -157,6 +164,11 @@ public abstract class AbstractRecordReaderTest {
    */
   protected abstract RecordReader createRecordReader()
       throws Exception;
+
+  /**
+   * @return an implementation of RecordExtractor
+   */
+  protected abstract RecordExtractor createRecordExtractor(Set<String> sourceFields);
 
   /**
    * Write records into a file

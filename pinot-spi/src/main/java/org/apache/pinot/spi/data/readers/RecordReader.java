@@ -26,11 +26,10 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * The <code>RecordReader</code> interface is used to read records from various file formats into {@link GenericRow}s.
- * Pinot segments will be generated from {@link GenericRow}s.
- * <p>NOTE: for time column, record reader should be able to read both incoming and outgoing time
+ * The <code>RecordReader</code> interface is used to read records from various file formats.
+ * This record is given to  <code>RecordExtractor</code> to convert to GenericRow
  */
-public interface RecordReader extends Closeable {
+public interface RecordReader<T> extends Closeable {
 
   /**
    * Initializes the record reader with data file, schema and (optional) record reader config.
@@ -53,14 +52,14 @@ public interface RecordReader extends Closeable {
   /**
    * Get the next record.
    */
-  GenericRow next()
+  T next()
       throws IOException;
 
   /**
    * Get the next record. Re-use the given row if possible to reduce garbage.
    * <p>The passed in row should be returned by previous call to {@link #next()}.
    */
-  GenericRow next(GenericRow reuse)
+  T next(T reuse)
       throws IOException;
 
   /**

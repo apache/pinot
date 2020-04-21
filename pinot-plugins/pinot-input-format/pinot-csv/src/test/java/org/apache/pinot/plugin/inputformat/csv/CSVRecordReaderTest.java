@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 
@@ -45,6 +47,15 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReader csvRecordReader = new CSVRecordReader();
     csvRecordReader.init(_dataFile, getPinotSchema(), csvRecordReaderConfig);
     return csvRecordReader;
+  }
+
+  @Override
+  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    CSVRecordExtractor csvRecordExtractor = new CSVRecordExtractor();
+    csvRecordExtractor.init(sourceFields, csvRecordReaderConfig);
+    return  csvRecordExtractor;
   }
 
   @Override
@@ -71,10 +82,12 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap)
+  protected void checkValue(RecordReader recordReader, RecordExtractor recordExtractor, List<Map<String, Object>> expectedRecordsMap)
       throws Exception {
+    GenericRow reuse = new GenericRow();
     for (Map<String, Object> expectedRecord : expectedRecordsMap) {
-      GenericRow actualRecord = recordReader.next();
+      Object next = recordReader.next();
+      GenericRow actualRecord = recordExtractor.extract(next, reuse);
       org.apache.pinot.spi.data.Schema pinotSchema = recordReader.getSchema();
       for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();

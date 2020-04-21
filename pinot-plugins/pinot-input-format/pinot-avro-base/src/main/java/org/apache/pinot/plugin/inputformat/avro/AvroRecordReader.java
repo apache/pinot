@@ -20,24 +20,20 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
  * Record reader for AVRO file.
  */
-public class AvroRecordReader implements RecordReader {
+public class AvroRecordReader implements RecordReader<GenericRecord> {
   private File _dataFile;
   private Schema _schema;
-  private AvroRecordExtractor _recordExtractor;
   private DataFileStream<GenericRecord> _avroReader;
   private GenericRecord _reusableAvroRecord = null;
 
@@ -56,9 +52,6 @@ public class AvroRecordReader implements RecordReader {
       _avroReader.close();
       throw e;
     }
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
-    _recordExtractor = new AvroRecordExtractor();
-    _recordExtractor.init(sourceFields, null);
   }
 
   @Override
@@ -67,19 +60,17 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
+  public GenericRecord next(GenericRecord reuse)
       throws IOException {
-    return next(new GenericRow());
+    return _avroReader.next(reuse);
   }
 
   // NOTE: hard to extract common code further
   @SuppressWarnings("Duplicates")
   @Override
-  public GenericRow next(GenericRow reuse)
+  public GenericRecord next()
       throws IOException {
-    _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
-    _recordExtractor.extract(_reusableAvroRecord, reuse);
-    return reuse;
+    return next(_reusableAvroRecord);
   }
 
   @Override

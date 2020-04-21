@@ -23,9 +23,11 @@ import java.io.File;
 import java.io.FileWriter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -43,6 +45,13 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
+  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+    JSONRecordExtractor recordExtractor = new JSONRecordExtractor();
+    recordExtractor.init(sourceFields, null);
+    return recordExtractor;
+  }
+
+  @Override
   protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
       throws Exception {
     try (FileWriter fileWriter = new FileWriter(_dateFile)) {
@@ -57,15 +66,19 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Override
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap)
+  protected void checkValue(RecordReader recordReader, RecordExtractor recordExtractor,
+      List<Map<String, Object>> expectedRecordsMap)
       throws Exception {
+    GenericRow reuse = new GenericRow();
     for (Map<String, Object> expectedRecord : expectedRecordsMap) {
-      GenericRow actualRecord = recordReader.next();
+      Object next = recordReader.next();
+      GenericRow actualRecord = recordExtractor.extract(next, reuse);
       org.apache.pinot.spi.data.Schema pinotSchema = recordReader.getSchema();
       for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(), expectedRecord.get(fieldSpecName).toString());
+          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(),
+              expectedRecord.get(fieldSpecName).toString());
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
@@ -75,7 +88,6 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
           }
         }
       }
-    }
-    Assert.assertFalse(recordReader.hasNext());
+    } Assert.assertFalse(recordReader.hasNext());
   }
 }
