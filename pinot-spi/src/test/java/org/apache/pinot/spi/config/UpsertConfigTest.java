@@ -26,7 +26,7 @@ import static org.testng.Assert.*;
 public class UpsertConfigTest {
 
   @Test
-  public void testIngestionMode() {
+  public void testUpsertConfig() {
     UpsertConfig upsertConfig;
 
     // test regular upsert table

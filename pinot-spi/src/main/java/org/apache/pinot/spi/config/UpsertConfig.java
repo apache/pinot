@@ -33,9 +33,9 @@ import java.util.List;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class UpsertConfig extends BaseJsonConfig {
-  // names of the columns that used as primary keys of this upsert table
+  // names of the columns that used as primary keys of an upsert table
   private final List<String> _primaryKeyColumns;
-  // name of the virtual columns that we are going to store the offset value to
+  // name of the column that we are going to store the offset value to
   private final String _offsetColumn;
   // name of the virtual column that we are going to store the validFrom value to
   private final String _validFromColumn;
@@ -49,11 +49,7 @@ public class UpsertConfig extends BaseJsonConfig {
       @JsonProperty(value="validFromColumn") String validFromColumn,
       @JsonProperty(value="validUntilColumn") String validUntilColumn) {
 
-    if (primaryKeyColumns == null) {
-      _primaryKeyColumns = ImmutableList.of();
-    } else {
-      _primaryKeyColumns = primaryKeyColumns;
-    }
+    _primaryKeyColumns = primaryKeyColumns;
     _offsetColumn = offsetColumn;
     _validFromColumn = validFromColumn;
     _validUntilColumn = validUntilColumn;

@@ -118,9 +118,9 @@ public class TableConfigUtils {
     }
 
     UpsertConfig upsertConfig = null;
-    String ingestionModeConfigString = simpleFields.get(TableConfig.UPSERT_CONFIG_KEY);
-    if (ingestionModeConfigString != null) {
-      upsertConfig = JsonUtils.stringToObject(ingestionModeConfigString, UpsertConfig.class);
+    String upsertConfigString = simpleFields.get(TableConfig.UPSERT_CONFIG_KEY);
+    if (upsertConfigString != null) {
+      upsertConfig = JsonUtils.stringToObject(upsertConfigString, UpsertConfig.class);
     }
 
 
