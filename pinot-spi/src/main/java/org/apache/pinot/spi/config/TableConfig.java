@@ -45,7 +45,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String QUERY_CONFIG_KEY = "query";
   public static final String INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY = "instanceAssignmentConfigMap";
   public static final String FIELD_CONFIG_LIST_KEY = "fieldConfigList";
-  public static final String INGESTION_MODE_CONFIG_KEY = "ingestionModeConfig";
+  public static final String UPSERT_CONFIG_KEY = "upsertConfig";
 
   // Double underscore is reserved for real-time segment name delimiter
   private static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -76,8 +76,8 @@ public class TableConfig extends BaseJsonConfig {
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
 
-  @JsonPropertyDescription(value = "ingestion mode config, mostly related to upsert related configuration")
-  private IngestionModeConfig _ingestionModeConfig;
+  @JsonPropertyDescription(value = "upsert related config")
+  private UpsertConfig _upsertConfig;
 
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
@@ -92,7 +92,7 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(QUERY_CONFIG_KEY) @Nullable QueryConfig queryConfig,
       @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
-      @JsonProperty(INGESTION_MODE_CONFIG_KEY) @Nullable IngestionModeConfig ingestionModeConfig) {
+      @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -115,7 +115,7 @@ public class TableConfig extends BaseJsonConfig {
     _queryConfig = queryConfig;
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
     _fieldConfigList = fieldConfigList;
-    _ingestionModeConfig = ingestionModeConfig;
+    _upsertConfig = upsertConfig;
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -226,12 +226,12 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public IngestionModeConfig getIngestionModeConfig() {
-    return _ingestionModeConfig;
+  public UpsertConfig getUpsertConfig() {
+    return _upsertConfig;
   }
 
-  public void setIngestionModeConfig(IngestionModeConfig ingestionModeConfig) {
-    _ingestionModeConfig = ingestionModeConfig;
+  public void setUpsertConfig(UpsertConfig upsertConfig) {
+    _upsertConfig = upsertConfig;
   }
 
 }

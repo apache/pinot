@@ -26,7 +26,7 @@ import java.util.Map;
 import org.apache.pinot.spi.config.CompletionConfig;
 import org.apache.pinot.spi.config.FieldConfig;
 import org.apache.pinot.spi.config.IndexingConfig;
-import org.apache.pinot.spi.config.IngestionModeConfig;
+import org.apache.pinot.spi.config.UpsertConfig;
 import org.apache.pinot.spi.config.QueryConfig;
 import org.apache.pinot.spi.config.QuotaConfig;
 import org.apache.pinot.spi.config.ReplicaGroupStrategyConfig;
@@ -92,8 +92,7 @@ public class TableConfigBuilder {
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
 
-  // ingestion mode (upsert) config
-  private IngestionModeConfig _ingestionModeConfig;
+  private UpsertConfig _upsertConfig;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -271,8 +270,8 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setIngestionModeConfig(IngestionModeConfig ingestionModeConfig) {
-    _ingestionModeConfig = ingestionModeConfig;
+  public TableConfigBuilder setUpsertConfig(UpsertConfig upsertConfig) {
+    _upsertConfig = upsertConfig;
     return this;
   }
 
@@ -315,12 +314,8 @@ public class TableConfigBuilder {
       _customConfig = new TableCustomConfig(null);
     }
 
-    if (_ingestionModeConfig == null) {
-      _ingestionModeConfig = IngestionModeConfig.DEFAULT_APPEND_INGESTION_MODE;
-    }
-
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _ingestionModeConfig);
+        _fieldConfigList, _upsertConfig);
   }
 }

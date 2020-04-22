@@ -28,7 +28,7 @@ import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.spi.config.FieldConfig;
 import org.apache.pinot.spi.config.IndexingConfig;
-import org.apache.pinot.spi.config.IngestionModeConfig;
+import org.apache.pinot.spi.config.UpsertConfig;
 import org.apache.pinot.spi.config.QueryConfig;
 import org.apache.pinot.spi.config.QuotaConfig;
 import org.apache.pinot.spi.config.RoutingConfig;
@@ -117,16 +117,16 @@ public class TableConfigUtils {
       });
     }
 
-    IngestionModeConfig ingestionModeConfig = null;
-    String ingestionModeConfigString = simpleFields.get(TableConfig.INGESTION_MODE_CONFIG_KEY);
+    UpsertConfig upsertConfig = null;
+    String ingestionModeConfigString = simpleFields.get(TableConfig.UPSERT_CONFIG_KEY);
     if (ingestionModeConfigString != null) {
-      ingestionModeConfig = JsonUtils.stringToObject(ingestionModeConfigString, IngestionModeConfig.class);
+      upsertConfig = JsonUtils.stringToObject(ingestionModeConfigString, UpsertConfig.class);
     }
 
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
-        ingestionModeConfig);
+        upsertConfig);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -167,10 +167,6 @@ public class TableConfigUtils {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       simpleFields.put(TableConfig.FIELD_CONFIG_LIST_KEY, JsonUtils.objectToString(fieldConfigList));
-    }
-    IngestionModeConfig ingestionModeConfig = tableConfig.getIngestionModeConfig();
-    if (ingestionModeConfig != null) {
-      simpleFields.put(TableConfig.INGESTION_MODE_CONFIG_KEY, JsonUtils.objectToString(ingestionModeConfig));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

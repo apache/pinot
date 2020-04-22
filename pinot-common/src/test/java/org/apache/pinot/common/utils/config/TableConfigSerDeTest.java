@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.CompletionConfig;
 import org.apache.pinot.spi.config.FieldConfig;
-import org.apache.pinot.spi.config.IngestionModeConfig;
+import org.apache.pinot.spi.config.UpsertConfig;
 import org.apache.pinot.spi.config.QueryConfig;
 import org.apache.pinot.spi.config.QuotaConfig;
 import org.apache.pinot.spi.config.ReplicaGroupStrategyConfig;
@@ -234,25 +234,15 @@ public class TableConfigSerDeTest {
       checkFieldConfig(tableConfigToCompare);
     }
     {
-      // with ingestionMode config
-      IngestionModeConfig ingestionModeConfig = new IngestionModeConfig(IngestionModeConfig.APPEND_TABLE_CONFIG_VALUE,
-          null, null, null, null);
+      // with upsert config
+      UpsertConfig upsertConfig = new UpsertConfig(ImmutableList.of("pk"), "offset",
+          "$validFrom", "$validUntil");
 
-      TableConfig tableConfig = tableConfigBuilder.setIngestionModeConfig(
-          ingestionModeConfig).build();
-
-      // Serialize then de-serialize
-      checkTableConfigWithIngestionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), tableConfig);
-      checkTableConfigWithIngestionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), tableConfig);
-
-      ingestionModeConfig = new IngestionModeConfig(IngestionModeConfig.UPSERT_TABLE_CONFIG_VALUE,
-          ImmutableList.of("primaryKey"), "offsetKey", "$validFrom", "$validUntil");
-      tableConfig = tableConfigBuilder.setIngestionModeConfig(
-          ingestionModeConfig).build();
+      TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
       // Serialize then de-serialize
-      checkTableConfigWithIngestionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), tableConfig);
-      checkTableConfigWithIngestionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), tableConfig);
+      checkTableConfigWithUpsertConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), tableConfig);
+      checkTableConfigWithUpsertConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), tableConfig);
     }
   }
 
@@ -391,12 +381,11 @@ public class TableConfigSerDeTest {
     assertNull(secondFieldConfig.getProperties());
   }
 
-  private void checkTableConfigWithIngestionConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
-    // Check that the ingestion configuration does exist.
+  private void checkTableConfigWithUpsertConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
     assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-    assertNotNull(tableConfigToCompare.getIngestionModeConfig());
-    assertEquals(tableConfigToCompare.getIngestionModeConfig(),
-        tableConfig.getIngestionModeConfig());
+    assertNotNull(tableConfigToCompare.getUpsertConfig());
+    assertEquals(tableConfigToCompare.getUpsertConfig(),
+        tableConfig.getUpsertConfig());
   }
 
 }
