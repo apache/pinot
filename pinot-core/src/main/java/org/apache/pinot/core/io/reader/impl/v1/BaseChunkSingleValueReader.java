@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.compression.ChunkDecompressor;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
@@ -49,6 +51,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
   protected final int _numChunks;
   protected final int _lengthOfLongestEntry;
   private final int _version;
+  private final int _headerEntryChunkOffsetSize;
 
   /**
    * Constructor for the class.
@@ -89,9 +92,10 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     }
 
     _chunkSize = (_lengthOfLongestEntry * _numDocsPerChunk);
+    _headerEntryChunkOffsetSize = BaseChunkSingleValueWriter.getHeaderEntryChunkOffsetSize(_version);
 
     // Slice out the header from the data buffer.
-    int dataHeaderLength = _numChunks * VarByteChunkSingleValueWriter.FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE;
+    int dataHeaderLength = _numChunks * _headerEntryChunkOffsetSize;
     int rawDataStart = dataHeaderStart + dataHeaderLength;
     _dataHeader = _dataBuffer.view(dataHeaderStart, rawDataStart);
 
@@ -147,15 +151,15 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
 
   /**
    * Helper method to get the offset of the chunk in the data.
-   *
    * @param chunkId Id of the chunk for which to return the position.
    * @return Position (offset) of the chunk in the data.
    */
   protected long getChunkPosition(int chunkId) {
-    if (_version < 3) {
-      return _dataHeader.getInt(chunkId * VarByteChunkSingleValueWriter.FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2);
+    if (_headerEntryChunkOffsetSize == Integer.BYTES) {
+      return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
+    } else {
+      return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
     }
-    return _dataHeader.getLong(chunkId * VarByteChunkSingleValueWriter.FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE);
   }
 
   /**
