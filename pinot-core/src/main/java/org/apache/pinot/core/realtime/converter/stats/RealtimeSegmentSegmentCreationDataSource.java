@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.realtime.converter.stats;
 
+import org.apache.pinot.core.data.readers.GenericRowRecordExtractor;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
@@ -54,5 +56,10 @@ public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreation
   @Override
   public RecordReader getRecordReader() {
     return _realtimeSegmentRecordReader;
+  }
+
+  @Override
+  public RecordExtractor getRecordExtractor() {
+    return new GenericRowRecordExtractor();
   }
 }

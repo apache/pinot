@@ -59,7 +59,7 @@ public abstract class AbstractRecordExtractorTest {
     _inputRecords = getInputRecords();
     createInputFile();
     _recordReader = createRecordReader();
-    _recordExtractor = createRecordExtractor();
+    _recordExtractor = createRecordExtractor(_sourceFieldNames);
   }
 
   protected Schema getPinotSchema()
@@ -106,7 +106,7 @@ public abstract class AbstractRecordExtractorTest {
   protected abstract RecordReader createRecordReader()
       throws IOException;
 
-  protected abstract RecordExtractor createRecordExtractor()
+  protected abstract RecordExtractor createRecordExtractor(Set<String> sourceFields)
       throws IOException;
 
   protected abstract void createInputFile()

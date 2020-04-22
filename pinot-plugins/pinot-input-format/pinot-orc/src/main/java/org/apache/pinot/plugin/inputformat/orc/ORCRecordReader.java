@@ -63,7 +63,7 @@ import org.apache.pinot.spi.utils.StringUtils;
  *   <li>MAP -> Map of the supported types</li>
  * </ul>
  */
-public class ORCRecordReader implements RecordReader {
+public class ORCRecordReader implements RecordReader<GenericRow> {
   private Schema _schema;
   private List<String> _orcFields;
   private List<TypeDescription> _orcFieldTypes;
@@ -343,6 +343,11 @@ public class ORCRecordReader implements RecordReader {
   @Override
   public Schema getSchema() {
     return _schema;
+  }
+
+  @Override
+  public String getRecordExtractorClassName() {
+    return ORCRecordExtractor.class.getName();
   }
 
   @Override

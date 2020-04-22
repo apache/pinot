@@ -98,10 +98,8 @@ public class ThriftRecordReaderTest {
     ThriftRecordReaderConfig readerConfig = getThriftRecordReaderConfig();
     ThriftRecordReader recordReader = new ThriftRecordReader();
     recordReader.init(_tempFile, getSchema(), readerConfig);
-    ThriftRecordExtractorConfig extractorConfig = new ThriftRecordExtractorConfig();
-    extractorConfig.init(readerConfig);
     ThriftRecordExtractor recordExtractor = new ThriftRecordExtractor();
-    recordExtractor.init(Sets.newHashSet(), extractorConfig);
+    recordExtractor.init(Sets.newHashSet(), readerConfig);
     GenericRow to = new GenericRow();
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
@@ -123,10 +121,8 @@ public class ThriftRecordReaderTest {
     ThriftRecordReaderConfig readerConfig = getThriftRecordReaderConfig();
     ThriftRecordReader recordReader = new ThriftRecordReader();
     recordReader.init(_tempFile, getSchema(), readerConfig);
-    ThriftRecordExtractorConfig extractorConfig = new ThriftRecordExtractorConfig();
-    extractorConfig.init(readerConfig);
     ThriftRecordExtractor recordExtractor = new ThriftRecordExtractor();
-    recordExtractor.init(Sets.newHashSet(), extractorConfig);
+    recordExtractor.init(Sets.newHashSet(), readerConfig);
     GenericRow to = new GenericRow();
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {

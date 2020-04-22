@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
@@ -34,6 +35,7 @@ import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
 import static org.apache.avro.Schema.create;
@@ -56,6 +58,13 @@ public class ParquetRecordExtractorTest extends AbstractRecordExtractorTest {
     ParquetRecordReader recordReader = new ParquetRecordReader();
     recordReader.init(_dataFile, _pinotSchema, null);
     return recordReader;
+  }
+
+  @Override
+  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+    ParquetRecordExtractor recordExtractor = new ParquetRecordExtractor();
+    recordExtractor.init(sourceFields, null);
+    return recordExtractor;
   }
 
   /**

@@ -33,6 +33,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.readers.GenericRowRecordExtractor;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -50,6 +51,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -82,7 +84,7 @@ public class SegmentGenerationWithBytesTypeTest {
   private static final String VARIABLE_BYTES_COLUMN = "variableBytes";
 
   private Random _random;
-  private RecordReader _recordReader;
+  private RecordReader<GenericRow> _recordReader;
   private Schema _schema;
   private ImmutableSegment _segment;
 

@@ -23,7 +23,9 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -44,6 +46,13 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
     JSONRecordReader recordReader = new JSONRecordReader();
     recordReader.init(_dataFile, _pinotSchema, null);
     return recordReader;
+  }
+
+  @Override
+  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+    JSONRecordExtractor recordExtractor = new JSONRecordExtractor();
+    recordExtractor.init(sourceFields, null);
+    return recordExtractor;
   }
 
   /**

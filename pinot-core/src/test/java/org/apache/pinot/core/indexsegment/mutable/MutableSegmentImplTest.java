@@ -36,11 +36,14 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorFactory;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -87,9 +90,11 @@ public class MutableSegmentImplTest {
     _startTimeMs = System.currentTimeMillis();
 
     try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, avroFile, _schema, null)) {
+      RecordExtractor recordExtractor = RecordExtractorFactory.getRecordExtractor(recordReader, null, _schema);
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+        Object next = recordReader.next(reuse);
+        _mutableSegmentImpl.index(recordExtractor.extract(next, reuse), defaultMetadata);
         _lastIndexedTs = System.currentTimeMillis();
       }
     }

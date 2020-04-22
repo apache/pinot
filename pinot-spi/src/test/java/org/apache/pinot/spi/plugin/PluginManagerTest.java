@@ -76,7 +76,7 @@ public class PluginManagerTest {
         testRecordReader.init(null, null, null);
         int count = 0;
         while (testRecordReader.hasNext()) {
-          GenericRow row = testRecordReader.next();
+          testRecordReader.next();
           count++;
         }
 

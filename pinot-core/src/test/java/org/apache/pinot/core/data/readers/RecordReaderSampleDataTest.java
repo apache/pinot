@@ -26,9 +26,11 @@ import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorFactory;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -77,15 +79,21 @@ public class RecordReaderSampleDataTest {
             .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA, null);
         RecordReader jsonRecordReader = RecordReaderFactory
             .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA, null)) {
+
+      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA);
+      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA);
+      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA);
+
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
         assertTrue(jsonRecordReader.hasNext());
         numRecords++;
 
-        GenericRow avroRecord = defaultTransformer.transform(avroRecordReader.next());
-        GenericRow csvRecord = defaultTransformer.transform(csvRecordReader.next());
-        GenericRow jsonRecord = defaultTransformer.transform(jsonRecordReader.next());
+        GenericRow reuse = new GenericRow();
+        GenericRow avroRecord = defaultTransformer.transform(avroRecordExtractor.extract(avroRecordReader.next(), reuse));
+        GenericRow csvRecord = defaultTransformer.transform(csvRecordExtractor.extract(csvRecordReader.next(), reuse));
+        GenericRow jsonRecord = defaultTransformer.transform(jsonRecordExtractor.extract(jsonRecordReader.next(), reuse));
         checkEqualCSV(avroRecord, csvRecord);
         checkEqual(avroRecord, jsonRecord);
 
@@ -122,15 +130,19 @@ public class RecordReaderSampleDataTest {
             .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null);
         RecordReader jsonRecordReader = RecordReaderFactory
             .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null)) {
+      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA);
+      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA);
+      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA);
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
         assertTrue(jsonRecordReader.hasNext());
         numRecords++;
 
-        GenericRow avroRecord = avroRecordReader.next();
-        GenericRow csvRecord = csvRecordReader.next();
-        GenericRow jsonRecord = jsonRecordReader.next();
+        GenericRow reuse = new GenericRow();
+        GenericRow avroRecord = avroRecordExtractor.extract(avroRecordReader.next(), reuse);
+        GenericRow csvRecord = csvRecordExtractor.extract(csvRecordReader.next(), reuse);
+        GenericRow jsonRecord = jsonRecordExtractor.extract(jsonRecordReader.next(), reuse);
         checkEqualCSV(avroRecord, csvRecord);
         checkEqual(avroRecord, jsonRecord);
 
@@ -156,15 +168,19 @@ public class RecordReaderSampleDataTest {
             .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null);
         RecordReader jsonRecordReader = RecordReaderFactory
             .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null)) {
+      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA);
+      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA);
+      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA);
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
         assertTrue(jsonRecordReader.hasNext());
         numRecords++;
 
-        GenericRow avroRecord = avroRecordReader.next();
-        GenericRow csvRecord = csvRecordReader.next();
-        GenericRow jsonRecord = jsonRecordReader.next();
+        GenericRow reuse = new GenericRow();
+        GenericRow avroRecord = avroRecordExtractor.extract(avroRecordReader.next(), reuse);
+        GenericRow csvRecord = csvRecordExtractor.extract(csvRecordReader.next(), reuse);
+        GenericRow jsonRecord = jsonRecordExtractor.extract(jsonRecordReader.next(), reuse);
         checkEqualCSV(avroRecord, csvRecord);
         checkEqual(avroRecord, jsonRecord);
 
@@ -190,15 +206,19 @@ public class RecordReaderSampleDataTest {
             .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null);
         RecordReader jsonRecordReader = RecordReaderFactory
             .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null)) {
+      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA);
+      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA);
+      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA);
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
         assertTrue(jsonRecordReader.hasNext());
         numRecords++;
 
-        GenericRow avroRecord = avroRecordReader.next();
-        GenericRow csvRecord = csvRecordReader.next();
-        GenericRow jsonRecord = jsonRecordReader.next();
+        GenericRow reuse = new GenericRow();
+        GenericRow avroRecord = avroRecordExtractor.extract(avroRecordReader.next(), reuse);
+        GenericRow csvRecord = csvRecordExtractor.extract(csvRecordReader.next(), reuse);
+        GenericRow jsonRecord = jsonRecordExtractor.extract(jsonRecordReader.next(), reuse);
         checkEqualCSV(avroRecord, csvRecord);
         checkEqual(avroRecord, jsonRecord);
 

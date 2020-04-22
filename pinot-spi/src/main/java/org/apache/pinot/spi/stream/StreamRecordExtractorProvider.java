@@ -25,6 +25,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,19 +34,32 @@ import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
  */
 public abstract class StreamRecordExtractorProvider {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamRecordExtractorProvider.class);
   private static final String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
 
   /**
    * Constructs a RecordExtractor using properties in {@link StreamConfig} and initializes it
    */
-  public static RecordExtractor create(StreamMessageDecoder decoder, Map<String, String> decoderProperties, Schema schema) {
+  public static RecordExtractor create(StreamMessageDecoder decoder, Map<String, String> decoderProperties,
+      Schema schema) {
     RecordExtractor recordExtractor = null;
-    String recordExtractorClass = decoderProperties.get(RECORD_EXTRACTOR_CONFIG_KEY);
-    if (recordExtractorClass != null) {
+    if (decoderProperties != null) {
+      String recordExtractorClass = decoderProperties.get(RECORD_EXTRACTOR_CONFIG_KEY);
+      if (recordExtractorClass != null) {
+        try {
+          recordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+        } catch (Exception e) {
+          LOGGER.info("Could not create RecordExtractor using class name {}", recordExtractorClass);
+        }
+      }
+    }
+    if (recordExtractor == null) {
+      String recordExtractorClassName = decoder.getRecordExtractorClassName();
       try {
-        recordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+        recordExtractor = PluginManager.get().createInstance(recordExtractorClassName);
       } catch (Exception e) {
-
+        LOGGER.info("Could not create RecordExtractor using class name {} provided by Decoder {}",
+            recordExtractorClassName, decoder.getClass().getName());
       }
     }
 

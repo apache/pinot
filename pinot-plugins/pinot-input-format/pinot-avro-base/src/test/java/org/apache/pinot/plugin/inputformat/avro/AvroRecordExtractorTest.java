@@ -24,11 +24,13 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
 import static org.apache.avro.Schema.*;
@@ -50,6 +52,13 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
     avroRecordReader.init(_dataFile, _pinotSchema, null);
     return avroRecordReader;
+  }
+
+  @Override
+  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    avroRecordExtractor.init(sourceFields, null);
+    return avroRecordExtractor;
   }
 
   /**

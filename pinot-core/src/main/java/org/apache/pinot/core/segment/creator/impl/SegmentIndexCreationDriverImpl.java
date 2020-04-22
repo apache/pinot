@@ -56,6 +56,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorFactory;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
@@ -130,21 +131,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  /**
-   * Constructs the RecordExtractor
-   */
-  public RecordExtractor getRecordExtractor(SegmentGeneratorConfig config, RecordReader recordReader)
-      throws Exception {
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(config.getSchema());
-    String recordExtractorClassName = recordReader.getRecordExtractorClassName();
-    RecordExtractor recordExtractor = PluginManager.get().createInstance(recordExtractorClassName);
-    recordExtractor.init(sourceFields, config.getReaderConfig());
-    return recordExtractor;
-  }
-
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(recordReader, getRecordExtractor(config, recordReader)));
+    init(config, new RecordReaderSegmentCreationDataSource(recordReader,
+        RecordExtractorFactory.getRecordExtractor(recordReader, config.getReaderConfig(), config.getSchema())));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) {

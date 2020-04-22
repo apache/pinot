@@ -30,6 +30,7 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.core.data.readers.GenericRowRecordExtractor;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -37,6 +38,7 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -72,7 +74,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final int NUM_ROWS = 1000;
 
-  private RecordReader _recordReader;
+  private RecordReader<GenericRow> _recordReader;
   private TransformOperator _transformOperator;
   private TransformBlock _transformBlock;
 
@@ -167,7 +169,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * @return Set of unique group keys.
    * @throws Exception
    */
-  private Set<String> getExpectedGroupKeys(RecordReader recordReader, String[] groupByColumns)
+  private Set<String> getExpectedGroupKeys(RecordReader<GenericRow> recordReader, String[] groupByColumns)
       throws Exception {
     Set<String> groupKeys = new HashSet<>();
     StringBuilder stringBuilder = new StringBuilder();

@@ -36,6 +36,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -105,7 +106,7 @@ public class PinotOutputFormatTest {
     }
 
     File outputDir = new File(untarOutput, PinotOutputFormat.getSegmentName(fakeTaskAttemptContext));
-    RecordReader recordReader = new PinotSegmentRecordReader(outputDir, Schema.fromString(getSchema()), null);
+    RecordReader<GenericRow> recordReader = new PinotSegmentRecordReader(outputDir, Schema.fromString(getSchema()), null);
     Map<Integer, GenericRow> resultMap = new HashMap<>();
     while (recordReader.hasNext()) {
       GenericRow row = recordReader.next();

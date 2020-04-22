@@ -20,8 +20,10 @@ package org.apache.pinot.plugin.inputformat.orc;
  */
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
@@ -33,6 +35,7 @@ import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.StringUtils;
 
@@ -46,6 +49,13 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
     orcRecordReader.init(_dataFile, _pinotSchema, null);
     return orcRecordReader;
+  }
+
+  @Override
+  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+    ORCRecordExtractor orcRecordExtractor = new ORCRecordExtractor();
+    orcRecordExtractor.init(sourceFields, null);
+    return orcRecordExtractor;
   }
 
   @Override

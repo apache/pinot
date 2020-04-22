@@ -18,17 +18,20 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 
@@ -53,19 +56,30 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     return csvRecordReader;
   }
 
+  @Override
+  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    CSVRecordExtractor csvRecordExtractor = new CSVRecordExtractor();
+    csvRecordExtractor.init(sourceFields, csvRecordReaderConfig);
+    return  csvRecordExtractor;
+  }
+
   /**
    * Create a CSV input file using the input records
    */
   @Override
   public void createInputFile()
       throws IOException {
+
+    List<String> header = Lists.newArrayList(_sourceFieldNames);
     try (FileWriter fileWriter = new FileWriter(_dataFile); CSVPrinter csvPrinter = new CSVPrinter(fileWriter,
-        CSVFormat.DEFAULT.withHeader(_sourceFieldNames.toArray(new String[0])))) {
+        CSVFormat.DEFAULT.withHeader(header.toArray(new String[0])))) {
 
       for (Map<String, Object> inputRecord : _inputRecords) {
-        Object[] record = new Object[_sourceFieldNames.size()];
-        for (int i = 0; i < _sourceFieldNames.size(); i++) {
-          Object value = inputRecord.get(_sourceFieldNames.get(i));
+        Object[] record = new Object[header.size()];
+        for (int i = 0; i < header.size(); i++) {
+          Object value = inputRecord.get(header.get(i));
           if (value instanceof Collection) {
             record[i] = StringUtils.join(((List) value).toArray(), CSV_MULTI_VALUE_DELIMITER);
           } else {

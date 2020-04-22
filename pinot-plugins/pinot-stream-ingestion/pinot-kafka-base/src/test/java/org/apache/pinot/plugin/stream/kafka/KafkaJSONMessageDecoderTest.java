@@ -20,14 +20,20 @@ package org.apache.pinot.plugin.stream.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Sets;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.HashMap;
+import java.util.Map;
+import org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorFactory;
+import org.apache.pinot.spi.stream.StreamRecordExtractorProvider;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -64,11 +70,14 @@ public class KafkaJSONMessageDecoderTest {
         new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()))) {
       KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
       decoder.init(new HashMap<>(), schema, "testTopic");
+      RecordExtractor recordExtractor = StreamRecordExtractorProvider.create(decoder, null, schema);
+
       GenericRow r = new GenericRow();
       String line = reader.readLine();
       while (line != null) {
         JsonNode jsonNode = objectMapper.reader().readTree(line);
-        decoder.decode(line.getBytes(), r);
+        Map<String, Object> decodedRecord = decoder.decode(line.getBytes());
+        r = recordExtractor.extract(decodedRecord, r);
         for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
           FieldSpec incomingFieldSpec = fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? new TimeFieldSpec(
               schema.getTimeFieldSpec().getIncomingGranularitySpec()) : fieldSpec;

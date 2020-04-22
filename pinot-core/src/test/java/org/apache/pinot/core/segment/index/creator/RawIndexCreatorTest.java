@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.core.data.readers.GenericRowRecordExtractor;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -33,6 +34,7 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
@@ -65,7 +67,7 @@ public class RawIndexCreatorTest {
   private static final String STRING_COLUMN = "stringColumn";
 
   Random _random;
-  private RecordReader _recordReader;
+  private RecordReader<GenericRow> _recordReader;
   SegmentDirectory _segmentDirectory;
   private SegmentDirectory.Reader _segmentReader;
 
