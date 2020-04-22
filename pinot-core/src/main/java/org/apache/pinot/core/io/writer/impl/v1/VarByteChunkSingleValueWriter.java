@@ -36,7 +36,11 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
  *   <li> Integer: Total number of chunks. </li>
  *   <li> Integer: Number of docs per chunk. </li>
  *   <li> Integer: Length of longest entry (in bytes). </li>
- *   <li> Integer array: Integer offsets for all chunks in the data .</li>
+ *   <li> Integer: Total number of docs (version 2 onwards). </li>
+ *   <li> Integer: Compression type enum value (version 2 onwards). </li>
+ *   <li> Integer: Start offset of data header (version 2 onwards). </li>
+ *   <li> Integer array: Integer offsets for all chunks in the data (upto version 2),
+ *   Long array: Long offsets for all chunks in the data (version 3 onwards) </li>
  * </ul>
  *
  * <p> Individual Chunks: </p>
