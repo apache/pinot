@@ -32,6 +32,7 @@
 
   <properties>
     <revision>1.0.0</revision>
+    <sha1>-SNAPSHOT</sha1>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <pinot.version>0.1.0</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -87,7 +88,7 @@
   <distributionManagement>
     <repository>
       <id>bintray-linkedin-maven</id>
-      <url>https://api.bintray.com/maven/linkedin/test-repo/thirdeye/;publish=1</url>
+      <url>https://api.bintray.com/maven/linkedin/maven/thirdeye/;publish=1</url>
     </repository>
   </distributionManagement>
   
