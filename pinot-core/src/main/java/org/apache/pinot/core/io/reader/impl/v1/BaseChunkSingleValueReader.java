@@ -24,6 +24,7 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.compression.ChunkDecompressor;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
+import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
   protected final int _numDocsPerChunk;
   protected final int _numChunks;
   protected final int _lengthOfLongestEntry;
+  private final int _version;
 
   /**
    * Constructor for the class.
@@ -57,7 +59,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     _dataBuffer = pinotDataBuffer;
 
     int headerOffset = 0;
-    int version = _dataBuffer.getInt(headerOffset);
+    _version = _dataBuffer.getInt(headerOffset);
     headerOffset += Integer.BYTES;
 
     _numChunks = _dataBuffer.getInt(headerOffset);
@@ -70,7 +72,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     headerOffset += Integer.BYTES;
 
     int dataHeaderStart = headerOffset;
-    if (version > 1) {
+    if (_version > 1) {
       _dataBuffer.getInt(headerOffset); // Total docs
       headerOffset += Integer.BYTES;
 
@@ -89,7 +91,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     _chunkSize = (_lengthOfLongestEntry * _numDocsPerChunk);
 
     // Slice out the header from the data buffer.
-    int dataHeaderLength = _numChunks * Integer.BYTES;
+    int dataHeaderLength = _numChunks * VarByteChunkSingleValueWriter.FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE;
     int rawDataStart = dataHeaderStart + dataHeaderLength;
     _dataHeader = _dataBuffer.view(dataHeaderStart, rawDataStart);
 
@@ -120,14 +122,14 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     }
 
     int chunkSize;
-    int chunkPosition = getChunkPosition(chunkId);
+    long chunkPosition = getChunkPosition(chunkId);
 
     // Size of chunk can be determined using next chunks offset, or end of data buffer for last chunk.
     if (chunkId == (_numChunks - 1)) { // Last chunk.
       chunkSize = (int) (_dataBuffer.size() - chunkPosition);
     } else {
-      int nextChunkOffset = getChunkPosition(chunkId + 1);
-      chunkSize = nextChunkOffset - chunkPosition;
+      long nextChunkOffset = getChunkPosition(chunkId + 1);
+      chunkSize = (int)(nextChunkOffset - chunkPosition);
     }
 
     ByteBuffer decompressedBuffer = context.getChunkBuffer();
@@ -149,8 +151,11 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
    * @param chunkId Id of the chunk for which to return the position.
    * @return Position (offset) of the chunk in the data.
    */
-  protected int getChunkPosition(int chunkId) {
-    return _dataHeader.getInt(chunkId * Integer.BYTES);
+  protected long getChunkPosition(int chunkId) {
+    if (_version < 3) {
+      return _dataHeader.getInt(chunkId * VarByteChunkSingleValueWriter.FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2);
+    }
+    return _dataHeader.getLong(chunkId * VarByteChunkSingleValueWriter.FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE);
   }
 
   /**

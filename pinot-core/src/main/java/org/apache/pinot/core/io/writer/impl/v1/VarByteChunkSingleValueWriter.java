@@ -49,7 +49,7 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
  */
 @NotThreadSafe
 public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
-  private static final int CURRENT_VERSION = 2;
+  private static final int CURRENT_VERSION = 3;
   public static final int CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE = Integer.BYTES;
 
   private final int _chunkHeaderSize;

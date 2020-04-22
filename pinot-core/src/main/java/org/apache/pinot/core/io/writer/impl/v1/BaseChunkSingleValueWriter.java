@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleValueWriter {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSingleValueWriter.class);
+  public static final int FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2 = Integer.BYTES;
+  public static final int FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE = Long.BYTES;
 
   protected final FileChannel _dataFile;
   protected ByteBuffer _header;
@@ -45,7 +47,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   protected final ChunkCompressor _chunkCompressor;
 
   protected int _chunkSize;
-  protected int _dataOffset;
+  protected long _dataOffset;
 
   /**
    * Constructor for the class.
@@ -139,7 +141,8 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   private int writeHeader(ChunkCompressorFactory.CompressionType compressionType, int totalDocs, int numDocsPerChunk,
       int sizeOfEntry, int version) {
     int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
-    int headerSize = (numChunks + 7) * Integer.BYTES; // 7 items written before chunk indexing.
+    // 7 items written before chunk indexing.
+    int headerSize = (7 * Integer.BYTES) + (numChunks * VarByteChunkSingleValueWriter.FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE);
 
     _header = ByteBuffer.allocateDirect(headerSize);
 
@@ -196,7 +199,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
       throw new RuntimeException(e);
     }
 
-    _header.putInt(_dataOffset);
+    _header.putLong(_dataOffset);
     _dataOffset += sizeToWrite;
 
     _chunkBuffer.clear();
