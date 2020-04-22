@@ -30,8 +30,7 @@ if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   cd thirdeye-frontend/
   # Deploy ThirdEye frontend to NPM
   npm version ${BUILD_VERSION}${DEV_VERSION}
-  echo "_auth = $NPM_TOKEN" > ~/.npmrc
-  echo "email = $NPM_EMAIL" >> ~/.npmrc
-  npm config set //registry.npmjs.org/:_authToken ${NPM_TOKEN}
+  echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+  echo "email = ${NPM_EMAIL}" >> ~/.npmrc
   npm publish
 fi
