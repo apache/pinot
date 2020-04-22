@@ -201,7 +201,6 @@ public class VarByteChunkSingleValueReaderWriteTest {
     }
 
     writer.close();
-    System.out.println("num docs per chunk: " + numDocsPerChunk + " " + "maxsize: " + maxStringLengthInBytes + " " + "length: " + outFile.length());
 
     PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(outFile);
     try (VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(buffer)) {
