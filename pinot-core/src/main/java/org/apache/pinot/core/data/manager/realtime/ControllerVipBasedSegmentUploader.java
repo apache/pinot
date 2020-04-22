@@ -19,36 +19,47 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.slf4j.Logger;
+
+import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS;
 
 
 // A segment uploader which uploads segments to the controller via the controller's segmentCommitUpload end point
 // point.
 public class ControllerVipBasedSegmentUploader implements SegmentUploader {
-  private final SegmentCompletionProtocol.Request.Params _params;
-  private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final Logger _segmentLogger;
   private final String _controllerVipUrl;
+  private final FileUploadDownloadClient _fileUploadDownloadClient;
+  private final String _segmentName;
+  private final int _segmentUploadRequestTimeoutMs;
+  private final ServerMetrics _serverMetrics;
 
-  public ControllerVipBasedSegmentUploader(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      SegmentCompletionProtocol.Request.Params params, String controllerVipUrl) {
+  public ControllerVipBasedSegmentUploader(Logger segmentLogger, FileUploadDownloadClient fileUploadDownloadClient,
+      String controllerVipUrl, String segmentName, int segmentUploadRequestTimeoutMs, ServerMetrics serverMetrics) {
     _segmentLogger = segmentLogger;
-    _protocolHandler = protocolHandler;
-    _params = params;
+    _fileUploadDownloadClient = fileUploadDownloadClient;
     _controllerVipUrl = controllerVipUrl;
+    _segmentName = segmentName;
+    _segmentUploadRequestTimeoutMs = segmentUploadRequestTimeoutMs;
+    _serverMetrics = serverMetrics;
   }
 
   @Override
-  public SegmentUploadStatus segmentUpload(File segmentFile) {
-    SegmentCompletionProtocol.Response segmentCommitUploadResponse =
-        _protocolHandler.segmentCommitUpload(_params, segmentFile, _controllerVipUrl);
-    if (!segmentCommitUploadResponse.getStatus()
-        .equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
-      _segmentLogger.warn("Segment upload failed with response {}", segmentCommitUploadResponse.toJsonString());
-      return new SegmentUploadStatus(false, null);
+  public URI uploadSegment(File segmentFile)
+      throws URISyntaxException {
+    SegmentCompletionProtocol.Response response = SegmentCompletionProtocolUtils
+        .uploadSegmentWithFileUploadDownloadClient(_fileUploadDownloadClient, segmentFile, _controllerVipUrl,
+            _segmentName, _segmentUploadRequestTimeoutMs, _segmentLogger);
+    SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(_serverMetrics, response);
+    if (response.getStatus() == UPLOAD_SUCCESS) {
+      return new URI(response.getSegmentLocation());
     }
-    return new SegmentUploadStatus(true, segmentCommitUploadResponse.getSegmentLocation());
+    return null;
   }
 }

@@ -19,10 +19,16 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -31,6 +37,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -39,22 +47,32 @@ import static org.mockito.Mockito.when;
 public class ControllerVipBasedSegmentUploaderTest {
   private static final String GOOD_CONTROLLER_VIP = "good_controller_vip";
   private static final String BAD_CONTROLLER_VIP = "bad_controller_vip";
-  public static final String SEGMENT_LOCATION = "segment_location";
+  public static final String SEGMENT_LOCATION = "http://server/segment_location";
   private static Logger _logger = LoggerFactory.getLogger(ControllerVipBasedSegmentUploaderTest.class);
-  private ServerSegmentCompletionProtocolHandler _handler;
+  private FileUploadDownloadClient _fileUploadDownloadClient;
   private File _file;
 
   @BeforeClass
-  public void setUp() {
+  public void setUp()
+      throws URISyntaxException, IOException, HttpErrorStatusException {
     SegmentCompletionProtocol.Response successResp = new SegmentCompletionProtocol.Response();
     successResp.setStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
     successResp.setSegmentLocation(SEGMENT_LOCATION);
+    SimpleHttpResponse successHttpResponse = new SimpleHttpResponse(200, successResp.toJsonString());
+
     SegmentCompletionProtocol.Response failureResp = new SegmentCompletionProtocol.Response();
     failureResp.setStatus(SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
+    SimpleHttpResponse failHttpResponse = new SimpleHttpResponse(404, failureResp.toJsonString());
 
-    _handler = mock(ServerSegmentCompletionProtocolHandler.class);
-    when(_handler.segmentCommitUpload(any(), any(), eq(GOOD_CONTROLLER_VIP))).thenReturn(successResp);
-    when(_handler.segmentCommitUpload(any(), any(), eq(BAD_CONTROLLER_VIP))).thenReturn(failureResp);
+    _fileUploadDownloadClient = mock(FileUploadDownloadClient.class);
+
+    when(_fileUploadDownloadClient.uploadSegment(eq(new URI(GOOD_CONTROLLER_VIP)), anyString(), any(File.class), any(), any(), anyInt()))
+        .thenReturn(successHttpResponse);
+    when(_fileUploadDownloadClient
+        .uploadSegment(eq(new URI(BAD_CONTROLLER_VIP)), anyString(), any(File.class), any(), any(), anyInt()))
+        .thenReturn(failHttpResponse);
+
+
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
   }
@@ -65,21 +83,22 @@ public class ControllerVipBasedSegmentUploaderTest {
   }
 
   @Test
-  public void testUploadSuccess() {
+  public void testUploadSuccess()
+      throws URISyntaxException {
     ControllerVipBasedSegmentUploader uploader =
-        new ControllerVipBasedSegmentUploader(_logger, _handler, new SegmentCompletionProtocol.Request.Params(),
-            GOOD_CONTROLLER_VIP);
-    SegmentUploadStatus status = uploader.segmentUpload(_file);
-    Assert.assertTrue(status.isUploadSuccessful());
-    Assert.assertEquals(status.getSegmentLocation(), SEGMENT_LOCATION);
+        new ControllerVipBasedSegmentUploader(_logger, _fileUploadDownloadClient, GOOD_CONTROLLER_VIP, "segmentName",
+            10000, mock(ServerMetrics.class));
+    URI segmentURI = uploader.uploadSegment(_file);
+    Assert.assertEquals(segmentURI.toString(), SEGMENT_LOCATION);
   }
 
   @Test
-  public void testUploadFailure() {
+  public void testUploadFailure()
+      throws URISyntaxException {
     ControllerVipBasedSegmentUploader uploader =
-        new ControllerVipBasedSegmentUploader(_logger, _handler, new SegmentCompletionProtocol.Request.Params(),
-            BAD_CONTROLLER_VIP);
-    SegmentUploadStatus status = uploader.segmentUpload(_file);
-    Assert.assertFalse(status.isUploadSuccessful());
+        new ControllerVipBasedSegmentUploader(_logger, _fileUploadDownloadClient, BAD_CONTROLLER_VIP, "segmentName",
+            10000, mock(ServerMetrics.class));
+    URI segmentURI = uploader.uploadSegment(_file);
+    Assert.assertNull(segmentURI);
   }
 }
