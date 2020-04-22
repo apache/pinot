@@ -20,14 +20,12 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.parsers.CompilerConstants;
 
 
 /**
@@ -47,8 +45,7 @@ public class AggregationFunctionFactory {
   public static AggregationFunction getAggregationFunction(AggregationInfo aggregationInfo,
       @Nullable BrokerRequest brokerRequest) {
     String functionName = aggregationInfo.getAggregationType();
-    String argumentsString = AggregationFunctionUtils.getColumn(aggregationInfo);
-    List<String> arguments = Arrays.asList(argumentsString.split(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR));
+    List<String> arguments = AggregationFunctionUtils.getAggregationExpressions(aggregationInfo);
 
     try {
       String upperCaseFunctionName = functionName.toUpperCase();

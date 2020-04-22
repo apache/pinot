@@ -61,13 +61,13 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + column;
+  public String getColumnName() {
+    return getType().getName() + _percentile + "_" + _column;
   }
 
   @Override
-  public String getResultColumnName(String column) {
-    return AggregationFunctionType.PERCENTILE.getName().toLowerCase() + _percentile + "(" + column + ")";
+  public String getResultColumnName() {
+    return getType().getName().toLowerCase() + _percentile + "(" + _column + ")";
   }
 
   @Override

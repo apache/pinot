@@ -62,13 +62,13 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "_" + column;
+  public String getColumnName() {
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "_" + _column;
   }
 
   @Override
-  public String getResultColumnName(String column) {
-    return AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + _percentile + "(" + column + ")";
+  public String getResultColumnName() {
+    return AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + _percentile + "(" + _column + ")";
   }
 
   @Override

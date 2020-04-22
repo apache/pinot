@@ -21,19 +21,17 @@ package org.apache.pinot.plugin.inputformat.csv;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
-import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
+
 
 /**
  * Tests the {@link CSVRecordExtractor} using a schema containing groovy transform functions
@@ -86,7 +84,7 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
       Object expectedValue = entry.getValue();
       Object actualValue = genericRow.getValue(columnName);
       if (expectedValue instanceof Collection) {
-        List expectedArray = (ArrayList) expectedValue;
+        List expectedArray = (List) expectedValue;
         if (expectedArray.size() == 1) {
           // in CSV, cannot differentiate between array with single element vs actual single element
           Assert.assertEquals(actualValue, String.valueOf(expectedArray.get(0)));

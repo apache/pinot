@@ -23,8 +23,8 @@ import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
 /**

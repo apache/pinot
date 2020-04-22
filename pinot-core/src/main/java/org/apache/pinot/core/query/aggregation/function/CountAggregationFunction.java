@@ -48,12 +48,12 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public String getColumnName(String column) {
+  public String getColumnName() {
     return COLUMN_NAME;
   }
 
   @Override
-  public String getResultColumnName(String column) {
+  public String getResultColumnName() {
     return AggregationFunctionType.COUNT.getName().toLowerCase() + "(*)";
   }
 

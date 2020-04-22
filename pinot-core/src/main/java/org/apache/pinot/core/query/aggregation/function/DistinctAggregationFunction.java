@@ -68,6 +68,16 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   }
 
   @Override
+  public String getColumnName() {
+    return getType().getName() + "_" + AggregationFunctionUtils.concatArgs(Arrays.asList(_columns));
+  }
+
+  @Override
+  public String getResultColumnName() {
+    return getType().getName().toLowerCase() + "(" + AggregationFunctionUtils.concatArgs(Arrays.asList(_columns)) + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
@@ -78,7 +88,8 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<String, BlockValSet> blockValSetMap) {
     int numColumns = _columns.length;
     int numBlockValSets = blockValSetMap.size();
     Preconditions.checkState(numBlockValSets == numColumns, "Size mismatch: numBlockValSets = %s, numColumns = %s",

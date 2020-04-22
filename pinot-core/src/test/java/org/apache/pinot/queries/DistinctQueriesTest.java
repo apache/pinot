@@ -53,7 +53,7 @@ import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;

@@ -20,146 +20,125 @@ package org.apache.pinot.plugin.inputformat.orc;
  */
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.io.FileUtils;
+import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.Text;
 import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
-import org.apache.orc.mapred.OrcList;
-import org.apache.orc.mapred.OrcMapredRecordWriter;
-import org.apache.orc.mapred.OrcStruct;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
+import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.StringUtils;
 
 
-public class ORCRecordReaderTest {
-  private static final File TEMP_DIR = FileUtils.getTempDirectory();
-  private static final File ORC_FILE = new File(TEMP_DIR.getAbsolutePath(), "my-file.orc");
-  private static final File MULTIVALUE_ORC_FILE = new File(TEMP_DIR.getAbsolutePath(), "mv-my-file.orc");
+public class ORCRecordReaderTest extends AbstractRecordReaderTest {
+  private final File _dataFile = new File(_tempDir, "data.orc");
 
-  @BeforeClass
-  public void setUp()
+  @Override
+  protected RecordReader createRecordReader()
       throws Exception {
-    FileUtils.deleteQuietly(TEMP_DIR);
+    ORCRecordReader orcRecordReader = new ORCRecordReader();
+    orcRecordReader.init(_dataFile, _pinotSchema, null);
+    return orcRecordReader;
+  }
 
-    TypeDescription schema = TypeDescription.fromString("struct<x:int,y:string>");
-
-    Writer writer = OrcFile.createWriter(new Path(ORC_FILE.getAbsolutePath()),
+  @Override
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
+      throws Exception {
+    TypeDescription schema = TypeDescription.fromString(
+        "struct<dim_sv_int:int,dim_sv_long:bigint,dim_sv_float:float,dim_sv_double:double,dim_sv_string:string,dim_mv_int:array<int>,dim_mv_long:array<bigint>,dim_mv_float:array<float>,dim_mv_double:array<double>,dim_mv_string:array<string>,met_int:int,met_long:bigint,met_float:float,met_double:double>");
+    Writer writer = OrcFile.createWriter(new Path(_dataFile.getAbsolutePath()),
         OrcFile.writerOptions(new Configuration()).setSchema(schema));
 
-    VectorizedRowBatch batch = schema.createRowBatch();
-    LongColumnVector x = (LongColumnVector) batch.cols[0];
-    BytesColumnVector y = (BytesColumnVector) batch.cols[1];
-    for (int r = 0; r < 5; ++r) {
-      int row = batch.size++;
-      x.vector[row] = r;
-      byte[] buffer = ("Last-" + (r * 3)).getBytes(StandardCharsets.UTF_8);
-      y.setRef(row, buffer, 0, buffer.length);
-      // If the batch is full, write it out and start over.
-      if (batch.size == batch.getMaxSize()) {
-        writer.addRowBatch(batch);
-        batch.reset();
+    VectorizedRowBatch rowBatch = schema.createRowBatch();
+    int numRowsPerBatch = rowBatch.getMaxSize();
+    LongColumnVector dimSVIntVector = (LongColumnVector) rowBatch.cols[0];
+    LongColumnVector dimSVLongVector = (LongColumnVector) rowBatch.cols[1];
+    DoubleColumnVector dimSVFloatVector = (DoubleColumnVector) rowBatch.cols[2];
+    DoubleColumnVector dimSVDoubleVector = (DoubleColumnVector) rowBatch.cols[3];
+    BytesColumnVector dimSVStringVector = (BytesColumnVector) rowBatch.cols[4];
+    // At most 50 entries for each multi-value
+    int maxNumElements = numRowsPerBatch * 50;
+    ListColumnVector dimMVIntVector = (ListColumnVector) rowBatch.cols[5];
+    LongColumnVector dimMVIntElementVector = (LongColumnVector) dimMVIntVector.child;
+    dimMVIntElementVector.ensureSize(maxNumElements, false);
+    ListColumnVector dimMVLongVector = (ListColumnVector) rowBatch.cols[6];
+    LongColumnVector dimMVLongElementVector = (LongColumnVector) dimMVLongVector.child;
+    dimMVLongElementVector.ensureSize(maxNumElements, false);
+    ListColumnVector dimMVFloatVector = (ListColumnVector) rowBatch.cols[7];
+    DoubleColumnVector dimMVFloatElementVector = (DoubleColumnVector) dimMVFloatVector.child;
+    dimMVFloatElementVector.ensureSize(maxNumElements, false);
+    ListColumnVector dimMVDoubleVector = (ListColumnVector) rowBatch.cols[8];
+    DoubleColumnVector dimMVDoubleElementVector = (DoubleColumnVector) dimMVDoubleVector.child;
+    dimMVDoubleElementVector.ensureSize(maxNumElements, false);
+    ListColumnVector dimMVStringVector = (ListColumnVector) rowBatch.cols[9];
+    BytesColumnVector dimMVStringElementVector = (BytesColumnVector) dimMVStringVector.child;
+    dimMVStringElementVector.ensureSize(maxNumElements, false);
+    LongColumnVector metIntVector = (LongColumnVector) rowBatch.cols[10];
+    LongColumnVector metLongVector = (LongColumnVector) rowBatch.cols[11];
+    DoubleColumnVector metFloatVector = (DoubleColumnVector) rowBatch.cols[12];
+    DoubleColumnVector metDoubleVector = (DoubleColumnVector) rowBatch.cols[13];
+
+    for (Map<String, Object> record : recordsToWrite) {
+      int rowId = rowBatch.size++;
+
+      dimSVIntVector.vector[rowId] = (int) record.get("dim_sv_int");
+      dimSVLongVector.vector[rowId] = (long) record.get("dim_sv_long");
+      dimSVFloatVector.vector[rowId] = (float) record.get("dim_sv_float");
+      dimSVDoubleVector.vector[rowId] = (double) record.get("dim_sv_double");
+      dimSVStringVector.setVal(rowId, StringUtils.encodeUtf8((String) record.get("dim_sv_string")));
+
+      List dimMVInts = (List) record.get("dim_mv_int");
+      dimMVIntVector.offsets[rowId] = dimMVIntVector.childCount;
+      dimMVIntVector.lengths[rowId] = dimMVInts.size();
+      for (Object element : dimMVInts) {
+        dimMVIntElementVector.vector[dimMVIntVector.childCount++] = (int) element;
+      }
+      List dimMVLongs = (List) record.get("dim_mv_long");
+      dimMVLongVector.offsets[rowId] = dimMVLongVector.childCount;
+      dimMVLongVector.lengths[rowId] = dimMVLongs.size();
+      for (Object element : dimMVLongs) {
+        dimMVLongElementVector.vector[dimMVLongVector.childCount++] = (long) element;
+      }
+      List dimMVFloats = (List) record.get("dim_mv_float");
+      dimMVFloatVector.offsets[rowId] = dimMVFloatVector.childCount;
+      dimMVFloatVector.lengths[rowId] = dimMVFloats.size();
+      for (Object element : dimMVFloats) {
+        dimMVFloatElementVector.vector[dimMVFloatVector.childCount++] = (float) element;
+      }
+      List dimMVDoubles = (List) record.get("dim_mv_double");
+      dimMVDoubleVector.offsets[rowId] = dimMVDoubleVector.childCount;
+      dimMVDoubleVector.lengths[rowId] = dimMVDoubles.size();
+      for (Object element : dimMVDoubles) {
+        dimMVDoubleElementVector.vector[dimMVDoubleVector.childCount++] = (double) element;
+      }
+      List dimMVStrings = (List) record.get("dim_mv_string");
+      dimMVStringVector.offsets[rowId] = dimMVStringVector.childCount;
+      dimMVStringVector.lengths[rowId] = dimMVStrings.size();
+      for (Object element : dimMVStrings) {
+        dimMVStringElementVector.setVal(dimMVStringVector.childCount++, StringUtils.encodeUtf8((String) element));
+      }
+
+      metIntVector.vector[rowId] = (int) record.get("met_int");
+      metLongVector.vector[rowId] = (long) record.get("met_long");
+      metFloatVector.vector[rowId] = (float) record.get("met_float");
+      metDoubleVector.vector[rowId] = (double) record.get("met_double");
+
+      if (rowBatch.size == numRowsPerBatch) {
+        writer.addRowBatch(rowBatch);
+        rowBatch.reset();
       }
     }
-    if (batch.size != 0) {
-      writer.addRowBatch(batch);
+    if (rowBatch.size != 0) {
+      writer.addRowBatch(rowBatch);
+      rowBatch.reset();
     }
     writer.close();
-
-    // Define the mv orc schema - TypeDescription
-    TypeDescription orcTypeDesc = TypeDescription.createStruct();
-    TypeDescription typeEmails = TypeDescription.createList(TypeDescription.createString());
-
-    orcTypeDesc.addField("emails", typeEmails);
-    orcTypeDesc.addField("x", TypeDescription.createInt());
-
-    OrcList<Text> emails = new OrcList<>(typeEmails);
-    emails.add(new Text("hello"));
-    emails.add(new Text("no"));
-
-    OrcStruct struct = new OrcStruct(orcTypeDesc);
-    struct.setFieldValue("emails", emails);
-    struct.setFieldValue("x", new IntWritable(1));
-
-    Writer mvWriter = OrcFile.createWriter(new Path(MULTIVALUE_ORC_FILE.getAbsolutePath()),
-        OrcFile.writerOptions(new Configuration()).setSchema(orcTypeDesc));
-
-    OrcMapredRecordWriter mrRecordWriter = new OrcMapredRecordWriter(mvWriter);
-    mrRecordWriter.write(null, struct);
-    mrRecordWriter.close(null);
-  }
-
-  @Test
-  public void testReadData()
-      throws IOException {
-    ORCRecordReader orcRecordReader = new ORCRecordReader();
-
-    Schema schema = new Schema();
-    FieldSpec xFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.LONG, true);
-    schema.addField(xFieldSpec);
-    FieldSpec yFieldSpec = new DimensionFieldSpec("y", FieldSpec.DataType.BYTES, true);
-    schema.addField(yFieldSpec);
-    orcRecordReader.init(ORC_FILE, schema, null);
-
-    List<GenericRow> genericRows = new ArrayList<>();
-    while (orcRecordReader.hasNext()) {
-      genericRows.add(orcRecordReader.next());
-    }
-    orcRecordReader.close();
-    Assert.assertEquals(genericRows.size(), 5, "Generic row size must be 5");
-
-    for (int i = 0; i < genericRows.size(); i++) {
-      Assert.assertEquals(genericRows.get(i).getValue("x"), i);
-      Assert.assertEquals(genericRows.get(i).getValue("y"), "Last-" + (i * 3));
-    }
-  }
-
-  @Test
-  public void testReadMVData()
-      throws IOException {
-    ORCRecordReader orcRecordReader = new ORCRecordReader();
-    Schema schema = new Schema();
-    FieldSpec emailsFieldSpec = new DimensionFieldSpec("emails", FieldSpec.DataType.STRING, false);
-    schema.addField(emailsFieldSpec);
-    FieldSpec xFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
-    schema.addField(xFieldSpec);
-    orcRecordReader.init(MULTIVALUE_ORC_FILE, schema, null);
-
-    List<GenericRow> genericRows = new ArrayList<>();
-    while (orcRecordReader.hasNext()) {
-      genericRows.add(orcRecordReader.next());
-    }
-    orcRecordReader.close();
-
-    Assert.assertEquals(genericRows.size(), 1, "Generic row size must be 1");
-
-    List<Integer> l = (List) genericRows.get(0).getValue("emails");
-    Assert.assertTrue(l.size() == 2);
-    Assert.assertEquals(l.get(0), "hello");
-    Assert.assertEquals(l.get(1), "no");
-
-    int val = (Integer) genericRows.get(0).getValue("x");
-    Assert.assertTrue(val == 1);
-  }
-
-  @AfterClass
-  public void tearDown() {
-    FileUtils.deleteQuietly(TEMP_DIR);
   }
 }

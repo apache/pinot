@@ -64,7 +64,7 @@ public class RealtimeQuickStart {
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
+    File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schemaFile, tableConfigFile);
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);

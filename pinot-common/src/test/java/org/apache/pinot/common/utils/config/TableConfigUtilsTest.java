@@ -19,9 +19,9 @@
 package org.apache.pinot.common.utils.config;
 
 import java.util.Collections;
-import org.apache.pinot.spi.config.FieldConfig;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.TableType;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 

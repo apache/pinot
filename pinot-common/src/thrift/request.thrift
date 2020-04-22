@@ -102,6 +102,11 @@ struct AggregationInfo {
   2: optional map<string,string> aggregationParams;
   3: optional bool isInSelectList;
 
+  // Backward compatible change to allow aggregation functions to take multiple arguments.
+  // We could not reuse aggregationParams, as it requires argument name (as key), which may not be
+  // available for aggregation functions with variable arguments. Each argument can be an expression.
+  4: optional list<string> expressions;
+
 }
 
 /**

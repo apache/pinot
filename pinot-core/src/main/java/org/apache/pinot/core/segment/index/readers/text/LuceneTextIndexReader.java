@@ -38,7 +38,7 @@ import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreato
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 

@@ -19,10 +19,10 @@
 package org.apache.pinot.common.utils.config;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.config.TableType;
-import org.apache.pinot.spi.config.TagOverrideConfig;
-import org.apache.pinot.spi.config.TenantConfig;
-import org.apache.pinot.spi.config.api.TenantRole;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 
 
 /**

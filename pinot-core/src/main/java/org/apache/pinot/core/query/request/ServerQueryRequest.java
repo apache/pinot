@@ -95,8 +95,9 @@ public class ServerQueryRequest {
       _aggregationExpressions = new HashSet<>();
       for (AggregationInfo aggregationInfo : aggregationsInfo) {
         if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          _aggregationExpressions.add(
-              TransformExpressionTree.compileToExpressionTree(AggregationFunctionUtils.getColumn(aggregationInfo)));
+          for (String expressions : AggregationFunctionUtils.getAggregationExpressions(aggregationInfo)) {
+            _aggregationExpressions.add(TransformExpressionTree.compileToExpressionTree(expressions));
+          }
         }
       }
       _aggregationColumns = RequestUtils.extractColumnsFromExpressions(_aggregationExpressions);

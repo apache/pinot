@@ -23,24 +23,24 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.pinot.spi.config.CompletionConfig;
-import org.apache.pinot.spi.config.FieldConfig;
-import org.apache.pinot.spi.config.IndexingConfig;
 import org.apache.pinot.spi.config.UpsertConfig;
-import org.apache.pinot.spi.config.QueryConfig;
-import org.apache.pinot.spi.config.QuotaConfig;
-import org.apache.pinot.spi.config.ReplicaGroupStrategyConfig;
-import org.apache.pinot.spi.config.RoutingConfig;
-import org.apache.pinot.spi.config.SegmentPartitionConfig;
-import org.apache.pinot.spi.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.TableCustomConfig;
-import org.apache.pinot.spi.config.TableTaskConfig;
-import org.apache.pinot.spi.config.TableType;
-import org.apache.pinot.spi.config.TagOverrideConfig;
-import org.apache.pinot.spi.config.TenantConfig;
-import org.apache.pinot.spi.config.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.CompletionConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableCustomConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
 public class TableConfigBuilder {

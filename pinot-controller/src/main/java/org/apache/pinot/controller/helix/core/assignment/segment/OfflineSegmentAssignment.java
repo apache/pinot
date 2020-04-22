@@ -35,9 +35,9 @@ import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
-import org.apache.pinot.spi.config.ReplicaGroupStrategyConfig;
-import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.config.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

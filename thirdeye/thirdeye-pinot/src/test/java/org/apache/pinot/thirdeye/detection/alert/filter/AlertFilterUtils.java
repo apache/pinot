@@ -16,14 +16,24 @@
 
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.anomaly.AnomalyType;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
 import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
 import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionJiraAlerter.*;
@@ -78,5 +88,38 @@ public class AlertFilterUtils {
     DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(config, alertProps, config.getReferenceLinks());
 
     return new DetectionAlertFilterNotification(subsConfig);
+  }
+
+  static MergedAnomalyResultDTO makeAnomaly(Long configId, long baseTime, long start, long end,
+      Map<String, String> dimensions, AnomalyFeedbackDTO feedback) {
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(configId, baseTime + start, baseTime + end);
+    anomaly.setType(AnomalyType.DEVIATION);
+    anomaly.setChildIds(Collections.emptySet());
+
+    Multimap<String, String> filters = HashMultimap.create();
+    for (Map.Entry<String, String> dimension : dimensions.entrySet()) {
+      filters.put(dimension.getKey(), dimension.getValue());
+    }
+    anomaly.setMetricUrn(MetricEntity.fromMetric(1.0, 1l, filters).getUrn());
+
+    DimensionMap dimMap = new DimensionMap();
+    dimMap.putAll(dimensions);
+    anomaly.setDimensions(dimMap);
+
+    anomaly.setCreatedBy("no-auth-user");
+    anomaly.setUpdatedBy("no-auth-user");
+    anomaly.setId(DAORegistry.getInstance().getMergedAnomalyResultDAO().save(anomaly));
+
+    if (feedback != null) {
+      anomaly.setFeedback(feedback);
+      anomaly.setDimensions(null);
+      DAORegistry.getInstance().getMergedAnomalyResultDAO().updateAnomalyFeedback(anomaly);
+    }
+
+    return anomaly;
+  }
+
+  static MergedAnomalyResultDTO makeAnomaly(Long configId, long baseTime, long start, long end) {
+    return makeAnomaly(configId, baseTime, start, end, Collections.emptyMap(), null);
   }
 }

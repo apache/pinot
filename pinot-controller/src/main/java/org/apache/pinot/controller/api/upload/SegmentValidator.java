@@ -32,7 +32,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
-import org.apache.pinot.spi.config.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.Interval;
 import org.slf4j.Logger;

@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,23 +61,17 @@ public abstract class AbstractRecordExtractorTest {
 
   protected Schema getPinotSchema()
       throws IOException {
-    URL resource =
-        AbstractRecordExtractorTest.class.getClassLoader().getResource("groovy_transform_functions_schema.json");
-    File schemaFile = new File(resource.getFile());
-    return Schema.fromFile(schemaFile);
+    InputStream schemaInputStream = AbstractRecordExtractorTest.class.getClassLoader()
+        .getResourceAsStream("groovy_transform_functions_schema.json");
+    return Schema.fromInputSteam(schemaInputStream);
   }
 
   protected List<Map<String, Object>> getInputRecords() {
     Integer[] userID = new Integer[]{1, 2, null, 4};
     String[] firstName = new String[]{null, "John", "Ringo", "George"};
     String[] lastName = new String[]{"McCartney", "Lenon", "Starr", "Harrison"};
-    List<List<Integer>> bids = new ArrayList<>(4);
-    bids.add(new ArrayList<>(Arrays.asList(10, 20)));
-    bids.add(null);
-    bids.add(new ArrayList<>(Arrays.asList(1)));
-    bids.add(new ArrayList<>(Arrays.asList(1, 2, 3)));
-    byte[][] campaignInfo =
-        new byte[][]{"yesterday".getBytes(), "blackbird".getBytes(), "here comes the sun".getBytes(), "hey jude".getBytes()};
+    List[] bids = new List[]{Arrays.asList(10, 20), null, Collections.singletonList(1), Arrays.asList(1, 2, 3)};
+    String[] campaignInfo = new String[]{"yesterday", "blackbird", "here comes the sun", "hey jude"};
     double[] cost = new double[]{10000, 20000, 30000, 25000};
     long[] timestamp = new long[]{1570863600000L, 1571036400000L, 1571900400000L, 1574000000000L};
 
@@ -87,8 +81,8 @@ public abstract class AbstractRecordExtractorTest {
       record.put("user_id", userID[i]);
       record.put("firstName", firstName[i]);
       record.put("lastName", lastName[i]);
-      record.put("bids", bids.get(i));
-      record.put("campaignInfo", campaignInfo[i].toString());
+      record.put("bids", bids[i]);
+      record.put("campaignInfo", campaignInfo[i]);
       record.put("cost", cost[i]);
       record.put("timestamp", timestamp[i]);
       inputRecords.add(record);
@@ -116,7 +110,7 @@ public abstract class AbstractRecordExtractorTest {
       if (expectedValue instanceof Collection) {
         List actualArray =
             actualValue instanceof List ? (ArrayList) actualValue : Arrays.asList((Object[]) actualValue);
-        List expectedArray = (ArrayList) expectedValue;
+        List expectedArray = (List) expectedValue;
         for (int j = 0; j < actualArray.size(); j++) {
           Assert.assertEquals(actualArray.get(j), expectedArray.get(j));
         }

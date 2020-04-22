@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -338,7 +339,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int totalDocs = _segmentMetadata.getTotalDocs();
     Object defaultValue = fieldSpec.getDefaultNullValue();
     String stringDefaultValue = (String) defaultValue;
-    int lengthOfLongestEntry = stringDefaultValue.length();
+    int lengthOfLongestEntry = StringUtil.encodeUtf8(stringDefaultValue).length;
     int dictionaryElementSize = 0;
 
     SingleValueVarByteRawIndexCreator rawIndexCreator =

@@ -91,7 +91,7 @@ public class SingleFileIndexDirectoryTest {
     // segmentDir does not have anything to begin with
     Assert.assertEquals(segmentDir.list().length, 0);
     SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-    PinotDataBuffer writtenBuffer = columnDirectory.newDictionaryBuffer("foo", 1024);
+    PinotDataBuffer writtenBuffer = columnDirectory.newBuffer("foo", ColumnIndexType.DICTIONARY, 1024);
     String data = new String("This is a test string");
     final byte[] dataBytes = data.getBytes();
     int pos = 0;
@@ -102,7 +102,7 @@ public class SingleFileIndexDirectoryTest {
 
     when(segmentMetadata.getAllColumns()).thenReturn(new HashSet<String>(Arrays.asList("foo")));
     try (SingleFileIndexDirectory directoryReader = new SingleFileIndexDirectory(segmentDir, segmentMetadata,
-        ReadMode.mmap); PinotDataBuffer readBuffer = directoryReader.getDictionaryBufferFor("foo")) {
+        ReadMode.mmap); PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", ColumnIndexType.DICTIONARY)) {
       Assert.assertEquals(1024, readBuffer.size());
       int length = dataBytes.length;
       for (int i = 0; i < length; i++) {
@@ -162,12 +162,14 @@ public class SingleFileIndexDirectoryTest {
       throws Exception {
     {
       try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(segmentDir, segmentMetadata,
-          ReadMode.mmap); PinotDataBuffer buffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
+          ReadMode.mmap);
+          PinotDataBuffer buffer = columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024)) {
       }
     }
     {
       try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(segmentDir, segmentMetadata,
-          ReadMode.mmap); PinotDataBuffer repeatBuffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
+          ReadMode.mmap);
+          PinotDataBuffer repeatBuffer = columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024)) {
 
       }
     }
@@ -178,7 +180,7 @@ public class SingleFileIndexDirectoryTest {
       throws IOException, ConfigurationException {
     try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(segmentDir, segmentMetadata,
         ReadMode.mmap)) {
-      try (PinotDataBuffer buffer = columnDirectory.getDictionaryBufferFor("column1")) {
+      try (PinotDataBuffer buffer = columnDirectory.getBuffer("column1", ColumnIndexType.DICTIONARY)) {
 
       }
     }
@@ -188,7 +190,7 @@ public class SingleFileIndexDirectoryTest {
   public void testRemoveIndex()
       throws IOException, ConfigurationException {
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
-      try (PinotDataBuffer buffer = sfd.newDictionaryBuffer("col1", 1024)) {
+      try (PinotDataBuffer buffer = sfd.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024)) {
       }
       Assert.assertFalse(sfd.isIndexRemovalSupported());
       sfd.removeIndex("col1", ColumnIndexType.DICTIONARY);

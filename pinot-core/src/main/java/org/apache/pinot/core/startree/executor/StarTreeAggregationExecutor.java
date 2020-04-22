@@ -47,7 +47,7 @@ public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
 
     _functionArgs = new String[functionContexts.length];
     for (int i = 0; i < functionContexts.length; i++) {
-      _functionArgs[i] = functionContexts[i].getColumn();
+      _functionArgs[i] = functionContexts[i].getColumnName();
     }
   }
 

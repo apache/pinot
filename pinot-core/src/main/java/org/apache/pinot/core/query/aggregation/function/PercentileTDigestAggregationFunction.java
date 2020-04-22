@@ -64,13 +64,13 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + column;
+  public String getColumnName() {
+    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + _column;
   }
 
   @Override
-  public String getResultColumnName(String column) {
-    return AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + _percentile + "(" + column + ")";
+  public String getResultColumnName() {
+    return AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + _percentile + "(" + _column + ")";
   }
 
   @Override
