@@ -80,12 +80,8 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
     switch (version) {
       case 1:
       case 2:
-        // fixed-byte chunk writer is still on version 2 and uses 4-byte
-        // chunk offsets in the header
         return FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2;
       case 3:
-        // var-byte chunk writer is on version 3 since and uses 8-byte
-        // chunk offsets in the header
         return FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V3;
       default:
         throw new IllegalStateException("Invalid version: " + version);
@@ -217,7 +213,6 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
       throw new RuntimeException(e);
     }
 
-    // fixed byte chunk writer uses 4-byte offsets, var-byte writer uses 8-byte offsets
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
       _header.putInt((int)_dataOffset);
     } else if (_headerEntryChunkOffsetSize == Long.BYTES) {

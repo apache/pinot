@@ -260,25 +260,32 @@ public class FixedByteChunkSingleValueReaderWriteTest {
    * @throws IOException
    */
   @Test
-  public void testBackwardCompatibility()
-      throws IOException {
-    // Get v1 from resources folder
+  public void testBackwardCompatibilityV1()
+      throws Exception {
+    testBackwardCompatibilityHelper("data/fixedByteSVRDoubles.v1", 10009, 0);
+  }
+
+  @Test
+  public void testBackwardCompatibilityV2()
+      throws Exception {
+    testBackwardCompatibilityHelper("data/fixedByteCompressed.v2", 2000, 100.2356);
+    testBackwardCompatibilityHelper("data/fixedByteRaw.v2", 2000, 100.2356);
+  }
+
+  private void testBackwardCompatibilityHelper(String fileName, int numDocs, double startValue)
+      throws Exception {
     ClassLoader classLoader = getClass().getClassLoader();
-    String fileName = "data/fixedByteSVRDoubles.v1";
     URL resource = classLoader.getResource(fileName);
     if (resource == null) {
       throw new RuntimeException("Input file not found: " + fileName);
     }
-
     File file = new File(resource.getFile());
     try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(file))) {
       ChunkReaderContext context = reader.createContext();
-
-      int numEntries = 10009; // Number of entries in the input file.
-      for (int i = 0; i < numEntries; i++) {
+      for (int i = 0; i < numDocs; i++) {
         double actual = reader.getDouble(i, context);
-        Assert.assertEquals(actual, (double) i);
+        Assert.assertEquals(actual, i + startValue);
       }
     }
   }
