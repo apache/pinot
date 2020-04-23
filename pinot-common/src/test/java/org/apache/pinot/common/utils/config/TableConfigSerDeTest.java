@@ -236,14 +236,14 @@ public class TableConfigSerDeTest {
     }
     {
       // with upsert config
-      UpsertConfig upsertConfig = new UpsertConfig(ImmutableList.of("pk"), "offset",
+      UpsertConfig upsertConfig = new UpsertConfig(Collections.singletonList("pk"), "offset",
           "$validFrom", "$validUntil");
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
       // Serialize then de-serialize
-      checkTableConfigWithUpsertConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class), tableConfig);
-      checkTableConfigWithUpsertConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)), tableConfig);
+      checkTableConfigWithUpsertConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkTableConfigWithUpsertConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
   }
 
@@ -382,11 +382,15 @@ public class TableConfigSerDeTest {
     assertNull(secondFieldConfig.getProperties());
   }
 
-  private void checkTableConfigWithUpsertConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
-    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-    assertNotNull(tableConfigToCompare.getUpsertConfig());
-    assertEquals(tableConfigToCompare.getUpsertConfig(),
-        tableConfig.getUpsertConfig());
+  private void checkTableConfigWithUpsertConfig(TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assertNotNull(upsertConfig);
+
+    assertEquals(upsertConfig.getPrimaryKeyColumns().size(), 1);
+    assertEquals(upsertConfig.getPrimaryKeyColumns().get(0), "pk");
+    assertEquals(upsertConfig.getOffsetColumn(), "offset");
+    assertEquals(upsertConfig.getValidFromColumn(), "$validFrom");
+    assertEquals(upsertConfig.getValidUntilColumn(), "$validUntil");
   }
 
 }

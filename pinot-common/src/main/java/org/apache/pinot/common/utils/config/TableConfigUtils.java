@@ -123,7 +123,6 @@ public class TableConfigUtils {
       upsertConfig = JsonUtils.stringToObject(upsertConfigString, UpsertConfig.class);
     }
 
-
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
         upsertConfig);
@@ -167,6 +166,10 @@ public class TableConfigUtils {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       simpleFields.put(TableConfig.FIELD_CONFIG_LIST_KEY, JsonUtils.objectToString(fieldConfigList));
+    }
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig != null) {
+      simpleFields.put(TableConfig.UPSERT_CONFIG_KEY, JsonUtils.objectToString(upsertConfig));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
