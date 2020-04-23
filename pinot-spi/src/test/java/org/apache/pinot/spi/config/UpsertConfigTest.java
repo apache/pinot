@@ -29,7 +29,7 @@ public class UpsertConfigTest {
   public void testUpsertConfig() {
     UpsertConfig upsertConfig;
 
-    // test regular upsert table
+    // verify upsert config is initialized correctly
     upsertConfig = new UpsertConfig(ImmutableList.of("primaryKey"), "offset", "validFrom",
         "validUntil");
     assertEquals(1, upsertConfig.getPrimaryKeyColumns().size());
