@@ -44,11 +44,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-public class ControllerVipBasedSegmentUploaderTest {
+public class Server2ControllerSegmentUploaderTest {
   private static final String GOOD_CONTROLLER_VIP = "good_controller_vip";
   private static final String BAD_CONTROLLER_VIP = "bad_controller_vip";
   public static final String SEGMENT_LOCATION = "http://server/segment_location";
-  private static Logger _logger = LoggerFactory.getLogger(ControllerVipBasedSegmentUploaderTest.class);
+  private static Logger _logger = LoggerFactory.getLogger(Server2ControllerSegmentUploaderTest.class);
   private FileUploadDownloadClient _fileUploadDownloadClient;
   private File _file;
 
@@ -66,12 +66,12 @@ public class ControllerVipBasedSegmentUploaderTest {
 
     _fileUploadDownloadClient = mock(FileUploadDownloadClient.class);
 
-    when(_fileUploadDownloadClient.uploadSegment(eq(new URI(GOOD_CONTROLLER_VIP)), anyString(), any(File.class), any(), any(), anyInt()))
+    when(_fileUploadDownloadClient
+        .uploadSegment(eq(new URI(GOOD_CONTROLLER_VIP)), anyString(), any(File.class), any(), any(), anyInt()))
         .thenReturn(successHttpResponse);
     when(_fileUploadDownloadClient
         .uploadSegment(eq(new URI(BAD_CONTROLLER_VIP)), anyString(), any(File.class), any(), any(), anyInt()))
         .thenReturn(failHttpResponse);
-
 
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
@@ -83,20 +83,18 @@ public class ControllerVipBasedSegmentUploaderTest {
   }
 
   @Test
-  public void testUploadSuccess()
-      throws URISyntaxException {
-    ControllerVipBasedSegmentUploader uploader =
-        new ControllerVipBasedSegmentUploader(_logger, _fileUploadDownloadClient, GOOD_CONTROLLER_VIP, "segmentName",
+  public void testUploadSuccess() {
+    Server2ControllerSegmentUploader uploader =
+        new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, GOOD_CONTROLLER_VIP, "segmentName",
             10000, mock(ServerMetrics.class));
     URI segmentURI = uploader.uploadSegment(_file);
     Assert.assertEquals(segmentURI.toString(), SEGMENT_LOCATION);
   }
 
   @Test
-  public void testUploadFailure()
-      throws URISyntaxException {
-    ControllerVipBasedSegmentUploader uploader =
-        new ControllerVipBasedSegmentUploader(_logger, _fileUploadDownloadClient, BAD_CONTROLLER_VIP, "segmentName",
+  public void testUploadFailure() {
+    Server2ControllerSegmentUploader uploader =
+        new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, BAD_CONTROLLER_VIP, "segmentName",
             10000, mock(ServerMetrics.class));
     URI segmentURI = uploader.uploadSegment(_file);
     Assert.assertNull(segmentURI);

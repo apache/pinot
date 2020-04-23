@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
-import java.net.URISyntaxException;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -59,15 +58,9 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    URI segmentLocation= null;
-    try {
-      segmentLocation = _segmentUploader.uploadSegment(segmentTarFile);
-    } catch (URISyntaxException e) {
-      _segmentLogger.error("URI format error in segment location", e);
-    } finally {
-      if (segmentLocation == null) {
+    URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile);
+    if (segmentLocation == null) {
         return SegmentCompletionProtocol.RESP_FAILED;
-      }
     }
     _params.withSegmentLocation(segmentLocation.toString());
 

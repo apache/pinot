@@ -23,12 +23,12 @@ import java.net.URI;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -106,9 +106,9 @@ public class ServerSegmentCompletionProtocolHandler {
       throw new RuntimeException("Could not make URI", e);
     }
     String url = request.getUrl(hostPort, protocol);
-    return SegmentCompletionProtocolUtils
-        .uploadSegmentWithFileUploadDownloadClient(_fileUploadDownloadClient, segmentTarFile, url,
-            params.getSegmentName(), _controllerHttpsPort, LOGGER);
+    Server2ControllerSegmentUploader segmentUploader= new Server2ControllerSegmentUploader(LOGGER,
+        _fileUploadDownloadClient, url, params.getSegmentName(), _segmentUploadRequestTimeoutMs, _serverMetrics);
+    return segmentUploader.uploadSegmentToController(segmentTarFile);
   }
 
   // Replaced by segmentCommitEndWithMetadata().
@@ -142,9 +142,9 @@ public class ServerSegmentCompletionProtocolHandler {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
 
-    return SegmentCompletionProtocolUtils
-        .uploadSegmentWithFileUploadDownloadClient(_fileUploadDownloadClient, segmentTarFile, url,
-            params.getSegmentName(), _controllerHttpsPort, LOGGER);
+    Server2ControllerSegmentUploader segmentUploader= new Server2ControllerSegmentUploader(LOGGER,
+        _fileUploadDownloadClient, url, params.getSegmentName(), _segmentUploadRequestTimeoutMs, _serverMetrics);
+    return segmentUploader.uploadSegmentToController(segmentTarFile);
   }
 
   public SegmentCompletionProtocol.Response extendBuildTime(SegmentCompletionProtocol.Request.Params params) {

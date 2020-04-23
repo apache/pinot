@@ -20,11 +20,9 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
-import java.net.URISyntaxException;
 
 
 public interface SegmentUploader {
   // Returns the URI of the uploaded segment. null if the upload fails.
-  URI uploadSegment(File segmentFile)
-      throws URISyntaxException;
+  URI uploadSegment(File segmentFile);
 }

@@ -18,48 +18,19 @@
  */
 package org.apache.pinot.core.util;
 
-import java.io.File;
-import java.net.URI;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.server.realtime.ControllerLeaderLocator;
-import org.slf4j.Logger;
 
 
 /**
  * Util methods related to low level consumers' segment completion protocols. 
  */
 public class SegmentCompletionProtocolUtils {
-  public static SegmentCompletionProtocol.Response uploadSegmentWithFileUploadDownloadClient(
-      FileUploadDownloadClient fileUploadDownloadClient, File segmentFile, String controllerVipUrl, String segmentName,
-      int segmentUploadRequestTimeoutMs, Logger logger) {
-    SegmentCompletionProtocol.Response response;
-    try {
-      String responseStr = fileUploadDownloadClient
-          .uploadSegment(new URI(controllerVipUrl), segmentName, segmentFile, null, null, segmentUploadRequestTimeoutMs)
-          .getResponse();
-      response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      logger.info("Controller response {} for {}", response.toJsonString(), controllerVipUrl);
-      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
-        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
-      }
-    } catch (Exception e) {
-      // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
-      response = SegmentCompletionProtocol.RESP_NOT_SENT;
-      logger.error("Could not send request {}", controllerVipUrl, e);
-      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
-      // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
-      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
-    }
-    return response;
-  }
-
   /**
    * raise a metric indicating the response we received from the controller
    */
-  public static void raiseSegmentCompletionProtocolResponseMetric(ServerMetrics serverMetrics, 
+  public static void raiseSegmentCompletionProtocolResponseMetric(ServerMetrics serverMetrics,
       SegmentCompletionProtocol.Response response) {
     switch (response.getStatus()) {
       case NOT_SENT:
