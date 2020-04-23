@@ -31,7 +31,6 @@ import org.apache.commons.io.IOUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -42,7 +41,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 
 
 @Test(enabled = false)
-@Listeners(com.adobe.testing.s3mock.testng.S3MockListener.class)
+//@Listeners(com.adobe.testing.s3mock.testng.S3MockListener.class)
 public class S3PinotFSTest {
   final String DELIMITER = "/";
   S3PinotFS _s3PinotFS;
