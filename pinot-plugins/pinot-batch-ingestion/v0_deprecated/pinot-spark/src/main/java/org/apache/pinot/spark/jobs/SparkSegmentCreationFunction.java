@@ -41,6 +41,7 @@ import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
+import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -294,6 +295,15 @@ public class SparkSegmentCreationFunction implements Serializable {
           ThriftRecordReaderConfig readerConfig =
               JsonUtils.inputStreamToObject(inputStream, ThriftRecordReaderConfig.class);
           _logger.info("Using Thrift record reader config: {}", readerConfig);
+          return readerConfig;
+        }
+      }
+
+      if (fileFormat == FileFormat.PROTO) {
+        try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {
+          ProtoBufRecordReaderConfig readerConfig =
+              JsonUtils.inputStreamToObject(inputStream, ProtoBufRecordReaderConfig.class);
+          _logger.info("Using Protocol Buffer record reader config: {}", readerConfig);
           return readerConfig;
         }
       }
