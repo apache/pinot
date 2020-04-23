@@ -99,9 +99,15 @@ export default Component.extend({
               const offsets = yield fetch(`/rootcause/metric/aggregate/batch?urn=${metric}&start=${start}&end=${end}&offsets=${offsetsStr}&timezone=America/Los_Angeles`).then(checkStatus).then(res => res);
               sumOffsets.push(offsets);
             }
-            const reducedSumOffsets = sumOffsets.reduce((arg, current) => {
-              return [arg[0] + current[0], arg[1] + current[1]];
-            });
+            // assumes maximum of two metrics and compares the two
+            let reducedSumOffsets;
+            if (Array.isArray(sumOffsets[0]) && sumOffsets.length > 1  && Array.isArray(sumOffsets[1])) {
+              reducedSumOffsets = [sumOffsets[0][0], sumOffsets[1][0]]
+            } else {
+              reducedSumOffsets = sumOffsets.reduce((arg, current) => {
+                return [arg[0] + current[0], arg[1] + current[1]];
+              });
+            }
             cell.summary = [humanizeFloat(reducedSumOffsets[0]), floatToPercent(reducedSumOffsets[0]  / reducedSumOffsets[1] - 1)];
             customHeaderMapping[index].push(cell);
           }
