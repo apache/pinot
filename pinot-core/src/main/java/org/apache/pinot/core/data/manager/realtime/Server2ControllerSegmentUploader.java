@@ -35,17 +35,19 @@ import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.Contro
 // point.
 public class Server2ControllerSegmentUploader implements SegmentUploader {
   private final Logger _segmentLogger;
-  private final String _controllerUrl;
+  // The controller segment upload url.
+  private final String _controllerSegmentUploadCommitUrl;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final String _segmentName;
   private final int _segmentUploadRequestTimeoutMs;
   private final ServerMetrics _serverMetrics;
 
   public Server2ControllerSegmentUploader(Logger segmentLogger, FileUploadDownloadClient fileUploadDownloadClient,
-      String controllerUrl, String segmentName, int segmentUploadRequestTimeoutMs, ServerMetrics serverMetrics) {
+      String controllerSegmentUploadCommitUrl, String segmentName, int segmentUploadRequestTimeoutMs,
+      ServerMetrics serverMetrics) {
     _segmentLogger = segmentLogger;
     _fileUploadDownloadClient = fileUploadDownloadClient;
-    _controllerUrl = controllerUrl;
+    _controllerSegmentUploadCommitUrl = controllerSegmentUploadCommitUrl;
     _segmentName = segmentName;
     _segmentUploadRequestTimeoutMs = segmentUploadRequestTimeoutMs;
     _serverMetrics = serverMetrics;
@@ -68,18 +70,19 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     SegmentCompletionProtocol.Response response;
     try {
       String responseStr = _fileUploadDownloadClient
-          .uploadSegment(new URI(_controllerUrl), _segmentName, segmentFile, null, null, _segmentUploadRequestTimeoutMs)
-          .getResponse();
+          .uploadSegment(new URI(_controllerSegmentUploadCommitUrl), _segmentName, segmentFile, null, null,
+              _segmentUploadRequestTimeoutMs).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      _segmentLogger.info("Controller response {} for {}", response.toJsonString(), _controllerUrl);
+      _segmentLogger.info("Controller response {} for {}", response.toJsonString(), _controllerSegmentUploadCommitUrl);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
         ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
       }
     } catch (Exception e) {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
       response = SegmentCompletionProtocol.RESP_NOT_SENT;
-      _segmentLogger.error("Could not send request {}", _controllerUrl, e);
-      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
+      _segmentLogger.error("Could not send request {}", _controllerSegmentUploadCommitUrl, e);
+      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and
+      // hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }

@@ -91,8 +91,8 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   // TODO We need to make this work with trusted certificates if the VIP is using https.
-  public SegmentCompletionProtocol.Response segmentCommitUpload(SegmentCompletionProtocol.Request.Params params,
-      final File segmentTarFile, final String controllerVipUrl) {
+  public String getSegmentCommitUploadURL(SegmentCompletionProtocol.Request.Params params,
+      final String controllerVipUrl) {
     SegmentCompletionProtocol.SegmentCommitUploadRequest request =
         new SegmentCompletionProtocol.SegmentCommitUploadRequest(params);
 
@@ -105,10 +105,7 @@ public class ServerSegmentCompletionProtocolHandler {
     } catch (Exception e) {
       throw new RuntimeException("Could not make URI", e);
     }
-    String url = request.getUrl(hostPort, protocol);
-    Server2ControllerSegmentUploader segmentUploader= new Server2ControllerSegmentUploader(LOGGER,
-        _fileUploadDownloadClient, url, params.getSegmentName(), _segmentUploadRequestTimeoutMs, _serverMetrics);
-    return segmentUploader.uploadSegmentToController(segmentTarFile);
+    return request.getUrl(hostPort, protocol);
   }
 
   // Replaced by segmentCommitEndWithMetadata().

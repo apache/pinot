@@ -813,11 +813,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     SegmentCommitter segmentCommitter;
 
     if (isSplitCommit) {
-      // TODO: make segement uploader used in the segment committer configurable.
+      // TODO: make segment uploader used in the segment committer configurable.
       SegmentUploader segmentUploader =
           new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
-              controllerVipUrl, _segmentNameStr,
-              ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
+              _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
+              ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(),  _serverMetrics);
       segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
     } else {
       segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
