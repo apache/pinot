@@ -40,7 +40,8 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
  *   <li> Integer: Total number of docs (version 2 onwards). </li>
  *   <li> Integer: Compression type enum value (version 2 onwards). </li>
  *   <li> Integer: Start offset of data header (version 2 onwards). </li>
- *   <li> Integer array: Integer offsets for all chunks in the data .</li>
+ *   <li> Integer array: Integer offsets for all chunks in the data (upto version 2),
+ *   Long array: Long offsets for all chunks in the data (version 3 onwards) </li>
  * </ul>
  *
  * <p> Individual Chunks: </p>
@@ -53,7 +54,7 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 @NotThreadSafe
 public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
 
-  private static final int CURRENT_VERSION = 2;
+  private static final int CURRENT_VERSION = 3;
   private int _chunkDataOffset;
 
   /**

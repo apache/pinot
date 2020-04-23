@@ -43,7 +43,7 @@ public class PinotNonNativeOrderLBuffer extends BasePinotLBuffer {
     return buffer;
   }
 
-  static PinotNonNativeOrderLBuffer mapFile(File file, boolean readOnly, long offset, long size)
+  public static PinotNonNativeOrderLBuffer mapFile(File file, boolean readOnly, long offset, long size)
       throws IOException {
     if (readOnly) {
       return new PinotNonNativeOrderLBuffer(new MMapBuffer(file, offset, size, MMapMode.READ_ONLY), true, false);
