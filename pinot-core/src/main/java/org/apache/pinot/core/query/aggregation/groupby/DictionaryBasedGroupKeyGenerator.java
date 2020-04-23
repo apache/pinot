@@ -109,15 +109,15 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     if (longOverflow) {
       _globalGroupIdUpperBound = numGroupsLimit;
-      _rawKeyHolder = new ArrayMapBasedHolder();
+      _rawKeyHolder = new ArrayMapBasedHolder(_globalGroupIdUpperBound);
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
         _globalGroupIdUpperBound = numGroupsLimit;
-        _rawKeyHolder = new LongMapBasedHolder();
+        _rawKeyHolder = new LongMapBasedHolder(_globalGroupIdUpperBound);
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
         if (cardinalityProduct > arrayBasedThreshold) {
-          _rawKeyHolder = new IntMapBasedHolder();
+          _rawKeyHolder = new IntMapBasedHolder(_globalGroupIdUpperBound);
         } else {
           _rawKeyHolder = new ArrayBasedHolder();
         }
@@ -259,11 +259,12 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   private class IntMapBasedHolder implements RawKeyHolder {
-    private final Int2IntOpenHashMap _rawKeyToGroupIdMap = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap _rawKeyToGroupIdMap;
 
     private int _numGroups = 0;
 
-    public IntMapBasedHolder() {
+    public IntMapBasedHolder(int initialSize) {
+      _rawKeyToGroupIdMap = new Int2IntOpenHashMap(initialSize);
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
     }
 
@@ -437,11 +438,12 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   private class LongMapBasedHolder implements RawKeyHolder {
-    private final Long2IntOpenHashMap _rawKeyToGroupIdMap = new Long2IntOpenHashMap();
+    private final Long2IntOpenHashMap _rawKeyToGroupIdMap;
 
     private int _numGroups = 0;
 
-    public LongMapBasedHolder() {
+    public LongMapBasedHolder(int initialSize) {
+      _rawKeyToGroupIdMap = new Long2IntOpenHashMap(initialSize);
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
     }
 
@@ -607,11 +609,12 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   private class ArrayMapBasedHolder implements RawKeyHolder {
-    private final Object2IntOpenHashMap<IntArray> _rawKeyToGroupIdMap = new Object2IntOpenHashMap<>();
+    private final Object2IntOpenHashMap<IntArray> _rawKeyToGroupIdMap;
 
     private int _numGroups = 0;
 
-    public ArrayMapBasedHolder() {
+    public ArrayMapBasedHolder(int initialSize) {
+      _rawKeyToGroupIdMap = new Object2IntOpenHashMap<>(initialSize);
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
     }
 
