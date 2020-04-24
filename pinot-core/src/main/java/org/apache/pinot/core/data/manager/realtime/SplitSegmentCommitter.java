@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
+import java.net.URI;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -32,18 +33,18 @@ import org.slf4j.Logger;
 public class SplitSegmentCommitter implements SegmentCommitter {
   private final SegmentCompletionProtocol.Request.Params _params;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private final String _controllerVipUrl;
   private final IndexLoadingConfig _indexLoadingConfig;
+  private final SegmentUploader _segmentUploader;
 
   private final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, String controllerVipUrl) {
+      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _indexLoadingConfig = indexLoadingConfig;
     _params = new SegmentCompletionProtocol.Request.Params(params);
-    _controllerVipUrl = controllerVipUrl;
+    _segmentUploader = segmentUploader;
   }
 
   @Override
@@ -57,15 +58,11 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    SegmentCompletionProtocol.Response segmentCommitUploadResponse =
-        _protocolHandler.segmentCommitUpload(_params, segmentTarFile, _controllerVipUrl);
-    if (!segmentCommitUploadResponse.getStatus()
-        .equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
-      _segmentLogger.warn("Segment upload failed with response {}", segmentCommitUploadResponse.toJsonString());
-      return SegmentCompletionProtocol.RESP_FAILED;
+    URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile);
+    if (segmentLocation == null) {
+        return SegmentCompletionProtocol.RESP_FAILED;
     }
-
-    _params.withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation());
+    _params.withSegmentLocation(segmentLocation.toString());
 
     SegmentCompletionProtocol.Response commitEndResponse;
     if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {

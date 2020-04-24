@@ -20,15 +20,17 @@ package org.apache.pinot.server.realtime;
 
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
+import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -71,6 +73,14 @@ public class ServerSegmentCompletionProtocolHandler {
     _rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
   }
 
+  public static int getSegmentUploadRequestTimeoutMs() {
+    return _segmentUploadRequestTimeoutMs;
+  }
+
+  public FileUploadDownloadClient getFileUploadDownloadClient() {
+    return _fileUploadDownloadClient;
+  }
+
   public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params params) {
     SegmentCompletionProtocol.SegmentCommitStartRequest request =
         new SegmentCompletionProtocol.SegmentCommitStartRequest(params);
@@ -82,8 +92,8 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   // TODO We need to make this work with trusted certificates if the VIP is using https.
-  public SegmentCompletionProtocol.Response segmentCommitUpload(SegmentCompletionProtocol.Request.Params params,
-      final File segmentTarFile, final String controllerVipUrl) {
+  public String getSegmentCommitUploadURL(SegmentCompletionProtocol.Request.Params params,
+      final String controllerVipUrl) {
     SegmentCompletionProtocol.SegmentCommitUploadRequest request =
         new SegmentCompletionProtocol.SegmentCommitUploadRequest(params);
 
@@ -96,8 +106,7 @@ public class ServerSegmentCompletionProtocolHandler {
     } catch (Exception e) {
       throw new RuntimeException("Could not make URI", e);
     }
-    String url = request.getUrl(hostPort, protocol);
-    return uploadSegment(url, params.getSegmentName(), segmentTarFile);
+    return request.getUrl(hostPort, protocol);
   }
 
   // Replaced by segmentCommitEndWithMetadata().
@@ -131,7 +140,15 @@ public class ServerSegmentCompletionProtocolHandler {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
 
-    return uploadSegment(url, params.getSegmentName(), segmentTarFile);
+    Server2ControllerSegmentUploader segmentUploader= null;
+    try {
+      segmentUploader = new Server2ControllerSegmentUploader(LOGGER,
+          _fileUploadDownloadClient, url, params.getSegmentName(), _segmentUploadRequestTimeoutMs, _serverMetrics);
+    } catch (URISyntaxException e) {
+      LOGGER.error("Segment commit upload url error: ", e);
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
+    }
+    return segmentUploader.uploadSegmentToController(segmentTarFile);
   }
 
   public SegmentCompletionProtocol.Response extendBuildTime(SegmentCompletionProtocol.Request.Params params) {
@@ -196,7 +213,7 @@ public class ServerSegmentCompletionProtocolHandler {
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }
-    raiseSegmentCompletionProtocolResponseMetric(response);
+    SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(_serverMetrics, response);
     return response;
   }
 
@@ -219,77 +236,7 @@ public class ServerSegmentCompletionProtocolHandler {
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
       ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }
-    raiseSegmentCompletionProtocolResponseMetric(response);
+    SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(_serverMetrics, response);
     return response;
-  }
-
-  private SegmentCompletionProtocol.Response uploadSegment(String url, final String segmentName,
-      final File segmentTarFile) {
-    SegmentCompletionProtocol.Response response;
-    try {
-      String responseStr = _fileUploadDownloadClient
-          .uploadSegment(new URI(url), segmentName, segmentTarFile, null, null, _segmentUploadRequestTimeoutMs)
-          .getResponse();
-      response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
-      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
-        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
-      }
-    } catch (Exception e) {
-      // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
-      response = SegmentCompletionProtocol.RESP_NOT_SENT;
-      LOGGER.error("Could not send request {}", url, e);
-      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
-      // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
-      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
-    }
-    raiseSegmentCompletionProtocolResponseMetric(response);
-    return response;
-  }
-
-  /**
-   * raise a metric indicating the response we received from the controller
-   *
-   * @param response
-   */
-  private void raiseSegmentCompletionProtocolResponseMetric(SegmentCompletionProtocol.Response response) {
-    switch (response.getStatus()) {
-      case NOT_SENT:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_SENT, 1);
-        break;
-      case COMMIT:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT, 1);
-        break;
-      case HOLD:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_HOLD, 1);
-        break;
-      case CATCH_UP:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_CATCH_UP, 1);
-        break;
-      case DISCARD:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_DISCARD, 1);
-        break;
-      case KEEP:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_KEEP, 1);
-        break;
-      case NOT_LEADER:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_LEADER, 1);
-        break;
-      case FAILED:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_FAILED, 1);
-        break;
-      case COMMIT_SUCCESS:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS, 1);
-        break;
-      case COMMIT_CONTINUE:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT_CONTINUE, 1);
-        break;
-      case PROCESSED:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_PROCESSED, 1);
-        break;
-      case UPLOAD_SUCCESS:
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_UPLOAD_SUCCESS, 1);
-        break;
-    }
   }
 }
