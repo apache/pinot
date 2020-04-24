@@ -25,7 +25,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
 /**
@@ -36,7 +36,7 @@ public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>>
   private Set<String> _fields;
 
   @Override
-  public void init(Set<String> fields, @Nullable RecordReaderConfig recordReaderConfig) {
+  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
   }
 

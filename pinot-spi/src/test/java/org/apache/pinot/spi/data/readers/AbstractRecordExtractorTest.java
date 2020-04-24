@@ -46,20 +46,22 @@ public abstract class AbstractRecordExtractorTest {
   protected Schema _pinotSchema;
   protected Set<String> _sourceFieldNames;
   protected List<Map<String, Object>> _inputRecords;
+  private RecordReaderConfig _readerConfig;
   private RecordReader _recordReader;
   private RecordExtractor _recordExtractor;
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordTransformationTest");
 
   @BeforeClass
   public void setup()
-      throws IOException {
+      throws Exception {
     FileUtils.forceMkdir(_tempDir);
     _pinotSchema = getPinotSchema();
     _sourceFieldNames = getSourceFields();
     _inputRecords = getInputRecords();
     createInputFile();
-    _recordReader = createRecordReader();
-    _recordExtractor = createRecordExtractor(_sourceFieldNames);
+    _readerConfig = createRecordReaderConfig();
+    _recordReader = createRecordReader(_readerConfig);
+    _recordExtractor = RecordExtractorFactory.getRecordExtractor(_recordReader, _readerConfig, _pinotSchema);
   }
 
   protected Schema getPinotSchema()
@@ -103,10 +105,10 @@ public abstract class AbstractRecordExtractorTest {
     FileUtils.forceDelete(_tempDir);
   }
 
-  protected abstract RecordReader createRecordReader()
+  protected abstract RecordReader createRecordReader(RecordReaderConfig readerConfig)
       throws IOException;
 
-  protected abstract RecordExtractor createRecordExtractor(Set<String> sourceFields)
+  protected abstract RecordReaderConfig createRecordReaderConfig()
       throws IOException;
 
   protected abstract void createInputFile()

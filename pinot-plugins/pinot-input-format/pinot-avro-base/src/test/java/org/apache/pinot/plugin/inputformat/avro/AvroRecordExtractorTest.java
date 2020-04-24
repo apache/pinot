@@ -32,6 +32,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 import static org.apache.avro.Schema.*;
 
@@ -43,22 +44,17 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
 
   private final File _dataFile = new File(_tempDir, "events.avro");
 
-  /**
-   * Create an AvroRecordReader
-   */
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(RecordReaderConfig readerConfig)
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _pinotSchema, null);
+    avroRecordReader.init(_dataFile, _pinotSchema, readerConfig);
     return avroRecordReader;
   }
 
   @Override
-  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
-    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
-    avroRecordExtractor.init(sourceFields, null);
-    return avroRecordExtractor;
+  protected RecordReaderConfig createRecordReaderConfig() {
+    return null;
   }
 
   /**

@@ -37,6 +37,7 @@ import org.apache.orc.Writer;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.StringUtils;
 
 
@@ -44,18 +45,16 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dataFile = new File(_tempDir, "data.orc");
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(RecordReaderConfig readerConfig)
       throws Exception {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
-    orcRecordReader.init(_dataFile, _pinotSchema, null);
+    orcRecordReader.init(_dataFile, _pinotSchema, readerConfig);
     return orcRecordReader;
   }
 
   @Override
-  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
-    ORCRecordExtractor orcRecordExtractor = new ORCRecordExtractor();
-    orcRecordExtractor.init(sourceFields, null);
-    return orcRecordExtractor;
+  protected RecordReaderConfig createRecordReaderConfig() {
+    return null;
   }
 
   @Override

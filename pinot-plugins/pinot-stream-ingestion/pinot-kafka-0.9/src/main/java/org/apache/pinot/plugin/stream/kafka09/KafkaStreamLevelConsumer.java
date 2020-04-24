@@ -21,13 +21,13 @@ package org.apache.pinot.plugin.stream.kafka09;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorFactory;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.StreamRecordExtractorProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +62,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
     _recordExtractor =
-        StreamRecordExtractorProvider.create(_messageDecoder, streamConfig.getDecoderProperties(), schema);
+        RecordExtractorFactory.getRecordExtractor(_messageDecoder, streamConfig.getDecoderProperties(), schema);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory

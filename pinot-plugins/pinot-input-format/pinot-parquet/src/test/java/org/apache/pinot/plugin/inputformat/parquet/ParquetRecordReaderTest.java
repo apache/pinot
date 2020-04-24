@@ -32,24 +32,23 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dataFile = new File(_tempDir, "data.parquet");
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(RecordReaderConfig readerConfig)
       throws Exception {
     ParquetRecordReader recordReader = new ParquetRecordReader();
-    recordReader.init(_dataFile, getPinotSchema(), null);
+    recordReader.init(_dataFile, getPinotSchema(), readerConfig);
     return recordReader;
   }
 
   @Override
-  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
-    ParquetRecordExtractor recordExtractor = new ParquetRecordExtractor();
-    recordExtractor.init(sourceFields, null);
-    return recordExtractor;
+  protected RecordReaderConfig createRecordReaderConfig() {
+    return null;
   }
 
   @Override

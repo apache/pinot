@@ -31,9 +31,9 @@ public interface RecordExtractor<T> {
    * Initialize the record extractor with its config
    *
    * @param fields List of field names to extract from the provided input record
-   * @param recordReaderConfig The record reader config
+   * @param recordExtractorConfig The record extractor config
    */
-  void init(Set<String> fields, RecordReaderConfig recordReaderConfig);
+  void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig);
 
   /**
    * Extracts fields as listed in the sourceFieldNames from the given input record and sets them into the GenericRow

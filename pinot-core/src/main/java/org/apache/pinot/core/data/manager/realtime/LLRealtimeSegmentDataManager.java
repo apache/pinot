@@ -65,6 +65,7 @@ import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorFactory;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -75,7 +76,6 @@ import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
-import org.apache.pinot.spi.stream.StreamRecordExtractorProvider;
 import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -1149,8 +1149,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _clientId = _streamTopic + "-" + _streamPartitionId;
 
     // Create record extractor
-    _recordExtractor = StreamRecordExtractorProvider
-        .create(_messageDecoder, _partitionLevelStreamConfig.getDecoderProperties(), _schema);
+    _recordExtractor = RecordExtractorFactory
+        .getRecordExtractor(_messageDecoder, _partitionLevelStreamConfig.getDecoderProperties(), _schema);
 
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);

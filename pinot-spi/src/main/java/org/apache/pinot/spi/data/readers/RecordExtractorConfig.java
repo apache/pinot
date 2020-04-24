@@ -16,28 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.inputformat.orc;
+package org.apache.pinot.spi.data.readers;
 
-import java.util.Set;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import java.util.Map;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
 
 /**
- * Extractor for ORC records
+ * Config for {@link RecordExtractor}
  */
-public class ORCRecordExtractor implements RecordExtractor<GenericRow> {
+public interface RecordExtractorConfig {
 
-  @Override
-  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+  /**
+   * Initialize the RecordExtractorConfig using the config from {@link RecordReader}
+   */
+  void init(RecordReaderConfig readerConfig);
 
-  }
-
-  @Override
-  public GenericRow extract(GenericRow from, GenericRow to) {
-    to.init(from);
-    return to;
-  }
+  /**
+   * Initialize the RecordExtractorConfig using the config from {@link StreamMessageDecoder}
+   */
+  void init(Map<String, String> decoderProps);
 }

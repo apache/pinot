@@ -33,7 +33,6 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorFactory;
-import org.apache.pinot.spi.stream.StreamRecordExtractorProvider;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -70,7 +69,7 @@ public class KafkaJSONMessageDecoderTest {
         new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()))) {
       KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
       decoder.init(new HashMap<>(), schema, "testTopic");
-      RecordExtractor recordExtractor = StreamRecordExtractorProvider.create(decoder, null, schema);
+      RecordExtractor recordExtractor = RecordExtractorFactory.getRecordExtractor(decoder, null, schema);
 
       GenericRow r = new GenericRow();
       String line = reader.readLine();

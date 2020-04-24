@@ -19,9 +19,10 @@
 package org.apache.pinot.core.data.readers;
 
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
 /**
@@ -29,7 +30,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  */
 public class GenericRowRecordExtractor implements RecordExtractor<GenericRow> {
   @Override
-  public void init(Set<String> fields, RecordReaderConfig recordReaderConfig) {
+  public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
 
   }
 

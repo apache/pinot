@@ -18,41 +18,44 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.thrift.TBase;
+import org.apache.thrift.TFieldIdEnum;
 
 
 /**
- * Extractor for records of Thrift input
+ * Config for {@link ThriftRecordExtractor}
  */
-public class ThriftRecordExtractor implements RecordExtractor<TBase> {
-
-  private Map<String, Integer> _fieldIds;
-  private Set<String> _fields;
+public class ThriftRecordExtractorConfig implements RecordExtractorConfig {
+  private Map<String, Integer> _fieldIds= new HashMap<>();
 
   @Override
-  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    _fields = fields;
-    _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
+  public void init(RecordReaderConfig readerConfig) {
+    TBase tObject;
+    try {
+      Class<?> thriftClass =
+          this.getClass().getClassLoader().loadClass(((ThriftRecordReaderConfig) readerConfig).getThriftClass());
+      tObject = (TBase) thriftClass.newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    int index = 1;
+    TFieldIdEnum tFieldIdEnum;
+    while ((tFieldIdEnum = tObject.fieldForId(index)) != null) {
+      _fieldIds.put(tFieldIdEnum.getFieldName(), index);
+      index++;
+    }
   }
 
   @Override
-  public GenericRow extract(TBase from, GenericRow to) {
-    for (String fieldName : _fields) {
-      Object value = null;
-      Integer fieldId = _fieldIds.get(fieldName);
-      if (fieldId != null) {
-        //noinspection unchecked
-        value = from.getFieldValue(from.fieldForId(fieldId));
-      }
-      Object convertedValue = RecordReaderUtils.convert(value);
-      to.putValue(fieldName, convertedValue);
-    }
-    return to;
+  public void init(Map<String, String> decoderProps) {
+
+  }
+
+  public Map<String, Integer> getFieldIds() {
+    return _fieldIds;
   }
 }

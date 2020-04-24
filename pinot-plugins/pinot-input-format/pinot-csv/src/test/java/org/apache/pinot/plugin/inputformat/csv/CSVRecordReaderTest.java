@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.testng.Assert;
 
 
@@ -40,22 +41,18 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   private final File _dataFile = new File(_tempDir, "data.csv");
 
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(RecordReaderConfig readerConfig)
       throws Exception {
-    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
-    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, getPinotSchema(), csvRecordReaderConfig);
+    csvRecordReader.init(_dataFile, getPinotSchema(), readerConfig);
     return csvRecordReader;
   }
 
   @Override
-  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+  protected RecordReaderConfig createRecordReaderConfig() {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
-    CSVRecordExtractor csvRecordExtractor = new CSVRecordExtractor();
-    csvRecordExtractor.init(sourceFields, csvRecordReaderConfig);
-    return  csvRecordExtractor;
+    return csvRecordReaderConfig;
   }
 
   @Override

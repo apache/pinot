@@ -42,6 +42,7 @@ public abstract class AbstractRecordReaderTest {
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordReaderTest");
   protected List<Map<String, Object>> _records;
   protected org.apache.pinot.spi.data.Schema _pinotSchema;
+  private RecordReaderConfig _recordReaderConfig;
   private RecordReader _recordReader;
   private RecordExtractor _recordExtractor;
   private Set<String> _sourceFields;
@@ -140,8 +141,9 @@ public abstract class AbstractRecordReaderTest {
     // Write generated random records to file
     writeRecordsToFile(_records);
     // Create and init RecordReader
-    _recordReader = createRecordReader();
-    _recordExtractor = createRecordExtractor(_sourceFields);
+    _recordReaderConfig = createRecordReaderConfig();
+    _recordReader = createRecordReader(_recordReaderConfig);
+    _recordExtractor = RecordExtractorFactory.getRecordExtractor(_recordReader, _recordReaderConfig, _pinotSchema);
   }
 
   @AfterClass
@@ -162,13 +164,13 @@ public abstract class AbstractRecordReaderTest {
    * @return an implementation of RecordReader
    * @throws Exception
    */
-  protected abstract RecordReader createRecordReader()
+  protected abstract RecordReader createRecordReader(RecordReaderConfig readerConfig)
       throws Exception;
 
   /**
-   * @return an implementation of RecordExtractor
+   * @return an implementation of RecordReaderConfig
    */
-  protected abstract RecordExtractor createRecordExtractor(Set<String> sourceFields);
+  protected abstract RecordReaderConfig createRecordReaderConfig();
 
   /**
    * Write records into a file

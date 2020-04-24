@@ -32,6 +32,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorFactory;
+import org.apache.thrift.TBase;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.testng.Assert;
@@ -94,15 +97,16 @@ public class ThriftRecordReaderTest {
 
   @Test
   public void testReadData()
-      throws IOException {
+      throws Exception {
     ThriftRecordReaderConfig readerConfig = getThriftRecordReaderConfig();
     ThriftRecordReader recordReader = new ThriftRecordReader();
     recordReader.init(_tempFile, getSchema(), readerConfig);
-    ThriftRecordExtractor recordExtractor = new ThriftRecordExtractor();
-    recordExtractor.init(Sets.newHashSet(), readerConfig);
-    GenericRow to = new GenericRow();
+    RecordExtractor recordExtractor =
+        RecordExtractorFactory.getRecordExtractor(recordReader, readerConfig, getSchema());
+
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
+      GenericRow to = new GenericRow();
       genericRows.add(recordExtractor.extract(recordReader.next(), to));
     }
     recordReader.close();
@@ -117,12 +121,12 @@ public class ThriftRecordReaderTest {
 
   @Test
   public void testRewind()
-      throws IOException {
+      throws Exception {
     ThriftRecordReaderConfig readerConfig = getThriftRecordReaderConfig();
     ThriftRecordReader recordReader = new ThriftRecordReader();
     recordReader.init(_tempFile, getSchema(), readerConfig);
-    ThriftRecordExtractor recordExtractor = new ThriftRecordExtractor();
-    recordExtractor.init(Sets.newHashSet(), readerConfig);
+    RecordExtractor recordExtractor =
+        RecordExtractorFactory.getRecordExtractor(recordReader, readerConfig, getSchema());
     GenericRow to = new GenericRow();
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {

@@ -33,6 +33,7 @@ import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.testng.Assert;
 
 
@@ -47,22 +48,18 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create a CSVRecordReader
    */
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(RecordReaderConfig readerConfig)
       throws IOException {
-    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
-    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, _pinotSchema, csvRecordReaderConfig);
+    csvRecordReader.init(_dataFile, getPinotSchema(), readerConfig);
     return csvRecordReader;
   }
 
   @Override
-  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
+  protected RecordReaderConfig createRecordReaderConfig() {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
-    CSVRecordExtractor csvRecordExtractor = new CSVRecordExtractor();
-    csvRecordExtractor.init(sourceFields, csvRecordReaderConfig);
-    return  csvRecordExtractor;
+    return csvRecordReaderConfig;
   }
 
   /**

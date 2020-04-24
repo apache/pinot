@@ -34,6 +34,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 import static org.apache.avro.Schema.*;
 
@@ -73,6 +74,19 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
     return inputRecords;
   }
 
+  @Override
+  protected RecordReader createRecordReader(RecordReaderConfig _readerConfig)
+      throws IOException {
+    AvroRecordReader avroRecordReader = new AvroRecordReader();
+    avroRecordReader.init(_dataFile, _pinotSchema, _readerConfig);
+    return avroRecordReader;
+  }
+
+  @Override
+  protected RecordReaderConfig createRecordReaderConfig() {
+    return null;
+  }
+
   protected Set<String> getSourceFields() {
     return Sets.newHashSet("map1", "map2");
   }
@@ -83,24 +97,6 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
     InputStream schemaInputStream = AbstractRecordExtractorTest.class.getClassLoader()
         .getResourceAsStream("groovy_map_transform_functions_schema.json");
     return org.apache.pinot.spi.data.Schema.fromInputSteam(schemaInputStream);
-  }
-
-  /**
-   * Create an AvroRecordReader
-   */
-  @Override
-  protected RecordReader createRecordReader()
-      throws IOException {
-    AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _pinotSchema, null);
-    return avroRecordReader;
-  }
-
-  @Override
-  protected RecordExtractor createRecordExtractor(Set<String> sourceFields) {
-    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
-    avroRecordExtractor.init(sourceFields, null);
-    return avroRecordExtractor;
   }
 
   /**
