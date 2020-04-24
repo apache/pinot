@@ -61,7 +61,7 @@ public class UpsertConfig extends BaseJsonConfig {
     Preconditions.checkState(StringUtils.isNotEmpty(_validFromColumn),
         "upsert feature requires \"validFromColumn\" to be set");
     Preconditions.checkState(StringUtils.isNotEmpty(_validUntilColumn),
-        "upsert feature requires \"validUntilColumn\" to be set");
+        "Upsert feature requires \"validUntilColumn\" to be set");
   }
 
   public List<String> getPrimaryKeyColumns() {
