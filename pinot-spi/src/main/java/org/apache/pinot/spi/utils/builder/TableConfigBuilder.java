@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.pinot.spi.config.UpsertConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -89,6 +91,8 @@ public class TableConfigBuilder {
   private QueryConfig _queryConfig;
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
+
+  private UpsertConfig _upsertConfig;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -266,6 +270,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setUpsertConfig(UpsertConfig upsertConfig) {
+    _upsertConfig = upsertConfig;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -307,6 +316,6 @@ public class TableConfigBuilder {
 
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList);
+        _fieldConfigList, _upsertConfig);
   }
 }

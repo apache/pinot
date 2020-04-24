@@ -33,7 +33,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collection;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;

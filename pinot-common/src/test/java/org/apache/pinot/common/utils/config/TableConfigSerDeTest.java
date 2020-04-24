@@ -19,12 +19,15 @@
 package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.pinot.spi.config.UpsertConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -231,6 +234,17 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkFieldConfig(tableConfigToCompare);
     }
+    {
+      // with upsert config
+      UpsertConfig upsertConfig = new UpsertConfig(Collections.singletonList("pk"), "offset",
+          "$validFrom", "$validUntil");
+
+      TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
+
+      // Serialize then de-serialize
+      checkTableConfigWithUpsertConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkTableConfigWithUpsertConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+    }
   }
 
   private void checkDefaultTableConfig(TableConfig tableConfig) {
@@ -367,4 +381,16 @@ public class TableConfigSerDeTest {
     assertNull(secondFieldConfig.getIndexType());
     assertNull(secondFieldConfig.getProperties());
   }
+
+  private void checkTableConfigWithUpsertConfig(TableConfig tableConfig) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assertNotNull(upsertConfig);
+
+    assertEquals(upsertConfig.getPrimaryKeyColumns().size(), 1);
+    assertEquals(upsertConfig.getPrimaryKeyColumns().get(0), "pk");
+    assertEquals(upsertConfig.getOffsetColumn(), "offset");
+    assertEquals(upsertConfig.getValidFromColumn(), "$validFrom");
+    assertEquals(upsertConfig.getValidUntilColumn(), "$validUntil");
+  }
+
 }
