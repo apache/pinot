@@ -46,6 +46,7 @@ public class IndexLoadingConfig {
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _textIndexColumns = new HashSet<>();
+  private Set<String> _rangeIndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -84,6 +85,11 @@ public class IndexLoadingConfig {
     List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
     if (invertedIndexColumns != null) {
       _invertedIndexColumns.addAll(invertedIndexColumns);
+    }
+
+    List<String> rangeIndexColumns = indexingConfig.getRangeIndexColumns();
+    if (rangeIndexColumns != null) {
+      _rangeIndexColumns.addAll(rangeIndexColumns);
     }
 
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
@@ -204,6 +210,10 @@ public class IndexLoadingConfig {
   @Nonnull
   public Set<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
+  }  @Nonnull
+
+  public Set<String> getRangeIndexColumns() {
+    return _rangeIndexColumns;
   }
 
   @Nonnull
@@ -232,6 +242,14 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setInvertedIndexColumns(@Nonnull Set<String> invertedIndexColumns) {
     _invertedIndexColumns = invertedIndexColumns;
+  }
+
+  /**
+   * For tests only.
+   */
+  @VisibleForTesting
+  public void setRangeIndexColumns(@Nonnull Set<String> rangeIndexColumns) {
+    _rangeIndexColumns = rangeIndexColumns;
   }
 
   /**

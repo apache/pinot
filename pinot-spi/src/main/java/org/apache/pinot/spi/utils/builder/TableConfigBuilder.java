@@ -79,6 +79,7 @@ public class TableConfigBuilder {
   private List<String> _noDictionaryColumns;
   private List<String> _onHeapDictionaryColumns;
   private List<String> _bloomFilterColumns;
+  private List<String> _rangeIndexColumns;
   private Map<String, String> _streamConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
 
@@ -219,6 +220,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setRangeIndexColumns(List<String> rangeIndexColumns) {
+    _rangeIndexColumns = rangeIndexColumns;
+    return this;
+  }
+
   public TableConfigBuilder setStreamConfigs(Map<String, String> streamConfigs) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
     _streamConfigs = streamConfigs;
@@ -298,6 +304,7 @@ public class TableConfigBuilder {
     indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
     indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
     indexingConfig.setBloomFilterColumns(_bloomFilterColumns);
+    indexingConfig.setRangeIndexColumns(_rangeIndexColumns);
     indexingConfig.setStreamConfigs(_streamConfigs);
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
 

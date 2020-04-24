@@ -167,7 +167,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    */
   private void setupOfflineTable(String table)
       throws Exception {
-    addOfflineTable(table, null, null, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null);
+    addOfflineTable(table, null, null, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null,
+        null);
   }
 
   /**
@@ -190,7 +191,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     String timeType = outgoingTimeUnit.toString();
 
     addOfflineTable(tableName, timeColumnName, timeType, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null,
-        null, null, null);
+        null, null, null, null);
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
@@ -219,8 +220,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     addRealtimeTable(table, useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR, topic,
         getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME, TENANT_NAME,
-        getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(),
-        getTaskConfig(), getStreamConsumerFactoryClassName());
+        getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getBloomFilterIndexColumns(),
+        getRangeIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName());
   }
 
   @Override

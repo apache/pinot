@@ -41,6 +41,11 @@ public interface ColumnIndexContainer {
   InvertedIndexReader getInvertedIndex();
 
   /**
+   * Returns the inverted index for the column, or {@code null} if it does not exist.
+   */
+  InvertedIndexReader getRangeIndex();
+
+  /**
    * Returns the dictionary for the column, or {@code null} if it does not exist.
    */
   Dictionary getDictionary();

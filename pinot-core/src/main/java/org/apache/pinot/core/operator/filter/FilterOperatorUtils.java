@@ -54,6 +54,12 @@ public class FilterOperatorUtils {
 
     Predicate.Type predicateType = predicateEvaluator.getPredicateType();
 
+    //Only for dictionary encoded columns and offline data sources
+    if (predicateType == Predicate.Type.RANGE && dataSource.getDictionary() != null
+        && dataSource.getRangeIndex() != null) {
+      return new RangeFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
+    }
+
     if (predicateType == Predicate.Type.TEXT_MATCH) {
       return new TextMatchFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
     }

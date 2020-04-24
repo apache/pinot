@@ -117,7 +117,6 @@ public class FilterPlanNode implements PlanNode {
 
       TransformExpressionTree expression = filterQueryTree.getExpression();
       if (expression.getExpressionType() == TransformExpressionTree.ExpressionType.FUNCTION) {
-
         return new ExpressionFilterOperator(segment, expression, predicate);
       } else {
         DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
