@@ -265,6 +265,9 @@ Supported transform functions
    expressed as hours since UTC epoch (note that the output is not Los Angeles
    timezone)
 
+``LENGTH``
+   Takes a multi-valued column and returns the length of the column
+
 ``VALUEIN``
    Takes at least 2 arguments, where the first argument is a multi-valued column, and the following arguments are constant values.
    The transform function will filter the value from the multi-valued column with the given constant values.

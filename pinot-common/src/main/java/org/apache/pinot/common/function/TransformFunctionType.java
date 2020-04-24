@@ -42,6 +42,7 @@ public enum TransformFunctionType {
   TIMECONVERT("timeConvert"),
   DATETIMECONVERT("dateTimeConvert"),
   DATETRUNC("dateTrunc"),
+  LENGTH("length"),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue");
 
