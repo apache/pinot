@@ -54,6 +54,7 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 kill -9 $PID
+rm -rf /tmp/PinotAdmin/zkData
 
 # Test quick-start-streaming
 bin/quick-start-streaming.sh &
@@ -89,6 +90,7 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 kill -9 $PID
+rm -rf /tmp/PinotAdmin/zkData
 
 # Test quick-start-hybrid
 cd bin
@@ -124,6 +126,7 @@ if [ "${PASS}" -eq 0 ]; then
 fi
 
 kill -9 $PID
+rm -rf /tmp/PinotAdmin/zkData
 
 cd ../../../../../
 pwd
