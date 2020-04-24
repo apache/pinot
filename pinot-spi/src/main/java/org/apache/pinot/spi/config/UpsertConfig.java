@@ -59,7 +59,7 @@ public class UpsertConfig extends BaseJsonConfig {
     Preconditions.checkState(StringUtils.isNotEmpty(_offsetColumn),
         "upsert feature requires \"offsetColumn\" to be set ");
     Preconditions.checkState(StringUtils.isNotEmpty(_validFromColumn),
-        "upsert feature requires \"validFromColumn\" to be set");
+        "Upsert feature requires \"validFromColumn\" to be set");
     Preconditions.checkState(StringUtils.isNotEmpty(_validUntilColumn),
         "Upsert feature requires \"validUntilColumn\" to be set");
   }
