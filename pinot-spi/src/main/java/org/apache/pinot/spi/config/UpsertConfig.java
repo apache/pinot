@@ -55,7 +55,7 @@ public class UpsertConfig extends BaseJsonConfig {
     _validUntilColumn = validUntilColumn;
 
     Preconditions.checkState(_primaryKeyColumns.size() == 1,
-        "upsert feature support only one primary key column");
+        "Upsert feature supports only one primary key column");
     Preconditions.checkState(StringUtils.isNotEmpty(_offsetColumn),
         "upsert feature requires \"offsetColumn\" to be set ");
     Preconditions.checkState(StringUtils.isNotEmpty(_validFromColumn),
