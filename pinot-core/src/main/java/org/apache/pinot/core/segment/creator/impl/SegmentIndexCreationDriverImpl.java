@@ -133,8 +133,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(recordReader,
-        RecordExtractorFactory.getRecordExtractor(recordReader, config.getReaderConfig(), config.getSchema())));
+    RecordExtractor recordExtractor =
+        RecordExtractorFactory.getRecordExtractor(recordReader, config.getReaderConfig(), config.getSchema());
+    init(config, new RecordReaderSegmentCreationDataSource(recordReader, recordExtractor));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) {

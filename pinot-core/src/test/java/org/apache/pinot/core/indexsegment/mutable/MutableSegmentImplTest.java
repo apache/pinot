@@ -93,7 +93,7 @@ public class MutableSegmentImplTest {
       RecordExtractor recordExtractor = RecordExtractorFactory.getRecordExtractor(recordReader, null, _schema);
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        Object next = recordReader.next(reuse);
+        Object next = recordReader.next();
         _mutableSegmentImpl.index(recordExtractor.extract(next, reuse), defaultMetadata);
         _lastIndexedTs = System.currentTimeMillis();
       }

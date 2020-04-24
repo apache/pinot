@@ -35,12 +35,14 @@ import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreationDataSource {
   private final MutableSegmentImpl _realtimeSegment;
   private final RealtimeSegmentRecordReader _realtimeSegmentRecordReader;
+  private final RecordExtractor _recordExtractor;
   private final Schema _schema;
 
   public RealtimeSegmentSegmentCreationDataSource(MutableSegmentImpl realtimeSegment,
       RealtimeSegmentRecordReader realtimeSegmentRecordReader, Schema schema) {
     _realtimeSegment = realtimeSegment;
     _realtimeSegmentRecordReader = realtimeSegmentRecordReader;
+    _recordExtractor = new GenericRowRecordExtractor();
     _schema = schema;
   }
 
@@ -60,6 +62,6 @@ public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreation
 
   @Override
   public RecordExtractor getRecordExtractor() {
-    return new GenericRowRecordExtractor();
+    return _recordExtractor;
   }
 }

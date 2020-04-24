@@ -130,9 +130,9 @@ public class RecordReaderSampleDataTest {
             .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null);
         RecordReader jsonRecordReader = RecordReaderFactory
             .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null)) {
-      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA);
-      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA);
-      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA);
+      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA_DIFFERENT_INCOMING_OUTGOING);
+      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA_DIFFERENT_INCOMING_OUTGOING);
+      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA_DIFFERENT_INCOMING_OUTGOING);
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -168,9 +168,9 @@ public class RecordReaderSampleDataTest {
             .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null);
         RecordReader jsonRecordReader = RecordReaderFactory
             .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null)) {
-      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA);
-      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA);
-      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA);
+      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA_NO_INCOMING);
+      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA_NO_INCOMING);
+      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA_NO_INCOMING);
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -206,9 +206,9 @@ public class RecordReaderSampleDataTest {
             .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null);
         RecordReader jsonRecordReader = RecordReaderFactory
             .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null)) {
-      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA);
-      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA);
-      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA);
+      RecordExtractor avroRecordExtractor = RecordExtractorFactory.getRecordExtractor(avroRecordReader, null, SCHEMA_NO_OUTGOING);
+      RecordExtractor jsonRecordExtractor = RecordExtractorFactory.getRecordExtractor(jsonRecordReader, null, SCHEMA_NO_OUTGOING);
+      RecordExtractor csvRecordExtractor = RecordExtractorFactory.getRecordExtractor(csvRecordReader, null, SCHEMA_NO_OUTGOING);
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -258,8 +258,6 @@ public class RecordReaderSampleDataTest {
       String row1Key = entry.getKey();
       if (row1Value == null) {
         Assert.assertNull(csvRecord.getValue(row1Key));
-      } else if (row1Value.toString().isEmpty()) {
-        Assert.assertEquals(csvRecord.getValue(row1Key), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
       } else {
         Assert.assertEquals(row1Value.toString(), csvRecord.getValue(row1Key).toString());
       }
