@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -814,10 +815,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     if (isSplitCommit) {
       // TODO: make segment uploader used in the segment committer configurable.
-      SegmentUploader segmentUploader =
-          new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
-              _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
-              ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(),  _serverMetrics);
+      SegmentUploader segmentUploader;
+      try {
+        segmentUploader = new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
+            _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
+            ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(),  _serverMetrics);
+      } catch (URISyntaxException e) {
+        segmentLogger.error("Segment commit upload url error: ", e);
+        return SegmentCompletionProtocol.RESP_NOT_SENT;
+      }
       segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
     } else {
       segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);

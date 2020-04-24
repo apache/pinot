@@ -83,7 +83,8 @@ public class Server2ControllerSegmentUploaderTest {
   }
 
   @Test
-  public void testUploadSuccess() {
+  public void testUploadSuccess()
+      throws URISyntaxException {
     Server2ControllerSegmentUploader uploader =
         new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, GOOD_CONTROLLER_VIP, "segmentName",
             10000, mock(ServerMetrics.class));
@@ -92,7 +93,8 @@ public class Server2ControllerSegmentUploaderTest {
   }
 
   @Test
-  public void testUploadFailure() {
+  public void testUploadFailure()
+      throws URISyntaxException {
     Server2ControllerSegmentUploader uploader =
         new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, BAD_CONTROLLER_VIP, "segmentName",
             10000, mock(ServerMetrics.class));

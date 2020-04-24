@@ -20,6 +20,7 @@ package org.apache.pinot.server.realtime;
 
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
@@ -139,8 +140,14 @@ public class ServerSegmentCompletionProtocolHandler {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
 
-    Server2ControllerSegmentUploader segmentUploader= new Server2ControllerSegmentUploader(LOGGER,
-        _fileUploadDownloadClient, url, params.getSegmentName(), _segmentUploadRequestTimeoutMs, _serverMetrics);
+    Server2ControllerSegmentUploader segmentUploader= null;
+    try {
+      segmentUploader = new Server2ControllerSegmentUploader(LOGGER,
+          _fileUploadDownloadClient, url, params.getSegmentName(), _segmentUploadRequestTimeoutMs, _serverMetrics);
+    } catch (URISyntaxException e) {
+      LOGGER.error("Segment commit upload url error: ", e);
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
+    }
     return segmentUploader.uploadSegmentToController(segmentTarFile);
   }
 

@@ -28,15 +28,12 @@ import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.slf4j.Logger;
 
-import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS;
 
-
-// A segment uploader which uploads segments to the controller via the controller's segmentCommitUpload end point
-// point.
+// A segment uploader which uploads segments to the controller via the controller's segmentCommitUpload end point.
 public class Server2ControllerSegmentUploader implements SegmentUploader {
   private final Logger _segmentLogger;
   // The controller segment upload url.
-  private final String _controllerSegmentUploadCommitUrl;
+  private final URI _controllerSegmentUploadCommitUrl;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final String _segmentName;
   private final int _segmentUploadRequestTimeoutMs;
@@ -44,10 +41,11 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
 
   public Server2ControllerSegmentUploader(Logger segmentLogger, FileUploadDownloadClient fileUploadDownloadClient,
       String controllerSegmentUploadCommitUrl, String segmentName, int segmentUploadRequestTimeoutMs,
-      ServerMetrics serverMetrics) {
+      ServerMetrics serverMetrics)
+      throws URISyntaxException {
     _segmentLogger = segmentLogger;
     _fileUploadDownloadClient = fileUploadDownloadClient;
-    _controllerSegmentUploadCommitUrl = controllerSegmentUploadCommitUrl;
+    _controllerSegmentUploadCommitUrl = new URI(controllerSegmentUploadCommitUrl);
     _segmentName = segmentName;
     _segmentUploadRequestTimeoutMs = segmentUploadRequestTimeoutMs;
     _serverMetrics = serverMetrics;
@@ -56,7 +54,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   @Override
   public URI uploadSegment(File segmentFile) {
     SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile);
-    if (response.getStatus() == UPLOAD_SUCCESS) {
+    if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS) {
       try {
         return new URI(response.getSegmentLocation());
       } catch (URISyntaxException e) {
@@ -70,7 +68,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     SegmentCompletionProtocol.Response response;
     try {
       String responseStr = _fileUploadDownloadClient
-          .uploadSegment(new URI(_controllerSegmentUploadCommitUrl), _segmentName, segmentFile, null, null,
+          .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile, null, null,
               _segmentUploadRequestTimeoutMs).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       _segmentLogger.info("Controller response {} for {}", response.toJsonString(), _controllerSegmentUploadCommitUrl);
