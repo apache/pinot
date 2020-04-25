@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -43,9 +42,8 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName)
+  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> fields)
       throws Exception {
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
     String recordExtractorClass = null;
     if (props != null) {
       recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
@@ -54,7 +52,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _jsonRecordExtractor.init(sourceFields, null);
+    _jsonRecordExtractor.init(fields, null);
   }
 
   @Override

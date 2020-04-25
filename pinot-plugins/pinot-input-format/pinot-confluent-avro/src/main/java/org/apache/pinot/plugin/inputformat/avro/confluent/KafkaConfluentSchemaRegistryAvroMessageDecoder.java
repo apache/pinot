@@ -32,7 +32,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -47,17 +46,16 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     private String _topicName;
 
     @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
+    public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> fields) throws Exception {
         checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
         String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
         Preconditions.checkNotNull(indexingSchema, "Schema must be provided");
-        Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
         SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000);
         _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
         Preconditions.checkNotNull(topicName, "Topic must be provided");
         _topicName = topicName;
         _avroRecordExtractor = PluginManager.get().createInstance(AvroRecordExtractor.class.getName());
-        _avroRecordExtractor.init(sourceFields, null);
+        _avroRecordExtractor.init(fields, null);
     }
 
     @Override

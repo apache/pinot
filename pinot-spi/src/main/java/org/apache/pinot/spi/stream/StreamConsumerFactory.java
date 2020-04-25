@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -52,7 +53,7 @@ public abstract class StreamConsumerFactory {
    * @return
    */
   public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      String groupId);
+      String groupId, Set<String> sourceFields);
 
   /**
    * Creates a metadata provider which provides partition specific metadata

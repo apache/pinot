@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.data.Schema;
@@ -40,7 +41,7 @@ public interface StreamMessageDecoder<T> {
    * @param props
    * @throws Exception
    */
-  void init(Map<String, String> props, Schema indexingSchema, String topicName)
+  void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> fields)
       throws Exception;
 
   /**
