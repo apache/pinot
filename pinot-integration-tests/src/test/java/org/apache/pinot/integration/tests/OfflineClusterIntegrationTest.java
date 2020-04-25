@@ -574,7 +574,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(groupByEntry.get("group").get(0).asText(), "5");
     assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "length(DivAirports)");
 
-    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY length(valuein(DivAirports,'DFW','ORD'))";
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY length(valueIn(DivAirports,'DFW','ORD'))";
     response = postQuery(pqlQuery);
     groupByResult = response.get("aggregationResults").get(0);
     groupByEntry = groupByResult.get("groupByResult").get(0);
