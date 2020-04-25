@@ -20,15 +20,17 @@
 
 if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   echo "Deploying ThirdEye to bintray"
-  cd thirdeye/thirdeye-pinot
+  # Generate new version number
+  cd thirdeye/
   BUILD_VERSION=$(grep -E "<revision>(.*)</revision>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1)
   echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
   mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}" -q -B
   mvn versions:commit -q -B
   # Deploy ThirdEye to bintray
-  mvn deploy -s ../.travis/.ci.settings.xml -DskipTests -q
-  cd ../thirdeye-frontend/
+  cd thirdeye-pinot/
+  mvn deploy -s ../../.travis/.ci.settings.xml -DskipTests -q
   # Deploy ThirdEye frontend to NPM
+  cd ../thirdeye-frontend/
   npm version ${BUILD_VERSION}${DEV_VERSION}
   npm-login-noninteractive
   npm publish
