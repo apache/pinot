@@ -39,7 +39,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   protected RecordReader createRecordReader()
       throws Exception {
     ParquetRecordReader recordReader = new ParquetRecordReader();
-    recordReader.init(_dataFile, getPinotSchema(), null);
+    recordReader.init(_dataFile, getPinotSchema(), null, _sourceFields);
     return recordReader;
   }
 

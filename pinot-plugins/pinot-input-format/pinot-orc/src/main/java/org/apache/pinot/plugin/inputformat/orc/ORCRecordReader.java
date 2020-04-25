@@ -45,7 +45,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.utils.StringUtils;
 
 
@@ -75,7 +74,7 @@ public class ORCRecordReader implements RecordReader {
   private int _nextRowId;
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
       throws IOException {
     _schema = schema;
 
@@ -89,7 +88,6 @@ public class ORCRecordReader implements RecordReader {
     _orcFieldTypes = orcSchema.getChildren();
 
     // Only read the required fields
-    Set<String> schemaFields = SchemaFieldExtractorUtils.extract(schema);
     int numOrcFields = _orcFields.size();
     _includeOrcFields = new boolean[numOrcFields];
     // NOTE: Include for ORC reader uses field id as the index
@@ -97,7 +95,7 @@ public class ORCRecordReader implements RecordReader {
     orcReaderInclude[orcSchema.getId()] = true;
     for (int i = 0; i < numOrcFields; i++) {
       String field = _orcFields.get(i);
-      if (schemaFields.contains(field)) {
+      if (fields.contains(field)) {
         TypeDescription fieldType = _orcFieldTypes.get(i);
         TypeDescription.Category category = fieldType.getCategory();
         if (category == TypeDescription.Category.LIST) {

@@ -44,7 +44,7 @@ public class ORCRecordReaderTest extends AbstractRecordReaderTest {
   protected RecordReader createRecordReader()
       throws Exception {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
-    orcRecordReader.init(_dataFile, _pinotSchema, null);
+    orcRecordReader.init(_dataFile, _pinotSchema, null, _sourceFields);
     return orcRecordReader;
   }
 

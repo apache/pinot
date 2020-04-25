@@ -30,7 +30,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
@@ -60,13 +59,12 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     _recordExtractor = new JSONRecordExtractor();
-    _recordExtractor.init(sourceFields, null);
+    _recordExtractor.init(fields, null);
     init();
   }
 

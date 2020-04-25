@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -120,10 +121,10 @@ public class RecordReaderFactory {
    * @throws Exception
    */
   public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile, Schema schema,
-      RecordReaderConfig recordReaderConfig)
+      RecordReaderConfig recordReaderConfig, Set<String> fields)
       throws Exception {
     RecordReader recordReader = PluginManager.get().createInstance(recordReaderClassName);
-    recordReader.init(dataFile, schema, recordReaderConfig);
+    recordReader.init(dataFile, schema, recordReaderConfig, fields);
     return recordReader;
   }
 
@@ -138,9 +139,9 @@ public class RecordReaderFactory {
    * @throws Exception Any exception while initializing the RecordReader
    */
   public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Schema schema,
-      RecordReaderConfig recordReaderConfig)
+      RecordReaderConfig recordReaderConfig, Set<String> fields)
       throws Exception {
-    return getRecordReader(fileFormat.name(), dataFile, schema, recordReaderConfig);
+    return getRecordReader(fileFormat.name(), dataFile, schema, recordReaderConfig, fields);
   }
 
   /**
@@ -154,12 +155,12 @@ public class RecordReaderFactory {
    * @throws Exception Any exception while initializing the RecordReader
    */
   public static RecordReader getRecordReader(String fileFormatStr, File dataFile, Schema schema,
-      RecordReaderConfig recordReaderConfig)
+      RecordReaderConfig recordReaderConfig, Set<String> fields)
       throws Exception {
     String fileFormatKey = fileFormatStr.toUpperCase();
     if (DEFAULT_RECORD_READER_CLASS_MAP.containsKey(fileFormatKey)) {
       return getRecordReaderByClass(DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormatKey), dataFile, schema,
-          recordReaderConfig);
+          recordReaderConfig, fields);
     }
     throw new UnsupportedOperationException(
         "No supported RecordReader found for file format - '" + fileFormatStr + "'");

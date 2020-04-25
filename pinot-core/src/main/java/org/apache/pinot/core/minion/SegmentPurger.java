@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -162,7 +163,8 @@ public class SegmentPurger {
     }
 
     @Override
-    public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
+    public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig,
+        Set<String> fields) {
     }
 
     @Override

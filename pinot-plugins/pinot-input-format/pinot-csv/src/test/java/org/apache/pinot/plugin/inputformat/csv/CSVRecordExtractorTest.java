@@ -49,7 +49,7 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, _pinotSchema, csvRecordReaderConfig);
+    csvRecordReader.init(_dataFile, _pinotSchema, csvRecordReaderConfig, _sourceFieldNames);
     return csvRecordReader;
   }
 
@@ -59,13 +59,14 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   public void createInputFile()
       throws IOException {
+    String[] header = _sourceFieldNames.toArray(new String[0]);
     try (FileWriter fileWriter = new FileWriter(_dataFile); CSVPrinter csvPrinter = new CSVPrinter(fileWriter,
-        CSVFormat.DEFAULT.withHeader(_sourceFieldNames.toArray(new String[0])))) {
+        CSVFormat.DEFAULT.withHeader(header))) {
 
       for (Map<String, Object> inputRecord : _inputRecords) {
-        Object[] record = new Object[_sourceFieldNames.size()];
-        for (int i = 0; i < _sourceFieldNames.size(); i++) {
-          Object value = inputRecord.get(_sourceFieldNames.get(i));
+        Object[] record = new Object[header.length];
+        for (int i = 0; i < header.length; i++) {
+          Object value = inputRecord.get(header[i]);
           if (value instanceof Collection) {
             record[i] = StringUtils.join(((List) value).toArray(), CSV_MULTI_VALUE_DELIMITER);
           } else {

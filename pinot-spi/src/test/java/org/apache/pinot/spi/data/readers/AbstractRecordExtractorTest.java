@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,9 +29,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -43,7 +44,7 @@ import org.testng.annotations.Test;
 public abstract class AbstractRecordExtractorTest {
 
   protected Schema _pinotSchema;
-  protected List<String> _sourceFieldNames;
+  protected Set<String> _sourceFieldNames;
   protected List<Map<String, Object>> _inputRecords;
   private RecordReader _recordReader;
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordTransformationTest");
@@ -53,7 +54,7 @@ public abstract class AbstractRecordExtractorTest {
       throws IOException {
     FileUtils.forceMkdir(_tempDir);
     _pinotSchema = getPinotSchema();
-    _sourceFieldNames = new ArrayList<>(SchemaFieldExtractorUtils.extractSource(_pinotSchema));
+    _sourceFieldNames = getSourceFields();
     _inputRecords = getInputRecords();
     createInputFile();
     _recordReader = createRecordReader();
@@ -88,6 +89,10 @@ public abstract class AbstractRecordExtractorTest {
       inputRecords.add(record);
     }
     return inputRecords;
+  }
+
+  protected Set<String> getSourceFields() {
+    return Sets.newHashSet("user_id", "firstName", "lastName", "bids", "campaignInfo", "cost", "timestamp");
   }
 
   @AfterClass

@@ -86,7 +86,8 @@ public class MutableSegmentImplTest {
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs);
     _startTimeMs = System.currentTimeMillis();
 
-    try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, avroFile, _schema, null)) {
+    try (RecordReader recordReader = RecordReaderFactory
+        .getRecordReader(FileFormat.AVRO, avroFile, _schema, null, _schema.getColumnNames())) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
         _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);

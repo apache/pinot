@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -41,6 +43,7 @@ public abstract class AbstractRecordReaderTest {
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordReaderTest");
   protected List<Map<String, Object>> _records;
   protected org.apache.pinot.spi.data.Schema _pinotSchema;
+  protected Set<String> _sourceFields;
   private RecordReader _recordReader;
 
   private static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
@@ -123,12 +126,17 @@ public abstract class AbstractRecordReaderTest {
         .addMetric("met_double", FieldSpec.DataType.DOUBLE).build();
   }
 
+  protected Set<String> getSourceFields(Schema schema) {
+    return Sets.newHashSet(schema.getColumnNames());
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
     FileUtils.forceMkdir(_tempDir);
     // Generate Pinot schema
     _pinotSchema = getPinotSchema();
+    _sourceFields = getSourceFields(_pinotSchema);
     // Generate random records based on Pinot schema
     _records = generateRandomRecords(_pinotSchema);
     // Write generated random records to file

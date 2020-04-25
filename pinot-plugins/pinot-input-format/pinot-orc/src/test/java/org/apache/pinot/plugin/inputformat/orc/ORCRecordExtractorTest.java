@@ -50,7 +50,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
   protected RecordReader createRecordReader()
       throws IOException {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
-    orcRecordReader.init(_dataFile, _pinotSchema, null);
+    orcRecordReader.init(_dataFile, _pinotSchema, null, _sourceFieldNames);
     return orcRecordReader;
   }
 

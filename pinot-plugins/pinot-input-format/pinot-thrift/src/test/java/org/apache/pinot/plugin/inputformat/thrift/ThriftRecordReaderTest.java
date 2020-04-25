@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -95,7 +96,7 @@ public class ThriftRecordReaderTest {
   public void testReadData()
       throws IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSchema(), getThriftRecordReaderConfig());
+    recordReader.init(_tempFile, getSchema(), getThriftRecordReaderConfig(), getSourceFields());
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
       genericRows.add(recordReader.next());
@@ -114,7 +115,7 @@ public class ThriftRecordReaderTest {
   public void testRewind()
       throws IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSchema(), getThriftRecordReaderConfig());
+    recordReader.init(_tempFile, getSchema(), getThriftRecordReaderConfig(), getSourceFields());
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
       genericRows.add(recordReader.next());
@@ -148,6 +149,10 @@ public class ThriftRecordReaderTest {
         .addSingleValueDimension("active", FieldSpec.DataType.BOOLEAN)
         .addMultiValueDimension("groups", FieldSpec.DataType.INT)
         .addMultiValueDimension("set_values", FieldSpec.DataType.STRING).build();
+  }
+
+  private Set<String> getSourceFields() {
+    return Sets.newHashSet("id", "name", "created_at", "active", "groups", "set_values");
   }
 
   @AfterClass

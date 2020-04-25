@@ -42,7 +42,7 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
   protected RecordReader createRecordReader()
       throws IOException {
     JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dataFile, _pinotSchema, null);
+    recordReader.init(_dataFile, _pinotSchema, null, _sourceFieldNames);
     return recordReader;
   }
 

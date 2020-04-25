@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,6 +27,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -78,6 +80,11 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
     return org.apache.pinot.spi.data.Schema.fromInputSteam(schemaInputStream);
   }
 
+  @Override
+  protected Set<String> getSourceFields() {
+    return Sets.newHashSet("map1", "map2");
+  }
+
   /**
    * Create an AvroRecordReader
    */
@@ -85,7 +92,7 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
   protected RecordReader createRecordReader()
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _pinotSchema, null);
+    avroRecordReader.init(_dataFile, _pinotSchema, null, _sourceFieldNames);
     return avroRecordReader;
   }
 

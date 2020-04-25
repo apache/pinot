@@ -57,6 +57,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +98,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     Schema schema = segmentGeneratorConfig.getSchema();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
+    Set<String> fields = SchemaFieldExtractorUtils.extract(config.getSchema());
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -108,7 +110,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
             fileFormat);
       }
       return RecordReaderFactory
-          .getRecordReaderByClass(recordReaderClassName, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
+          .getRecordReaderByClass(recordReaderClassName, dataFile, schema, segmentGeneratorConfig.getReaderConfig(),
+              fields);
     }
 
     switch (fileFormat) {
@@ -118,7 +121,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       default:
         try {
           return org.apache.pinot.spi.data.readers.RecordReaderFactory
-              .getRecordReader(fileFormat, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
+              .getRecordReader(fileFormat, dataFile, schema, segmentGeneratorConfig.getReaderConfig(), fields);
         } catch (Exception e) {
           throw new UnsupportedOperationException("Unsupported input file format: '" + fileFormat + "'", e);
         }
