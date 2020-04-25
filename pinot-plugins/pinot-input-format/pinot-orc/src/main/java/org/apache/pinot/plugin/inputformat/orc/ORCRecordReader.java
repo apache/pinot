@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
@@ -78,8 +79,9 @@ public class ORCRecordReader implements RecordReader {
       throws IOException {
     _schema = schema;
 
-    Reader orcReader =
-        OrcFile.createReader(new Path(dataFile.getAbsolutePath()), OrcFile.readerOptions(new Configuration()));
+    Configuration configuration = new Configuration();
+    Reader orcReader = OrcFile.createReader(new Path(dataFile.getAbsolutePath()),
+        OrcFile.readerOptions(configuration).filesystem(FileSystem.getLocal(configuration)));
     TypeDescription orcSchema = orcReader.getSchema();
     Preconditions
         .checkState(orcSchema.getCategory() == TypeDescription.Category.STRUCT, "ORC schema must be of type: STRUCT");
