@@ -92,14 +92,19 @@ public abstract class AbstractRecordReaderTest {
   protected void checkValue(RecordReader recordReader, RecordExtractor recordExtractor, List<Map<String, Object>> expectedRecordsMap)
       throws Exception {
     GenericRow reuse = new GenericRow();
+    int count = 0;
     for (Map<String, Object> expectedRecord : expectedRecordsMap) {
       Object next = recordReader.next();
       GenericRow actualRow = recordExtractor.extract(next, reuse);
       org.apache.pinot.spi.data.Schema pinotSchema = recordReader.getSchema();
+      System.out.println(count++);
       for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRow.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
+          if (!actualRow.getValue(fieldSpecName).toString().equals(expectedRecord.get(fieldSpecName).toString())) {
+            Assert.assertEquals(actualRow.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
+            //System.out.println(fieldSpec);
+          }
         } else {
           Object[] actualRecords = (Object[]) actualRow.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
