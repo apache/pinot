@@ -141,9 +141,8 @@ module.exports = {
       trackingID: 'UA-157446650-1',
     },
     algolia: {
-      apiKey: 'f3cde09979e469ad62eaea4e115c21ea',
+      apiKey: 'ef0051ce1fd0a5d07af57bffdbb46f87',
       indexName: 'apache_pinot',
-      algoliaOptions: {}, // Optional, if provided by Algolia
     },
   },
   plugins: [
