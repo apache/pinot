@@ -2,13 +2,14 @@
 <project
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
   xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye-frontend</artifactId>
-  <version>{revision}{sha1}</version>
+  <version>${revision}${sha1}</version>
   <name>thirdeye-frontend</name>
   <url>http://maven.apache.org</url>
-  
+
   <properties>
     <revision>1.0.0</revision>
     <sha1>-SNAPSHOT</sha1>
@@ -59,6 +60,7 @@
               <environmentalVariables>
                 <JOBS>1</JOBS>
               </environmentalVariables>
+              <!-- Used for local build only -->
               <arguments>run build --prod --output-path=../thirdeye-pinot/src/main/resources/app</arguments>
             </configuration>
           </execution>
@@ -121,7 +123,7 @@
           <exclude>**/.gitkeep</exclude>
           <exclude>testem.js</exclude>
         </excludes>
-        <targetPath>META-INF/resources/</targetPath>
+        <targetPath>app/</targetPath>
       </resource>
     </resources>
 
