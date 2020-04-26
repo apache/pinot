@@ -44,23 +44,7 @@ public interface RecordReader extends Closeable {
    *
    * TODO: decouple Schema and RecordReader. This should be easier, now that we have field names to extract
    */
-  default void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
-      throws IOException {
-    // for backward compatibility
-    init(dataFile, schema, recordReaderConfig);
-  }
-
-  /**
-   * Initializes the record reader with data file, schema and (optional) record reader config.
-   *
-   * @param dataFile Data file
-   * @param schema Pinot Schema associated with the table
-   * @param recordReaderConfig Config for the reader specific to the format. e.g. delimiter for csv format etc
-   * @throws IOException If an I/O error occurs
-   *
-   * TODO: decouple Schema and RecordReader. This should be easier, now that we have field names to extract
-   */
-  void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
+  void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
       throws IOException;
 
   /**

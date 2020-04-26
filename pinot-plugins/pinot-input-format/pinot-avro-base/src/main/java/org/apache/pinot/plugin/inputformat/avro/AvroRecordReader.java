@@ -60,12 +60,6 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
-      throws IOException {
-
-  }
-
-  @Override
   public boolean hasNext() {
     return _avroReader.hasNext();
   }
