@@ -34,11 +34,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 @InterfaceStability.Stable
 public interface StreamMessageDecoder<T> {
 
-  static final String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
+  String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
 
   /**
-   * Initialize the decoder with decoder properties map, the stream topic name and stream schema
-   * @param props
+   * Initialize the decoder
+   * @param props decoder properties extracted from the {@link StreamConfig}
+   * @param indexingSchema the Pinot schema
+   * @param topicName topic name of the stream
+   * @param fields the fields to be extracted from the record
    * @throws Exception
    */
   void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> fields)
