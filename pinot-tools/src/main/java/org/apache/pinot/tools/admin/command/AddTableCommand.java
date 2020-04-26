@@ -137,7 +137,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     String res = AbstractBaseAdminCommand
         .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
     LOGGER.info(res);
-    return res.contains("succesfully added");
+    return res.contains("succesfully added") || res.contains("Successfully added");
   }
 
   @Override

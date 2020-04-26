@@ -23,6 +23,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
@@ -86,14 +87,20 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
       writer.flush();
     }
 
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
+    try {
+      return readInputStream(conn.getInputStream());
+    } catch (Exception e) {
+      return readInputStream(conn.getErrorStream());
+    }
+  }
 
+  private static String readInputStream(InputStream inputStream) throws IOException {
+    final BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
+    final StringBuilder sb = new StringBuilder();
+    String line;
     while ((line = reader.readLine()) != null) {
       sb.append(line);
     }
-
     return sb.toString();
   }
 

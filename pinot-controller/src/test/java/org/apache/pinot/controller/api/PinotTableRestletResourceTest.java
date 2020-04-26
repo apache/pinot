@@ -266,7 +266,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Case 1: Create a REALTIME table and delete it directly w/o using query param.
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
     String creationResponse = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_REALTIME Successfully added\"}");
 
     // Delete realtime table using REALTIME suffix.
     String deleteResponse =
@@ -276,7 +276,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Case 2: Create an offline table and delete it directly w/o using query param.
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("table0").build();
     creationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_OFFLINE Successfully added\"}");
 
     // Delete offline table using OFFLINE suffix.
     deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table0_OFFLINE"));
@@ -285,11 +285,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Case 3: Create REALTIME and OFFLINE tables and delete both of them.
     TableConfig rtConfig1 = _realtimeBuilder.setTableName("table1").build();
     creationResponse = sendPostRequest(_createTableUrl, rtConfig1.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table1_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table1_REALTIME Successfully added\"}");
 
     TableConfig offlineConfig1 = _offlineBuilder.setTableName("table1").build();
     creationResponse = sendPostRequest(_createTableUrl, offlineConfig1.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table1_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table1_OFFLINE Successfully added\"}");
 
     deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table1"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table1_OFFLINE, table1_REALTIME] deleted\"}");
@@ -297,11 +297,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Case 4: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params.
     TableConfig rtConfig2 = _realtimeBuilder.setTableName("table2").build();
     creationResponse = sendPostRequest(_createTableUrl, rtConfig2.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table2_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table2_REALTIME Successfully added\"}");
 
     TableConfig offlineConfig2 = _offlineBuilder.setTableName("table2").build();
     creationResponse = sendPostRequest(_createTableUrl, offlineConfig2.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table2_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table2_OFFLINE Successfully added\"}");
 
     // The conflict between param type and table name suffix causes no table being deleted.
     try {
@@ -331,11 +331,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Case 6: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params and suffixes.
     TableConfig rtConfig3 = _realtimeBuilder.setTableName("table3").build();
     creationResponse = sendPostRequest(_createTableUrl, rtConfig3.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_REALTIME Successfully added\"}");
 
     TableConfig offlineConfig3 = _offlineBuilder.setTableName("table3").build();
     creationResponse = sendPostRequest(_createTableUrl, offlineConfig3.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_OFFLINE Successfully added\"}");
 
     deleteResponse =
         sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table3_REALTIME?type=realtime"));
