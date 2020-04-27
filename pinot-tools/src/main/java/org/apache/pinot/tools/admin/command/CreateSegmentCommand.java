@@ -365,7 +365,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
                   if (_readerConfigFile != null) {
                     readerConfig = JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class);
                   }
-                  csvRecordReader.init(localFile, schema, readerConfig, SchemaFieldExtractorUtils.extract(schema));
+                  csvRecordReader.init(localFile, schema, readerConfig, SchemaFieldExtractorUtils.extractSourceFields(schema));
                   driver.init(config, csvRecordReader);
                   break;
                 default:

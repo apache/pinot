@@ -32,17 +32,18 @@ public abstract class StreamDecoderProvider {
 
   /**
    * Constructs a {@link StreamMessageDecoder} using properties in {@link StreamConfig} and initializes it
-   * @param streamConfig
-   * @param schema
-   * @return
+   * @param streamConfig the stream configs from the table config
+   * @param schema the schema of the Pinot table
+   * @param sourceFields the fields to extract from the source stream
+   * @return the StreamMessageDecoder
    */
-  public static StreamMessageDecoder create(StreamConfig streamConfig, Schema schema, Set<String> fields) {
+  public static StreamMessageDecoder create(StreamConfig streamConfig, Schema schema, Set<String> sourceFields) {
     StreamMessageDecoder decoder = null;
     String decoderClass = streamConfig.getDecoderClass();
     Map<String, String> decoderProperties = streamConfig.getDecoderProperties();
     try {
       decoder = PluginManager.get().createInstance(decoderClass);
-      decoder.init(decoderProperties, schema, streamConfig.getTopicName(), fields);
+      decoder.init(decoderProperties, schema, streamConfig.getTopicName(), sourceFields);
     } catch (Exception e) {
       ExceptionUtils.rethrow(e);
     }

@@ -48,7 +48,7 @@ public class SchemaFieldExtractorUtils {
    *
    * TODO: for now, we assume that arguments to transform function are in the source i.e. there's no columns which are derived from transformed columns
    */
-  public static Set<String> extract(Schema schema) {
+  public static Set<String> extractSourceFields(Schema schema) {
     Set<String> sourceFieldNames = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -57,22 +57,6 @@ public class SchemaFieldExtractorUtils {
           sourceFieldNames.addAll(expressionEvaluator.getArguments());
         }
         sourceFieldNames.add(fieldSpec.getName());
-      }
-    }
-    return sourceFieldNames;
-  }
-
-  @VisibleForTesting
-  public static Set<String> extractSource(Schema schema) {
-    Set<String> sourceFieldNames = new HashSet<>();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-        if (expressionEvaluator != null) {
-          sourceFieldNames.addAll(expressionEvaluator.getArguments());
-        } else {
-          sourceFieldNames.add(fieldSpec.getName());
-        }
       }
     }
     return sourceFieldNames;

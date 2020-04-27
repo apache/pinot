@@ -1153,7 +1153,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir);
 
     // Create message decoder
-    _sourceFields = SchemaFieldExtractorUtils.extract(_schema);
+    _sourceFields = SchemaFieldExtractorUtils.extractSourceFields(_schema);
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema, _sourceFields);
     _clientId = _streamTopic + "-" + _streamPartitionId;
 

@@ -94,7 +94,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();
     StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(streamConfig, pinotSchema,
-        SchemaFieldExtractorUtils.extract(pinotSchema));
+        SchemaFieldExtractorUtils.extractSourceFields(pinotSchema));
     GenericRow decodedRow = new GenericRow();
     streamMessageDecoder.decode(messageBatch.getMessageAtIndex(0), decodedRow);
     System.out.println(decodedRow);

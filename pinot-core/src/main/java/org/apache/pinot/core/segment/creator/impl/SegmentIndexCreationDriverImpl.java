@@ -98,7 +98,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     Schema schema = segmentGeneratorConfig.getSchema();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
-    Set<String> fields = SchemaFieldExtractorUtils.extract(segmentGeneratorConfig.getSchema());
+    Set<String> fields = SchemaFieldExtractorUtils.extractSourceFields(segmentGeneratorConfig.getSchema());
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format

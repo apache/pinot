@@ -37,6 +37,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * An implementation of StreamMessageDecoder to read simple avro records from stream
+ * NOTE: Do not use schema in the implementation, as schema will be removed from the params
+ */
 @NotThreadSafe
 public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleAvroMessageDecoder.class);

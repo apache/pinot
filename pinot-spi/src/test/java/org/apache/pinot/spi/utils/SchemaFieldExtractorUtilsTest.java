@@ -28,7 +28,6 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -49,7 +48,7 @@ public class SchemaFieldExtractorUtilsTest {
     dimensionFieldSpec.setTransformFunction("Groovy({function}, argument1, argument2)");
     schema.addField(dimensionFieldSpec);
 
-    List<String> extract = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
+    List<String> extract = new ArrayList<>(SchemaFieldExtractorUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 3);
     Assert.assertTrue(extract.containsAll(Arrays.asList("d1", "argument1", "argument2")));
 
@@ -59,7 +58,7 @@ public class SchemaFieldExtractorUtilsTest {
     dimensionFieldSpec.setTransformFunction("Groovy({function})");
     schema.addField(dimensionFieldSpec);
 
-    extract = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
+    extract = new ArrayList<>(SchemaFieldExtractorUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("d1"));
 
@@ -68,7 +67,7 @@ public class SchemaFieldExtractorUtilsTest {
     dimensionFieldSpec = new DimensionFieldSpec("map__KEYS", FieldSpec.DataType.INT, false);
     schema.addField(dimensionFieldSpec);
 
-    extract = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
+    extract = new ArrayList<>(SchemaFieldExtractorUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("map", "map__KEYS")));
 
@@ -77,7 +76,7 @@ public class SchemaFieldExtractorUtilsTest {
     dimensionFieldSpec = new DimensionFieldSpec("map__VALUES", FieldSpec.DataType.LONG, false);
     schema.addField(dimensionFieldSpec);
 
-    extract = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
+    extract = new ArrayList<>(SchemaFieldExtractorUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("map", "map__VALUES")));
 
@@ -87,7 +86,7 @@ public class SchemaFieldExtractorUtilsTest {
     TimeFieldSpec timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
     schema.addField(timeFieldSpec);
 
-    extract = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
+    extract = new ArrayList<>(SchemaFieldExtractorUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("time"));
 
@@ -98,7 +97,7 @@ public class SchemaFieldExtractorUtilsTest {
             TimeUnit.MILLISECONDS);
     schema.addField(timeFieldSpec);
 
-    extract = new ArrayList<>(SchemaFieldExtractorUtils.extract(schema));
+    extract = new ArrayList<>(SchemaFieldExtractorUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("in", "out")));
   }

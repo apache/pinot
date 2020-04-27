@@ -68,7 +68,7 @@ public class MeetupRsvpStream {
     try {
       final ClientEndpointConfig cec = ClientEndpointConfig.Builder.create().build();
       final StreamMessageDecoder decoder = PluginManager.get().createInstance(KafkaStarterUtils.KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME);
-      decoder.init(null, schema, null, SchemaFieldExtractorUtils.extract(schema));
+      decoder.init(null, schema, null, SchemaFieldExtractorUtils.extractSourceFields(schema));
       client = ClientManager.createClient();
       client.connectToServer(new Endpoint() {
 
