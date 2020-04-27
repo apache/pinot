@@ -16,22 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config;
-
+package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import org.apache.commons.lang.StringUtils;
-
-import javax.annotation.Nullable;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
-@SuppressWarnings("unused")
-@JsonIgnoreProperties(ignoreUnknown = true)
+
 public class UpsertConfig extends BaseJsonConfig {
   // names of the columns that used as primary keys of an upsert table
   private final List<String> _primaryKeyColumns;
@@ -43,25 +37,19 @@ public class UpsertConfig extends BaseJsonConfig {
   private final String _validUntilColumn;
 
   @JsonCreator
-  public UpsertConfig(
-      @JsonProperty(value="primaryKeyColumns") List<String> primaryKeyColumns,
-      @JsonProperty(value="offsetColumn") String offsetColumn,
-      @JsonProperty(value="validFromColumn") String validFromColumn,
-      @JsonProperty(value="validUntilColumn") String validUntilColumn) {
-
+  public UpsertConfig(@JsonProperty(value = "primaryKeyColumns") List<String> primaryKeyColumns,
+      @JsonProperty(value = "offsetColumn") String offsetColumn,
+      @JsonProperty(value = "validFromColumn") String validFromColumn,
+      @JsonProperty(value = "validUntilColumn") String validUntilColumn) {
+    Preconditions.checkArgument(primaryKeyColumns != null && primaryKeyColumns.size() == 1,
+        "'primaryKeyColumns' must be configured with exact one column");
+    Preconditions.checkArgument(StringUtils.isNotEmpty(offsetColumn), "'offsetColumn' must be configured");
+    Preconditions.checkArgument(StringUtils.isNotEmpty(validFromColumn), "'validFromColumn' must be configured");
+    Preconditions.checkArgument(StringUtils.isNotEmpty(validUntilColumn), "'validUntilColumn' must be configured");
     _primaryKeyColumns = primaryKeyColumns;
     _offsetColumn = offsetColumn;
     _validFromColumn = validFromColumn;
     _validUntilColumn = validUntilColumn;
-
-    Preconditions.checkState(_primaryKeyColumns.size() == 1,
-        "Upsert feature supports only one primary key column");
-    Preconditions.checkState(StringUtils.isNotEmpty(_offsetColumn),
-        "Upsert feature requires \"offsetColumn\" to be set ");
-    Preconditions.checkState(StringUtils.isNotEmpty(_validFromColumn),
-        "Upsert feature requires \"validFromColumn\" to be set");
-    Preconditions.checkState(StringUtils.isNotEmpty(_validUntilColumn),
-        "Upsert feature requires \"validUntilColumn\" to be set");
   }
 
   public List<String> getPrimaryKeyColumns() {

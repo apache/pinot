@@ -25,9 +25,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.config.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -235,5 +233,4 @@ public class TableConfig extends BaseJsonConfig {
   public void setUpsertConfig(UpsertConfig upsertConfig) {
     _upsertConfig = upsertConfig;
   }
-
 }
