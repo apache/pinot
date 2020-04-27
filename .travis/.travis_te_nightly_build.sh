@@ -27,10 +27,9 @@ if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}" -q -B
   mvn versions:commit -q -B
   # Deploy ThirdEye to bintray
-  cd thirdeye-pinot/
-  mvn deploy -s ../../.travis/.ci.settings.xml -DskipTests -q
+  mvn deploy -s ../.travis/.ci.settings.xml -DskipTests -q
   # Deploy ThirdEye frontend to NPM
-  cd ../thirdeye-frontend/
+  cd thirdeye-frontend/
   npm version ${BUILD_VERSION}${DEV_VERSION}
   npm-login-noninteractive
   npm publish
