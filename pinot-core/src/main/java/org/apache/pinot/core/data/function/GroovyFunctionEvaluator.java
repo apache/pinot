@@ -31,7 +31,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * An {@link ExpressionEvaluator} for evaluating schema transform expressions written in Groovy.
+ * An {@link FunctionEvaluator} for evaluating transform function expressions of a Schema field spec written in Groovy.
  * GroovyShell is used to execute expressions.
  *
  * The transform expression must follow the convention Groovy({expression}, arguments1, argument2...)
@@ -44,7 +44,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *     }
  *  ]
  */
-public class GroovyExpressionEvaluator implements ExpressionEvaluator {
+public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   private static final String GROOVY_EXPRESSION_PREFIX = "Groovy";
   private static final String GROOVY_FUNCTION_REGEX = "Groovy\\(\\{(?<script>.+)}(,(?<arguments>.+))?\\)";
@@ -58,7 +58,7 @@ public class GroovyExpressionEvaluator implements ExpressionEvaluator {
   private final Binding _binding;
   private final Script _script;
 
-  public GroovyExpressionEvaluator(String transformExpression) {
+  public GroovyFunctionEvaluator(String transformExpression) {
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(transformExpression);
     Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", transformExpression);
     String arguments = matcher.group(ARGUMENTS_GROUP_NAME);

@@ -23,8 +23,8 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.function.ExpressionEvaluator;
-import org.apache.pinot.core.data.function.ExpressionEvaluatorFactory;
+import org.apache.pinot.core.data.function.FunctionEvaluator;
+import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 
 
 /**
@@ -34,14 +34,14 @@ import org.apache.pinot.core.data.function.ExpressionEvaluatorFactory;
  */
 public class ExpressionTransformer implements RecordTransformer {
 
-  private final Map<String, ExpressionEvaluator> _expressionEvaluators = new HashMap<>();
+  private final Map<String, FunctionEvaluator> _expressionEvaluators = new HashMap<>();
 
   public ExpressionTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-        if (expressionEvaluator != null) {
-          _expressionEvaluators.put(fieldSpec.getName(), expressionEvaluator);
+        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        if (functionEvaluator != null) {
+          _expressionEvaluators.put(fieldSpec.getName(), functionEvaluator);
         }
       }
     }
@@ -49,13 +49,13 @@ public class ExpressionTransformer implements RecordTransformer {
 
   @Override
   public GenericRow transform(GenericRow record) {
-    for (Map.Entry<String, ExpressionEvaluator> entry : _expressionEvaluators.entrySet()) {
+    for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
-      ExpressionEvaluator transformExpressionEvaluator = entry.getValue();
+      FunctionEvaluator transformFunctionEvaluator = entry.getValue();
       // Skip transformation if column value already exist.
       // NOTE: column value might already exist for OFFLINE data
       if (record.getValue(column) == null) {
-        Object result = transformExpressionEvaluator.evaluate(record);
+        Object result = transformFunctionEvaluator.evaluate(record);
         record.putValue(column, result);
       }
     }

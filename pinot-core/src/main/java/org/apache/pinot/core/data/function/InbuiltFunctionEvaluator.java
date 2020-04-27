@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.function;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -42,12 +43,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *   </li>
  * </ul>
  */
-public class FunctionExpressionEvaluator {
+public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;
+  private final List<String> _arguments;
 
-  public FunctionExpressionEvaluator(String expression)
+  public InbuiltFunctionEvaluator(String expression)
       throws Exception {
+    _arguments = new ArrayList<>();
     _rootNode = planExecution(TransformExpressionTree.compileToExpressionTree(expression));
   }
 
@@ -65,7 +68,9 @@ public class FunctionExpressionEvaluator {
           childNode = planExecution(childExpression);
           break;
         case IDENTIFIER:
-          childNode = new ColumnExecutionNode(childExpression.getValue());
+          String columnName = childExpression.getValue();
+          childNode = new ColumnExecutionNode(columnName);
+          _arguments.add(columnName);
           break;
         case LITERAL:
           childNode = new ConstantExecutionNode(childExpression.getValue());
@@ -79,6 +84,11 @@ public class FunctionExpressionEvaluator {
 
     FunctionInfo functionInfo = FunctionRegistry.resolve(transformName, argumentTypes);
     return new FunctionExecutionNode(functionInfo, childNodes);
+  }
+
+  @Override
+  public List<String> getArguments() {
+    return _arguments;
   }
 
   public Object evaluate(GenericRow row) {

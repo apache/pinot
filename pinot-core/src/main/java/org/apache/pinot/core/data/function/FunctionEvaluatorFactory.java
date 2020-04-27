@@ -19,36 +19,32 @@
 package org.apache.pinot.core.data.function;
 
 import javax.annotation.Nullable;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.core.util.SchemaUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
- * Factory class to create an {@link ExpressionEvaluator} for the field spec based on the {@link FieldSpec#getTransformFunction()}
+ * Factory class to create an {@link FunctionEvaluator} for the field spec based on the {@link FieldSpec#getTransformFunction()}
  */
-public class ExpressionEvaluatorFactory {
+public class FunctionEvaluatorFactory {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionEvaluatorFactory.class);
-
-  private ExpressionEvaluatorFactory() {
+  private FunctionEvaluatorFactory() {
 
   }
 
   /**
-   * Creates the {@link ExpressionEvaluator} for the given field spec
+   * Creates the {@link FunctionEvaluator} for the given field spec
    *
-   * 1. If transform expression is defined, use it to create {@link ExpressionEvaluator}
-   * 2. For TIME column, if conversion is needed, {@link DefaultTimeSpecEvaluator} for backward compatible handling of time spec. This is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
-   * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default functions for handing the Map
+   * 1. If transform expression is defined, use it to create the appropriate {@link FunctionEvaluator}
+   * 2. For TIME column, if conversion is needed, {@link TimeSpecFunctionEvaluator} for backward compatible handling of time spec. This is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
+   * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default groovy functions for handing the Map
    * 4. Return null, if none of the above
    */
   @Nullable
-  public static ExpressionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
-    ExpressionEvaluator expressionEvaluator = null;
+  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
+    FunctionEvaluator functionEvaluator = null;
 
     String columnName = fieldSpec.getName();
     String transformExpression = fieldSpec.getTransformFunction();
@@ -56,7 +52,7 @@ public class ExpressionEvaluatorFactory {
 
       // if transform function expression present, use it to generate function evaluator
       try {
-        expressionEvaluator = getExpressionEvaluator(transformExpression);
+        functionEvaluator = getExpressionEvaluator(transformExpression);
       } catch (Exception e) {
         throw new IllegalStateException(
             "Caught exception while constructing expression evaluator for transform expression:" + transformExpression
@@ -70,7 +66,7 @@ public class ExpressionEvaluatorFactory {
       TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
       if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
         if (!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
-          expressionEvaluator = new DefaultTimeSpecEvaluator(incomingGranularitySpec, outgoingGranularitySpec);
+          functionEvaluator = new TimeSpecFunctionEvaluator(incomingGranularitySpec, outgoingGranularitySpec);
         } else {
           throw new IllegalStateException(
               "Invalid timeSpec - Incoming and outgoing field specs are different, but name " + incomingGranularitySpec
@@ -84,23 +80,30 @@ public class ExpressionEvaluatorFactory {
       String sourceMapName =
           columnName.substring(0, columnName.length() - SchemaUtils.MAP_KEY_COLUMN_SUFFIX.length());
       String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
-      expressionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
+      functionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
     } else if (columnName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX)) {
       // for backward compatible handling of Map type in avro (currently only in Avro)
       String sourceMapName =
           columnName.substring(0, columnName.length() - SchemaUtils.MAP_VALUE_COLUMN_SUFFIX.length());
       String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
-      expressionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
+      functionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
     }
-    return expressionEvaluator;
+    return functionEvaluator;
   }
 
-  private static ExpressionEvaluator getExpressionEvaluator(String transformExpression) {
-    ExpressionEvaluator expressionEvaluator = null;
-    if (transformExpression.startsWith(GroovyExpressionEvaluator.getGroovyExpressionPrefix())) {
-      expressionEvaluator = new GroovyExpressionEvaluator(transformExpression);
+  private static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
+    FunctionEvaluator functionEvaluator;
+    try {
+      if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
+        functionEvaluator = new GroovyFunctionEvaluator(transformExpression);
+      } else {
+        functionEvaluator = new InbuiltFunctionEvaluator(transformExpression);
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Could not construct FunctionEvaluator for transformFunction: " + transformExpression, e);
     }
-    return expressionEvaluator;
+    return functionEvaluator;
   }
 
   private static String getDefaultMapKeysTransformExpression(String mapColumnName) {

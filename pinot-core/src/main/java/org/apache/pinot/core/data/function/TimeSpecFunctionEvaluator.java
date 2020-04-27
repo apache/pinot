@@ -29,16 +29,16 @@ import org.apache.pinot.spi.utils.TimeUtils;
 
 
 /**
- * The {@code DefaultTimeSpecEvaluator} class will convert the time value based on the {@link TimeFieldSpec}.
+ * An implementation of {@link FunctionEvaluator} for converting the time value based on the {@link TimeFieldSpec}.
  */
-public class DefaultTimeSpecEvaluator implements ExpressionEvaluator {
+public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
   private final String _incomingTimeColumn;
   private final String _outgoingTimeColumn;
   private final TimeConverter _incomingTimeConverter;
   private final TimeConverter _outgoingTimeConverter;
   private boolean _isValidated = false;
 
-  public DefaultTimeSpecEvaluator(TimeGranularitySpec incomingGranularitySpec,
+  public TimeSpecFunctionEvaluator(TimeGranularitySpec incomingGranularitySpec,
       TimeGranularitySpec outgoingGranularitySpec) {
     Preconditions.checkState(!incomingGranularitySpec.equals(outgoingGranularitySpec));
     _incomingTimeColumn = incomingGranularitySpec.getName();

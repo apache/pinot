@@ -32,12 +32,12 @@ import org.testng.collections.Lists;
 /**
  * Tests Groovy functions for transforming schema columns
  */
-public class GroovyExpressionEvaluatorTest {
+public class GroovyFunctionEvaluatorTest {
 
   @Test(dataProvider = "groovyFunctionEvaluationDataProvider")
   public void testGroovyFunctionEvaluation(String transformFunction, List<String> arguments, GenericRow genericRow, Object expectedResult) {
 
-    GroovyExpressionEvaluator groovyExpressionEvaluator = new GroovyExpressionEvaluator(transformFunction);
+    GroovyFunctionEvaluator groovyExpressionEvaluator = new GroovyFunctionEvaluator(transformFunction);
     Assert.assertEquals(groovyExpressionEvaluator.getArguments(), arguments);
 
     Object result = groovyExpressionEvaluator.evaluate(genericRow);
