@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data.function.evaluators;
+package org.apache.pinot.core.data.function;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,18 +78,17 @@ public class ExpressionEvaluatorFactory {
         }
       }
 
-    } else if (columnName.endsWith(SchemaFieldExtractorUtils.MAP_KEY_COLUMN_SUFFIX)) {
+    } else if (columnName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)) {
 
       // for backward compatible handling of Map type (currently only in Avro)
       String sourceMapName =
-          columnName.substring(0, columnName.length() - SchemaFieldExtractorUtils.MAP_KEY_COLUMN_SUFFIX.length());
+          columnName.substring(0, columnName.length() - SchemaUtils.MAP_KEY_COLUMN_SUFFIX.length());
       String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
       expressionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
-    } else if (columnName.endsWith(SchemaFieldExtractorUtils.MAP_VALUE_COLUMN_SUFFIX)) {
-
+    } else if (columnName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX)) {
       // for backward compatible handling of Map type in avro (currently only in Avro)
       String sourceMapName =
-          columnName.substring(0, columnName.length() - SchemaFieldExtractorUtils.MAP_VALUE_COLUMN_SUFFIX.length());
+          columnName.substring(0, columnName.length() - SchemaUtils.MAP_VALUE_COLUMN_SUFFIX.length());
       String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
       expressionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
     }

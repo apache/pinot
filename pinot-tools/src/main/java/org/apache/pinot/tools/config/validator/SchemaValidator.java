@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.config.validator;
 
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -27,6 +28,6 @@ public class SchemaValidator {
 
   public static boolean validate(Schema schema) {
     // TODO: ADD MORE VALIDATIONS.
-    return schema.validate(null);
+    return SchemaUtils.validate(schema);
   }
 }

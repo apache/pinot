@@ -23,8 +23,8 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluator;
-import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluatorFactory;
+import org.apache.pinot.core.data.function.ExpressionEvaluator;
+import org.apache.pinot.core.data.function.ExpressionEvaluatorFactory;
 
 
 /**
