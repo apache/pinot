@@ -85,7 +85,7 @@ public class LuceneTextIndexReader implements InvertedIndexReader<MutableRoaring
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
-      _standardAnalyzer = new StandardAnalyzer();
+      _standardAnalyzer = new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET);
     } catch (Exception e) {
       LOGGER
           .error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());

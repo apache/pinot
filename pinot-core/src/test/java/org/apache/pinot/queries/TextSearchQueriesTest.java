@@ -1163,6 +1163,21 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
     expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
     testInterSegmentSelectionQueryHelper(query, expected);
+
+    // query with only stop-words. they should not be indexed
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'a and or in the are')";
+    testInterSegmentAggregationQueryHelper(query, 0);
+    // analyzer should prune/ignore the stop words from search expression and consider everything else for a match
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"learned a lot\"')";
+    testInterSegmentAggregationQueryHelper(query, 4);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"indexing and transaction processing\"')";
+    testInterSegmentAggregationQueryHelper(query, 12);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"docker image building and distribution\"')";
+    testInterSegmentAggregationQueryHelper(query, 8);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed query engines for analytics and data warehouses\"')";
+    testInterSegmentAggregationQueryHelper(query, 8);
+    query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"worked in NGO\"')";
+    testInterSegmentAggregationQueryHelper(query, 4);
   }
 
   private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {

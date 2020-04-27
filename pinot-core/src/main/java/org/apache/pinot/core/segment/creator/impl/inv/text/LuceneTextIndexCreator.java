@@ -20,7 +20,15 @@ package org.apache.pinot.core.segment.creator.impl.inv.text;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.analysis.core.LowerCaseFilterFactory;
+import org.apache.lucene.analysis.core.StopFilterFactory;
+import org.apache.lucene.analysis.custom.CustomAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.standard.StandardTokenizerFactory;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -49,6 +57,15 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
   private final String _textColumn;
   private final Directory _indexDirectory;
   private final IndexWriter _indexWriter;
+
+  public static final CharArraySet ENGLISH_STOP_WORDS_SET =
+      new CharArraySet(Arrays.asList(
+          "a", "an", "and", "are", "as", "at", "be", "but", "by",
+          "for", "if", "in", "into", "is", "it",
+          "no", "not", "of", "on", "or", "such",
+          "that", "the", "their", "then", "than", "there", "these",
+          "they", "this", "to", "was", "will", "with", "those"
+      ), true);
 
   /**
    * Called by {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
@@ -81,7 +98,7 @@ public class LuceneTextIndexCreator implements InvertedIndexCreator {
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       File indexFile = getV1TextIndexFile(segmentIndexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
-      StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
+      StandardAnalyzer standardAnalyzer = new StandardAnalyzer(ENGLISH_STOP_WORDS_SET);
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
       indexWriterConfig.setRAMBufferSizeMB(LUCENE_INDEX_MAX_BUFFER_SIZE_MB);
       indexWriterConfig.setCommitOnClose(commit);
