@@ -54,7 +54,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private GenericData.Record _avroRecordToReuse;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> fields)
+  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
       throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
@@ -65,7 +65,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
     _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _avroRecordExtractor.init(fields, null);
+    _avroRecordExtractor.init(sourceFields, null);
   }
 
   /**

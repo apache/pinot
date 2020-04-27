@@ -41,10 +41,10 @@ public interface StreamMessageDecoder<T> {
    * @param props decoder properties extracted from the {@link StreamConfig}
    * @param indexingSchema the Pinot schema TODO: Remove Schema from StreamMessageDecoder. Do not use inside the implementation, as this will be removed
    * @param topicName topic name of the stream
-   * @param fields the fields to be read from the source stream's record
+   * @param sourceFields the fields to be read from the source stream's record
    * @throws Exception
    */
-  void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> fields)
+  void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
       throws Exception;
 
   /**

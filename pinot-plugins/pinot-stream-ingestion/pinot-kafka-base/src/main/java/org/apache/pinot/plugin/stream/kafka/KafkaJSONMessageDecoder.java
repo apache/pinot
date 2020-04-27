@@ -46,7 +46,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> fields)
+  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
       throws Exception {
     String recordExtractorClass = null;
     if (props != null) {
@@ -56,7 +56,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _jsonRecordExtractor.init(fields, null);
+    _jsonRecordExtractor.init(sourceFields, null);
   }
 
   @Override

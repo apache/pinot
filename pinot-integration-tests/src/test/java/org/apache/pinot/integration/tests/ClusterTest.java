@@ -352,14 +352,14 @@ public abstract class ClusterTest extends ControllerTest {
     private DatumReader<GenericData.Record> _reader;
 
     @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> fields)
+    public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
         throws Exception {
       // Load Avro schema
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
       reader.close();
       _recordExtractor = new AvroRecordExtractor();
-      _recordExtractor.init(fields, null);
+      _recordExtractor.init(sourceFields, null);
       _reader = new GenericDatumReader<>(_avroSchema);
     }
 
