@@ -29,7 +29,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Bytes;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
@@ -62,15 +61,13 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private long lastCount = 0;
   private long currentCount = 0L;
 
-
-
-  public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
-      String groupId, Set<String> sourceFields) {
+  public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig,
+      Set<String> sourceFields, String groupId) {
     _clientId = clientId;
     _streamConfig = streamConfig;
     _kafkaStreamLevelStreamConfig = new KafkaStreamLevelStreamConfig(streamConfig, tableName, groupId);
 
-    _messageDecoder = StreamDecoderProvider.create(streamConfig, schema, sourceFields);
+    _messageDecoder = StreamDecoderProvider.create(streamConfig, sourceFields);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory

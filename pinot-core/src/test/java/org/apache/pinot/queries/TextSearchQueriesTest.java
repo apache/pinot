@@ -103,7 +103,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     createPinotTableSchema();
     createTestData();
-    _recordReader = new GenericRowRecordReader(_rows, _schema);
+    _recordReader = new GenericRowRecordReader(_rows);
     createSegment();
     loadSegment();
   }

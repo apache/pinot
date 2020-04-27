@@ -21,12 +21,11 @@ package org.apache.pinot.plugin.stream.kafka09;
 import java.util.Set;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,13 +51,13 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private long lastCount = 0;
   private long currentCount = 0L;
 
-  public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
-      String groupId, Set<String> sourceFields) {
+  public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig,
+      Set<String> fieldsToRead, String groupId) {
     _clientId = clientId;
     _streamConfig = streamConfig;
     _kafkaHighLevelStreamConfig = new KafkaHighLevelStreamConfig(streamConfig, tableName, groupId);
 
-    _messageDecoder = StreamDecoderProvider.create(streamConfig, schema, sourceFields);
+    _messageDecoder = StreamDecoderProvider.create(streamConfig, fieldsToRead);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory

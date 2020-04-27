@@ -24,6 +24,7 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,7 +39,6 @@ import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -85,7 +85,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private String[] _schemaRegistryUrls;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
     _schemaRegistryUrls = parseSchemaRegistryUrls(props.get(SCHEMA_REGISTRY_REST_URL));
 
@@ -115,7 +115,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
     this._avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _avroRecordExtractor.init(sourceFields, null);
+    _avroRecordExtractor.init(fieldsToRead, null);
     this._decoderFactory = new DecoderFactory();
     _md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
@@ -206,7 +206,8 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
         LOGGER.info("Fetching schema using url {}", url.toString());
 
         StringBuilder queryResp = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+        try (BufferedReader reader = new BufferedReader(
+            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
           for (String line = reader.readLine(); line != null; line = reader.readLine()) {
             queryResp.append(line);
           }

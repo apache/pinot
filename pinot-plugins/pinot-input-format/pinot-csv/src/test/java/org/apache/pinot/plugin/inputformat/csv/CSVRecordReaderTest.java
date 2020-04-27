@@ -43,7 +43,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, getPinotSchema(), csvRecordReaderConfig, _sourceFields);
+    csvRecordReader.init(_dataFile, _sourceFields, csvRecordReaderConfig);
     return csvRecordReader;
   }
 
@@ -75,11 +75,11 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
       throws Exception {
     for (Map<String, Object> expectedRecord : expectedRecordsMap) {
       GenericRow actualRecord = recordReader.next();
-      org.apache.pinot.spi.data.Schema pinotSchema = recordReader.getSchema();
-      for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+      for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(), expectedRecord.get(fieldSpecName).toString());
+          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(),
+              expectedRecord.get(fieldSpecName).toString());
         } else {
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           if (expectedRecords.size() == 1) {

@@ -34,6 +34,7 @@ import org.apache.pinot.core.minion.segment.RecordTransformer;
 import org.apache.pinot.core.minion.segment.ReducerRecordReader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
 
@@ -100,7 +101,8 @@ public class SegmentConverter {
 
       try (MapperRecordReader mapperRecordReader = new MapperRecordReader(_inputIndexDirs, _recordTransformer,
           _recordPartitioner, _totalNumPartition, currentPartition)) {
-        buildSegment(mapperOutputPath, _tableName, outputSegmentName, mapperRecordReader, null);
+        buildSegment(mapperOutputPath, _tableName, outputSegmentName, mapperRecordReader, null,
+            mapperRecordReader.getSchema());
       }
       File outputSegment = new File(mapperOutputPath + File.separator + outputSegmentName);
 
@@ -109,7 +111,8 @@ public class SegmentConverter {
         String reducerOutputPath = _workingDir.getPath() + File.separator + REDUCER_PREFIX + currentPartition;
         try (ReducerRecordReader reducerRecordReader = new ReducerRecordReader(outputSegment, _recordAggregator,
             _groupByColumns)) {
-          buildSegment(reducerOutputPath, _tableName, outputSegmentName, reducerRecordReader, null);
+          buildSegment(reducerOutputPath, _tableName, outputSegmentName, reducerRecordReader, null,
+              reducerRecordReader.getSchema());
         }
         outputSegment = new File(reducerOutputPath + File.separator + outputSegmentName);
       }
@@ -122,9 +125,10 @@ public class SegmentConverter {
         // Check if the table config has any index configured
         if (CollectionUtils.isNotEmpty(sortedColumn) || CollectionUtils.isNotEmpty(invertedIndexColumns)) {
           String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
-          try (
-              PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(outputSegment, null, sortedColumn)) {
-            buildSegment(indexGenerationOutputPath, _tableName, outputSegmentName, recordReader, _indexingConfig);
+          try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(outputSegment, null,
+              sortedColumn)) {
+            buildSegment(indexGenerationOutputPath, _tableName, outputSegmentName, pinotSegmentRecordReader,
+                _indexingConfig, pinotSegmentRecordReader.getSchema());
           }
           outputSegment = new File(indexGenerationOutputPath + File.separator + outputSegmentName);
         }
@@ -141,9 +145,9 @@ public class SegmentConverter {
    * TODO: Support all kinds of indexing (no dictionary)
    */
   private void buildSegment(String outputPath, String tableName, String segmentName, RecordReader recordReader,
-      IndexingConfig indexingConfig)
+      @Nullable IndexingConfig indexingConfig, Schema schema)
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(recordReader.getSchema());
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
     segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setSegmentName(segmentName);

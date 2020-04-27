@@ -68,7 +68,7 @@ public class MultiplePinotSegmentRecordReaderTest {
       String segmentName = "multiplePinotSegmentRecordReaderTest_" + i;
       List<GenericRow> rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
       _rowsList.add(rows);
-      RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+      RecordReader recordReader = new GenericRowRecordReader(rows);
       _segmentIndexDirList.add(PinotSegmentUtil.createSegment(schema, segmentName, _segmentOutputDir, recordReader));
     }
   }

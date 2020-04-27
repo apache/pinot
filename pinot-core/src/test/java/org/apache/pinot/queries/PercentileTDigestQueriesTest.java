@@ -153,7 +153,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     config.setRawIndexCreationColumns(Collections.singletonList(TDIGEST_COLUMN));
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(rows, schema)) {
+    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
     }

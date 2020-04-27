@@ -24,29 +24,28 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * An implementation of StreamMessageDecoder to read JSON records from a stream
- * NOTE: Do not use schema in the implementation, as schema will be removed from the params
+ * An implementation of StreamMessageDecoder to read JSON records from a stream.
  */
 public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final String JSON_RECORD_EXTRACTOR_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
+  private static final String JSON_RECORD_EXTRACTOR_CLASS =
+      "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
     String recordExtractorClass = null;
     if (props != null) {
@@ -56,14 +55,15 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _jsonRecordExtractor.init(sourceFields, null);
+    _jsonRecordExtractor.init(fieldsToRead, null);
   }
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      Map<String, Object> from = OBJECT_MAPPER.convertValue(message, new TypeReference<Map<String, Object>>(){});
+      Map<String, Object> from = OBJECT_MAPPER.convertValue(message, new TypeReference<Map<String, Object>>() {
+      });
       _jsonRecordExtractor.extract(from, destination);
       return destination;
     } catch (Exception e) {

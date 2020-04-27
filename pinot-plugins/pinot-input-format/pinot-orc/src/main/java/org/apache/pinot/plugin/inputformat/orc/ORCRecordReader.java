@@ -41,7 +41,6 @@ import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.orc.OrcFile;
 import org.apache.orc.Reader;
 import org.apache.orc.TypeDescription;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -64,7 +63,6 @@ import org.apache.pinot.spi.utils.StringUtils;
  * </ul>
  */
 public class ORCRecordReader implements RecordReader {
-  private Schema _schema;
   private List<String> _orcFields;
   private List<TypeDescription> _orcFieldTypes;
   private boolean[] _includeOrcFields;
@@ -74,10 +72,8 @@ public class ORCRecordReader implements RecordReader {
   private int _nextRowId;
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    _schema = schema;
-
     Configuration configuration = new Configuration();
     Reader orcReader = OrcFile.createReader(new Path(dataFile.getAbsolutePath()),
         OrcFile.readerOptions(configuration).filesystem(FileSystem.getLocal(configuration)));
@@ -95,7 +91,7 @@ public class ORCRecordReader implements RecordReader {
     orcReaderInclude[orcSchema.getId()] = true;
     for (int i = 0; i < numOrcFields; i++) {
       String field = _orcFields.get(i);
-      if (sourceFields.contains(field)) {
+      if (fieldsToRead.contains(field)) {
         TypeDescription fieldType = _orcFieldTypes.get(i);
         TypeDescription.Category category = fieldType.getCategory();
         if (category == TypeDescription.Category.LIST) {
@@ -338,11 +334,6 @@ public class ORCRecordReader implements RecordReader {
     _orcRecordReader.seekToRow(0);
     _hasNext = _orcRecordReader.nextBatch(_rowBatch);
     _nextRowId = 0;
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
   }
 
   @Override

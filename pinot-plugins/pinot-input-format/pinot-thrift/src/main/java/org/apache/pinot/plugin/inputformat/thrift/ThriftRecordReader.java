@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -42,7 +41,6 @@ import org.apache.thrift.transport.TIOStreamTransport;
  */
 public class ThriftRecordReader implements RecordReader {
   private File _dataFile;
-  private Schema _schema;
   private ThriftRecordExtractor _recordExtractor;
   private Class<?> _thriftClass;
   private Map<String, Integer> _fieldIds = new HashMap<>();
@@ -51,35 +49,11 @@ public class ThriftRecordReader implements RecordReader {
   private TProtocol _tProtocol;
   private boolean _hasNext;
 
-  public ThriftRecordReader() {
-  }
-
-  private void init()
-      throws IOException {
-    _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
-    try {
-      _tProtocol = new TBinaryProtocol(new TIOStreamTransport(_inputStream));
-      _hasNext = hasMoreToRead();
-    } catch (Exception e) {
-      _inputStream.close();
-      throw e;
-    }
-  }
-
-  private boolean hasMoreToRead()
-      throws IOException {
-    _inputStream.mark(1);
-    int nextByte = _inputStream.read();
-    _inputStream.reset();
-    return nextByte != -1;
-  }
-
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig config, Set<String> sourceFields)
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig config)
       throws IOException {
     ThriftRecordReaderConfig recordReaderConfig = (ThriftRecordReaderConfig) config;
     _dataFile = dataFile;
-    _schema = schema;
     TBase tObject;
     try {
       _thriftClass = this.getClass().getClassLoader().loadClass(recordReaderConfig.getThriftClass());
@@ -96,9 +70,24 @@ public class ThriftRecordReader implements RecordReader {
     ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
     recordExtractorConfig.setFieldIds(_fieldIds);
     _recordExtractor = new ThriftRecordExtractor();
-    _recordExtractor.init(sourceFields, recordExtractorConfig);
+    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
 
     init();
+  }
+
+  private void init()
+      throws IOException {
+    _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
+    _tProtocol = new TBinaryProtocol(new TIOStreamTransport(_inputStream));
+    _hasNext = hasMoreToRead();
+  }
+
+  private boolean hasMoreToRead()
+      throws IOException {
+    _inputStream.mark(1);
+    int nextByte = _inputStream.read();
+    _inputStream.reset();
+    return nextByte != -1;
   }
 
   @Override
@@ -132,11 +121,6 @@ public class ThriftRecordReader implements RecordReader {
       throws IOException {
     _inputStream.close();
     init();
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
   }
 
   @Override

@@ -48,7 +48,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
   protected RecordReader createRecordReader()
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _pinotSchema, null, _sourceFieldNames);
+    avroRecordReader.init(_dataFile, _sourceFieldNames, null);
     return avroRecordReader;
   }
 
@@ -64,10 +64,9 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
         .asList(new Field("user_id", createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
             new Field("firstName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
             new Field("lastName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
-            new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null, null),
-            new Field("campaignInfo", create(Type.STRING), null, null),
-            new Field("cost", create(Type.DOUBLE), null, null),
-            new Field("timestamp", create(Type.LONG), null, null));
+            new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null,
+                null), new Field("campaignInfo", create(Type.STRING), null, null),
+            new Field("cost", create(Type.DOUBLE), null, null), new Field("timestamp", create(Type.LONG), null, null));
 
     avroSchema.setFields(fields);
 

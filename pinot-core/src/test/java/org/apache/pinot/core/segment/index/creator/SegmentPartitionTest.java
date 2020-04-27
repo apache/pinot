@@ -220,7 +220,7 @@ public class SegmentPartitionTest {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     _segment = ImmutableSegmentLoader.load(new File(SEGMENT_PATH), ReadMode.mmap);
   }

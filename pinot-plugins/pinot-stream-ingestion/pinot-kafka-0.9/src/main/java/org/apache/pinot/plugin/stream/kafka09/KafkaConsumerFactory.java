@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.stream.kafka09;
 
 import java.util.Set;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
@@ -31,47 +30,22 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
  */
 public class KafkaConsumerFactory extends StreamConsumerFactory {
 
-  /**
-   * Creates a partition level consumer for fetching from a partition of a kafka stream
-   * @param clientId
-   * @param partition
-   * @return
-   */
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
     return new KafkaPartitionLevelConsumer(clientId, _streamConfig, partition);
   }
 
-  /**
-   * Creates a stream level consumer for a kafka stream
-   * @param clientId
-   * @param tableName
-   * @param schema
-   * @param groupId
-   * @return
-   */
   @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      String groupId, Set<String> sourceFields) {
-    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, groupId, sourceFields);
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
+      String groupId) {
+    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, fieldsToRead, groupId);
   }
 
-  /**
-   * Creates a partition metadata provider for a kafka stream
-   * @param clientId
-   * @param partition
-   * @return
-   */
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
     return new KafkaStreamMetadataProvider(clientId, _streamConfig, partition);
   }
 
-  /**
-   * Creates a stream metadata provider for a kafka stream
-   * @param clientId
-   * @return
-   */
   @Override
   public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
     return new KafkaStreamMetadataProvider(clientId, _streamConfig);

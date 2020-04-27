@@ -28,7 +28,6 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -54,7 +53,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private GenericData.Record _avroRecordToReuse;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
@@ -65,7 +64,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
     _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _avroRecordExtractor.init(sourceFields, null);
+    _avroRecordExtractor.init(fieldsToRead, null);
   }
 
   /**

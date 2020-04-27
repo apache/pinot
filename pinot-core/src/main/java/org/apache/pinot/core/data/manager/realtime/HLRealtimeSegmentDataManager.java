@@ -43,6 +43,7 @@ import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -51,7 +52,6 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
-import org.apache.pinot.core.util.SchemaUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -168,12 +168,10 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // create and init stream level consumer
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
-    Set<String> sourceFields = SchemaUtils.extractSourceFields(schema);
     _streamLevelConsumer = _streamConsumerFactory
-        .createStreamLevelConsumer(clientId, tableNameWithType, schema, instanceMetadata.getGroupId(tableNameWithType),
-            sourceFields);
+        .createStreamLevelConsumer(clientId, tableNameWithType, SchemaUtils.extractSourceFields(schema),
+            instanceMetadata.getGroupId(tableNameWithType));
     _streamLevelConsumer.start();
-
     tableStreamName = tableNameWithType + "_" + _streamConfig.getTopicName();
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -287,7 +285,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   tableNameWithType, timeColumnName, realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
                   HLRealtimeSegmentDataManager.this.invertedIndexColumns, noDictionaryColumns,
-                  varLengthDictionaryColumns, null/*StarTreeIndexSpec*/, indexingConfig.isNullHandlingEnabled()); // Star tree not supported for HLC.
+                  varLengthDictionaryColumns, null/*StarTreeIndexSpec*/,
+                  indexingConfig.isNullHandlingEnabled()); // Star tree not supported for HLC.
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

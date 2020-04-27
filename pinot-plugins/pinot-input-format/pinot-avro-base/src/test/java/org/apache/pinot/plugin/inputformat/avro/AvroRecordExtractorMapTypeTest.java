@@ -92,7 +92,7 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
   protected RecordReader createRecordReader()
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _pinotSchema, null, _sourceFieldNames);
+    avroRecordReader.init(_dataFile, _sourceFieldNames, null);
     return avroRecordReader;
   }
 
@@ -105,8 +105,8 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
     org.apache.avro.Schema avroSchema = createRecord("mapRecord", null, null, false);
     org.apache.avro.Schema intStringMapAvroSchema = createMap(create(Type.STRING));
     org.apache.avro.Schema stringIntMapAvroSchema = createMap(create(Type.INT));
-    List<Field> fields = Arrays
-        .asList(new Field("map1", intStringMapAvroSchema, null, null), new Field("map2", stringIntMapAvroSchema, null, null));
+    List<Field> fields = Arrays.asList(new Field("map1", intStringMapAvroSchema, null, null),
+        new Field("map2", stringIntMapAvroSchema, null, null));
     avroSchema.setFields(fields);
 
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {

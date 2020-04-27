@@ -140,7 +140,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
   public void testInnerSegmentQuery()
       throws Exception {
     Random random = new Random();
-    try (RecordReader recordReader = new GenericRowRecordReader(_rows, _schema)) {
+    try (RecordReader recordReader = new GenericRowRecordReader(_rows)) {
       createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
       final ImmutableSegment immutableSegment = loadSegment(SEGMENT_NAME_1);
       _indexSegments.add(immutableSegment);

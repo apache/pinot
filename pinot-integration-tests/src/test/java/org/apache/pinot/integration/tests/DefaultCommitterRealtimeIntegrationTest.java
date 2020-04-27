@@ -144,7 +144,7 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
     Schema schema = _helixResourceManager.getSchema(getTableName());
     String _segmentOutputDir = Files.createTempDir().toString();
     List<GenericRow> _rows = PinotSegmentUtil.createTestData(schema, 1);
-    RecordReader _recordReader = new GenericRowRecordReader(_rows, schema);
+    RecordReader _recordReader = new GenericRowRecordReader(_rows);
 
     _indexDir = PinotSegmentUtil.createSegment(schema, "segmentName", _segmentOutputDir, _recordReader);
   }

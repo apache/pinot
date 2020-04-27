@@ -64,7 +64,7 @@ public class PinotSegmentRecordReaderTest {
     String segmentName = "pinotSegmentRecordReaderTest";
     _segmentOutputDir = Files.createTempDir().toString();
     _rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
-    _recordReader = new GenericRowRecordReader(_rows, schema);
+    _recordReader = new GenericRowRecordReader(_rows);
     _segmentIndexDir = PinotSegmentUtil.createSegment(schema, segmentName, _segmentOutputDir, _recordReader);
   }
 

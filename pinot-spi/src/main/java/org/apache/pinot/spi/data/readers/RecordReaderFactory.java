@@ -23,32 +23,35 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.spi.data.Schema;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class RecordReaderFactory {
+  private RecordReaderFactory() {
+  }
 
   private static final Map<String, String> DEFAULT_RECORD_READER_CLASS_MAP = new HashMap<>();
   private static final Map<String, String> DEFAULT_RECORD_READER_CONFIG_CLASS_MAP = new HashMap<>();
 
   // TODO: This could be removed once we have dynamic loading plugins supports.
-  private static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
-  private static final String DEFAULT_CSV_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader";
+  private static final String DEFAULT_AVRO_RECORD_READER_CLASS =
+      "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
+  private static final String DEFAULT_CSV_RECORD_READER_CLASS =
+      "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader";
   private static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.csv.data.readers.CSVRecordReaderConfig";
-  private static final String DEFAULT_JSON_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONRecordReader";
+  private static final String DEFAULT_JSON_RECORD_READER_CLASS =
+      "org.apache.pinot.plugin.inputformat.json.JSONRecordReader";
   private static final String DEFAULT_THRIFT_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader";
   private static final String DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig";
-  private static final String DEFAULT_ORC_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader";
+  private static final String DEFAULT_ORC_RECORD_READER_CLASS =
+      "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader";
   private static final String DEFAULT_PARQUET_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader";
-
-  private RecordReaderFactory() {
-  }
 
   public static void register(String fileFormat, String recordReaderClassName, String recordReaderConfigClassName) {
     DEFAULT_RECORD_READER_CLASS_MAP.put(fileFormat.toUpperCase(), recordReaderClassName);
@@ -57,6 +60,16 @@ public class RecordReaderFactory {
 
   public static void register(FileFormat fileFormat, String recordReaderClassName, String recordReaderConfigClassName) {
     register(fileFormat.name(), recordReaderClassName, recordReaderConfigClassName);
+  }
+
+  static {
+    register(FileFormat.AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, null);
+    register(FileFormat.GZIPPED_AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, null);
+    register(FileFormat.CSV, DEFAULT_CSV_RECORD_READER_CLASS, DEFAULT_CSV_RECORD_READER_CONFIG_CLASS);
+    register(FileFormat.JSON, DEFAULT_JSON_RECORD_READER_CLASS, null);
+    register(FileFormat.THRIFT, DEFAULT_THRIFT_RECORD_READER_CLASS, DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);
+    register(FileFormat.ORC, DEFAULT_ORC_RECORD_READER_CLASS, null);
+    register(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS, null);
   }
 
   /**
@@ -111,59 +124,36 @@ public class RecordReaderFactory {
   }
 
   /**
-   * Construct a RecordReader instance given RecordReader class name, then initialize it with config.
-   *
-   * @param recordReaderClassName
-   * @param dataFile
-   * @param schema
-   * @param recordReaderConfig
-   * @return an initialized RecordReader instance.
-   * @throws Exception
+   * Constructs and initializes a RecordReader based on the given RecordReader class name and config.
    */
-  public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile, Schema schema,
-      RecordReaderConfig recordReaderConfig, Set<String> fields)
+  public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile,
+      Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
     RecordReader recordReader = PluginManager.get().createInstance(recordReaderClassName);
-    recordReader.init(dataFile, schema, recordReaderConfig, fields);
+    recordReader.init(dataFile, fieldsToRead, recordReaderConfig);
     return recordReader;
   }
 
   /**
-   * Get an initialized RecordReader.
-   *
-   * @param fileFormat
-   * @param dataFile
-   * @param schema
-   * @param recordReaderConfig
-   * @return an initialized RecordReader instance.
-   * @throws Exception Any exception while initializing the RecordReader
+   * Constructs and initializes a RecordReader based on the given file format and RecordReader config.
    */
-  public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Schema schema,
-      RecordReaderConfig recordReaderConfig, Set<String> fields)
+  public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
-    return getRecordReader(fileFormat.name(), dataFile, schema, recordReaderConfig, fields);
+    return getRecordReader(fileFormat.name(), dataFile, fieldsToRead, recordReaderConfig);
   }
 
   /**
-   * Get a RecordReader instance of file format initialized with recordReaderConfig which is ready to read from dataFile given schema.
-   *
-   * @param fileFormatStr
-   * @param dataFile
-   * @param schema
-   * @param recordReaderConfig
-   * @return an initialized RecordReader instance.
-   * @throws Exception Any exception while initializing the RecordReader
+   * Constructs and initializes a RecordReader based on the given file format and RecordReader config.
    */
-  public static RecordReader getRecordReader(String fileFormatStr, File dataFile, Schema schema,
-      RecordReaderConfig recordReaderConfig, Set<String> fields)
+  public static RecordReader getRecordReader(String fileFormat, File dataFile, Set<String> fieldsToRead,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
-    String fileFormatKey = fileFormatStr.toUpperCase();
-    if (DEFAULT_RECORD_READER_CLASS_MAP.containsKey(fileFormatKey)) {
-      return getRecordReaderByClass(DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormatKey), dataFile, schema,
-          recordReaderConfig, fields);
+    String recordReaderClassName = DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormat.toUpperCase());
+    if (recordReaderClassName == null) {
+      throw new UnsupportedOperationException("No supported RecordReader found for file format - '" + fileFormat + "'");
     }
-    throw new UnsupportedOperationException(
-        "No supported RecordReader found for file format - '" + fileFormatStr + "'");
+    return getRecordReaderByClass(recordReaderClassName, dataFile, fieldsToRead, recordReaderConfig);
   }
 
   /**
@@ -184,15 +174,5 @@ public class RecordReaderFactory {
    */
   public static String getRecordReaderConfigClassName(String fileFormatStr) {
     return DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.get(fileFormatStr.toUpperCase());
-  }
-
-  static {
-    register(FileFormat.AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, null);
-    register(FileFormat.GZIPPED_AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, null);
-    register(FileFormat.CSV, DEFAULT_CSV_RECORD_READER_CLASS, DEFAULT_CSV_RECORD_READER_CONFIG_CLASS);
-    register(FileFormat.JSON, DEFAULT_JSON_RECORD_READER_CLASS, null);
-    register(FileFormat.THRIFT, DEFAULT_THRIFT_RECORD_READER_CLASS, DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);
-    register(FileFormat.ORC, DEFAULT_ORC_RECORD_READER_CLASS, null);
-    register(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS, null);
   }
 }

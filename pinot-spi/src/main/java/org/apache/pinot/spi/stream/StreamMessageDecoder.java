@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -37,20 +36,21 @@ public interface StreamMessageDecoder<T> {
   String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
 
   /**
-   * Initialize the decoder
-   * @param props decoder properties extracted from the {@link StreamConfig}
-   * @param indexingSchema the Pinot schema TODO: Remove Schema from StreamMessageDecoder. Do not use inside the implementation, as this will be removed
-   * @param topicName topic name of the stream
-   * @param sourceFields the fields to be read from the source stream's record
-   * @throws Exception
+   * Initializes the decoder.
+   *
+   * @param props Decoder properties extracted from the {@link StreamConfig}
+   * @param fieldsToRead The fields to read from the source stream
+   * @param topicName Topic name of the stream
+   * @throws Exception If an error occurs
    */
-  void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
+  void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception;
 
   /**
-   * Decodes the payload received into a generic row
-   * @param payload
-   * @return
+   * Decodes a row.
+   *
+   * @param payload The buffer from which to read the row.
+   * @return A new row decoded from the buffer
    */
   GenericRow decode(T payload, GenericRow destination);
 

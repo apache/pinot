@@ -24,7 +24,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -35,7 +34,6 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  */
 public class AvroRecordReader implements RecordReader {
   private File _dataFile;
-  private Schema _schema;
   private AvroRecordExtractor _recordExtractor;
   private DataFileStream<GenericRecord> _avroReader;
   private GenericRecord _reusableAvroRecord = null;
@@ -44,19 +42,12 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
-    _schema = schema;
     _avroReader = AvroUtils.getAvroReader(dataFile);
-    try {
-      AvroUtils.validateSchema(_schema, _avroReader.getSchema());
-    } catch (Exception e) {
-      _avroReader.close();
-      throw e;
-    }
     _recordExtractor = new AvroRecordExtractor();
-    _recordExtractor.init(sourceFields, null);
+    _recordExtractor.init(fieldsToRead, null);
   }
 
   @Override
@@ -70,8 +61,6 @@ public class AvroRecordReader implements RecordReader {
     return next(new GenericRow());
   }
 
-  // NOTE: hard to extract common code further
-  @SuppressWarnings("Duplicates")
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
@@ -85,11 +74,6 @@ public class AvroRecordReader implements RecordReader {
       throws IOException {
     _avroReader.close();
     _avroReader = AvroUtils.getAvroReader(_dataFile);
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
   }
 
   @Override

@@ -202,7 +202,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final StreamMessageDecoder _messageDecoder;
-  private final Set<String> _sourceFields;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
@@ -627,6 +626,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
   }
+
   /**
    * Fetches the completion mode for the segment completion for the given realtime table
    */
@@ -819,9 +819,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // TODO: make segment uploader used in the segment committer configurable.
       SegmentUploader segmentUploader;
       try {
-        segmentUploader = new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
-            _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
-            ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(),  _serverMetrics);
+        segmentUploader =
+            new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
+                _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
+                ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
       } catch (URISyntaxException e) {
         segmentLogger.error("Segment commit upload url error: ", e);
         return SegmentCompletionProtocol.RESP_NOT_SENT;
@@ -1153,8 +1154,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir);
 
     // Create message decoder
-    _sourceFields = SchemaUtils.extractSourceFields(_schema);
-    _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema, _sourceFields);
+    _messageDecoder =
+        StreamDecoderProvider.create(_partitionLevelStreamConfig, SchemaUtils.extractSourceFields(_schema));
     _clientId = _streamTopic + "-" + _streamPartitionId;
 
     // Create record transformer

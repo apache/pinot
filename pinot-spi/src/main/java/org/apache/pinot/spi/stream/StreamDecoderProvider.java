@@ -20,33 +20,33 @@ package org.apache.pinot.spi.stream;
 
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
 /**
  * Provider for {@link StreamMessageDecoder}
  */
-public abstract class StreamDecoderProvider {
+public class StreamDecoderProvider {
+  private StreamDecoderProvider() {
+  }
 
   /**
-   * Constructs a {@link StreamMessageDecoder} using properties in {@link StreamConfig} and initializes it
-   * @param streamConfig the stream configs from the table config
-   * @param schema the schema of the Pinot table
-   * @param sourceFields the fields to extract from the source stream
-   * @return the StreamMessageDecoder
+   * Creates a {@link StreamMessageDecoder} using properties in {@link StreamConfig}.
+   *
+   * @param streamConfig The stream config from the table config
+   * @param fieldsToRead The fields to read from the source stream
+   * @return The initialized StreamMessageDecoder
    */
-  public static StreamMessageDecoder create(StreamConfig streamConfig, Schema schema, Set<String> sourceFields) {
-    StreamMessageDecoder decoder = null;
+  public static StreamMessageDecoder create(StreamConfig streamConfig, Set<String> fieldsToRead) {
     String decoderClass = streamConfig.getDecoderClass();
     Map<String, String> decoderProperties = streamConfig.getDecoderProperties();
     try {
-      decoder = PluginManager.get().createInstance(decoderClass);
-      decoder.init(decoderProperties, schema, streamConfig.getTopicName(), sourceFields);
+      StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
+      decoder.init(decoderProperties, fieldsToRead, streamConfig.getTopicName());
+      return decoder;
     } catch (Exception e) {
-      ExceptionUtils.rethrow(e);
+      throw new RuntimeException(
+          "Caught exception while creating StreamMessageDecoder from stream config: " + streamConfig, e);
     }
-    return decoder;
   }
 }

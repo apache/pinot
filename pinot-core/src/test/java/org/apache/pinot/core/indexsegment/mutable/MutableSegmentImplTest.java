@@ -87,7 +87,7 @@ public class MutableSegmentImplTest {
     _startTimeMs = System.currentTimeMillis();
 
     try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, avroFile, _schema, null, _schema.getColumnNames())) {
+        .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
         _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);

@@ -25,7 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -36,19 +35,16 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  */
 public class ParquetRecordReader implements RecordReader {
   private Path _dataFilePath;
-  private Schema _schema;
   private ParquetRecordExtractor _recordExtractor;
   private ParquetReader<GenericRecord> _reader;
   private GenericRecord _nextRecord;
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
-    _schema = schema;
-    ParquetUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
     _recordExtractor = new ParquetRecordExtractor();
-    _recordExtractor.init(sourceFields, null);
+    _recordExtractor.init(fieldsToRead, null);
 
     _reader = ParquetUtils.getParquetReader(_dataFilePath);
     _nextRecord = _reader.read();
@@ -65,12 +61,10 @@ public class ParquetRecordReader implements RecordReader {
     return next(new GenericRow());
   }
 
-  // NOTE: hard to extract common code further
-  @SuppressWarnings("Duplicates")
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-   _recordExtractor.extract(_nextRecord, reuse);
+    _recordExtractor.extract(_nextRecord, reuse);
     _nextRecord = _reader.read();
     return reuse;
   }
@@ -83,14 +77,8 @@ public class ParquetRecordReader implements RecordReader {
   }
 
   @Override
-  public Schema getSchema() {
-    return _schema;
-  }
-
-  @Override
   public void close()
       throws IOException {
     _reader.close();
   }
-
 }

@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -34,23 +33,14 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 public class RealtimeSegmentRecordReader implements RecordReader {
   private final MutableSegmentImpl _realtimeSegment;
   private final int _numDocs;
-  private final Schema _schema;
   private final int[] _sortedDocIdIterationOrder;
 
   private int _nextDocId = 0;
 
-  public RealtimeSegmentRecordReader(MutableSegmentImpl realtimeSegment, Schema schema) {
+  public RealtimeSegmentRecordReader(MutableSegmentImpl realtimeSegment, @Nullable String sortedColumn) {
     _realtimeSegment = realtimeSegment;
     _numDocs = realtimeSegment.getNumDocsIndexed();
-    _schema = schema;
-    _sortedDocIdIterationOrder = null;
-  }
-
-  public RealtimeSegmentRecordReader(MutableSegmentImpl realtimeSegment, Schema schema, String sortedColumn) {
-    _realtimeSegment = realtimeSegment;
-    _numDocs = realtimeSegment.getNumDocsIndexed();
-    _schema = schema;
-    _sortedDocIdIterationOrder = realtimeSegment.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn);
+    _sortedDocIdIterationOrder = sortedColumn != null ? realtimeSegment.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn) : null;
   }
 
   public int[] getSortedDocIdIterationOrder() {
@@ -58,7 +48,7 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields) {
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override
@@ -83,11 +73,6 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   @Override
   public void rewind() {
     _nextDocId = 0;
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
   }
 
   @Override

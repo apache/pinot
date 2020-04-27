@@ -90,7 +90,7 @@ public class MergeRollupSegmentConverterTest {
 
     for (int i = 0; i < NUM_SEGMENTS; i++) {
       String segmentName = INPUT_SEGMENT_NAME_PREFIX + i;
-      RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+      RecordReader recordReader = new GenericRowRecordReader(rows);
       SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME);

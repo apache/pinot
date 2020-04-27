@@ -145,7 +145,7 @@ public class SegmentGenerationWithTimeColumnTest {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     driver.getOutputDirectory().deleteOnExit();
     return driver.getOutputDirectory();

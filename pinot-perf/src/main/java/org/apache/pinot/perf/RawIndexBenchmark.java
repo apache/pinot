@@ -159,7 +159,7 @@ public class RawIndexBenchmark {
 
     System.out.println("Generating segment...");
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
 
     return new File(SEGMENT_DIR_NAME, SEGMENT_NAME);

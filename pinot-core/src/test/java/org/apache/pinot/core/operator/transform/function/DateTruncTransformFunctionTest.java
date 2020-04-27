@@ -91,7 +91,7 @@ public class DateTruncTransformFunctionTest
       config.setOutDir(indexDirPath);
       config.setSegmentName(segmentName);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, new GenericRowRecordReader(rows, schema));
+      driver.init(config, new GenericRowRecordReader(rows));
       driver.build();
 
       IndexSegment indexSegment = ImmutableSegmentLoader.load(new File(indexDirPath, segmentName), ReadMode.heap);
