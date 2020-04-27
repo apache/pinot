@@ -30,7 +30,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -76,7 +75,7 @@ public class ThriftRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig config)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig config, Set<String> sourceFields)
       throws IOException {
     ThriftRecordReaderConfig recordReaderConfig = (ThriftRecordReaderConfig) config;
     _dataFile = dataFile;
@@ -94,7 +93,6 @@ public class ThriftRecordReader implements RecordReader {
       _fieldIds.put(tFieldIdEnum.getFieldName(), index);
       index++;
     }
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
     recordExtractorConfig.setFieldIds(_fieldIds);
     _recordExtractor = new ThriftRecordExtractor();

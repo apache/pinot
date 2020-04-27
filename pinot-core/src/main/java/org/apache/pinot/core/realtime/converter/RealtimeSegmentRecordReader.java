@@ -19,6 +19,7 @@
 package org.apache.pinot.core.realtime.converter;
 
 import java.io.File;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.spi.data.Schema;
@@ -57,7 +58,7 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields) {
   }
 
   @Override

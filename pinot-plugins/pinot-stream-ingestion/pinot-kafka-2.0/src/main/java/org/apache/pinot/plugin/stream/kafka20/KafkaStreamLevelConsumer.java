@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -64,12 +65,12 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
 
   public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
-      String groupId) {
+      String groupId, Set<String> sourceFields) {
     _clientId = clientId;
     _streamConfig = streamConfig;
     _kafkaStreamLevelStreamConfig = new KafkaStreamLevelStreamConfig(streamConfig, tableName, groupId);
 
-    _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
+    _messageDecoder = StreamDecoderProvider.create(streamConfig, schema, sourceFields);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory

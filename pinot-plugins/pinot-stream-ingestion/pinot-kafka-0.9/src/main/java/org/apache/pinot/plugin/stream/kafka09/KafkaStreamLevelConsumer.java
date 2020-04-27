@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka09;
 
+import java.util.Set;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -52,12 +53,12 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private long currentCount = 0L;
 
   public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
-      String groupId) {
+      String groupId, Set<String> sourceFields) {
     _clientId = clientId;
     _streamConfig = streamConfig;
     _kafkaHighLevelStreamConfig = new KafkaHighLevelStreamConfig(streamConfig, tableName, groupId);
 
-    _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
+    _messageDecoder = StreamDecoderProvider.create(streamConfig, schema, sourceFields);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory

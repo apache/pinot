@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import java.lang.reflect.Constructor;
 import java.util.Random;
+import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
@@ -53,12 +54,12 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     private Random _random = new Random();
 
     public FlakyStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
-        String groupId) {
+        String groupId, Set<String> sourceFields) {
       try {
         final Constructor constructor = Class.forName(KafkaStarterUtils.KAFKA_STREAM_LEVEL_CONSUMER_CLASS_NAME)
-            .getConstructor(String.class, String.class, StreamConfig.class, Schema.class, String.class);
+            .getConstructor(String.class, String.class, StreamConfig.class, Schema.class, String.class, Set.class);
         _streamLevelConsumer = (StreamLevelConsumer) constructor
-            .newInstance(clientId, tableName, streamConfig, schema, groupId);
+            .newInstance(clientId, tableName, streamConfig, schema, groupId, sourceFields);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -111,8 +112,8 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
 
     @Override
     public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-        String groupId) {
-      return new FlakyStreamLevelConsumer(clientId, tableName, _streamConfig, schema, groupId);
+        String groupId, Set<String> sourceFields) {
+      return new FlakyStreamLevelConsumer(clientId, tableName, _streamConfig, schema, groupId, sourceFields);
     }
 
     @Override

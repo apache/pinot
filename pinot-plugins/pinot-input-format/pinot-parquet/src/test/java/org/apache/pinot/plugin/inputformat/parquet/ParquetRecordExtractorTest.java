@@ -54,7 +54,7 @@ public class ParquetRecordExtractorTest extends AbstractRecordExtractorTest {
   protected RecordReader createRecordReader()
       throws IOException {
     ParquetRecordReader recordReader = new ParquetRecordReader();
-    recordReader.init(_dataFile, _pinotSchema, null);
+    recordReader.init(_dataFile, _pinotSchema, null, _sourceFieldNames);
     return recordReader;
   }
 

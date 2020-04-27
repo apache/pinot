@@ -32,13 +32,13 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Decodes avro messages with confluent schema registry.
  * First byte is MAGIC = 0, second 4 bytes are the schema id, the remainder is the value.
+ * NOTE: Do not use schema in the implementation, as schema will be removed from the params
  */
 public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
@@ -47,11 +47,9 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     private String _topicName;
 
     @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
+    public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields) throws Exception {
         checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
         String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
-        Preconditions.checkNotNull(indexingSchema, "Schema must be provided");
-        Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
         SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000);
         _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
         Preconditions.checkNotNull(topicName, "Topic must be provided");

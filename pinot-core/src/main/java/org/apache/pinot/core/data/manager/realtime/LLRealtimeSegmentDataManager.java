@@ -76,6 +76,7 @@ import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.TransientConsumerException;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -201,6 +202,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final StreamMessageDecoder _messageDecoder;
+  private final Set<String> _sourceFields;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
@@ -1151,7 +1153,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir);
 
     // Create message decoder
-    _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);
+    _sourceFields = SchemaFieldExtractorUtils.extractSourceFields(_schema);
+    _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema, _sourceFields);
     _clientId = _streamTopic + "-" + _streamPartitionId;
 
     // Create record transformer

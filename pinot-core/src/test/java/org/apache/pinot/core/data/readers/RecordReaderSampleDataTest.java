@@ -19,8 +19,10 @@
 package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -62,6 +64,7 @@ public class RecordReaderSampleDataTest {
   private final Schema SCHEMA_NO_INCOMING = new Schema.SchemaBuilder()
       .addTime("incoming", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "time_day", TimeUnit.DAYS, FieldSpec.DataType.INT)
       .build();
+
   // Outgoing time column does not exist in the record, should read incoming time only
   private final Schema SCHEMA_NO_OUTGOING = new Schema.SchemaBuilder()
       .addTime("time_day", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "outgoing", TimeUnit.DAYS, FieldSpec.DataType.INT)
@@ -72,11 +75,11 @@ public class RecordReaderSampleDataTest {
       throws Exception {
     CompositeTransformer defaultTransformer = CompositeTransformer.getDefaultTransformer(SCHEMA);
     try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA, null);
+        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA, null, SCHEMA.getColumnNames());
         RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA, null);
+            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA, null, SCHEMA.getColumnNames());
         RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA, null)) {
+            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA, null, SCHEMA.getColumnNames())) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -117,11 +120,14 @@ public class RecordReaderSampleDataTest {
   public void testDifferentIncomingOutgoing()
       throws Exception {
     try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null);
+        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null,
+            Sets.newHashSet("time_day", "column2"));
         RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null);
+        .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null,
+            Sets.newHashSet("time_day", "column2"));
         RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null)) {
+        .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_DIFFERENT_INCOMING_OUTGOING, null,
+            Sets.newHashSet("time_day", "column2"))) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -151,11 +157,11 @@ public class RecordReaderSampleDataTest {
   public void testNoIncoming()
       throws Exception {
     try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null);
+        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null, SCHEMA_NO_INCOMING.getColumnNames());
         RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null);
+            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null, SCHEMA_NO_INCOMING.getColumnNames());
         RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null)) {
+            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING, null, SCHEMA_NO_INCOMING.getColumnNames())) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -185,11 +191,12 @@ public class RecordReaderSampleDataTest {
   public void testNoOutgoing()
       throws Exception {
     try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null);
-        RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null);
-        RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null)) {
+        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null,
+            Sets.newHashSet("time_day", "outgoing")); RecordReader csvRecordReader = RecordReaderFactory
+        .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null,
+            Sets.newHashSet("time_day", "outgoing")); RecordReader jsonRecordReader = RecordReaderFactory
+        .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_OUTGOING, null,
+            Sets.newHashSet("time_day", "outgoing"))) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());

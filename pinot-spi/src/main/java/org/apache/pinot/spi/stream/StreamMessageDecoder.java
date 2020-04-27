@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.data.Schema;
@@ -33,14 +34,17 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 @InterfaceStability.Stable
 public interface StreamMessageDecoder<T> {
 
-  static final String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
+  String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
 
   /**
-   * Initialize the decoder with decoder properties map, the stream topic name and stream schema
-   * @param props
+   * Initialize the decoder
+   * @param props decoder properties extracted from the {@link StreamConfig}
+   * @param indexingSchema the Pinot schema TODO: Remove Schema from StreamMessageDecoder. Do not use inside the implementation, as this will be removed
+   * @param topicName topic name of the stream
+   * @param sourceFields the fields to be read from the source stream's record
    * @throws Exception
    */
-  void init(Map<String, String> props, Schema indexingSchema, String topicName)
+  void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
       throws Exception;
 
   /**

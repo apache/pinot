@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.realtime.impl.fakestream;
 
+import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -30,6 +31,7 @@ import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
@@ -47,7 +49,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      String groupId) {
+      String groupId, Set<String> sourceFields) {
     return new FakeStreamLevelConsumer();
   }
 
@@ -91,7 +93,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();
-    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(streamConfig, pinotSchema);
+    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(streamConfig, pinotSchema,
+        SchemaFieldExtractorUtils.extractSourceFields(pinotSchema));
     GenericRow decodedRow = new GenericRow();
     streamMessageDecoder.decode(messageBatch.getMessageAtIndex(0), decodedRow);
     System.out.println(decodedRow);

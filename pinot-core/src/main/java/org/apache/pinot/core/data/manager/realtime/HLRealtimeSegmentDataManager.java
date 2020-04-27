@@ -51,6 +51,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
+import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -167,8 +168,10 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // create and init stream level consumer
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extractSourceFields(schema);
     _streamLevelConsumer = _streamConsumerFactory
-        .createStreamLevelConsumer(clientId, tableNameWithType, schema, instanceMetadata.getGroupId(tableNameWithType));
+        .createStreamLevelConsumer(clientId, tableNameWithType, schema, instanceMetadata.getGroupId(tableNameWithType),
+            sourceFields);
     _streamLevelConsumer.start();
 
     tableStreamName = tableNameWithType + "_" + _streamConfig.getTopicName();

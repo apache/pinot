@@ -29,7 +29,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
@@ -43,12 +42,11 @@ public class ParquetRecordReader implements RecordReader {
   private GenericRecord _nextRecord;
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
       throws IOException {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     _schema = schema;
     ParquetUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     _recordExtractor = new ParquetRecordExtractor();
     _recordExtractor.init(sourceFields, null);
 

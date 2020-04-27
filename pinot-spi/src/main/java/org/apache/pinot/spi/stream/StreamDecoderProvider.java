@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -31,17 +32,18 @@ public abstract class StreamDecoderProvider {
 
   /**
    * Constructs a {@link StreamMessageDecoder} using properties in {@link StreamConfig} and initializes it
-   * @param streamConfig
-   * @param schema
-   * @return
+   * @param streamConfig the stream configs from the table config
+   * @param schema the schema of the Pinot table
+   * @param sourceFields the fields to extract from the source stream
+   * @return the StreamMessageDecoder
    */
-  public static StreamMessageDecoder create(StreamConfig streamConfig, Schema schema) {
+  public static StreamMessageDecoder create(StreamConfig streamConfig, Schema schema, Set<String> sourceFields) {
     StreamMessageDecoder decoder = null;
     String decoderClass = streamConfig.getDecoderClass();
     Map<String, String> decoderProperties = streamConfig.getDecoderProperties();
     try {
       decoder = PluginManager.get().createInstance(decoderClass);
-      decoder.init(decoderProperties, schema, streamConfig.getTopicName());
+      decoder.init(decoderProperties, schema, streamConfig.getTopicName(), sourceFields);
     } catch (Exception e) {
       ExceptionUtils.rethrow(e);
     }

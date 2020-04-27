@@ -47,7 +47,7 @@ public class AvroRecordToPinotRowGeneratorTest {
         new org.apache.pinot.spi.data.Schema.SchemaBuilder().setSchemaName("testSchema")
             .addTime("incomingTime", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG, "outgoingTime", TimeUnit.DAYS,
                 FieldSpec.DataType.INT).build();
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(pinotSchema);
+    Set<String> sourceFields = SchemaFieldExtractorUtils.extractSourceFields(pinotSchema);
 
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
     avroRecordExtractor.init(sourceFields, null);

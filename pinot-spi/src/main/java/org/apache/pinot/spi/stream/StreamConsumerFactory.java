@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -49,10 +50,11 @@ public abstract class StreamConsumerFactory {
    * @param tableName the table name for the topic of this consumer
    * @param schema the pinot schema of the event being consumed
    * @param groupId consumer group Id
-   * @return
+   * @param sourceFields the fields to extract from the source stream
+   * @return the stream level consumer
    */
   public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      String groupId);
+      String groupId, Set<String> sourceFields);
 
   /**
    * Creates a metadata provider which provides partition specific metadata

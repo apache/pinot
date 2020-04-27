@@ -48,7 +48,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
   protected RecordReader createRecordReader()
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _pinotSchema, null);
+    avroRecordReader.init(_dataFile, _pinotSchema, null, _sourceFieldNames);
     return avroRecordReader;
   }
 

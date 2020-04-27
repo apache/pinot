@@ -38,7 +38,7 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   protected RecordReader createRecordReader()
       throws Exception {
     JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dateFile, getPinotSchema(), null);
+    recordReader.init(_dateFile, getPinotSchema(), null, _sourceFields);
     return recordReader;
   }
 

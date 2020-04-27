@@ -19,17 +19,15 @@
 package org.apache.pinot.spi.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluator;
+import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluatorFactory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluator;
-import org.apache.pinot.spi.data.function.evaluators.ExpressionEvaluatorFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +48,7 @@ public class SchemaFieldExtractorUtils {
    *
    * TODO: for now, we assume that arguments to transform function are in the source i.e. there's no columns which are derived from transformed columns
    */
-  public static Set<String> extract(Schema schema) {
+  public static Set<String> extractSourceFields(Schema schema) {
     Set<String> sourceFieldNames = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -59,22 +57,6 @@ public class SchemaFieldExtractorUtils {
           sourceFieldNames.addAll(expressionEvaluator.getArguments());
         }
         sourceFieldNames.add(fieldSpec.getName());
-      }
-    }
-    return sourceFieldNames;
-  }
-
-  @VisibleForTesting
-  public static Set<String> extractSource(Schema schema) {
-    Set<String> sourceFieldNames = new HashSet<>();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-        if (expressionEvaluator != null) {
-          sourceFieldNames.addAll(expressionEvaluator.getArguments());
-        } else {
-          sourceFieldNames.add(fieldSpec.getName());
-        }
       }
     }
     return sourceFieldNames;

@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.data.function.evaluators;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.data.TimeFieldSpec;

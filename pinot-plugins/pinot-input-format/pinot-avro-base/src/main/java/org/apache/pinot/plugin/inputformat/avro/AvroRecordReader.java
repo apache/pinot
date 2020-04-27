@@ -28,7 +28,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
 /**
@@ -45,7 +44,7 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
@@ -56,7 +55,6 @@ public class AvroRecordReader implements RecordReader {
       _avroReader.close();
       throw e;
     }
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     _recordExtractor = new AvroRecordExtractor();
     _recordExtractor.init(sourceFields, null);
   }

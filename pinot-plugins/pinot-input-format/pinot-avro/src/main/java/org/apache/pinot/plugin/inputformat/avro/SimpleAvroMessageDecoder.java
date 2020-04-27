@@ -33,11 +33,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * An implementation of StreamMessageDecoder to read simple avro records from stream
+ * NOTE: Do not use schema in the implementation, as schema will be removed from the params
+ */
 @NotThreadSafe
 public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleAvroMessageDecoder.class);
@@ -51,10 +54,9 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private GenericData.Record _avroRecordToReuse;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName)
+  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
       throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
     _datumReader = new GenericDatumReader<>(_avroSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);

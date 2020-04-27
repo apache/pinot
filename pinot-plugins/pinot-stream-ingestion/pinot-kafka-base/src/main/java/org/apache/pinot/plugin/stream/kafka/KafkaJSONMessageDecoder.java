@@ -21,13 +21,10 @@ package org.apache.pinot.plugin.stream.kafka;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -37,6 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * An implementation of StreamMessageDecoder to read JSON records from a stream
+ * NOTE: Do not use schema in the implementation, as schema will be removed from the params
+ */
 public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -45,9 +46,8 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Schema indexingSchema, String topicName)
+  public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
       throws Exception {
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(indexingSchema);
     String recordExtractorClass = null;
     if (props != null) {
       recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);

@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -21,7 +22,7 @@ public class TestRecordReader implements RecordReader {
   Iterator<GenericRow> _iterator;
   Schema _schema;
 
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
       throws IOException {
     _schema = schema;
     int numRows = 10;

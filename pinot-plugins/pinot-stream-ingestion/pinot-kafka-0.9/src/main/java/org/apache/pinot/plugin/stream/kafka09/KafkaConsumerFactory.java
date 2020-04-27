@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka09;
 
+import java.util.Set;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -51,8 +52,8 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
    */
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      String groupId) {
-    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, groupId);
+      String groupId, Set<String> sourceFields) {
+    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, groupId, sourceFields);
   }
 
   /**

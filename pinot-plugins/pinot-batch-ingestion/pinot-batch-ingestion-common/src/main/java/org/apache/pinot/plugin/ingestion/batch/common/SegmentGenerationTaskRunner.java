@@ -81,12 +81,6 @@ public class SegmentGenerationTaskRunner implements Serializable {
       recordReaderConfig = (RecordReaderConfig) JsonUtils.jsonNodeToObject(jsonNode, clazz);
     }
 
-    //init record reader
-    String readerClassName = _taskSpec.getRecordReaderSpec().getClassName();
-    RecordReader recordReader = PluginManager.get().createInstance(readerClassName);
-
-    recordReader.init(new File(_taskSpec.getInputFilePath()), schema, recordReaderConfig);
-
     //init segmentName Generator
     SegmentNameGenerator segmentNameGenerator = getSegmentNameGerator();
 
@@ -96,10 +90,13 @@ public class SegmentGenerationTaskRunner implements Serializable {
     segmentGeneratorConfig.setOutDir(_taskSpec.getOutputDirectoryPath());
     segmentGeneratorConfig.setSegmentNameGenerator(segmentNameGenerator);
     segmentGeneratorConfig.setSequenceId(_taskSpec.getSequenceId());
+    segmentGeneratorConfig.setReaderConfig(recordReaderConfig);
+    segmentGeneratorConfig.setRecordReaderPath(_taskSpec.getRecordReaderSpec().getClassName());
+    segmentGeneratorConfig.setInputFilePath(_taskSpec.getInputFilePath());
 
     //build segment
     SegmentIndexCreationDriverImpl segmentIndexCreationDriver = new SegmentIndexCreationDriverImpl();
-    segmentIndexCreationDriver.init(segmentGeneratorConfig, recordReader);
+    segmentIndexCreationDriver.init(segmentGeneratorConfig);
     segmentIndexCreationDriver.build();
     return segmentIndexCreationDriver.getSegmentName();
   }

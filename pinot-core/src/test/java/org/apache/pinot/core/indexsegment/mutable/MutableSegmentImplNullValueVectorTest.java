@@ -56,7 +56,8 @@ public class MutableSegmentImplNullValueVectorTest {
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false, true);
     GenericRow reuse = new GenericRow();
-    try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile, _schema, null)) {
+    try (RecordReader recordReader = RecordReaderFactory
+        .getRecordReader(FileFormat.JSON, jsonFile, _schema, null, _schema.getColumnNames())) {
       while (recordReader.hasNext()) {
         recordReader.next(reuse);
         GenericRow transformedRow = _recordTransformer.transform(reuse);
