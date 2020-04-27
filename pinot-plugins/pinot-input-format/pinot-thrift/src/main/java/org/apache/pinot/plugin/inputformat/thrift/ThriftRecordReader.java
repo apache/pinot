@@ -75,7 +75,7 @@ public class ThriftRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig config, Set<String> fields)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig config, Set<String> sourceFields)
       throws IOException {
     ThriftRecordReaderConfig recordReaderConfig = (ThriftRecordReaderConfig) config;
     _dataFile = dataFile;
@@ -96,7 +96,7 @@ public class ThriftRecordReader implements RecordReader {
     ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
     recordExtractorConfig.setFieldIds(_fieldIds);
     _recordExtractor = new ThriftRecordExtractor();
-    _recordExtractor.init(fields, recordExtractorConfig);
+    _recordExtractor.init(sourceFields, recordExtractorConfig);
 
     init();
   }

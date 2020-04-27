@@ -74,7 +74,7 @@ public class ORCRecordReader implements RecordReader {
   private int _nextRowId;
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
       throws IOException {
     _schema = schema;
 
@@ -95,7 +95,7 @@ public class ORCRecordReader implements RecordReader {
     orcReaderInclude[orcSchema.getId()] = true;
     for (int i = 0; i < numOrcFields; i++) {
       String field = _orcFields.get(i);
-      if (fields.contains(field)) {
+      if (sourceFields.contains(field)) {
         TypeDescription fieldType = _orcFieldTypes.get(i);
         TypeDescription.Category category = fieldType.getCategory();
         if (category == TypeDescription.Category.LIST) {

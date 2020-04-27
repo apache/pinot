@@ -44,7 +44,7 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
@@ -56,7 +56,7 @@ public class AvroRecordReader implements RecordReader {
       throw e;
     }
     _recordExtractor = new AvroRecordExtractor();
-    _recordExtractor.init(fields, null);
+    _recordExtractor.init(sourceFields, null);
   }
 
   @Override

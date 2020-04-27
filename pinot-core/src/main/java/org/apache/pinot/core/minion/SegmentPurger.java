@@ -164,7 +164,7 @@ public class SegmentPurger {
 
     @Override
     public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig,
-        Set<String> fields) {
+        Set<String> sourceFields) {
     }
 
     @Override

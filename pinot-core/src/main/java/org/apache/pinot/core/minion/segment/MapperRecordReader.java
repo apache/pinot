@@ -56,7 +56,7 @@ public class MapperRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields) {
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields) {
   }
 
   @Override

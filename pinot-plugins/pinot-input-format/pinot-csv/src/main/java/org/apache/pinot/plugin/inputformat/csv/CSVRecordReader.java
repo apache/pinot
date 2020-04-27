@@ -51,7 +51,7 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
@@ -97,7 +97,7 @@ public class CSVRecordReader implements RecordReader {
     _recordExtractor = new CSVRecordExtractor();
     CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
     recordExtractorConfig.setMultiValueDelimiter(_multiValueDelimiter);
-    _recordExtractor.init(fields, recordExtractorConfig);
+    _recordExtractor.init(sourceFields, recordExtractorConfig);
     init();
   }
 

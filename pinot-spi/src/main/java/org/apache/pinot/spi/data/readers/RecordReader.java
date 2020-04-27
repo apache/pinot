@@ -39,12 +39,12 @@ public interface RecordReader extends Closeable {
    * @param dataFile Data file
    * @param schema Pinot Schema associated with the table
    * @param recordReaderConfig Config for the reader specific to the format. e.g. delimiter for csv format etc
-   * @param fields The fields to extract
+   * @param sourceFields The fields to extract from the source record
    * @throws IOException If an I/O error occurs
    *
    * TODO: decouple Schema and RecordReader. This should be easier, now that we have field names to extract
    */
-  void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
+  void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
       throws IOException;
 
   /**

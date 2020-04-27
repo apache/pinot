@@ -42,13 +42,13 @@ public class ParquetRecordReader implements RecordReader {
   private GenericRecord _nextRecord;
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
       throws IOException {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     _schema = schema;
     ParquetUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
     _recordExtractor = new ParquetRecordExtractor();
-    _recordExtractor.init(fields, null);
+    _recordExtractor.init(sourceFields, null);
 
     _reader = ParquetUtils.getParquetReader(_dataFilePath);
     _nextRecord = _reader.read();
