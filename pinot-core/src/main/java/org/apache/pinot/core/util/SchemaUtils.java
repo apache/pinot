@@ -105,7 +105,8 @@ public class SchemaUtils {
                     incomingGranularitySpec, outgoingGranularitySpec);
                 return false;
               } else {
-                if (!incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()) || !outgoingGranularitySpec.getTimeFormat()
+                if (!incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
+                    || !outgoingGranularitySpec.getTimeFormat()
                     .equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
                   logger.error(
                       "When incoming and outgoing specs are different, cannot perform time conversion for time format other than EPOCH");
