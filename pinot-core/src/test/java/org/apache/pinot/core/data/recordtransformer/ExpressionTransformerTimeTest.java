@@ -82,9 +82,10 @@ public class ExpressionTransformerTimeTest {
 
     // 3] both incoming and outgoing defined - same column name only - skip conversion - this shouldn't be allowed by validation during add schema
     try {
-      new Schema.SchemaBuilder()
+      pinotSchema = new Schema.SchemaBuilder()
           .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
               new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time")).build();
+      new ExpressionTransformer(pinotSchema);
       Assert.fail();
     } catch (Exception e) {
       // expected
@@ -168,15 +169,5 @@ public class ExpressionTransformerTimeTest {
     genericRow.putValue("time", 20180101);
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("time"), 20180101);
-
-    // When incoming and outgoing spec are not the same, simple date format is not allowed
-    try {
-      new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
-              TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "incoming"),
-          new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.SECONDS, "outgoing")).build();
-      fail();
-    } catch (Exception e) {
-      // Expected
-    }
   }
 }

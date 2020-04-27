@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data.function.evaluators;
+package org.apache.pinot.core.data.function;
 
 import java.util.List;
 import org.apache.pinot.spi.data.readers.GenericRow;

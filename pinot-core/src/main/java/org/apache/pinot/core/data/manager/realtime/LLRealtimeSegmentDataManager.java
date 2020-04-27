@@ -76,7 +76,7 @@ import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.TransientConsumerException;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -1153,7 +1153,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir);
 
     // Create message decoder
-    _sourceFields = SchemaFieldExtractorUtils.extractSourceFields(_schema);
+    _sourceFields = SchemaUtils.extractSourceFields(_schema);
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema, _sourceFields);
     _clientId = _streamTopic + "-" + _streamPartitionId;
 

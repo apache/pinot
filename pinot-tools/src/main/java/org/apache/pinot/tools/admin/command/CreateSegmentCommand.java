@@ -40,7 +40,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -365,7 +365,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
                   if (_readerConfigFile != null) {
                     readerConfig = JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class);
                   }
-                  csvRecordReader.init(localFile, schema, readerConfig, SchemaFieldExtractorUtils.extractSourceFields(schema));
+                  csvRecordReader.init(localFile, schema, readerConfig, SchemaUtils.extractSourceFields(schema));
                   driver.init(config, csvRecordReader);
                   break;
                 default:

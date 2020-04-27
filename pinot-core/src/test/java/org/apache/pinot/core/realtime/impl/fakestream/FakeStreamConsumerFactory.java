@@ -31,7 +31,7 @@ import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
+import org.apache.pinot.core.util.SchemaUtils;
 
 
 /**
@@ -94,7 +94,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();
     StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(streamConfig, pinotSchema,
-        SchemaFieldExtractorUtils.extractSourceFields(pinotSchema));
+        SchemaUtils.extractSourceFields(pinotSchema));
     GenericRow decodedRow = new GenericRow();
     streamMessageDecoder.decode(messageBatch.getMessageAtIndex(0), decodedRow);
     System.out.println(decodedRow);
