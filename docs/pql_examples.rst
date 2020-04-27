@@ -265,7 +265,7 @@ Supported transform functions
    expressed as hours since UTC epoch (note that the output is not Los Angeles
    timezone)
 
-``LENGTH``
+``ARRAYLENGTH``
    Takes a multi-valued column and returns the length of the column
 
 ``VALUEIN``

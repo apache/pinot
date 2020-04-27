@@ -26,15 +26,15 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class LengthTransformFunctionTest extends BaseTransformFunctionTest {
+public class ArrayLengthTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testLengthTransformFunction() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("length(%s)", INT_MV_COLUMN));
+        TransformExpressionTree.compileToExpressionTree(String.format("arrayLength(%s)", INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof LengthTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), LengthTransformFunction.FUNCTION_NAME);
+    Assert.assertTrue(transformFunction instanceof ArrayLengthTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), ArrayLengthTransformFunction.FUNCTION_NAME);
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.INT);
     Assert.assertTrue(transformFunction.getResultMetadata().isSingleValue());
     Assert.assertFalse(transformFunction.getResultMetadata().hasDictionary());
@@ -53,7 +53,9 @@ public class LengthTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("length(%s,1)",
-        INT_MV_COLUMN)}, new Object[]{"length(2)"}, new Object[]{String.format("length(%s)", LONG_SV_COLUMN)}};
+    return new Object[][]{
+        new Object[]{String.format("arrayLength(%s,1)", INT_MV_COLUMN)},
+        new Object[]{"arrayLength(2)"},
+        new Object[]{String.format("arrayLength(%s)", LONG_SV_COLUMN)}};
   }
 }

@@ -566,15 +566,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(groupByEntry.get("group").get(0).asDouble(), 16138.0 / 2);
     assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "div(DaysSinceEpoch,'2')");
 
-    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY length(DivAirports)";
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY arrayLength(DivAirports)";
     response = postQuery(pqlQuery);
     groupByResult = response.get("aggregationResults").get(0);
     groupByEntry = groupByResult.get("groupByResult").get(0);
     assertEquals(groupByEntry.get("value").asDouble(), 115545.0);
     assertEquals(groupByEntry.get("group").get(0).asText(), "5");
-    assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "length(DivAirports)");
+    assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "arraylength(DivAirports)");
 
-    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY length(valueIn(DivAirports,'DFW','ORD'))";
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY arrayLength(valueIn(DivAirports,'DFW','ORD'))";
     response = postQuery(pqlQuery);
     groupByResult = response.get("aggregationResults").get(0);
     groupByEntry = groupByResult.get("groupByResult").get(0);
@@ -586,7 +586,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     groupByEntry = groupByResult.get("groupByResult").get(2);
     assertEquals(groupByEntry.get("value").asDouble(), 2.0);
     assertEquals(groupByEntry.get("group").get(0).asText(), "2");
-    assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "length(valuein(DivAirports,'DFW','ORD'))");
+    assertEquals(groupByResult.get("groupByColumns").get(0).asText(), "arraylength(valuein(DivAirports,'DFW','ORD'))");
 
     pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY valueIn(DivAirports,'DFW','ORD')";
     response = postQuery(pqlQuery);

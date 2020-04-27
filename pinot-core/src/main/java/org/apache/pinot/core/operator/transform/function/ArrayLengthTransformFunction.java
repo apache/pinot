@@ -26,8 +26,16 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 
 
-public class LengthTransformFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "length";
+/**
+ * The ArrayLengthTransformFunction class implements arrayLength function for multi-valued columns
+ *
+ * Sample queries:
+ * SELECT COUNT(*) FROM table WHERE arrayLength(mvColumn) > 2
+ * SELECT COUNT(*) FROM table GROUP BY arrayLength(mvColumn)
+ * SELECT MAX(arrayLength(mvColumn)) FROM table
+ */
+public class ArrayLengthTransformFunction extends BaseTransformFunction {
+  public static final String FUNCTION_NAME = "arrayLength";
 
   private int[] _results;
   private TransformFunction _argument;
@@ -41,14 +49,14 @@ public class LengthTransformFunction extends BaseTransformFunction {
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there is only 1 argument
     if (arguments.size() != 1) {
-      throw new IllegalArgumentException("Exactly 1 argument is required for LENGTH transform function");
+      throw new IllegalArgumentException("Exactly 1 argument is required for ARRAYLENGTH transform function");
     }
 
     // Check that the argument is a multi-valued column or transform function
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
-          "The argument of LENGTH transform function must be a multi-valued column or a transform function");
+          "The argument of ARRAYLENGTH transform function must be a multi-valued column or a transform function");
     }
     _argument = firstArgument;
   }
