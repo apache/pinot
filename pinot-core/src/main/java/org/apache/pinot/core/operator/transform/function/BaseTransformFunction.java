@@ -31,6 +31,8 @@ import org.apache.pinot.core.util.ArrayCopyUtils;
  * Base class for transform function providing the default implementation for all data types.
  */
 public abstract class BaseTransformFunction implements TransformFunction {
+  protected static final TransformResultMetadata INT_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.INT, true, false);
   protected static final TransformResultMetadata LONG_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.LONG, true, false);
   protected static final TransformResultMetadata DOUBLE_SV_NO_DICTIONARY_METADATA =
