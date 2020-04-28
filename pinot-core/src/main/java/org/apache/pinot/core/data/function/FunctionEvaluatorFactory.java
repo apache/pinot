@@ -97,7 +97,7 @@ public class FunctionEvaluatorFactory {
       if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
         functionEvaluator = new GroovyFunctionEvaluator(transformExpression);
       } else {
-        functionEvaluator = new InbuiltFunctionEvaluator(transformExpression);
+        functionEvaluator = new DefaultFunctionEvaluator(transformExpression);
       }
     } catch (Exception e) {
       throw new IllegalStateException(

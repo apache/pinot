@@ -39,7 +39,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Tests the RecordReader for schema with groovy transform functions
+ * Tests the RecordReader for schema with transform functions
  */
 public abstract class AbstractRecordExtractorTest {
 

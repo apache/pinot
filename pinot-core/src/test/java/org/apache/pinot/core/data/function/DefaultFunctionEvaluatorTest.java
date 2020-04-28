@@ -29,7 +29,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class InbuiltFunctionEvaluatorTest {
+public class DefaultFunctionEvaluatorTest {
 
   @Test
   public void testExpressionWithColumn()
@@ -40,31 +40,12 @@ public class InbuiltFunctionEvaluatorTest {
     System.out.println(functionInfo);
     String expression = "reverseString(testColumn)";
 
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    DefaultFunctionEvaluator evaluator = new DefaultFunctionEvaluator(expression);
     Assert.assertEquals(evaluator.getArguments(), Lists.newArrayList("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;
       row.putField("testColumn", value);
-      Object result = evaluator.evaluate(row);
-      Assert.assertEquals(result, new StringBuilder(value).reverse().toString());
-    }
-  }
-
-  @Test
-  public void testAdd()
-      throws Exception {
-    Method method = MyFunc.class.getDeclaredMethod("add", Integer.class, Integer.class);
-    FunctionRegistry.registerStaticFunction(method);
-
-    String expression = "add(col1, col2)";
-
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    GenericRow row = new GenericRow();
-    for (int i = 0; i < 5; i++) {
-      String value = "testValue" + i;
-      row.putField("col1", 10);
-      row.putField("col2", 20);
       Object result = evaluator.evaluate(row);
       Assert.assertEquals(result, new StringBuilder(value).reverse().toString());
     }
@@ -78,7 +59,8 @@ public class InbuiltFunctionEvaluatorTest {
     String input = "1980-01-01";
     String format = "yyyy-MM-dd";
     String expression = String.format("daysSinceEpoch('%s', '%s')", input, format);
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    DefaultFunctionEvaluator evaluator = new DefaultFunctionEvaluator(expression);
+    Assert.assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
     Object result = evaluator.evaluate(row);
     Assert.assertEquals(result, MyFunc.daysSinceEpoch(input, format));
@@ -94,7 +76,8 @@ public class InbuiltFunctionEvaluatorTest {
     String reversedInput = MyFunc.reverseString(input);
     String format = "yyyy-MM-dd";
     String expression = String.format("daysSinceEpoch(reverseString('%s'), '%s')", reversedInput, format);
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    DefaultFunctionEvaluator evaluator = new DefaultFunctionEvaluator(expression);
+    Assert.assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
     Object result = evaluator.evaluate(row);
     Assert.assertEquals(result, MyFunc.daysSinceEpoch(input, format));
@@ -114,10 +97,6 @@ public class InbuiltFunctionEvaluatorTest {
     static int daysSinceEpoch(String input, String format) {
       DateTime dateTime = DateTimeFormat.forPattern(format).parseDateTime(input);
       return Days.daysBetween(EPOCH_START, dateTime).getDays();
-    }
-
-    static int add(Integer a, Integer b) {
-      return a+b;
     }
   }
 }

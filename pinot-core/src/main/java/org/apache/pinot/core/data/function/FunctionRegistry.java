@@ -41,7 +41,7 @@ public class FunctionRegistry {
   static {
     try {
       registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHours", Long.class));
-      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochHours", Long.class));
+      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutes", Long.class, String.class));
     } catch (NoSuchMethodException e) {
       LOGGER.error("Caught exception when registering function", e);
     }

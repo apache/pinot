@@ -43,12 +43,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *   </li>
  * </ul>
  */
-public class InbuiltFunctionEvaluator implements FunctionEvaluator {
+public class DefaultFunctionEvaluator implements FunctionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;
   private final List<String> _arguments;
 
-  public InbuiltFunctionEvaluator(String expression)
+  public DefaultFunctionEvaluator(String expression)
       throws Exception {
     _arguments = new ArrayList<>();
     _rootNode = planExecution(TransformExpressionTree.compileToExpressionTree(expression));

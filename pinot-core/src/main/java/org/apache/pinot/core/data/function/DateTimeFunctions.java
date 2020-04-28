@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Inbuilt date time related transform functions
+ * TODO: Exhaustively add all time conversion functions
  */
 public class DateTimeFunctions {
 
@@ -30,8 +31,7 @@ public class DateTimeFunctions {
     return TimeUnit.MILLISECONDS.toHours(millis);
   }
 
-  static long fromEpochHours(Long hoursSinceEpoch) {
-    return TimeUnit.HOURS.toMillis(hoursSinceEpoch);
+  static Long toEpochMinutes(Long millis, String bucket) {
+    return TimeUnit.MILLISECONDS.toMinutes(millis) / Integer.parseInt(bucket);
   }
-
 }
