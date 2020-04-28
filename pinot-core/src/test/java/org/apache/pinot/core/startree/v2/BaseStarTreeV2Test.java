@@ -129,7 +129,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
     segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords, schema));
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));
     driver.build();
 
     StarTreeV2BuilderConfig starTreeV2BuilderConfig =

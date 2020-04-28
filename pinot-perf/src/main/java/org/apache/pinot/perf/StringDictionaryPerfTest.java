@@ -113,7 +113,7 @@ public class StringDictionaryPerfTest {
 
     long start = System.currentTimeMillis();
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     System.out.println("Total time for building segment: " + (System.currentTimeMillis() - start));
   }

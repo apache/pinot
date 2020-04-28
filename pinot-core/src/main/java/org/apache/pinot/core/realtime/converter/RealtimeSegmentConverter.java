@@ -93,12 +93,7 @@ public class RealtimeSegmentConverter {
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
     // lets create a record reader
-    RealtimeSegmentRecordReader reader;
-    if (sortedColumn == null) {
-      reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema);
-    } else {
-      reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema, sortedColumn);
-    }
+    RealtimeSegmentRecordReader reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, sortedColumn);
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(dataSchema);
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable

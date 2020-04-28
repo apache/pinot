@@ -63,7 +63,7 @@ public class KafkaJSONMessageDecoderTest {
     try (BufferedReader reader = new BufferedReader(
         new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()))) {
       KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
-      decoder.init(new HashMap<>(), schema, "testTopic", schema.getColumnNames());
+      decoder.init(new HashMap<>(), schema.getColumnNames(), "testTopic");
       GenericRow r = new GenericRow();
       String line = reader.readLine();
       while (line != null) {

@@ -104,7 +104,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
       throws Exception {
     try {
       final List<GenericRow> rows = createDataSet(10);
-      try (final RecordReader recordReader = new GenericRowRecordReader(rows, _schema)) {
+      try (final RecordReader recordReader = new GenericRowRecordReader(rows)) {
         createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
         final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
         _indexSegments.add(segment);
@@ -167,7 +167,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
       rows.add(row);
     }
 
-    try (final RecordReader recordReader = new GenericRowRecordReader(rows, _schema)) {
+    try (final RecordReader recordReader = new GenericRowRecordReader(rows)) {
       createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
       final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
       _indexSegments.add(segment);
@@ -205,8 +205,8 @@ public class TransformQueriesTest extends BaseQueriesTest {
       final List<GenericRow> segmentOneRows = createDataSet(10);
       final List<GenericRow> segmentTwoRows = createDataSet(10);
 
-      try (final RecordReader recordReaderOne = new GenericRowRecordReader(segmentOneRows, _schema);
-          final RecordReader recordReaderTwo = new GenericRowRecordReader(segmentTwoRows, _schema)) {
+      try (final RecordReader recordReaderOne = new GenericRowRecordReader(segmentOneRows);
+          final RecordReader recordReaderTwo = new GenericRowRecordReader(segmentTwoRows)) {
         createSegment(_schema, recordReaderOne, SEGMENT_NAME_1, TABLE_NAME);
         createSegment(_schema, recordReaderTwo, SEGMENT_NAME_2, TABLE_NAME);
 

@@ -69,7 +69,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -352,14 +351,14 @@ public abstract class ClusterTest extends ControllerTest {
     private DatumReader<GenericData.Record> _reader;
 
     @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields)
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
         throws Exception {
       // Load Avro schema
-      DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
-      _avroSchema = reader.getSchema();
-      reader.close();
+      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
+        _avroSchema = reader.getSchema();
+      }
       _recordExtractor = new AvroRecordExtractor();
-      _recordExtractor.init(sourceFields, null);
+      _recordExtractor.init(fieldsToRead, null);
       _reader = new GenericDatumReader<>(_avroSchema);
     }
 

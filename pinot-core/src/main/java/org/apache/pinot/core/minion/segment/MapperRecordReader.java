@@ -35,7 +35,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  * Record reader for mapper stage of the segment conversion
  */
 public class MapperRecordReader implements RecordReader {
-  private MultiplePinotSegmentRecordReader _recordReader;
+  private MultiplePinotSegmentRecordReader _multiplePinotSegmentRecordReader;
   private RecordTransformer _recordTransformer;
   private RecordPartitioner _recordPartitioner;
   private int _totalNumPartition;
@@ -48,15 +48,19 @@ public class MapperRecordReader implements RecordReader {
   public MapperRecordReader(List<File> indexDirs, RecordTransformer recordTransformer,
       RecordPartitioner recordPartitioner, int totalNumPartition, int currentPartition)
       throws Exception {
-    _recordReader = new MultiplePinotSegmentRecordReader(indexDirs);
+    _multiplePinotSegmentRecordReader = new MultiplePinotSegmentRecordReader(indexDirs);
     _recordPartitioner = recordPartitioner;
     _recordTransformer = recordTransformer;
     _totalNumPartition = totalNumPartition;
     _currentPartition = currentPartition;
   }
 
+  public Schema getSchema() {
+    return _multiplePinotSegmentRecordReader.getSchema();
+  }
+
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields) {
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override
@@ -69,8 +73,8 @@ public class MapperRecordReader implements RecordReader {
       return true;
     }
 
-    while (_recordReader.hasNext()) {
-      _nextRow = _recordReader.next(_nextRow);
+    while (_multiplePinotSegmentRecordReader.hasNext()) {
+      _nextRow = _multiplePinotSegmentRecordReader.next(_nextRow);
       // Filter out the records that do not belong to the current partition
       if (_recordPartitioner.getPartitionFromRecord(_nextRow, _totalNumPartition) == _currentPartition) {
         // Transform record
@@ -106,19 +110,14 @@ public class MapperRecordReader implements RecordReader {
 
   @Override
   public void rewind() {
-    _recordReader.rewind();
+    _multiplePinotSegmentRecordReader.rewind();
     _nextRowReturned = true;
     _finished = false;
   }
 
   @Override
-  public Schema getSchema() {
-    return _recordReader.getSchema();
-  }
-
-  @Override
   public void close()
       throws IOException {
-    _recordReader.close();
+    _multiplePinotSegmentRecordReader.close();
   }
 }

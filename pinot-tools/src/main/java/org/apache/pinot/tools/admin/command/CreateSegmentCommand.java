@@ -32,6 +32,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -40,7 +41,6 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -365,7 +365,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
                   if (_readerConfigFile != null) {
                     readerConfig = JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class);
                   }
-                  csvRecordReader.init(localFile, schema, readerConfig, SchemaUtils.extractSourceFields(schema));
+                  csvRecordReader.init(localFile, SchemaUtils.extractSourceFields(schema), readerConfig);
                   driver.init(config, csvRecordReader);
                   break;
                 default:

@@ -35,10 +35,9 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  * Record reader for reducer stage of the segment conversion
  */
 public class ReducerRecordReader implements RecordReader {
-
-  private PinotSegmentRecordReader _recordReader;
-  private RecordAggregator _recordAggregator;
-  private List<String> _groupByColumns;
+  private final PinotSegmentRecordReader _pinotSegmentRecordReader;
+  private final RecordAggregator _recordAggregator;
+  private final List<String> _groupByColumns;
 
   private List<GenericRow> _rowGroup = new ArrayList<>();
   private GenericRow _nextRow = new GenericRow();
@@ -47,13 +46,17 @@ public class ReducerRecordReader implements RecordReader {
 
   public ReducerRecordReader(File indexDir, RecordAggregator recordAggregator, List<String> groupByColumns)
       throws Exception {
-    _recordReader = new PinotSegmentRecordReader(indexDir, null, groupByColumns);
+    _pinotSegmentRecordReader = new PinotSegmentRecordReader(indexDir, null, groupByColumns);
     _recordAggregator = recordAggregator;
     _groupByColumns = groupByColumns;
   }
 
+  public Schema getSchema() {
+    return _pinotSegmentRecordReader.getSchema();
+  }
+
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields) {
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override
@@ -66,8 +69,8 @@ public class ReducerRecordReader implements RecordReader {
       return true;
     }
 
-    while (_recordReader.hasNext()) {
-      GenericRow currentRow = _recordReader.next();
+    while (_pinotSegmentRecordReader.hasNext()) {
+      GenericRow currentRow = _pinotSegmentRecordReader.next();
 
       // Grouping rows by the given group-by columns
       if (_rowGroup.isEmpty() || haveSameGroupByColumns(_rowGroup.iterator().next(), currentRow)) {
@@ -108,20 +111,15 @@ public class ReducerRecordReader implements RecordReader {
 
   @Override
   public void rewind() {
-    _recordReader.rewind();
+    _pinotSegmentRecordReader.rewind();
     _rowGroup.clear();
     _nextRowReturned = true;
     _finished = false;
   }
 
   @Override
-  public Schema getSchema() {
-    return _recordReader.getSchema();
-  }
-
-  @Override
   public void close() {
-    _recordReader.close();
+    _pinotSegmentRecordReader.close();
   }
 
   /**

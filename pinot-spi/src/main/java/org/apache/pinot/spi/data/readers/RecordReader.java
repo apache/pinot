@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -37,14 +36,11 @@ public interface RecordReader extends Closeable {
    * Initializes the record reader with data file, schema and (optional) record reader config.
    *
    * @param dataFile Data file
-   * @param schema Pinot Schema associated with the table
+   * @param fieldsToRead The fields to read from the data file
    * @param recordReaderConfig Config for the reader specific to the format. e.g. delimiter for csv format etc
-   * @param sourceFields The fields to extract from the source record
    * @throws IOException If an I/O error occurs
-   *
-   * TODO: decouple Schema and RecordReader. This should be easier, now that we have field names to extract
    */
-  void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
+  void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException;
 
   /**
@@ -70,9 +66,4 @@ public interface RecordReader extends Closeable {
    */
   void rewind()
       throws IOException;
-
-  /**
-   * Get the Pinot schema.
-   */
-  Schema getSchema();
 }

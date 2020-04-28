@@ -148,7 +148,7 @@ public class SegmentPurger {
   }
 
   private class PurgeRecordReader implements RecordReader {
-    final PinotSegmentRecordReader _recordReader;
+    final PinotSegmentRecordReader _pinotSegmentRecordReader;
 
     // Reusable generic row to store the next row to return
     GenericRow _nextRow = new GenericRow();
@@ -159,18 +159,21 @@ public class SegmentPurger {
 
     PurgeRecordReader()
         throws Exception {
-      _recordReader = new PinotSegmentRecordReader(_originalIndexDir);
+      _pinotSegmentRecordReader = new PinotSegmentRecordReader(_originalIndexDir);
+    }
+
+    public Schema getSchema() {
+      return _pinotSegmentRecordReader.getSchema();
     }
 
     @Override
-    public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig,
-        Set<String> sourceFields) {
+    public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
     }
 
     @Override
     public boolean hasNext() {
       if (_recordPurger == null) {
-        return _recordReader.hasNext();
+        return _pinotSegmentRecordReader.hasNext();
       } else {
         // If all records have already been iterated, return false
         if (_finished) {
@@ -183,8 +186,8 @@ public class SegmentPurger {
         }
 
         // Try to get the next row to return
-        while (_recordReader.hasNext()) {
-          _nextRow = _recordReader.next(_nextRow);
+        while (_pinotSegmentRecordReader.hasNext()) {
+          _nextRow = _pinotSegmentRecordReader.next(_nextRow);
 
           if (_recordPurger.shouldPurge(_nextRow)) {
             _numRecordsPurged++;
@@ -208,7 +211,7 @@ public class SegmentPurger {
     @Override
     public GenericRow next(GenericRow reuse) {
       if (_recordPurger == null) {
-        reuse = _recordReader.next(reuse);
+        reuse = _pinotSegmentRecordReader.next(reuse);
       } else {
         Preconditions.checkState(!_nextRowReturned);
         reuse.init(_nextRow);
@@ -226,7 +229,7 @@ public class SegmentPurger {
 
     @Override
     public void rewind() {
-      _recordReader.rewind();
+      _pinotSegmentRecordReader.rewind();
       _nextRowReturned = true;
       _finished = false;
 
@@ -235,14 +238,9 @@ public class SegmentPurger {
     }
 
     @Override
-    public Schema getSchema() {
-      return _recordReader.getSchema();
-    }
-
-    @Override
     public void close()
         throws IOException {
-      _recordReader.close();
+      _pinotSegmentRecordReader.close();
     }
   }
 

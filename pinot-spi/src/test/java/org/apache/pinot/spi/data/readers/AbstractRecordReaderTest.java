@@ -92,8 +92,7 @@ public abstract class AbstractRecordReaderTest {
       throws Exception {
     for (Map<String, Object> expectedRecord : expectedRecordsMap) {
       GenericRow actualRecord = recordReader.next();
-      org.apache.pinot.spi.data.Schema pinotSchema = recordReader.getSchema();
-      for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+      for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
           Assert.assertEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));

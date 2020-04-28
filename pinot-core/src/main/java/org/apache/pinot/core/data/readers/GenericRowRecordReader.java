@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -34,18 +33,16 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 public class GenericRowRecordReader implements RecordReader {
   private final List<GenericRow> _rows;
   private final int _numRows;
-  private final Schema _schema;
 
   private int _nextRowId = 0;
 
-  public GenericRowRecordReader(List<GenericRow> rows, Schema schema) {
+  public GenericRowRecordReader(List<GenericRow> rows) {
     _rows = rows;
     _numRows = rows.size();
-    _schema = schema;
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields) {
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override
@@ -67,11 +64,6 @@ public class GenericRowRecordReader implements RecordReader {
   @Override
   public void rewind() {
     _nextRowId = 0;
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
   }
 
   @Override

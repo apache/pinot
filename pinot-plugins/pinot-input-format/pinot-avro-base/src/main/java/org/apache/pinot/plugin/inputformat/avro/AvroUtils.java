@@ -201,35 +201,6 @@ public class AvroUtils {
   }
 
   /**
-   * Validates Pinot schema against the given Avro schema.
-   */
-  public static void validateSchema(Schema schema, org.apache.avro.Schema avroSchema) {
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
-      Field avroField = avroSchema.getField(fieldName);
-      if (avroField == null) {
-        LOGGER.warn("Pinot field: {} does not exist in Avro Schema", fieldName);
-      } else {
-        boolean isPinotFieldSingleValue = fieldSpec.isSingleValueField();
-        boolean isAvroFieldSingleValue = AvroUtils.isSingleValueField(avroField);
-        if (isPinotFieldSingleValue != isAvroFieldSingleValue) {
-          String errorMessage = "Pinot field: " + fieldName + " is " + (isPinotFieldSingleValue ? "Single" : "Multi")
-              + "-valued in Pinot schema but not in Avro schema";
-          LOGGER.error(errorMessage);
-          throw new IllegalStateException(errorMessage);
-        }
-
-        FieldSpec.DataType pinotFieldDataType = fieldSpec.getDataType();
-        FieldSpec.DataType avroFieldDataType = AvroUtils.extractFieldDataType(avroField);
-        if (pinotFieldDataType != avroFieldDataType) {
-          LOGGER.warn("Pinot field: {} of type: {} mismatches with corresponding field in Avro Schema of type: {}",
-              fieldName, pinotFieldDataType, avroFieldDataType);
-        }
-      }
-    }
-  }
-
-  /**
    * Get the Avro file reader for the given file.
    */
   public static DataFileStream<GenericRecord> getAvroReader(File avroFile)

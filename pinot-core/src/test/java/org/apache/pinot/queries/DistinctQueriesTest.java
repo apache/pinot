@@ -157,7 +157,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records, SCHEMA));
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), ReadMode.mmap);

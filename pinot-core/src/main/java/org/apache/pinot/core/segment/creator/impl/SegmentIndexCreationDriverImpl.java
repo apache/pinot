@@ -51,13 +51,13 @@ import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.CrcUtils;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
-import org.apache.pinot.core.util.SchemaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,7 +98,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     Schema schema = segmentGeneratorConfig.getSchema();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
-    Set<String> fields = SchemaUtils.extractSourceFields(segmentGeneratorConfig.getSchema());
+    Set<String> sourceFields = SchemaUtils.extractSourceFields(segmentGeneratorConfig.getSchema());
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -109,31 +109,22 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         LOGGER.warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderClassName,
             fileFormat);
       }
-      return RecordReaderFactory
-          .getRecordReaderByClass(recordReaderClassName, dataFile, schema, segmentGeneratorConfig.getReaderConfig(),
-              fields);
+      return RecordReaderFactory.getRecordReaderByClass(recordReaderClassName, dataFile, sourceFields,
+          segmentGeneratorConfig.getReaderConfig());
     }
 
-    switch (fileFormat) {
-      // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
-      case PINOT:
-        return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
-      default:
-        try {
-          return org.apache.pinot.spi.data.readers.RecordReaderFactory
-              .getRecordReader(fileFormat, dataFile, schema, segmentGeneratorConfig.getReaderConfig(), fields);
-        } catch (Exception e) {
-          throw new UnsupportedOperationException("Unsupported input file format: '" + fileFormat + "'", e);
-        }
+    // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
+    if (fileFormat == FileFormat.PINOT) {
+      return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
+    } else {
+      return RecordReaderFactory
+          .getRecordReader(fileFormat, dataFile, sourceFields, segmentGeneratorConfig.getReaderConfig());
     }
   }
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader) {
-    init(config, new RecordReaderSegmentCreationDataSource(recordReader));
-  }
-
-  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) {
-    init(config, dataSource, CompositeTransformer.getDefaultTransformer(dataSource.getRecordReader().getSchema()));
+    init(config, new RecordReaderSegmentCreationDataSource(recordReader),
+        CompositeTransformer.getDefaultTransformer(config.getSchema()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
@@ -141,7 +132,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     this.config = config;
     recordReader = dataSource.getRecordReader();
     Preconditions.checkState(recordReader.hasNext(), "No record in data source");
-    dataSchema = recordReader.getSchema();
+    dataSchema = config.getSchema();
 
     _recordTransformer = recordTransformer;
 

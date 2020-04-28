@@ -30,13 +30,13 @@ import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.glassfish.tyrus.client.ClientManager;
 
@@ -66,9 +66,10 @@ public class MeetupRsvpStream {
 
   public void run() {
     try {
-      final ClientEndpointConfig cec = ClientEndpointConfig.Builder.create().build();
-      final StreamMessageDecoder decoder = PluginManager.get().createInstance(KafkaStarterUtils.KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME);
-      decoder.init(null, schema, null, SchemaUtils.extractSourceFields(schema));
+      ClientEndpointConfig cec = ClientEndpointConfig.Builder.create().build();
+      StreamMessageDecoder decoder =
+          PluginManager.get().createInstance(KafkaStarterUtils.KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME);
+      decoder.init(null, SchemaUtils.extractSourceFields(schema), null);
       client = ClientManager.createClient();
       client.connectToServer(new Endpoint() {
 

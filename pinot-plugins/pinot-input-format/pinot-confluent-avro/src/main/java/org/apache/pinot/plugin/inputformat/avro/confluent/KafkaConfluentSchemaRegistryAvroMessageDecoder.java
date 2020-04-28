@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -35,37 +34,39 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
 import static com.google.common.base.Preconditions.checkState;
 
+
 /**
  * Decodes avro messages with confluent schema registry.
  * First byte is MAGIC = 0, second 4 bytes are the schema id, the remainder is the value.
  * NOTE: Do not use schema in the implementation, as schema will be removed from the params
  */
 public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
-    private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
-    private KafkaAvroDeserializer _deserializer;
-    private RecordExtractor<Record> _avroRecordExtractor;
-    private String _topicName;
+  private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
+  private KafkaAvroDeserializer _deserializer;
+  private RecordExtractor<Record> _avroRecordExtractor;
+  private String _topicName;
 
-    @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String topicName, Set<String> sourceFields) throws Exception {
-        checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
-        String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
-        SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000);
-        _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
-        Preconditions.checkNotNull(topicName, "Topic must be provided");
-        _topicName = topicName;
-        _avroRecordExtractor = PluginManager.get().createInstance(AvroRecordExtractor.class.getName());
-        _avroRecordExtractor.init(sourceFields, null);
-    }
+  @Override
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+      throws Exception {
+    checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
+    String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
+    SchemaRegistryClient schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000);
+    _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
+    Preconditions.checkNotNull(topicName, "Topic must be provided");
+    _topicName = topicName;
+    _avroRecordExtractor = PluginManager.get().createInstance(AvroRecordExtractor.class.getName());
+    _avroRecordExtractor.init(fieldsToRead, null);
+  }
 
-    @Override
-    public GenericRow decode(byte[] payload, GenericRow destination) {
-        Record avroRecord = (Record) _deserializer.deserialize(_topicName, payload);
-        return _avroRecordExtractor.extract(avroRecord, destination);
-    }
+  @Override
+  public GenericRow decode(byte[] payload, GenericRow destination) {
+    Record avroRecord = (Record) _deserializer.deserialize(_topicName, payload);
+    return _avroRecordExtractor.extract(avroRecord, destination);
+  }
 
-    @Override
-    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-        return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
-    }
+  @Override
+  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+  }
 }

@@ -38,7 +38,7 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   protected RecordReader createRecordReader()
       throws Exception {
     JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dateFile, getPinotSchema(), null, _sourceFields);
+    recordReader.init(_dateFile, _sourceFields, null);
     return recordReader;
   }
 
@@ -61,11 +61,11 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
       throws Exception {
     for (Map<String, Object> expectedRecord : expectedRecordsMap) {
       GenericRow actualRecord = recordReader.next();
-      org.apache.pinot.spi.data.Schema pinotSchema = recordReader.getSchema();
-      for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+      for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(), expectedRecord.get(fieldSpecName).toString());
+          Assert.assertEquals(actualRecord.getValue(fieldSpecName).toString(),
+              expectedRecord.get(fieldSpecName).toString());
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);

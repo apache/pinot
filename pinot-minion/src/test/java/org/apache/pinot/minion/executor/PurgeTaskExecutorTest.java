@@ -71,7 +71,7 @@ public class PurgeTaskExecutorTest {
       row.putField(D1, i);
       rows.add(row);
     }
-    GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows, schema);
+    GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows);
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());

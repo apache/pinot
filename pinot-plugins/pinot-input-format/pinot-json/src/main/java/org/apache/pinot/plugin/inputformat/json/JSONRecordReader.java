@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -37,7 +36,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class JSONRecordReader implements RecordReader {
   private File _dataFile;
-  private Schema _schema;
   private JSONRecordExtractor _recordExtractor;
 
   private MappingIterator<Map<String, Object>> _iterator;
@@ -59,12 +57,11 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> sourceFields)
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
-    _schema = schema;
     _recordExtractor = new JSONRecordExtractor();
-    _recordExtractor.init(sourceFields, null);
+    _recordExtractor.init(fieldsToRead, null);
     init();
   }
 
@@ -78,8 +75,6 @@ public class JSONRecordReader implements RecordReader {
     return next(new GenericRow());
   }
 
-  // NOTE: hard to extract common code further
-  @SuppressWarnings("Duplicates")
   @Override
   public GenericRow next(GenericRow reuse) {
     Map<String, Object> record = _iterator.next();
@@ -92,11 +87,6 @@ public class JSONRecordReader implements RecordReader {
       throws IOException {
     _iterator.close();
     init();
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
   }
 
   @Override

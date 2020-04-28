@@ -19,6 +19,7 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.util.Set;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -31,7 +32,6 @@ import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
-import org.apache.pinot.core.util.SchemaUtils;
 
 
 /**
@@ -48,8 +48,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
   }
 
   @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      String groupId, Set<String> sourceFields) {
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
+      String groupId) {
     return new FakeStreamLevelConsumer();
   }
 
@@ -63,7 +63,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     return new FakeStreamMetadataProvider(_streamConfig);
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     String clientId = "client_id_localhost_tester";
 
     // stream config
@@ -93,8 +94,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();
-    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(streamConfig, pinotSchema,
-        SchemaUtils.extractSourceFields(pinotSchema));
+    StreamMessageDecoder streamMessageDecoder =
+        StreamDecoderProvider.create(streamConfig, SchemaUtils.extractSourceFields(pinotSchema));
     GenericRow decodedRow = new GenericRow();
     streamMessageDecoder.decode(messageBatch.getMessageAtIndex(0), decodedRow);
     System.out.println(decodedRow);
