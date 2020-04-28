@@ -88,7 +88,7 @@ public class Server2ControllerSegmentUploaderTest {
     Server2ControllerSegmentUploader uploader =
         new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, GOOD_CONTROLLER_VIP, "segmentName",
             10000, mock(ServerMetrics.class));
-    URI segmentURI = uploader.uploadSegment(_file);
+    URI segmentURI = uploader.uploadSegment(_file, "table_REALTIME", "segment1");
     Assert.assertEquals(segmentURI.toString(), SEGMENT_LOCATION);
   }
 
@@ -98,7 +98,7 @@ public class Server2ControllerSegmentUploaderTest {
     Server2ControllerSegmentUploader uploader =
         new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, BAD_CONTROLLER_VIP, "segmentName",
             10000, mock(ServerMetrics.class));
-    URI segmentURI = uploader.uploadSegment(_file);
+    URI segmentURI = uploader.uploadSegment(_file, "table_REALTIME", "segment1");
     Assert.assertNull(segmentURI);
   }
 }

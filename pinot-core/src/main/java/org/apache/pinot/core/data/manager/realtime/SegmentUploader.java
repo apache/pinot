@@ -24,5 +24,5 @@ import java.net.URI;
 
 public interface SegmentUploader {
   // Returns the URI of the uploaded segment. null if the upload fails.
-  URI uploadSegment(File segmentFile);
+  URI uploadSegment(File segmentFile, String tableNameWithType, String segmentName);
 }

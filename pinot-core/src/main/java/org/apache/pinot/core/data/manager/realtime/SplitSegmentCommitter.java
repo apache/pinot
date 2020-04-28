@@ -21,8 +21,11 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.io.File;
 import java.net.URI;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 
 
@@ -58,7 +61,8 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(new LLCSegmentName(_params.getSegmentName()).getTableName());
+    URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile, tableNameWithType, _params.getSegmentName());
     if (segmentLocation == null) {
         return SegmentCompletionProtocol.RESP_FAILED;
     }
