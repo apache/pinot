@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -47,7 +48,6 @@ public class SchemaUtilsTest {
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("d1", FieldSpec.DataType.STRING, true);
     dimensionFieldSpec.setTransformFunction("Groovy({function}, argument1, argument2)");
     schema.addField(dimensionFieldSpec);
-
     List<String> extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 3);
     Assert.assertTrue(extract.containsAll(Arrays.asList("d1", "argument1", "argument2")));
@@ -57,7 +57,6 @@ public class SchemaUtilsTest {
     dimensionFieldSpec = new DimensionFieldSpec("d1", FieldSpec.DataType.STRING, true);
     dimensionFieldSpec.setTransformFunction("Groovy({function})");
     schema.addField(dimensionFieldSpec);
-
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("d1"));
@@ -66,7 +65,6 @@ public class SchemaUtilsTest {
     schema = new Schema();
     dimensionFieldSpec = new DimensionFieldSpec("map__KEYS", FieldSpec.DataType.INT, false);
     schema.addField(dimensionFieldSpec);
-
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("map", "map__KEYS")));
@@ -75,7 +73,6 @@ public class SchemaUtilsTest {
     schema = new Schema();
     dimensionFieldSpec = new DimensionFieldSpec("map__VALUES", FieldSpec.DataType.LONG, false);
     schema.addField(dimensionFieldSpec);
-
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("map", "map__VALUES")));
@@ -85,7 +82,6 @@ public class SchemaUtilsTest {
     schema = new Schema();
     TimeFieldSpec timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
     schema.addField(timeFieldSpec);
-
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("time"));
@@ -96,10 +92,27 @@ public class SchemaUtilsTest {
         new TimeFieldSpec("in", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out", FieldSpec.DataType.LONG,
             TimeUnit.MILLISECONDS);
     schema.addField(timeFieldSpec);
-
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("in", "out")));
+
+    // inbuilt functions
+    schema = new Schema();
+    dimensionFieldSpec = new DimensionFieldSpec("hoursSinceEpoch", FieldSpec.DataType.LONG, true);
+    dimensionFieldSpec.setTransformFunction("toEpochHours(timestamp)");
+    schema.addField(dimensionFieldSpec);
+    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
+    Assert.assertEquals(extract.size(), 2);
+    Assert.assertTrue(extract.containsAll(Arrays.asList("timestamp", "hoursSinceEpoch")));
+
+    // inbuilt functions with literal
+    schema = new Schema();
+    dimensionFieldSpec = new DimensionFieldSpec("tenMinutesSinceEpoch", FieldSpec.DataType.LONG, true);
+    dimensionFieldSpec.setTransformFunction("toEpochMinutes(timestamp, 10)");
+    schema.addField(dimensionFieldSpec);
+    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
+    Assert.assertEquals(extract.size(), 2);
+    Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestamp")));
   }
 
   @Test
