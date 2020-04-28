@@ -27,10 +27,16 @@ import java.util.concurrent.TimeUnit;
  */
 public class DateTimeFunctions {
 
+  /**
+   * Convert epoch millis to epoch hours
+   */
   static Long toEpochHours(Long millis) {
     return TimeUnit.MILLISECONDS.toHours(millis);
   }
 
+  /**
+   * Convert epoch millis to epoch minutes, bucketed by given bucket granularity
+   */
   static Long toEpochMinutes(Long millis, String bucket) {
     return TimeUnit.MILLISECONDS.toMinutes(millis) / Integer.parseInt(bucket);
   }
