@@ -18,26 +18,26 @@
  */
 package org.apache.pinot.core.data.function;
 
-import java.util.List;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import java.util.concurrent.TimeUnit;
 
 
 /**
- * Interface for evaluators of transform function expressions of schema field specs
- * They transformFunction follows the convention:
- *  "transformFunction": "FunctionType({function}, argument1, argument2,...argumentN)"
- *  For example,
- *  "transformFunction" : "Groovy({firstName + ' ' + lastName}, firstName, lastName)"
+ * Inbuilt date time related transform functions
+ * TODO: Exhaustively add all time conversion functions
  */
-public interface ExpressionEvaluator {
+public class DateTimeFunctions {
 
   /**
-   * Get the arguments of the function
+   * Convert epoch millis to epoch hours
    */
-  List<String> getArguments();
+  static Long toEpochHours(Long millis) {
+    return TimeUnit.MILLISECONDS.toHours(millis);
+  }
 
   /**
-   * Evaluate the function on the generic row and return the result
+   * Convert epoch millis to epoch minutes, bucketed by given bucket granularity
    */
-  Object evaluate(GenericRow genericRow);
+  static Long toEpochMinutes(Long millis, String bucket) {
+    return TimeUnit.MILLISECONDS.toMinutes(millis) / Integer.parseInt(bucket);
+  }
 }

@@ -21,8 +21,8 @@ package org.apache.pinot.core.util;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.core.data.function.ExpressionEvaluator;
-import org.apache.pinot.core.data.function.ExpressionEvaluatorFactory;
+import org.apache.pinot.core.data.function.FunctionEvaluator;
+import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -52,9 +52,9 @@ public class SchemaUtils {
     Set<String> sourceFieldNames = new HashSet<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-        if (expressionEvaluator != null) {
-          sourceFieldNames.addAll(expressionEvaluator.getArguments());
+        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        if (functionEvaluator != null) {
+          sourceFieldNames.addAll(functionEvaluator.getArguments());
         }
         sourceFieldNames.add(fieldSpec.getName());
       }
@@ -83,9 +83,9 @@ public class SchemaUtils {
           String column = fieldSpec.getName();
           String transformFunction = fieldSpec.getTransformFunction();
           if (transformFunction != null) {
-            ExpressionEvaluator expressionEvaluator = ExpressionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-            if (expressionEvaluator != null) {
-              List<String> arguments = expressionEvaluator.getArguments();
+            FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+            if (functionEvaluator != null) {
+              List<String> arguments = functionEvaluator.getArguments();
               // output column used as input
               if (arguments.contains(column)) {
                 logger.error("The arguments of transform function: {}, should not contain the destination column: {}",

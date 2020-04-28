@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.function;
 
+import com.google.common.collect.Lists;
 import java.lang.reflect.Method;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
@@ -28,7 +29,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class FunctionExpressionEvaluatorTest {
+public class DefaultFunctionEvaluatorTest {
 
   @Test
   public void testExpressionWithColumn()
@@ -39,7 +40,8 @@ public class FunctionExpressionEvaluatorTest {
     System.out.println(functionInfo);
     String expression = "reverseString(testColumn)";
 
-    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator(expression);
+    DefaultFunctionEvaluator evaluator = new DefaultFunctionEvaluator(expression);
+    Assert.assertEquals(evaluator.getArguments(), Lists.newArrayList("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;
@@ -57,7 +59,8 @@ public class FunctionExpressionEvaluatorTest {
     String input = "1980-01-01";
     String format = "yyyy-MM-dd";
     String expression = String.format("daysSinceEpoch('%s', '%s')", input, format);
-    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator(expression);
+    DefaultFunctionEvaluator evaluator = new DefaultFunctionEvaluator(expression);
+    Assert.assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
     Object result = evaluator.evaluate(row);
     Assert.assertEquals(result, MyFunc.daysSinceEpoch(input, format));
@@ -73,7 +76,8 @@ public class FunctionExpressionEvaluatorTest {
     String reversedInput = MyFunc.reverseString(input);
     String format = "yyyy-MM-dd";
     String expression = String.format("daysSinceEpoch(reverseString('%s'), '%s')", reversedInput, format);
-    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator(expression);
+    DefaultFunctionEvaluator evaluator = new DefaultFunctionEvaluator(expression);
+    Assert.assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
     Object result = evaluator.evaluate(row);
     Assert.assertEquals(result, MyFunc.daysSinceEpoch(input, format));

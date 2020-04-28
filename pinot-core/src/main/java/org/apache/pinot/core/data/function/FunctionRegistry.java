@@ -25,11 +25,27 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
+/**
+ * Registry for inbuilt Pinot functions
+ */
 public class FunctionRegistry {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
+
   static Map<String, List<FunctionInfo>> _functionInfoMap = new HashMap<>();
+
+  static {
+    try {
+      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHours", Long.class));
+      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutes", Long.class, String.class));
+    } catch (NoSuchMethodException e) {
+      LOGGER.error("Caught exception when registering function", e);
+    }
+  }
 
   public static FunctionInfo resolve(String functionName, Class<?>[] argumentTypes) {
     List<FunctionInfo> list = _functionInfoMap.get(functionName.toLowerCase());
