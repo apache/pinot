@@ -19,15 +19,12 @@
 package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.pinot.spi.config.UpsertConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -39,6 +36,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -236,8 +234,8 @@ public class TableConfigSerDeTest {
     }
     {
       // with upsert config
-      UpsertConfig upsertConfig = new UpsertConfig(Collections.singletonList("pk"), "offset",
-          "$validFrom", "$validUntil");
+      UpsertConfig upsertConfig =
+          new UpsertConfig(Collections.singletonList("pk"), "offset", "$validFrom", "$validUntil");
 
       TableConfig tableConfig = tableConfigBuilder.setUpsertConfig(upsertConfig).build();
 
@@ -386,11 +384,9 @@ public class TableConfigSerDeTest {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assertNotNull(upsertConfig);
 
-    assertEquals(upsertConfig.getPrimaryKeyColumns().size(), 1);
-    assertEquals(upsertConfig.getPrimaryKeyColumns().get(0), "pk");
+    assertEquals(upsertConfig.getPrimaryKeyColumns(), Collections.singletonList("pk"));
     assertEquals(upsertConfig.getOffsetColumn(), "offset");
     assertEquals(upsertConfig.getValidFromColumn(), "$validFrom");
     assertEquals(upsertConfig.getValidUntilColumn(), "$validUntil");
   }
-
 }
