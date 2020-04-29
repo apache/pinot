@@ -45,13 +45,13 @@ public class AggregationFunctionFactory {
   public static AggregationFunction getAggregationFunction(AggregationInfo aggregationInfo,
       @Nullable BrokerRequest brokerRequest) {
     String functionName = aggregationInfo.getAggregationType();
-    List<String> arguments = AggregationFunctionUtils.getAggregationExpressions(aggregationInfo);
+    List<String> expressions = AggregationFunctionUtils.getAggregationExpressions(aggregationInfo);
 
     try {
       String upperCaseFunctionName = functionName.toUpperCase();
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
-        List<String> args = new ArrayList<>(arguments);
+        List<String> args = new ArrayList<>(expressions);
         if (remainingFunctionName.matches("\\d+")) {
           // Percentile
           args.add(remainingFunctionName);
@@ -80,7 +80,7 @@ public class AggregationFunctionFactory {
           throw new IllegalArgumentException();
         }
       } else {
-        String column = arguments.get(0);
+        String column = expressions.get(0);
         switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
           case COUNT:
             return new CountAggregationFunction(column);
@@ -102,6 +102,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountRawHLLAggregationFunction(column);
           case FASTHLL:
             return new FastHLLAggregationFunction(column);
+          case DISTINCTCOUNTTHETASKETCH:
+            return new DistinctCountThetaSketchAggregationFunction(expressions);
           case COUNTMV:
             return new CountMVAggregationFunction(column);
           case MINMV:
@@ -123,7 +125,7 @@ public class AggregationFunctionFactory {
           case DISTINCT:
             Preconditions.checkState(brokerRequest != null,
                 "Broker request must be provided for 'DISTINCT' aggregation function");
-            return new DistinctAggregationFunction(arguments, brokerRequest.getOrderBy(),
+            return new DistinctAggregationFunction(expressions, brokerRequest.getOrderBy(),
                 brokerRequest.getLimit());
           default:
             throw new IllegalArgumentException();

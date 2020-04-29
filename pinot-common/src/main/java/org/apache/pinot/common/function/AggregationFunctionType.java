@@ -30,9 +30,11 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTHLL("distinctCountHLL"),
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),
   FASTHLL("fastHLL"),
+  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch"),
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),
   PERCENTILETDIGEST("percentileTDigest"),
+
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV"),
   MINMV("minMV"),

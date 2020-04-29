@@ -197,6 +197,21 @@ public class CalciteSqlParser {
     return identifiers;
   }
 
+  /**
+   * Compiles a String expression into {@link Expression}.
+   *
+   * @param expression String expression.
+   * @return {@link Expression} equivalent of the string.
+   *
+   * @throws SqlParseException Throws parse exception if String is not a valid expression.
+   */
+  public static Expression compileToExpression(String expression)
+      throws SqlParseException {
+    SqlParser sqlParser = getSqlParser(expression);
+    SqlNode sqlNode = sqlParser.parseExpression();
+    return toExpression(sqlNode);
+  }
+
   private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
     if (optionsStatements.isEmpty()) {
       return;
@@ -215,12 +230,7 @@ public class CalciteSqlParser {
   }
 
   private static PinotQuery compileCalciteSqlToPinotQuery(String sql) {
-    SqlParser.ConfigBuilder parserBuilder = SqlParser.configBuilder();
-    parserBuilder.setLex(PINOT_LEX);
-    // BABEL is a very liberal conformance value that allows anything supported by any dialect
-    parserBuilder.setConformance(SqlConformanceEnum.BABEL);
-    parserBuilder.setParserFactory(SqlBabelParserImpl.FACTORY);
-    SqlParser sqlParser = SqlParser.create(sql, parserBuilder.build());
+    SqlParser sqlParser = getSqlParser(sql);
     final SqlNode sqlNode;
     try {
       sqlNode = sqlParser.parseQuery();
@@ -283,6 +293,18 @@ public class CalciteSqlParser {
     }
     queryReWrite(pinotQuery);
     return pinotQuery;
+  }
+
+  private static SqlParser getSqlParser(String sql) {
+    // TODO: Check if this can be converted to static or thread local.
+    SqlParser.ConfigBuilder parserBuilder = SqlParser.configBuilder();
+    parserBuilder.setLex(PINOT_LEX);
+
+    // BABEL is a very liberal conformance value that allows anything supported by any dialect
+    parserBuilder.setConformance(SqlConformanceEnum.BABEL);
+    parserBuilder.setParserFactory(SqlBabelParserImpl.FACTORY);
+
+    return SqlParser.create(sql, parserBuilder.build());
   }
 
   private static void queryReWrite(PinotQuery pinotQuery) {

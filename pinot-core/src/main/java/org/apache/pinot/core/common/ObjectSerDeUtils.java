@@ -33,6 +33,8 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import org.apache.datasketches.memory.Memory;
+import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
@@ -60,7 +62,8 @@ public class ObjectSerDeUtils {
     Map(8),
     IntSet(9),
     TDigest(10),
-    DistinctTable(11);
+    DistinctTable(11),
+    DataSketch(12);
 
     private int _value;
 
@@ -97,6 +100,8 @@ public class ObjectSerDeUtils {
         return ObjectType.TDigest;
       } else if (value instanceof DistinctTable) {
         return ObjectType.DistinctTable;
+      } else if (value instanceof Sketch) {
+        return ObjectType.DataSketch;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -458,6 +463,25 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
+    @Override
+    public byte[] serialize(Sketch value) {
+      return value.compact().toByteArray();
+    }
+
+    @Override
+    public Sketch deserialize(byte[] bytes) {
+      return Sketch.wrap(Memory.wrap(bytes));
+    }
+
+    @Override
+    public Sketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return Sketch.wrap(Memory.wrap(bytes));
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -472,7 +496,8 @@ public class ObjectSerDeUtils {
       MAP_SER_DE,
       INT_SET_SER_DE,
       TDIGEST_SER_DE,
-      DISTINCT_TABLE_SER_DE
+      DISTINCT_TABLE_SER_DE,
+      DATA_SKETCH_SER_DE
   };
   //@formatter:on
 

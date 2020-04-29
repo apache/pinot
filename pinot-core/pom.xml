@@ -134,6 +134,10 @@
       <artifactId>stream</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.datasketches</groupId>
+      <artifactId>datasketches-java</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.tdunning</groupId>
       <artifactId>t-digest</artifactId>
     </dependency>
