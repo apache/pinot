@@ -64,6 +64,8 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.lineage.SegmentMergeLineage;
+import org.apache.pinot.common.lineage.SegmentMergeLineageAccessHelper;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -2267,6 +2269,18 @@ public class PinotHelixResourceManager {
     }
 
     return tableNamesWithType;
+  }
+
+  /**
+   * Fetch segment merge lineage for a given table
+   *
+   * @param tableNameWithType Table name with type.
+   * @return segment merge lineage for the given table.
+   */
+  public SegmentMergeLineage getSegmentMergeLineage(String tableNameWithType) {
+    ZNRecord segmentMergeLineageZNRecord =
+        SegmentMergeLineageAccessHelper.getSegmentMergeLineageZNRecord(getPropertyStore(), tableNameWithType);
+    return SegmentMergeLineage.fromZNRecord(segmentMergeLineageZNRecord);
   }
 
   /*

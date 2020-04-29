@@ -64,6 +64,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       @Nonnull List<File> originalIndexDir, @Nonnull File workingDir)
       throws Exception;
 
+  protected abstract void segmentPostProcess(@Nonnull List<SegmentConversionResult> segmentConversionResults,
+      @Nonnull PinotTaskConfig pinotTaskConfig) throws Exception;
+
   @Override
   public List<SegmentConversionResult> executeTask(@Nonnull PinotTaskConfig pinotTaskConfig)
       throws Exception {
@@ -102,6 +105,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
       List<SegmentConversionResult> segmentConversionResults = convert(pinotTaskConfig, inputSegmentFiles, workingDir);
+
+      // Post process after segment generation
+      segmentPostProcess(segmentConversionResults, pinotTaskConfig);
 
       // Create a directory for converted tarred segment files
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");

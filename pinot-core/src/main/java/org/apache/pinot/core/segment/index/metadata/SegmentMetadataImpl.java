@@ -45,6 +45,8 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.rollup.MergeRollupConstants;
+import org.apache.pinot.core.segment.rollup.MergeRollupMetadata;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
@@ -84,6 +86,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private SegmentVersion _segmentVersion;
   private List<StarTreeV2Metadata> _starTreeV2MetadataList;
+  private MergeRollupMetadata _mergeRollupMetadata;
   private String _creatorName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private int _totalDocs;
@@ -251,6 +254,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
             segmentMetadataPropertiesConfiguration.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i))));
       }
     }
+
+    // Build merge-rollup metadata
+    if (!segmentMetadataPropertiesConfiguration.subset(MergeRollupConstants.MetadataKey.MERGE_ROLLUP_PREFIX)
+        .isEmpty()) {
+      _mergeRollupMetadata = new MergeRollupMetadata(
+          segmentMetadataPropertiesConfiguration.subset(MergeRollupConstants.MetadataKey.MERGE_ROLLUP_PREFIX));
+    }
   }
 
   /**
@@ -417,6 +427,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   public List<StarTreeV2Metadata> getStarTreeV2MetadataList() {
     return _starTreeV2MetadataList;
+  }
+
+  public MergeRollupMetadata getMergeRollupMetadata() {
+    return _mergeRollupMetadata;
   }
 
   @Override

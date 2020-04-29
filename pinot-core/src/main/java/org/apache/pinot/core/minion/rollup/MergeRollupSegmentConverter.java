@@ -29,6 +29,7 @@ import org.apache.pinot.core.minion.SegmentConverter;
 import org.apache.pinot.core.minion.segment.RecordAggregator;
 import org.apache.pinot.core.minion.segment.RecordTransformer;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.rollup.MergeType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;

@@ -35,6 +35,8 @@ public class TaskExecutorFactoryRegistry {
     registerTaskExecutorFactory(MinionConstants.ConvertToRawIndexTask.TASK_TYPE,
         new ConvertToRawIndexTaskExecutorFactory());
     registerTaskExecutorFactory(MinionConstants.PurgeTask.TASK_TYPE, new PurgeTaskExecutorFactory());
+    registerTaskExecutorFactory(MinionConstants.MergeRollupTask.TASK_TYPE,
+        new MergeRollupTaskExecutorFactory());
   }
 
   /**

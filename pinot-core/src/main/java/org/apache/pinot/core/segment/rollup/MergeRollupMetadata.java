@@ -16,29 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.minion.rollup;
+package org.apache.pinot.core.segment.rollup;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
+import org.apache.commons.configuration.Configuration;
 
 
-public enum MergeType {
-  CONCATENATE, ROLLUP;
+public class MergeRollupMetadata {
+  private final List<String> _groupsFrom;
+  private final List<String> _segmentsTo;
 
-  private static final Map<String, MergeType> VALUE_MAP = new HashMap<>();
-
-  static {
-    for (MergeType mergeType : MergeType.values()) {
-      VALUE_MAP.put(mergeType.name().toLowerCase(), mergeType);
-    }
+  public MergeRollupMetadata(String groupId, List<String> groupsFrom, List<String> segmentsTo) {
+    _groupsFrom = groupsFrom;
+    _segmentsTo = segmentsTo;
   }
 
-  public static MergeType fromString(String name) {
-    MergeType mergeType = VALUE_MAP.get(name.toLowerCase());
+  public MergeRollupMetadata(Configuration metadataProperties) {
+    _groupsFrom = metadataProperties.getList(MergeRollupConstants.MetadataKey.GROUPS_FROM);
+    _segmentsTo = metadataProperties.getList(MergeRollupConstants.MetadataKey.SEGMENTS_TO);
+  }
 
-    if (mergeType == null) {
-      throw new IllegalArgumentException("No enum constant for: " + name);
-    }
-    return mergeType;
+  public List<String> getGroupsFrom() {
+    return _groupsFrom;
+  }
+
+  public List<String> getSegmentsTo() {
+    return _segmentsTo;
   }
 }
