@@ -59,7 +59,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
- * The class <code>MinionStarter</code> provides methods to start and stop the Pinot Minion.
+ * The class <id>MinionStarter</id> provides methods to start and stop the Pinot Minion.
  * <p>Pinot Minion will automatically join the given Helix cluster as a participant.
  */
 public class MinionStarter implements ServiceStartable {

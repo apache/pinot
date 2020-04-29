@@ -43,7 +43,7 @@ import org.apache.pinot.parsers.CompilerConstants;
 
 
 /**
- * The <code>AggregationFunctionUtils</code> class provides utility methods for aggregation function.
+ * The <id>AggregationFunctionUtils</id> class provides utility methods for aggregation function.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationFunctionUtils {

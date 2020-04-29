@@ -23,9 +23,9 @@ import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
- *  The <code>PinotDataType</code> enum represents the data type of a value in a row from recordReader and provides
+ *  The <id>PinotDataType</id> enum represents the data type of a value in a row from recordReader and provides
  *  utility methods to convert value across types if applicable.
- *  <p>We don't use <code>PinotDataType</code> to maintain type information, but use it to help organize the data and
+ *  <p>We don't use <id>PinotDataType</id> to maintain type information, but use it to help organize the data and
  *  use {@link FieldSpec.DataType} to maintain type information separately across various readers.
  *  <p>NOTE:
  *  <ul>

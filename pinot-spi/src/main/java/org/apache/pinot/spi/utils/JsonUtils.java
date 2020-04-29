@@ -183,8 +183,14 @@ public class JsonUtils {
         return jsonValue.asDouble();
       case STRING:
         return jsonValue.asText();
+      case BYTES:
+        try {
+          return jsonValue.binaryValue();
+        } catch (IOException e) {
+          throw new IllegalArgumentException("Failed to extract binary value");
+        }
       default:
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException(String.format("Unsupported data type %s", dataType));
     }
   }
 

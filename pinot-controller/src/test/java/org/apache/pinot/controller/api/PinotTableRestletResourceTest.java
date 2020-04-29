@@ -93,7 +93,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       Assert.fail("Creation of an OFFLINE table with two underscores in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 400"));
     }
 
     // Create an OFFLINE table with a valid name which should succeed
@@ -107,7 +107,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       Assert.fail("Creation of an existing OFFLINE table does not fail");
     } catch (IOException e) {
       // Expected 409 Conflict
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 409"));
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 409"));
     }
 
     // Create an OFFLINE table with invalid replication config
@@ -117,7 +117,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       Assert.fail("Creation of an invalid OFFLINE table does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 400"));
     }
 
     // Create a REALTIME table with an invalid name which should fail
@@ -130,7 +130,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       Assert.fail("Creation of a REALTIME table with two underscores in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 400"));
     }
 
     // Creating a REALTIME table without a valid schema should fail
@@ -140,7 +140,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       Assert.fail("Creation of a REALTIME table without a valid schema does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 400"));
     }
 
     // Creating a REALTIME table with a different schema name in the config should succeed (backwards compatibility mode)

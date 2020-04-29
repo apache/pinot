@@ -27,7 +27,7 @@ import org.apache.pinot.minion.metrics.MinionMetrics;
 
 
 /**
- * The <code>MinionContext</code> class is a singleton class which contains all minion related context.
+ * The <id>MinionContext</id> class is a singleton class which contains all minion related context.
  */
 public class MinionContext {
   private static final MinionContext INSTANCE = new MinionContext();

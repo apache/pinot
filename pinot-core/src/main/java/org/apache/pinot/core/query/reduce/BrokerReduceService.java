@@ -41,7 +41,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
- * The <code>BrokerReduceService</code> class provides service to reduce data tables gathered from multiple servers
+ * The <id>BrokerReduceService</id> class provides service to reduce data tables gathered from multiple servers
  * to {@link BrokerResponseNative}.
  */
 @ThreadSafe

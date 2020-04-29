@@ -34,7 +34,7 @@ import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * The class <code>ClusterInfoProvider</code> is an abstraction on top of {@link PinotHelixResourceManager} and
+ * The class <id>ClusterInfoProvider</id> is an abstraction on top of {@link PinotHelixResourceManager} and
  * {@link PinotHelixTaskResourceManager} which provides cluster information for {@link PinotTaskGenerator}.
  */
 public class ClusterInfoProvider {

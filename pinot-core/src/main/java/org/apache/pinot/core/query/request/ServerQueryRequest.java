@@ -30,7 +30,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
 
 /**
- * The <code>ServerQueryRequest</code> class encapsulates the query related information as well as the query processing
+ * The <id>ServerQueryRequest</id> class encapsulates the query related information as well as the query processing
  * context.
  * <p>All segment independent information should be pre-computed and stored in this class to avoid repetitive work on a
  * per segment basis.

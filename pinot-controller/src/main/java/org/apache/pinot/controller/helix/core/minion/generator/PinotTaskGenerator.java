@@ -25,7 +25,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
- * The interface <code>PinotTaskGenerator</code> defines the APIs for task generators.
+ * The interface <id>PinotTaskGenerator</id> defines the APIs for task generators.
  */
 public interface PinotTaskGenerator {
 

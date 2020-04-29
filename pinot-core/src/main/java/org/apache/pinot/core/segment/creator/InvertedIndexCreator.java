@@ -43,7 +43,7 @@ import java.io.IOException;
  * <p>To create an inverted index:
  * <ul>
  *   <li>
- *     Construct an instance of <code>InvertedIndexCreator</code>
+ *     Construct an instance of <id>InvertedIndexCreator</id>
  *   </li>
  *   <li>
  *     Call add() for each docId in sequence starting with 0 to add dictId (dictIds for multi-valued column) into the

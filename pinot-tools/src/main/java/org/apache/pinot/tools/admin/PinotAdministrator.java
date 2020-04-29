@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to implement Pinot Administrator, that provides the following commands:
  *
- * System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called with exit code.
+ * System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called with exit id.
  *
  * Sample Usage in Commandline:
  *  JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true" \

@@ -1027,7 +1027,7 @@ public class ClusterIntegrationTestUtils {
    * Helper method to convert boolean value to lower case.
    * <p>The reason for this method is that boolean values in H2 results are all uppercase characters, while in Pinot
    * they are all lowercase characters.
-   * <p>If value is neither <code>TRUE</code> or <code>FALSE</code>, return itself.
+   * <p>If value is neither <id>TRUE</id> or <id>FALSE</id>, return itself.
    *
    * @param value raw value.
    * @return converted value.

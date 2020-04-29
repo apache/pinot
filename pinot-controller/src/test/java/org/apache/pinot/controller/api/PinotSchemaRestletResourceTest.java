@@ -47,8 +47,8 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString());
     } catch (IOException e) {
-      // TODO The Jersey API returns 400, so we need to check return code here not a string.
-//      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
+      // TODO The Jersey API returns 400, so we need to check return id here not a string.
+//      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 415"), e.getMessage());
       return;
     }
     // should not reach here
@@ -69,7 +69,7 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
       Map<String, String> header = new HashMap<>();
       sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schemaString, header);
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 415"), e.getMessage());
     }
 
     try {

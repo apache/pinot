@@ -45,7 +45,7 @@ import org.testng.annotations.BeforeTest;
 
 
 /**
- * The <code>BaseMultiValueQueriesTest</code> class sets up the index segment for the multi-value queries test.
+ * The <id>BaseMultiValueQueriesTest</id> class sets up the index segment for the multi-value queries test.
  * <p>There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
  * the index segment. Selected columns information are as following:
  * <ul>
@@ -104,7 +104,7 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setInvertedIndexCreationColumns(Arrays.asList("column3", "column7", "column8", "column9"));
-    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // The segment generation id in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check

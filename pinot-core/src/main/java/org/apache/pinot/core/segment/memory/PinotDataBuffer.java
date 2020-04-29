@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The class <code>PinotDataBuffer</code> is the byte buffer for Pinot data that resides in off-heap memory.
+ * The class <id>PinotDataBuffer</id> is the byte buffer for Pinot data that resides in off-heap memory.
  *
  * <p>The byte buffer may be memory mapped (MMAP) or direct allocated (DIRECT).
  * <p>Supports buffers larger than 2GB.

@@ -64,7 +64,7 @@ public class PinotFileUploadTest extends ControllerTest {
     HttpResponse response = httpClient.execute(httpPost);
     int statusCode = response.getStatusLine().getStatusCode();
 
-    Assert.assertTrue(statusCode >= 400 && statusCode < 500, "Status code = " + statusCode);
+    Assert.assertTrue(statusCode >= 400 && statusCode < 500, "Status id = " + statusCode);
   }
 
   @AfterClass

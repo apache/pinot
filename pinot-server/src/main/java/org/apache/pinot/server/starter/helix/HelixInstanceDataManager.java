@@ -58,7 +58,7 @@ import com.google.common.base.Preconditions;
 
 
 /**
- * The class <code>HelixInstanceDataManager</code> is the instance data manager based on Helix.
+ * The class <id>HelixInstanceDataManager</id> is the instance data manager based on Helix.
  *
  * TODO: move SegmentFetcherAndLoader into this class to make this the top level manager
  */

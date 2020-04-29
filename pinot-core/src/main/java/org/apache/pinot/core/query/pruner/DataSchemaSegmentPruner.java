@@ -24,7 +24,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
- * The <code>DataSchemaSegmentPruner</code> class prunes segment based on whether the all the querying columns exist in
+ * The <id>DataSchemaSegmentPruner</id> class prunes segment based on whether the all the querying columns exist in
  * the segment schema.
  */
 public class DataSchemaSegmentPruner implements SegmentPruner {

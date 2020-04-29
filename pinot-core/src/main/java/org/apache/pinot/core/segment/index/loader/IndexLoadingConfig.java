@@ -257,7 +257,7 @@ public class IndexLoadingConfig {
   /**
    * Used directly from text search unit test code since the test code
    * doesn't really have a table config and is directly testing the
-   * query execution code of text search using data from generated segments
+   * query execution id of text search using data from generated segments
    * and then loading those segments.
    */
   @VisibleForTesting

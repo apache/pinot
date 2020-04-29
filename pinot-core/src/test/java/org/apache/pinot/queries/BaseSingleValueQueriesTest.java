@@ -46,7 +46,7 @@ import org.testng.annotations.BeforeTest;
 
 
 /**
- * The <code>BaseSingleValueQueriesTest</code> class sets up the index segment for the single-value queries test.
+ * The <id>BaseSingleValueQueriesTest</id> class sets up the index segment for the single-value queries test.
  * <p>There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
  * the index segment. Selected columns information are as following:
  * <ul>
@@ -107,7 +107,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // The segment generation id in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check

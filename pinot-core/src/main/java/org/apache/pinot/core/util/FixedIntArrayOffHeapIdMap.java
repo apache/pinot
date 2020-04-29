@@ -30,7 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * Implementation of {@link IdMap} with {@link FixedIntArray} as key.
  *
- * This implementation extends the {@link BaseOffHeapMutableDictionary} for code-reuse of off-heap functionality. The
+ * This implementation extends the {@link BaseOffHeapMutableDictionary} for id-reuse of off-heap functionality. The
  * dictionary related APIs are not supported.
  */
 public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary implements IdMap<FixedIntArray> {

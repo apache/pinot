@@ -48,7 +48,7 @@ public class AccessControlTest extends ControllerTest {
     try {
       sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload("testTable", "testSegment"));
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 403"));
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 403"));
       return;
     }
     Assert.fail("Access not denied");

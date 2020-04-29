@@ -400,7 +400,7 @@ public final class Schema {
    * Validates a pinot schema.
    * <p>The following validations are performed:
    * <ul>
-   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, STRING</li>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, STRING, BYTES</li>
    *   <li>For non-derived metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE</li>
    * </ul>
    *

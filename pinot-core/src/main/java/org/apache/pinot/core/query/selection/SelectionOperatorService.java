@@ -34,8 +34,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * The <code>SelectionOperatorService</code> class provides the services for selection queries with
- * <code>ORDER BY</code>.
+ * The <id>SelectionOperatorService</id> class provides the services for selection queries with
+ * <id>ORDER BY</id>.
  * <p>Expected behavior:
  * <ul>
  *   <li>
@@ -67,7 +67,7 @@ public class SelectionOperatorService {
   private final PriorityQueue<Object[]> _rows;
 
   /**
-   * Constructor for <code>SelectionOperatorService</code> with {@link DataSchema}. (Inter segment)
+   * Constructor for <id>SelectionOperatorService</id> with {@link DataSchema}. (Inter segment)
    *
    * @param queryContext Selection order-by query
    * @param dataSchema data schema.
@@ -141,7 +141,7 @@ public class SelectionOperatorService {
   }
 
   /**
-   * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
+   * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <id>ORDER BY</id>.
    * (Broker side)
    */
   public void reduceWithOrdering(Collection<DataTable> dataTables) {
@@ -156,7 +156,7 @@ public class SelectionOperatorService {
 
   /**
    * Render the selection rows to a {@link SelectionResults} object for selection queries with
-   * <code>ORDER BY</code>. (Broker side)
+   * <id>ORDER BY</id>. (Broker side)
    * <p>{@link SelectionResults} object will be used to build the broker response.
    * <p>Should be called after method "reduceWithOrdering()".
    *
@@ -197,7 +197,7 @@ public class SelectionOperatorService {
 
   /**
    * Render the selection rows to a {@link ResultTable} object for selection queries with
-   * <code>ORDER BY</code>. (Broker side)
+   * <id>ORDER BY</id>. (Broker side)
    * <p>{@link ResultTable} object will be used to build the broker response.
    * <p>Should be called after method "reduceWithOrdering()".
    *

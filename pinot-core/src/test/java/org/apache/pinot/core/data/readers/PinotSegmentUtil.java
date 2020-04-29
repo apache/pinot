@@ -105,7 +105,7 @@ public class PinotSegmentUtil {
   private static Object generateSingleValue(ThreadLocalRandom random, FieldSpec fieldSpec) {
     if (fieldSpec instanceof TimeFieldSpec) {
       // explicitly generate the time column values within allowed range so that
-      // segment generation code doesn't throw exception
+      // segment generation id doesn't throw exception
       TimeFieldSpec timeFieldSpec = (TimeFieldSpec)fieldSpec;
       TimeUnit unit = timeFieldSpec.getIncomingGranularitySpec().getTimeType();
       return generateTimeValue(random, unit);

@@ -96,23 +96,23 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   /**
    * Test hardcoded queries.
    * <p>NOTE:
-   * <p>For queries with <code>LIMIT</code> or <code>TOP</code>, need to remove limit or add <code>LIMIT 10000</code> to
+   * <p>For queries with <id>LIMIT</id> or <id>TOP</id>, need to remove limit or add <id>LIMIT 10000</id> to
    * the H2 SQL query because the comparison only works on exhausted result with at most 10000 rows.
    * <ul>
    *   <li>
-   *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
+   *     Eg. <id>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</id>
    *   </li>
    * </ul>
    * <p>For queries with multiple aggregation functions, need to split each of them into a separate H2 SQL query.
    * <ul>
    *   <li>
-   *     Eg. <code>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</code>
+   *     Eg. <id>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</id>
    *   </li>
    * </ul>
    * <p>For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
    * <ul>
    *   <li>
-   *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
+   *     Eg. <id>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</id>
    *   </li>
    * </ul>
    *
@@ -145,17 +145,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   /**
    * Test hardcoded queries.
    * <p>NOTE:
-   * <p>For queries with <code>LIMIT</code> or <code>TOP</code>, need to remove limit or add <code>LIMIT 10000</code> to
+   * <p>For queries with <id>LIMIT</id> or <id>TOP</id>, need to remove limit or add <id>LIMIT 10000</id> to
    * the H2 SQL query because the comparison only works on exhausted result with at most 10000 rows.
    * <ul>
    *   <li>
-   *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
+   *     Eg. <id>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</id>
    *   </li>
    * </ul>
    * <p>For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
    * <ul>
    *   <li>
-   *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
+   *     Eg. <id>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</id>
    *   </li>
    * </ul>
    * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct

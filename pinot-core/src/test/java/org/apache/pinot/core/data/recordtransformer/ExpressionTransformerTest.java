@@ -49,10 +49,8 @@ public class ExpressionTransformerTest {
         .addMultiValueDimension("bids", FieldSpec.DataType.INT)
         .addSingleValueDimension("maxBid", FieldSpec.DataType.INT)
         .addMultiValueDimension("map2_keys", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("map2_values", FieldSpec.DataType.INT)
-        .addMetric("cost", FieldSpec.DataType.DOUBLE)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
-        .build();
+        .addMultiValueDimension("map2_values", FieldSpec.DataType.INT).addMetric("cost", FieldSpec.DataType.DOUBLE)
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
 
     List<TransformConfig> transformConfigs = new ArrayList<>();
     transformConfigs.add(new TransformConfig("userId", "Groovy({user_id}, user_id)"));
@@ -83,6 +81,8 @@ public class ExpressionTransformerTest {
     genericRow.putValue("map2", map2);
     genericRow.putValue("cost", 1000.0);
     genericRow.putValue("timestamp", 1574000000000L);
+    genericRow.putValue("lon", 1.0);
+    genericRow.putValue("lat", 2.0);
 
     // expression transformer
     expressionTransformer.transform(genericRow);
@@ -122,6 +122,9 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("cost"), 1000.0);
     // convert to LONG
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch"), 437222L);
+
+    // geo-spatial transformer
+    Assert.assertEquals(genericRow.getValue("point"), "POINT (1 2)");
   }
 
   /**
@@ -135,10 +138,8 @@ public class ExpressionTransformerTest {
         .addMultiValueDimension("bids", FieldSpec.DataType.INT)
         .addSingleValueDimension("maxBid", FieldSpec.DataType.INT)
         .addMultiValueDimension("map1__KEYS", FieldSpec.DataType.INT)
-        .addMultiValueDimension("map1__VALUES", FieldSpec.DataType.STRING)
-        .addMetric("cost", FieldSpec.DataType.DOUBLE)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
-        .build();
+        .addMultiValueDimension("map1__VALUES", FieldSpec.DataType.STRING).addMetric("cost", FieldSpec.DataType.DOUBLE)
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
 
     // only specified in schema
     pinotSchema.getFieldSpecFor("maxBid").setTransformFunction("Groovy({bids.max{ it.toBigDecimal() }}, bids)");
@@ -192,6 +193,7 @@ public class ExpressionTransformerTest {
     // calculate hoursSinceEpoch
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch").toString(), "437222.2222222222");
   }
+
   /**
    * If destination field already exists in the row, do not execute transform function
    */

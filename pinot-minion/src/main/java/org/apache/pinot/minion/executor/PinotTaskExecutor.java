@@ -22,7 +22,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**
- * The interface <code>PinotTaskExecutor</code> defines the APIs for task executors.
+ * The interface <id>PinotTaskExecutor</id> defines the APIs for task executors.
  */
 public interface PinotTaskExecutor {
 

@@ -34,7 +34,7 @@ import org.apache.pinot.core.startree.v2.StarTreeV2;
 
 
 /**
- * The <code>AggregationPlanNode</code> class provides the execution plan for aggregation only query on a single
+ * The <id>AggregationPlanNode</id> class provides the execution plan for aggregation only query on a single
  * segment.
  */
 @SuppressWarnings("rawtypes")

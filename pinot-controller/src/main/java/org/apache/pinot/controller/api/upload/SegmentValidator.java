@@ -76,7 +76,7 @@ public class SegmentValidator {
     try {
       quotaResponse = checkStorageQuota(tempSegmentDir, segmentMetadata, offlineTableConfig);
     } catch (InvalidConfigException e) {
-      // Admin port is missing, return response with 500 status code.
+      // Admin port is missing, return response with 500 status id.
       throw new ControllerApplicationException(LOGGER,
           "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + e
               .getMessage(), Response.Status.INTERNAL_SERVER_ERROR);

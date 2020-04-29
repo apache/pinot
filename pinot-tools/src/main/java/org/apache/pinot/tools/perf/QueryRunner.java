@@ -283,7 +283,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   /**
    * Use multiple threads to run queries as fast as possible.
    * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
-   * queue whenever the queue length is low, and start <code>numThreads</code> worker threads to fetch queries from the
+   * queue whenever the queue length is low, and start <id>numThreads</id> worker threads to fetch queries from the
    * queue and send them.
    * <p>The main thread is responsible for collecting and logging the statistic information periodically.
    * <p>Queries are picked sequentially from the query file.
@@ -386,7 +386,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   /**
    * Use multiple threads to run query at a target QPS.
    * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
-   * queue at the target QPS, and start <code>numThreads</code> worker threads to fetch queries from the queue and send
+   * queue at the target QPS, and start <id>numThreads</id> worker threads to fetch queries from the queue and send
    * them.
    * <p>The main thread is responsible for collecting and logging the statistic information periodically.
    * <p>Queries are picked sequentially from the query file.
@@ -487,7 +487,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   /**
    * Use multiple threads to run query at an increasing target QPS.
    * <p>Use a concurrent linked queue to buffer the queries to be sent. Use the main thread to insert queries into the
-   * queue at the target QPS, and start <code>numThreads</code> worker threads to fetch queries from the queue and send
+   * queue at the target QPS, and start <id>numThreads</id> worker threads to fetch queries from the queue and send
    * them.
    * <p>We start with the start QPS, and keep adding delta QPS to the start QPS during the test.
    * <p>The main thread is responsible for collecting and logging the statistic information periodically.

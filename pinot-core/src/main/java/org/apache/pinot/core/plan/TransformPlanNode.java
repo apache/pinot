@@ -28,7 +28,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
- * The <code>TransformPlanNode</code> class provides the execution plan for transforms on a single segment.
+ * The <id>TransformPlanNode</id> class provides the execution plan for transforms on a single segment.
  */
 public class TransformPlanNode implements PlanNode {
   private final Collection<ExpressionContext> _expressions;

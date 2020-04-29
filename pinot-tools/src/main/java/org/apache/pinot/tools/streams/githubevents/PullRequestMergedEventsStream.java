@@ -191,9 +191,9 @@ public class PullRequestMergedEventsStream {
                   "Unauthorized call to GitHub events API. Status message: " + githubAPIResponse.statusMessage
                       + ". Exiting.");
               return;
-            default: // Unknown status code
+            default: // Unknown status id
               printStatus(Quickstart.Color.YELLOW,
-                  "Unknown status code " + githubAPIResponse.statusCode + " statusMessage "
+                  "Unknown status id " + githubAPIResponse.statusCode + " statusMessage "
                       + githubAPIResponse.statusMessage + ". Retry in 10s");
               Thread.sleep(SLEEP_MILLIS);
           }

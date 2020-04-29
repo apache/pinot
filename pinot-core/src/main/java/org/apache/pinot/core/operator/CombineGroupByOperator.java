@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>CombineGroupByOperator</code> class is the operator to combine aggregation group-by results.
+ * The <id>CombineGroupByOperator</id> class is the operator to combine aggregation group-by results.
  */
 @SuppressWarnings("rawtypes")
 public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBlock> {

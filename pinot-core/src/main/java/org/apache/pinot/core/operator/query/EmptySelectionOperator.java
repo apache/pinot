@@ -31,7 +31,7 @@ import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 /**
- * The <code>EmptySelectionOperator</code> class provides the operator for selection query with LIMIT less or equal to 0
+ * The <id>EmptySelectionOperator</id> class provides the operator for selection query with LIMIT less or equal to 0
  * on a single segment.
  * <p>NOTE: this operator short circuit underlying operators and directly returns the data schema without any rows.
  */

@@ -22,7 +22,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * The <code>TransformResultMetadata</code> class contains the metadata for the transform result.
+ * The <id>TransformResultMetadata</id> class contains the metadata for the transform result.
  */
 public class TransformResultMetadata {
   private final FieldSpec.DataType _dataType;

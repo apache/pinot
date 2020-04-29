@@ -34,7 +34,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 
 
 /**
- * The <code>DateTimeConversionTransformFunction</code> class implements the date time conversion transform function.
+ * The <id>DateTimeConversionTransformFunction</id> class implements the date time conversion transform function.
  * <ul>
  *   <li>
  *     This transform function should be invoked with arguments:

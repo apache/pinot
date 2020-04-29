@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>SegmentPurger</code> class takes a segment and purges/modifies its records and generate a new segment with
+ * The <id>SegmentPurger</id> class takes a segment and purges/modifies its records and generate a new segment with
  * the remaining modified records.
  */
 public class SegmentPurger {
@@ -239,7 +239,7 @@ public class SegmentPurger {
   public interface RecordPurger {
 
     /**
-     * Return <code>true</code> if the record should be purged.
+     * Return <id>true</id> if the record should be purged.
      */
     boolean shouldPurge(GenericRow row);
   }
@@ -261,7 +261,7 @@ public class SegmentPurger {
   public interface RecordModifier {
 
     /**
-     * Modify the record inplace, and return <code>true</code> if the record get modified.
+     * Modify the record inplace, and return <id>true</id> if the record get modified.
      */
     boolean modifyRecord(GenericRow row);
   }

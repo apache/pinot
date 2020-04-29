@@ -205,8 +205,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfigJson.toString());
       fail();
     } catch (IOException e) {
-      // Should get response code 400 (BAD_REQUEST)
-      assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      // Should get response id 400 (BAD_REQUEST)
+      assertTrue(e.getMessage().startsWith("Server returned HTTP response id: 400"));
     }
   }
 
@@ -996,7 +996,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       sendDeleteRequest(deleteInstanceRequest);
       fail("Delete should have returned a failure status (404)");
     } catch (IOException e) {
-      // Expected exception on 404 status code
+      // Expected exception on 404 status id
     }
 
     // Get the server name
@@ -1017,7 +1017,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       sendDeleteRequest(deleteInstanceRequest);
       fail("Delete should have returned a failure status (409)");
     } catch (IOException e) {
-      // Expected exception on 409 status code
+      // Expected exception on 409 status id
     }
 
     // Stop servers
@@ -1028,7 +1028,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       sendDeleteRequest(deleteInstanceRequest);
       fail("Delete should have returned a failure status (409)");
     } catch (IOException e) {
-      // Expected exception on 409 status code
+      // Expected exception on 409 status id
     }
 
     // Delete the table
@@ -1044,7 +1044,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       sendDeleteRequest(deleteInstanceRequest);
       fail("Delete should have returned a failure status (409)");
     } catch (IOException e) {
-      // Expected exception on 409 status code
+      // Expected exception on 409 status id
     }
 
     // Stop brokers

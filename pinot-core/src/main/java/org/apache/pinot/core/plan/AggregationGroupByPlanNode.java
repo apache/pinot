@@ -34,7 +34,7 @@ import org.apache.pinot.core.startree.v2.StarTreeV2;
 
 
 /**
- * The <code>AggregationGroupByPlanNode</code> class provides the execution plan for aggregation group-by query on a
+ * The <id>AggregationGroupByPlanNode</id> class provides the execution plan for aggregation group-by query on a
  * single segment.
  */
 @SuppressWarnings("rawtypes")

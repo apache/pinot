@@ -27,7 +27,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * The <code>TransformBlockValSet</code> class represents the block value set for a transform function in the transform
+ * The <id>TransformBlockValSet</id> class represents the block value set for a transform function in the transform
  * block.
  * <p>Caller is responsible for calling the correct method based on the data source metadata for the block value set.
  */

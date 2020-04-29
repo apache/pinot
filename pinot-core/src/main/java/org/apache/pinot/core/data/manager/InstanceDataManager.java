@@ -35,7 +35,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
- * The <code>InstanceDataManager</code> class is the instance level data manager, which manages all tables and segments
+ * The <id>InstanceDataManager</id> class is the instance level data manager, which manages all tables and segments
  * served by the instance.
  */
 @ThreadSafe
@@ -97,13 +97,13 @@ public interface InstanceDataManager {
   Set<String> getAllTables();
 
   /**
-   * Returns the table data manager for the given table, or <code>null</code> if it does not exist.
+   * Returns the table data manager for the given table, or <id>null</id> if it does not exist.
    */
   @Nullable
   TableDataManager getTableDataManager(String tableNameWithType);
 
   /**
-   * Returns the segment metadata for the given segment in the given table, or <code>null</code> if it does not exist.
+   * Returns the segment metadata for the given segment in the given table, or <id>null</id> if it does not exist.
    */
   @Nullable
   SegmentMetadata getSegmentMetadata(String tableNameWithType, String segmentName);

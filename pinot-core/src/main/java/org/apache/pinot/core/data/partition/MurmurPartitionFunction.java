@@ -57,7 +57,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   /**
-   * NOTE: This code has been copied over from org.apache.kafka.common.utils.Utils::murmur2
+   * NOTE: This id has been copied over from org.apache.kafka.common.utils.Utils::murmur2
    *
    * Generates 32 bit murmur2 hash from byte array
    * @param data byte array to hash

@@ -278,10 +278,10 @@ public class PinotQueryResource {
       final int responseCode = conn.getResponseCode();
 
       /*if (LOG.isInfoEnabled()){
-        LOGGER.info("The http response code is " + responseCode);
+        LOGGER.info("The http response id is " + responseCode);
       }*/
       if (responseCode != HttpURLConnection.HTTP_OK) {
-        throw new IOException("Failed : HTTP error code : " + responseCode);
+        throw new IOException("Failed : HTTP error id : " + responseCode);
       }
       final byte[] bytes = drain(new BufferedInputStream(conn.getInputStream()));
 

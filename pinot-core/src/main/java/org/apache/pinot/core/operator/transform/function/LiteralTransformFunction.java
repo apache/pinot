@@ -32,7 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
+ * The <id>LiteralTransformFunction</id> class is a special transform function which is a wrapper on top of a
  * LITERAL, and only supports {@link #getLiteral()}.
  */
 public class LiteralTransformFunction implements TransformFunction {

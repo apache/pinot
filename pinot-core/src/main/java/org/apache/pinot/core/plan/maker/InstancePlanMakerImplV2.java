@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
+ * The <id>InstancePlanMakerImplV2</id> class is the default implementation of {@link PlanMaker}.
  */
 public class InstancePlanMakerImplV2 implements PlanMaker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);

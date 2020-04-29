@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The base periodic task for pinot controller only. It uses <code>PinotHelixResourceManager</code> to determine
+ * The base periodic task for pinot controller only. It uses <id>PinotHelixResourceManager</id> to determine
  * which table resources should be managed by this Pinot controller.
  *
  * @param <C> the context type

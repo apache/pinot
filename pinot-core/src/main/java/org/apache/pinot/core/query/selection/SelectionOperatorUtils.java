@@ -47,8 +47,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
- * The <code>SelectionOperatorUtils</code> class provides the utility methods for selection queries without
- * <code>ORDER BY</code> and {@link SelectionOperatorService}.
+ * The <id>SelectionOperatorUtils</id> class provides the utility methods for selection queries without
+ * <id>ORDER BY</id> and {@link SelectionOperatorService}.
  * <p>Expected behavior:
  * <ul>
  *   <li>
@@ -189,7 +189,7 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Merge two partial results for selection queries without <code>ORDER BY</code>. (Server side)
+   * Merge two partial results for selection queries without <id>ORDER BY</id>. (Server side)
    *
    * @param mergedRows partial results 1.
    * @param rowsToMerge partial results 2.
@@ -204,7 +204,7 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Merge two partial results for selection queries with <code>ORDER BY</code>. (Server side)
+   * Merge two partial results for selection queries with <id>ORDER BY</id>. (Server side)
    * TODO: Should use type compatible comparator to compare the rows
    *
    * @param mergedRows partial results 1.
@@ -384,7 +384,7 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
+   * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <id>ORDER BY</id>.
    * (Broker side)
    */
   public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int selectionSize) {
@@ -404,7 +404,7 @@ public class SelectionOperatorUtils {
 
   /**
    * Render the selection rows to a formatted {@link SelectionResults} object for selection queries without
-   * <code>ORDER BY</code>. (Broker side)
+   * <id>ORDER BY</id>. (Broker side)
    * <p>{@link SelectionResults} object will be used to build the broker response.
    * <p>Should be called after method "reduceWithoutOrdering()".
    *
@@ -441,7 +441,7 @@ public class SelectionOperatorUtils {
 
   /**
    * Render the selection rows to a {@link ResultTable} object
-   * for selection queries without <code>ORDER BY</code>
+   * for selection queries without <id>ORDER BY</id>
    * <p>{@link ResultTable} object will be used to set in the broker response.
    * <p>Should be called after method "reduceWithoutOrdering()".
    *

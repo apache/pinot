@@ -143,6 +143,8 @@
     <snappy-java.version>1.1.1.7</snappy-java.version>
     <log4j.version>2.11.2</log4j.version>
     <netty.version>4.1.42.Final</netty.version>
+    <jts.version>1.16.1</jts.version>
+    <kryo.version>4.0.2</kryo.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
@@ -1185,6 +1187,22 @@
         <groupId>io.grpc</groupId>
         <artifactId>grpc-stub</artifactId>
         <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.objenesis</groupId>
+        <artifactId>objenesis</artifactId>
+        <version>2.5.1</version>
+      </dependency>
+      <!-- geo dependencies -->
+      <dependency>
+        <groupId>org.locationtech.jts</groupId>
+        <artifactId>jts-core</artifactId>
+        <version>${jts.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.esotericsoftware</groupId>
+        <artifactId>kryo</artifactId>
+        <version>${kryo.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

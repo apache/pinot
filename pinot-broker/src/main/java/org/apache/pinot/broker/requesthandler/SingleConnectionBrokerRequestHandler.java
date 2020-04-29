@@ -49,7 +49,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
- * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe broker request handler using a single
+ * The <id>SingleConnectionBrokerRequestHandler</id> class is a thread-safe broker request handler using a single
  * connection per server to route the queries.
  */
 @ThreadSafe

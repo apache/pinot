@@ -35,7 +35,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 /**
- * The <code>SelectionPlanNode</code> class provides the execution plan for selection query on a single segment.
+ * The <id>SelectionPlanNode</id> class provides the execution plan for selection query on a single segment.
  */
 public class SelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;

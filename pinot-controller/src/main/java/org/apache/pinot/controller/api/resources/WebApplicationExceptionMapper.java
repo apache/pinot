@@ -55,7 +55,7 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
 
   public static class ErrorInfo {
     @JsonCreator
-    public ErrorInfo(@JsonProperty("code") int code, @JsonProperty("error") String message) {
+    public ErrorInfo(@JsonProperty("id") int code, @JsonProperty("error") String message) {
       this.code = code;
       this.error = message;
     }

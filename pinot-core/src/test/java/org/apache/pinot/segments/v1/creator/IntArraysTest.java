@@ -68,7 +68,7 @@ public class IntArraysTest {
     final SegmentGeneratorConfig config = SegmentTestUtils
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "weeksSinceEpochSunday",
             TimeUnit.DAYS, "test");
-    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // The segment generation id in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check

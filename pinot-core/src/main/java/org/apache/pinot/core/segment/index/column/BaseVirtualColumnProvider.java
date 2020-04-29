@@ -26,7 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Shared implementation code between column providers.
+ * Shared implementation id between column providers.
  */
 public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
 

@@ -147,7 +147,7 @@ public class SegmentCompletionManager {
         LLCRealtimeSegmentZKMetadata segmentMetadata =
             _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName.getSegmentName(), null);
         if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
-          // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
+          // Best to go through the state machine for this case as well, so that all id regarding state handling is in one place
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
           // multiple instances of the FSM to be created for the same commit sequence at the same time.
           StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
@@ -304,9 +304,9 @@ public class SegmentCompletionManager {
    * This method is to be called when the segment sent in by the server has been saved locally in the correct path that
    * is downloadable by the servers.
    *
-   * It returns a response code to be sent back to the client.
+   * It returns a response id to be sent back to the client.
    *
-   * If the repsonse code is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
+   * If the repsonse id is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
    *
    * @return
    */

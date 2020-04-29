@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>SegmentPrunerService</code> class contains multiple segment pruners and provides service to prune segments
+ * The <id>SegmentPrunerService</id> class contains multiple segment pruners and provides service to prune segments
  * against all pruners.
  */
 public class SegmentPrunerService {
@@ -47,7 +47,7 @@ public class SegmentPrunerService {
   }
 
   /**
-   * Returns <code>true</code> if the segment can be pruned based on the query request.
+   * Returns <id>true</id> if the segment can be pruned based on the query request.
    */
   public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
     for (SegmentPruner segmentPruner : _segmentPruners) {

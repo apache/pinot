@@ -21,7 +21,7 @@ package org.apache.pinot.core.data.partition;
 import com.google.common.base.Preconditions;
 
 /**
- * Hash code partition function, where:
+ * Hash id partition function, where:
  * <ul>
  *   <li> partitionId = value.hashCode() % {@link #_numPartitions}</li>
  * </ul>

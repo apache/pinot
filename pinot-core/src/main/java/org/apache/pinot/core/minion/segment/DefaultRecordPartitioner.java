@@ -22,7 +22,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Default record partitioner that is using a hash code of the input row
+ * Default record partitioner that is using a hash id of the input row
  */
 public class DefaultRecordPartitioner implements RecordPartitioner {
 

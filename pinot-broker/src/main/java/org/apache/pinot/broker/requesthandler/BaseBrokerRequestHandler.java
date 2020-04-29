@@ -965,7 +965,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   /**
    * Helper method to get the time column name for the OFFLINE table name from the time boundary service, or
-   * <code>null</code> if the time boundary service does not have the information.
+   * <id>null</id> if the time boundary service does not have the information.
    */
   private String getTimeColumnName(String offlineTableName) {
     TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);

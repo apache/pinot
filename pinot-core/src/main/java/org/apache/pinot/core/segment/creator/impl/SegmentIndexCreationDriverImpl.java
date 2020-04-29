@@ -308,9 +308,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   // and hold the data in memory and write the buffer at the end. The memory requirement in this case increases linearly
   // with the number of columns. Variation of that is to mmap data to separate files...which is what we are doing here
   // 3. Another option is to generate dictionary and fwd indexes in v3 and generate inverted, star and raw indexes in
-  // separate files. Then add those files to v3 index file. This leads to lot of hodgepodge code to
+  // separate files. Then add those files to v3 index file. This leads to lot of hodgepodge id to
   // handle multiple segment formats.
-  // Using converter is similar to option (2), plus it's battle-tested code. We will roll out with
+  // Using converter is similar to option (2), plus it's battle-tested id. We will roll out with
   // this change to keep changes limited. Once we've migrated we can implement approach (1) with option to
   // copy for indexes for which we don't know sizes upfront.
   private void convertFormatIfNecessary(File segmentDirectory)
