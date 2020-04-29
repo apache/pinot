@@ -205,15 +205,13 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       _clusterInfoProvider = clusterInfoProvider;
     }
 
-    @Nonnull
     @Override
     public String getTaskType() {
       return TASK_TYPE;
     }
 
-    @Nonnull
     @Override
-    public List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs) {
+    public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
       assertEquals(tableConfigs.size(), 2);
 
       // Generate at most 2 tasks
@@ -229,15 +227,6 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
         taskConfigs.add(new PinotTaskConfig(TASK_TYPE, configs));
       }
       return taskConfigs;
-    }
-
-    @Override
-    public int getNumConcurrentTasksPerInstance() {
-      return DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
-    }
-
-    @Override
-    public void nonLeaderCleanUp() {
     }
   }
 

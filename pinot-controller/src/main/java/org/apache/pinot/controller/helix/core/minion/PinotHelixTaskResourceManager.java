@@ -174,11 +174,13 @@ public class PinotHelixTaskResourceManager {
    * Submit a list of child tasks with same task type to the Minion instances with the default tag.
    *
    * @param pinotTaskConfigs List of child task configs to be submitted
+   * @param taskTimeoutMs Timeout in milliseconds for each task
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
-  public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, int numConcurrentTasksPerInstance) {
-    return submitTask(pinotTaskConfigs, Helix.UNTAGGED_MINION_INSTANCE, numConcurrentTasksPerInstance);
+  public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, long taskTimeoutMs,
+      int numConcurrentTasksPerInstance) {
+    return submitTask(pinotTaskConfigs, Helix.UNTAGGED_MINION_INSTANCE, taskTimeoutMs, numConcurrentTasksPerInstance);
   }
 
   /**
@@ -186,11 +188,12 @@ public class PinotHelixTaskResourceManager {
    *
    * @param pinotTaskConfigs List of child task configs to be submitted
    * @param minionInstanceTag Tag of the Minion instances to submit the task to
+   * @param taskTimeoutMs Timeout in milliseconds for each task
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
   public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, String minionInstanceTag,
-      int numConcurrentTasksPerInstance) {
+      long taskTimeoutMs, int numConcurrentTasksPerInstance) {
     int numChildTasks = pinotTaskConfigs.size();
     Preconditions.checkState(numChildTasks > 0);
     Preconditions.checkState(numConcurrentTasksPerInstance > 0);
@@ -212,8 +215,8 @@ public class PinotHelixTaskResourceManager {
     // don't want one task failure affects other tasks. Also, if one task failed, next time we will re-schedule it
     JobConfig.Builder jobBuilder =
         new JobConfig.Builder().addTaskConfigs(helixTaskConfigs).setInstanceGroupTag(minionInstanceTag)
-            .setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance).setIgnoreDependentJobFailure(true)
-            .setMaxAttemptsPerTask(1).setFailureThreshold(Integer.MAX_VALUE);
+            .setTimeoutPerTask(taskTimeoutMs).setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance)
+            .setIgnoreDependentJobFailure(true).setMaxAttemptsPerTask(1).setFailureThreshold(Integer.MAX_VALUE);
     _taskDriver.enqueueJob(getHelixJobQueueName(taskType), parentTaskName, jobBuilder);
 
     // Wait until task state is available
