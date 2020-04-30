@@ -55,7 +55,7 @@ public class KafkaJSONMessageDecoderTest {
   public void testJsonDecoderWithOutgoingTimeSpec()
       throws Exception {
     Schema schema = Schema.fromFile(new File(
-        getClass().getClassLoader().getResource("data/test_sample_data_schema_with_outgoing_time_field.json")
+        getClass().getClassLoader().getResource("data/test_sample_data_schema_with_outgoing_time_spec.json")
             .getFile()));
     Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
