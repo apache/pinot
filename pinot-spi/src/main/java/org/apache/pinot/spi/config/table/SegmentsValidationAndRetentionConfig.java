@@ -51,8 +51,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _segmentAssignmentStrategy = segmentAssignmentStrategy;
   }
 
-  // TODO: Use TimeFieldSpec in Schema
-  @Deprecated
   public String getTimeColumnName() {
     return _timeColumnName;
   }
@@ -61,7 +59,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _timeColumnName = timeColumnName;
   }
 
-  // TODO: Use TimeFieldSpec in Schema
+  // TODO: Get field spec of _timeColumnName from Schema for the timeType
   @Deprecated
   public TimeUnit getTimeType() {
     return _timeType;

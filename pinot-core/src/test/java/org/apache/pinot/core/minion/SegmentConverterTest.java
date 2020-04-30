@@ -24,6 +24,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -35,6 +37,7 @@ import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -59,6 +62,7 @@ public class SegmentConverterTest {
   private static final long BASE_TIMESTAMP = new DateTime(2018, 9, 5, 0, 0).getMillis();
 
   private List<File> _segmentIndexDirList;
+  private TableConfig _tableConfig;
 
   @BeforeClass
   public void setUp()
@@ -71,6 +75,7 @@ public class SegmentConverterTest {
     schema.addField(new DimensionFieldSpec(D2, FieldSpec.DataType.STRING, true));
     schema.addField(new MetricFieldSpec(M1, FieldSpec.DataType.INT));
     schema.addField(new TimeFieldSpec(T, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(T).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -87,7 +92,7 @@ public class SegmentConverterTest {
       String segmentName = INPUT_SEGMENT_NAME_PREFIX + i;
       RecordReader recordReader = new GenericRowRecordReader(rows);
 
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME);
       config.setSegmentName(segmentName);
@@ -105,7 +110,7 @@ public class SegmentConverterTest {
     SegmentConverter segmentConverter =
         new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentConcatenate")
             .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> row)
-            .setTotalNumPartition(1).build();
+            .setTotalNumPartition(1).setTableConfig(_tableConfig).build();
 
     List<File> result = segmentConverter.convertSegment();
 
@@ -151,7 +156,7 @@ public class SegmentConverterTest {
             result.putValue(M1, aggregatedValue);
           }
           return result;
-        }).setTotalNumPartition(1).build();
+        }).setTotalNumPartition(1).setTableConfig(_tableConfig).build();
 
     List<File> result = segmentConverter.convertSegment();
 
@@ -183,7 +188,7 @@ public class SegmentConverterTest {
     SegmentConverter segmentConverter =
         new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentConcatenate")
             .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> row)
-            .setTotalNumPartition(3).build();
+            .setTotalNumPartition(3).setTableConfig(_tableConfig).build();
 
     List<File> result = segmentConverter.convertSegment();
 

@@ -210,7 +210,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
       schema.addField(dimensionFieldSpec);
     }
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
     config.setRawIndexCreationColumns(Arrays.asList(NO_DICT_COLUMN_NAMES));
 
     config.setOutDir(INDEX_DIR_PATH);

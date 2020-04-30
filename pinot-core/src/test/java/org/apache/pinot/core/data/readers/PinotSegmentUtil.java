@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -79,9 +80,10 @@ public class PinotSegmentUtil {
     return value1Set.containsAll(value2Set);
   }
 
-  public static File createSegment(Schema schema, String segmentName, String segmentOutputDir, RecordReader recordReader)
+  public static File createSegment(TableConfig tableConfig, Schema schema, String segmentName, String segmentOutputDir,
+      RecordReader recordReader)
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(segmentName);
     segmentGeneratorConfig.setOutDir(segmentOutputDir);
     segmentGeneratorConfig.setSegmentName(segmentName);

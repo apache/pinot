@@ -249,7 +249,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
-  private final String _timeColumnName;
   private final List<String> _invertedIndexColumns;
   private final List<String> _textIndexColumns;
   private final List<String> _noDictionaryColumns;
@@ -711,7 +710,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // lets convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
-              _tableNameWithType, _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
+              _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _textIndexColumns, _noDictionaryColumns, _varLengthDictionaryColumns,
               _nullHandlingEnabled);
       segmentLogger.info("Trying to build segment");
@@ -1083,7 +1082,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _streamPartitionId = _llcSegmentName.getPartitionId();
     _partitionConsumerSemaphore = partitionConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
-    _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _streamPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + _streamTopic;

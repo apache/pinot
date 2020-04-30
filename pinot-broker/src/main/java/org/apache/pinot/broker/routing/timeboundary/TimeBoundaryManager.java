@@ -34,7 +34,9 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,10 +68,17 @@ public class TimeBoundaryManager {
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _offlineTableName);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _offlineTableName);
-    _timeColumn = schema.getTimeColumnName();
-    _timeUnit = schema.getOutgoingTimeUnit();
-    Preconditions.checkState(_timeColumn != null && _timeUnit != null,
-        "Time column and time unit must be configured in the schema for table: %s", _offlineTableName);
+    _timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    Preconditions
+        .checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s", _offlineTableName);
+    FieldSpec fieldSpec = schema.getFieldSpecFor(_timeColumn);
+    Preconditions
+        .checkNotNull(fieldSpec, "Field spec must be specified in schema for time column: %s of table: %s", _timeColumn,
+            _offlineTableName);
+    _timeUnit = ((TimeFieldSpec) fieldSpec).getOutgoingGranularitySpec().getTimeType();
+    Preconditions
+        .checkNotNull(_timeUnit, "Time unit must be configured in the field spec for time column: %s of table: %s",
+            _timeColumn, _offlineTableName);
 
     // For HOURLY table with time unit other than DAYS, use (maxEndTime - 1 HOUR) as the time boundary; otherwise, use
     // (maxEndTime - 1 DAY)

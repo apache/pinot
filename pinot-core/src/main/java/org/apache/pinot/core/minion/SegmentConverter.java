@@ -34,6 +34,7 @@ import org.apache.pinot.core.minion.segment.RecordTransformer;
 import org.apache.pinot.core.minion.segment.ReducerRecordReader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
@@ -62,32 +63,34 @@ public class SegmentConverter {
   private String _tableName;
   private String _segmentName;
   private RecordTransformer _recordTransformer;
+  private TableConfig _tableConfig;
 
   // Optional
   private int _totalNumPartition;
   private RecordPartitioner _recordPartitioner;
   private RecordAggregator _recordAggregator;
   private List<String> _groupByColumns;
-  private IndexingConfig _indexingConfig;
   private boolean _skipTimeValueCheck;
+  private IndexingConfig _indexingConfig;
 
   public SegmentConverter(List<File> inputIndexDirs, File workingDir, String tableName, String segmentName,
       int totalNumPartition, RecordTransformer recordTransformer, @Nullable RecordPartitioner recordPartitioner,
       @Nullable RecordAggregator recordAggregator, @Nullable List<String> groupByColumns,
-      @Nullable IndexingConfig indexingConfig, boolean skipTimeValueCheck) {
+      TableConfig tableConfig, boolean skipTimeValueCheck) {
     _inputIndexDirs = inputIndexDirs;
     _workingDir = workingDir;
     _recordTransformer = recordTransformer;
     _tableName = tableName;
     _segmentName = segmentName;
+    _tableConfig = tableConfig;
 
     _recordPartitioner = (recordPartitioner == null) ? new DefaultRecordPartitioner() : recordPartitioner;
     _totalNumPartition = (totalNumPartition < 1) ? DEFAULT_NUM_PARTITION : totalNumPartition;
 
     _recordAggregator = recordAggregator;
     _groupByColumns = groupByColumns;
-    _indexingConfig = indexingConfig;
     _skipTimeValueCheck = skipTimeValueCheck;
+    _indexingConfig = tableConfig.getIndexingConfig();
   }
 
   public List<File> convertSegment()
@@ -101,8 +104,8 @@ public class SegmentConverter {
 
       try (MapperRecordReader mapperRecordReader = new MapperRecordReader(_inputIndexDirs, _recordTransformer,
           _recordPartitioner, _totalNumPartition, currentPartition)) {
-        buildSegment(mapperOutputPath, _tableName, outputSegmentName, mapperRecordReader, null,
-            mapperRecordReader.getSchema());
+        buildSegment(mapperOutputPath, _tableName, outputSegmentName, mapperRecordReader,
+            mapperRecordReader.getSchema(), _tableConfig);
       }
       File outputSegment = new File(mapperOutputPath + File.separator + outputSegmentName);
 
@@ -111,8 +114,8 @@ public class SegmentConverter {
         String reducerOutputPath = _workingDir.getPath() + File.separator + REDUCER_PREFIX + currentPartition;
         try (ReducerRecordReader reducerRecordReader = new ReducerRecordReader(outputSegment, _recordAggregator,
             _groupByColumns)) {
-          buildSegment(reducerOutputPath, _tableName, outputSegmentName, reducerRecordReader, null,
-              reducerRecordReader.getSchema());
+          buildSegment(reducerOutputPath, _tableName, outputSegmentName, reducerRecordReader,
+              reducerRecordReader.getSchema(), _tableConfig);
         }
         outputSegment = new File(reducerOutputPath + File.separator + outputSegmentName);
       }
@@ -128,7 +131,7 @@ public class SegmentConverter {
           try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(outputSegment, null,
               sortedColumn)) {
             buildSegment(indexGenerationOutputPath, _tableName, outputSegmentName, pinotSegmentRecordReader,
-                _indexingConfig, pinotSegmentRecordReader.getSchema());
+                pinotSegmentRecordReader.getSchema(), _tableConfig);
           }
           outputSegment = new File(indexGenerationOutputPath + File.separator + outputSegmentName);
         }
@@ -145,13 +148,14 @@ public class SegmentConverter {
    * TODO: Support all kinds of indexing (no dictionary)
    */
   private void buildSegment(String outputPath, String tableName, String segmentName, RecordReader recordReader,
-      @Nullable IndexingConfig indexingConfig, Schema schema)
+      Schema schema, TableConfig tableConfig)
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setSkipTimeValueCheck(_skipTimeValueCheck);
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig != null) {
       segmentGeneratorConfig.setInvertedIndexCreationColumns(indexingConfig.getInvertedIndexColumns());
     }
@@ -167,13 +171,13 @@ public class SegmentConverter {
     private String _tableName;
     private String _segmentName;
     private RecordTransformer _recordTransformer;
+    private TableConfig _tableConfig;
 
     // Optional
     private int _totalNumPartition;
     private RecordPartitioner _recordPartitioner;
     private RecordAggregator _recordAggregator;
     private List<String> _groupByColumns;
-    private IndexingConfig _indexingConfig;
     private boolean _skipTimeValueCheck;
 
     public Builder setInputIndexDirs(List<File> inputIndexDirs) {
@@ -221,8 +225,8 @@ public class SegmentConverter {
       return this;
     }
 
-    public Builder setIndexingConfig(IndexingConfig indexingConfig) {
-      _indexingConfig = indexingConfig;
+    public Builder setTableConfig(TableConfig tableConfig) {
+      _tableConfig = tableConfig;
       return this;
     }
 
@@ -242,7 +246,7 @@ public class SegmentConverter {
       }
 
       return new SegmentConverter(_inputIndexDirs, _workingDir, _tableName, _segmentName, _totalNumPartition,
-          _recordTransformer, _recordPartitioner, _recordAggregator, _groupByColumns, _indexingConfig,
+          _recordTransformer, _recordPartitioner, _recordAggregator, _groupByColumns, _tableConfig,
           _skipTimeValueCheck);
     }
   }

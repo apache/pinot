@@ -164,7 +164,7 @@ public class SegmentGenerationWithNullValueVectorTest {
 
   private void buildIndex(Schema schema)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
 
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);

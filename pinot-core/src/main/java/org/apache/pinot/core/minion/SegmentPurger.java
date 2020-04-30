@@ -85,7 +85,10 @@ public class SegmentPurger {
       }
 
       Schema schema = purgeRecordReader.getSchema();
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+      // FIXME: figure out how to get table config here.
+      //  Fine for now, since we will only have timeFieldSpec.
+      //  Will be an issue once we start using DateTimeFieldSpec
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
       config.setOutDir(_workingDir.getPath());
       config.setTableName(_rawTableName);
       config.setSegmentName(segmentName);

@@ -151,7 +151,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       throws Exception {
     String segmentName = SEGMENT_NAME_PREFIX + index;
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(SCHEMA);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());

@@ -230,14 +230,20 @@ public class AutoAddInvertedIndex {
       }
 
       // Skip tables without a proper time column
-      TimeFieldSpec timeFieldSpec = tableSchema.getTimeFieldSpec();
-      if (timeFieldSpec == null || timeFieldSpec.getDataType() == FieldSpec.DataType.STRING) {
+      String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+      if (timeColumnName == null) {
+        LOGGER.info(
+            "Table: {}, skip adding inverted index because it does not have a time column specified in the table config",
+            tableNameWithType);
+        continue;
+      }
+      FieldSpec fieldSpec = tableSchema.getFieldSpecFor(timeColumnName);
+      if (fieldSpec == null || fieldSpec.getDataType() == FieldSpec.DataType.STRING) {
         LOGGER.info("Table: {}, skip adding inverted index because it does not have a numeric time column",
             tableNameWithType);
         continue;
       }
-      String timeColumnName = timeFieldSpec.getName();
-      TimeUnit timeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
+      TimeUnit timeUnit = ((TimeFieldSpec) fieldSpec).getOutgoingGranularitySpec().getTimeType();
       if (timeUnit != TimeUnit.DAYS) {
         LOGGER.warn("Table: {}, time column {] has non-DAYS time unit: {}", timeColumnName, timeUnit);
       }

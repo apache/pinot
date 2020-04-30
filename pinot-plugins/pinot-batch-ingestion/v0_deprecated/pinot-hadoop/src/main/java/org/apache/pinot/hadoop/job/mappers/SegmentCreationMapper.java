@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -46,6 +47,7 @@ import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -110,7 +112,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _rawTableName = _jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME);
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
-    // Optional
+    // Optional.
+    // Once we move to dateTimeFieldSpec, check that table config (w/ valid timeColumnName) is provided if multiple dateTimeFieldSpecs are configured
     String tableConfigString = _jobConf.get(JobConfigConstants.TABLE_CONFIG);
     if (tableConfigString != null) {
       _tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
@@ -134,15 +137,22 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
             "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
         SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
         String timeFormat = null;
-        TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
-        if (timeFieldSpec != null) {
-          timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
+        TimeUnit timeType = null;
+        String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
+
+        if (timeColumnName != null) {
+          FieldSpec fieldSpec = _schema.getFieldSpecFor(timeColumnName);
+          if (fieldSpec != null) {
+            TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+            timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
+            timeType = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
+          }
         }
         _segmentNameGenerator =
             new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
                 _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
                 validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(),
-                validationConfig.getTimeType(), timeFormat);
+                timeType, timeFormat);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);

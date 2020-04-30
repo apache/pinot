@@ -145,7 +145,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     textIndexColumns.add(QUERY_LOG_TEXT_COL_NAME);
     textIndexColumns.add(SKILLS_TEXT_COL_NAME);
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, _schema);
     segmentGeneratorConfig.setTableName(TABLE_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);

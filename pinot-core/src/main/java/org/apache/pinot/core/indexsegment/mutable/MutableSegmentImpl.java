@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
@@ -69,6 +70,7 @@ import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -128,6 +130,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<FieldSpec> _physicalFieldSpecs;
   private final Collection<DimensionFieldSpec> _physicalDimensionFieldSpecs;
   private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
+  private final Collection<DateTimeFieldSpec> _physicalDateTimeFieldSpecs;
 
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
@@ -171,6 +174,7 @@ public class MutableSegmentImpl implements MutableSegment {
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
     List<DimensionFieldSpec> physicalDimensionFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
     List<MetricFieldSpec> physicalMetricFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
+    List<DateTimeFieldSpec> physicalDateTimeFieldSpecs = new ArrayList<>(_schema.getDateTimeFieldSpecs().size());
 
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -181,13 +185,16 @@ public class MutableSegmentImpl implements MutableSegment {
           physicalDimensionFieldSpecs.add((DimensionFieldSpec) fieldSpec);
         } else if (fieldType == FieldSpec.FieldType.METRIC) {
           physicalMetricFieldSpecs.add((MetricFieldSpec) fieldSpec);
+        } else if (fieldType == FieldSpec.FieldType.DATE_TIME) {
+          physicalDateTimeFieldSpecs.add((DateTimeFieldSpec) fieldSpec);
         }
       }
     }
     _physicalFieldSpecs = Collections.unmodifiableCollection(physicalFieldSpecs);
     _physicalDimensionFieldSpecs = Collections.unmodifiableCollection(physicalDimensionFieldSpecs);
     _physicalMetricFieldSpecs = Collections.unmodifiableCollection(physicalMetricFieldSpecs);
-    _numKeyColumns = _physicalDimensionFieldSpecs.size() + 1;  // Add 1 for time column
+    _physicalDateTimeFieldSpecs = Collections.unmodifiableCollection(physicalDateTimeFieldSpecs);
+    _numKeyColumns = _physicalDimensionFieldSpecs.size() + _physicalDateTimeFieldSpecs.size() + 1;  // Add 1 for time column
 
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
@@ -412,15 +419,21 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Update min/max value for time column
-      if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
+      FieldSpec.FieldType fieldType = fieldSpec.getFieldType();
+      if (fieldType.equals(FieldSpec.FieldType.TIME) || fieldType.equals(FieldSpec.FieldType.DATE_TIME)) {
         long timeValue;
         if (value instanceof Number) {
           timeValue = ((Number) value).longValue();
+          _minTime = Math.min(_minTime, timeValue);
+          _maxTime = Math.max(_maxTime, timeValue);
         } else {
-          timeValue = Long.valueOf(value.toString());
+          String stringValue = value.toString();
+          if (StringUtils.isNumeric(stringValue)) {
+            timeValue = Long.parseLong(stringValue);
+            _minTime = Math.min(_minTime, timeValue);
+            _maxTime = Math.max(_maxTime, timeValue);
+          }
         }
-        _minTime = Math.min(_minTime, timeValue);
-        _maxTime = Math.max(_maxTime, timeValue);
       }
     }
     return dictIdMap;
@@ -783,10 +796,13 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     int i = 0;
-    int[] dictIds = new int[_numKeyColumns]; // dimensions + time column.
+    int[] dictIds = new int[_numKeyColumns]; // dimensions + date time columns + time column.
 
     // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/incubator-pinot/issues/3867
     for (FieldSpec fieldSpec : _physicalDimensionFieldSpecs) {
+      dictIds[i++] = (Integer) dictIdMap.get(fieldSpec.getName());
+    }
+    for (FieldSpec fieldSpec : _physicalDateTimeFieldSpecs) {
       dictIds[i++] = (Integer) dictIdMap.get(fieldSpec.getName());
     }
 
@@ -855,6 +871,17 @@ public class MutableSegmentImpl implements MutableSegment {
       if (!fieldSpec.isSingleValueField()) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}",
             dimension);
+        _aggregateMetrics = false;
+        break;
+      }
+    }
+
+    // Date time columns should be dictionary encoded.
+    for (FieldSpec fieldSpec : _physicalDateTimeFieldSpecs) {
+      String dateTimeColumn = fieldSpec.getName();
+      if (noDictionaryColumns.contains(dateTimeColumn)) {
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary datetime columns, eg: {}",
+            dateTimeColumn);
         _aggregateMetrics = false;
         break;
       }

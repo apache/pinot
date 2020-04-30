@@ -163,7 +163,9 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     _segmentConfig.setOverwrite(true);
     _segmentConfig.setTableName(PinotOutputFormat.getTableName(context));
     _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
-    _segmentConfig.setSchema(Schema.fromString(PinotOutputFormat.getSchema(context)));
+    Schema schema = Schema.fromString(PinotOutputFormat.getSchema(context));
+    _segmentConfig.setSchema(schema);
+    _segmentConfig.setTime(schema.getTimeFieldSpec());
     _segmentConfig.setReaderConfigFile(PinotOutputFormat.getReaderConfig(context));
   }
 }

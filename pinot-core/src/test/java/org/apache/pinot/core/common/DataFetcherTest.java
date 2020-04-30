@@ -110,8 +110,9 @@ public class DataFetcherTest {
     schema.addField(new MetricFieldSpec(NO_DICT_FLOAT_METRIC_NAME, FieldSpec.DataType.FLOAT));
     schema.addField(new MetricFieldSpec(NO_DICT_DOUBLE_METRIC_NAME, FieldSpec.DataType.DOUBLE));
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig();
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
+    config.setSchema(schema);
     config.setOutDir(INDEX_DIR_PATH);
     config.setSegmentName(SEGMENT_NAME);
     config.setRawIndexCreationColumns(Arrays

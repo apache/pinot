@@ -207,7 +207,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         .addMetric(DISTINCT_COUNT_HLL_COLUMN, DataType.BYTES).addMetric(MIN_MAX_RANGE_COLUMN, DataType.BYTES)
         .addMetric(PERCENTILE_EST_COLUMN, DataType.BYTES).addMetric(PERCENTILE_TDIGEST_COLUMN, DataType.BYTES).build();
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(RAW_TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);

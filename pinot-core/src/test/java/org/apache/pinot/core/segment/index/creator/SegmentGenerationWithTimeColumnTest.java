@@ -31,12 +31,15 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.LocalDateTime;
@@ -65,9 +68,11 @@ public class SegmentGenerationWithTimeColumnTest {
   private long minTime;
   private long maxTime;
   private long startTime = System.currentTimeMillis();
+  private TableConfig _tableConfig;
 
   @BeforeClass
-  public void printSeed() {
+  public void setup() {
+    _tableConfig = createTableConfig();
     System.out.println("Seed is: " + seed);
   }
 
@@ -82,7 +87,7 @@ public class SegmentGenerationWithTimeColumnTest {
   public void testSimpleDateSegmentGeneration()
       throws Exception {
     Schema schema = createSchema(true);
-    File segmentDir = buildSegment(schema, true, false);
+    File segmentDir = buildSegment(_tableConfig, schema, true, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
     Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
@@ -92,7 +97,7 @@ public class SegmentGenerationWithTimeColumnTest {
   public void testEpochDateSegmentGeneration()
       throws Exception {
     Schema schema = createSchema(false);
-    File segmentDir = buildSegment(schema, false, false);
+    File segmentDir = buildSegment(_tableConfig, schema, false, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), minTime);
     Assert.assertEquals(metadata.getEndTime(), maxTime);
@@ -102,7 +107,7 @@ public class SegmentGenerationWithTimeColumnTest {
   public void testSegmentGenerationWithInvalidTime()
       throws Exception {
     Schema schema = createSchema(false);
-    buildSegment(schema, false, true);
+    buildSegment(_tableConfig, schema, false, true);
   }
 
   private Schema createSchema(boolean isSimpleDate) {
@@ -116,9 +121,14 @@ public class SegmentGenerationWithTimeColumnTest {
     return schema;
   }
 
-  private File buildSegment(final Schema schema, final boolean isSimpleDate, final boolean isInvalidDate)
+  private TableConfig createTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(TIME_COL_NAME).build();
+  }
+
+  private File buildSegment(final TableConfig tableConfig, final Schema schema, final boolean isSimpleDate,
+      final boolean isInvalidDate)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setRawIndexCreationColumns(schema.getDimensionNames());
 
     config.setOutDir(SEGMENT_DIR_NAME);
