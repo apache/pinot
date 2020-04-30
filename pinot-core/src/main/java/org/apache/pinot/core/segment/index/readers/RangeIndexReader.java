@@ -39,6 +39,7 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
   private final int _numRanges;
   final long _bitmapIndexOffset;
   private final Number[] _rangeStartArray;
+  private final Number[] _rangeEndArray;
 
   private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps = null;
 
@@ -67,11 +68,12 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     long rangeArrayStartOffset = offset;
 
     _rangeStartArray = new Number[_numRanges];
+    _rangeEndArray = new Number[_numRanges];
 
-    final long firstOffset = _buffer.getLong(offset + _numRanges * _valueType.size());
-    final long lastOffset = _buffer.getLong(offset + _numRanges * _valueType.size() + _numRanges * Long.BYTES);
+    final long firstOffset = _buffer.getLong(offset + 2 * _numRanges * _valueType.size());
+    final long lastOffset = _buffer.getLong(offset + 2 * _numRanges * _valueType.size() + _numRanges * Long.BYTES);
 
-    _bitmapIndexOffset = offset + _numRanges * _valueType.size();
+    _bitmapIndexOffset = offset + 2 * _numRanges * _valueType.size();
 
     Preconditions.checkState(lastOffset == _buffer.size(),
         "The last offset should be equal to buffer size! Current lastOffset: " + lastOffset + ", buffer size: "
@@ -79,22 +81,26 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     switch (_valueType) {
       case INT:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = _buffer.getInt(rangeArrayStartOffset + i * Integer.BYTES);
+          _rangeStartArray[i] = _buffer.getInt(rangeArrayStartOffset + 2 * i * Integer.BYTES);
+          _rangeEndArray[i] = _buffer.getInt(rangeArrayStartOffset + 2 * i * Integer.BYTES + Integer.BYTES);
         }
         break;
       case LONG:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = _buffer.getLong(rangeArrayStartOffset + i * Long.BYTES);
+          _rangeStartArray[i] = _buffer.getLong(rangeArrayStartOffset + 2 * i * Long.BYTES);
+          _rangeEndArray[i] = _buffer.getLong(rangeArrayStartOffset + 2 * i * Long.BYTES + Long.BYTES);
         }
         break;
       case FLOAT:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = _buffer.getFloat(rangeArrayStartOffset + i * Float.BYTES);
+          _rangeStartArray[i] = _buffer.getFloat(rangeArrayStartOffset + 2 * i * Float.BYTES);
+          _rangeEndArray[i] = _buffer.getFloat(rangeArrayStartOffset + 2 * i * Float.BYTES + Float.BYTES);
         }
         break;
       case DOUBLE:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = _buffer.getDouble(rangeArrayStartOffset + i * Double.BYTES);
+          _rangeStartArray[i] = _buffer.getDouble(rangeArrayStartOffset + 2 * i * Double.BYTES);
+          _rangeEndArray[i] = _buffer.getDouble(rangeArrayStartOffset + 2 * i * Double.BYTES + Double.BYTES);
         }
         break;
     }
@@ -169,39 +175,45 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     _buffer.close();
   }
 
+  /**
+   * Find the rangeIndex that the value falls in
+   * Note this assumes that the value is in one of the range.
+   * @param value
+   * @return
+   */
   public int findRangeId(int value) {
-    for (int i = 0; i < _rangeStartArray.length - 1; i++) {
-      if (value >= _rangeStartArray[i].intValue() && value < _rangeStartArray[i + 1].intValue()) {
+    for (int i = 0; i < _rangeStartArray.length; i++) {
+      if (value >= _rangeStartArray[i].intValue() && value < _rangeEndArray[i].intValue()) {
         return i;
       }
     }
-    return _rangeStartArray.length - 1;
+    return -1;
   }
 
   public int findRangeId(long value) {
     for (int i = 0; i < _rangeStartArray.length - 1; i++) {
-      if (value >= _rangeStartArray[i].longValue() && value < _rangeStartArray[i + 1].longValue()) {
+      if (value >= _rangeStartArray[i].longValue() && value < _rangeEndArray[i].longValue()) {
         return i;
       }
     }
-    return _rangeStartArray.length - 1;
+    return -1;
   }
 
   public int findRangeId(float value) {
     for (int i = 0; i < _rangeStartArray.length - 1; i++) {
-      if (value >= _rangeStartArray[i].floatValue() && value < _rangeStartArray[i + 1].floatValue()) {
+      if (value >= _rangeStartArray[i].floatValue() && value < _rangeEndArray[i].floatValue()) {
         return i;
       }
     }
-    return _rangeStartArray.length - 1;
+    return -1;
   }
 
   public int findRangeId(double value) {
     for (int i = 0; i < _rangeStartArray.length - 1; i++) {
-      if (value >= _rangeStartArray[i].doubleValue() && value < _rangeStartArray[i + 1].doubleValue()) {
+      if (value >= _rangeStartArray[i].doubleValue() && value < _rangeEndArray[i].doubleValue()) {
         return i;
       }
     }
-    return _rangeStartArray.length - 1;
+    return -1;
   }
 }

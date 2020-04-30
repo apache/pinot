@@ -52,9 +52,9 @@ public class RangeIndexCreatorTest {
     fieldSpec.setDataType(FieldSpec.DataType.INT);
     String columnName = "latency";
     fieldSpec.setName(columnName);
-    int cardinality = 1000;
-    int numDocs = 10000;
-    int numValues = 10000;
+    int cardinality = 5;
+    int numDocs = 50;
+    int numValues = 50;
     RangeIndexCreator creator =
         new RangeIndexCreator(indexDir, fieldSpec, FieldSpec.DataType.INT, -1, -1, numDocs, numValues);
     Random r = new Random();
@@ -108,19 +108,24 @@ public class RangeIndexCreatorTest {
     int numRanges = dis.readInt();
 
     Number[] rangeStart = new Number[numRanges];
+    Number[] rangeEnd = new Number[numRanges];
     for (int i = 0; i < numRanges; i++) {
       switch (dataType) {
         case INT:
           rangeStart[i] = dis.readInt();
+          rangeEnd[i] = dis.readInt();
           break;
         case LONG:
           rangeStart[i] = dis.readLong();
+          rangeEnd[i] = dis.readLong();
           break;
         case FLOAT:
           rangeStart[i] = dis.readFloat();
+          rangeEnd[i] = dis.readFloat();
           break;
         case DOUBLE:
           rangeStart[i] = dis.readDouble();
+          rangeEnd[i] = dis.readDouble();
           break;
       }
     }

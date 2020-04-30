@@ -24,25 +24,22 @@ import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.BufferedOutputStream;
 import java.io.Closeable;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
@@ -57,101 +54,100 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BIT
  *     A
  *   </li>
  *   <li>
- *     In the first pass (adding values phase), when add() method is called, store the raw values into the forward index
- *     value buffer (for multi-valued column also store number of values for each docId into forward index length
- *     buffer). We also compute the inverted index length for each dictId while adding values.
+ *     In the first pass (adding values phase), when add() method is called, store the raw values into the
+ *     value buffer (for multi-valued column we flatten the values).
+ *     We also store the corresponding docId in docIdBuffer which will be sorted in the next phase based on the value in valueBuffer.
+ *
  *   </li>
  *   <li>
- *     In the second pass (processing values phase), when seal() method is called, all the dictIds should already been
- *     added. We first reorder the values into the inverted index buffers by going over the dictIds in forward index
- *     value buffer (for multi-valued column we also need forward index length buffer to get the docId for each dictId).
- *     <p>Once we have the inverted index buffers, we simply go over them and create the bitmap for each dictId and
- *     serialize them into a file.
+ *     In the second pass (processing values phase), when seal() method is called, we sort the docIdBuffer based on the value in valueBuffer.
+ *     We then iterate over the sorted docIdBuffer and create ranges such that each range comprises of _numDocsPerRange.
+ *     While
  *   </li>
  * </ul>
- * <p>Based on the number of values we need to store, we use direct memory or MMap file to allocate the buffer.
  */
 public final class RangeIndexCreator implements InvertedIndexCreator {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexCreator.class);
+
+  //This will dump the content of temp buffers and ranges
+  private static final boolean TRACE = false;
+
   private static final int RANGE_INDEX_VERSION = 1;
 
-  // Use MMapBuffer if the value buffer size is larger than 2G
-  private static final int NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER = 500_000_000;
   private static final int DEFAULT_NUM_RANGES = 20;
 
-  private static final String FORWARD_INDEX_VALUE_BUFFER_SUFFIX = ".fwd.idx.val.buf";
-  private static final String DOC_ID_VALUE_BUFFER_SUFFIX = ".doc.id.val.buf";
+  private static final String VALUE_BUFFER_SUFFIX = "val.buf";
+  private static final String DOC_ID_VALUE_BUFFER_SUFFIX = ".doc.id.buf";
 
-  private final File _invertedIndexFile;
-  private final File _forwardIndexValueBufferFile;
-  private final File _docIdBufferFileForSorting;
-  private final int _numValues;
-  private final boolean _useMMapBuffer;
+  private final File _rangeIndexFile;
 
-  // Forward index buffers (from docId to dictId)
-  private int _nextDocId;
-  private PinotDataBuffer _forwardIndexValueBuffer;
-  private NumberValueBuffer _valueBuffer;
-  //for sorting
+  private final File _tempValueBufferFile;
+  private PinotDataBuffer _tempValueBuffer;
+  private NumberValueBuffer _numberValueBuffer;
+
+  private final File _tempDocIdBufferFile;
   private PinotDataBuffer _docIdValueBuffer;
   private IntValueBuffer _docIdBuffer;
-  // For multi-valued column only because each docId can have multiple dictIds
+
+  private final int _numValues;
+  private int _nextDocId;
   private int _nextValueId;
   private int _numDocsPerRange;
   private FieldSpec.DataType _valueType;
 
-  public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, FieldSpec.DataType valueType, int numRanges, int numDocsPerRange, int numDocs, int numValues)
+  public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, FieldSpec.DataType valueType, int numRanges,
+      int numDocsPerRange, int numDocs, int numValues)
       throws IOException {
     _valueType = valueType;
     String columnName = fieldSpec.getName();
-    _invertedIndexFile = new File(indexDir, columnName + BITMAP_RANGE_INDEX_FILE_EXTENSION);
-    _forwardIndexValueBufferFile = new File(indexDir, columnName + FORWARD_INDEX_VALUE_BUFFER_SUFFIX);
-    _docIdBufferFileForSorting = new File(indexDir, columnName + DOC_ID_VALUE_BUFFER_SUFFIX);
+    _rangeIndexFile = new File(indexDir, columnName + BITMAP_RANGE_INDEX_FILE_EXTENSION);
+    _tempValueBufferFile = new File(indexDir, columnName + VALUE_BUFFER_SUFFIX);
+    _tempDocIdBufferFile = new File(indexDir, columnName + DOC_ID_VALUE_BUFFER_SUFFIX);
     _numValues = fieldSpec.isSingleValueField() ? numDocs : numValues;
-    _useMMapBuffer = _numValues > NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER;
     int valueSize = valueType.size();
     try {
       //use DEFAULT_NUM_RANGES if numRanges is not set
-      if(numRanges < 0) {
+      if (numRanges < 0) {
         numRanges = DEFAULT_NUM_RANGES;
       }
-      if(numDocsPerRange < 0) {
+      if (numDocsPerRange < 0) {
         _numDocsPerRange = (int) Math.ceil(_numValues / numRanges);
       }
 
-      //FORWARD INDEX - stores the actual values added
-      _forwardIndexValueBuffer = createTempBuffer((long) _numValues * valueSize, _forwardIndexValueBufferFile);
+      //Value buffer to store the actual values added
+      _tempValueBuffer = createTempBuffer((long) _numValues * valueSize, _tempValueBufferFile);
 
       switch (_valueType) {
         case INT:
-          _valueBuffer = new IntValueBuffer(_forwardIndexValueBuffer);
+          _numberValueBuffer = new IntValueBuffer(_tempValueBuffer);
           break;
         case FLOAT:
-          _valueBuffer = new FloatValueBuffer(_forwardIndexValueBuffer);
+          _numberValueBuffer = new FloatValueBuffer(_tempValueBuffer);
           break;
         case LONG:
-          _valueBuffer = new LongValueBuffer(_forwardIndexValueBuffer);
+          _numberValueBuffer = new LongValueBuffer(_tempValueBuffer);
           break;
         case DOUBLE:
-          _valueBuffer = new DoubleValueBuffer(_forwardIndexValueBuffer);
+          _numberValueBuffer = new DoubleValueBuffer(_tempValueBuffer);
           break;
         default:
           throw new UnsupportedOperationException("Range index is not supported for columns of data type:" + valueType);
       }
 
-      //Stores the docId - this will be sorted based on the values in FORWARD INDEX in the end
-      _docIdValueBuffer = createTempBuffer((long) _numValues * Integer.BYTES, _forwardIndexValueBufferFile);
+      //docId  Buffer
+      _docIdValueBuffer = createTempBuffer((long) _numValues * Integer.BYTES, _tempDocIdBufferFile);
       _docIdBuffer = new IntValueBuffer(_docIdValueBuffer);
     } catch (Exception e) {
-      destroyBuffer(_forwardIndexValueBuffer, _forwardIndexValueBufferFile);
-      destroyBuffer(_forwardIndexValueBuffer, _docIdBufferFileForSorting);
+      destroyBuffer(_tempValueBuffer, _tempValueBufferFile);
+      destroyBuffer(_tempValueBuffer, _tempDocIdBufferFile);
       throw e;
     }
   }
 
   @Override
   public void add(int dictId) {
-    _valueBuffer.put(_nextDocId, dictId);
+    _numberValueBuffer.put(_nextDocId, dictId);
     _docIdBuffer.put(_nextDocId, _nextDocId);
     _nextDocId = _nextDocId + 1;
   }
@@ -160,10 +156,11 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
   public void add(int[] dictIds, int length) {
     for (int i = 0; i < length; i++) {
       int dictId = dictIds[i];
-      _valueBuffer.put(_nextDocId, dictId);
+      _numberValueBuffer.put(_nextValueId, dictId);
       _docIdBuffer.put(_nextValueId, _nextDocId);
       _nextValueId = _nextValueId + 1;
     }
+    _nextDocId = _nextDocId + 1;
   }
 
   @Override
@@ -174,22 +171,34 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
   @Override
   public void seal()
       throws IOException {
-    //sort the forward index copy
-    //go over the sorted value to compute ranges
+    if (TRACE) {
+      LOGGER.info("Before sorting");
+      dump();
+    }
+
+    //sort the value buffer, change the docId buffer to maintain the mapping
     IntComparator comparator = (i, j) -> {
-      Number val1 = _valueBuffer.get(_docIdBuffer.get(i).intValue());
-      Number val2 = _valueBuffer.get(_docIdBuffer.get(j).intValue());
-      return _valueBuffer.compare(val1, val2);
+      Number val1 = _numberValueBuffer.get(i);
+      Number val2 = _numberValueBuffer.get(j);
+      return _numberValueBuffer.compare(val1, val2);
     };
     Swapper swapper = (i, j) -> {
       Number temp = _docIdBuffer.get(i).intValue();
       _docIdBuffer.put(i, _docIdBuffer.get(j).intValue());
       _docIdBuffer.put(j, temp);
+
+      Number tempValue = _numberValueBuffer.get(i);
+      _numberValueBuffer.put(i, _numberValueBuffer.get(j));
+      _numberValueBuffer.put(j, tempValue);
     };
     Arrays.quickSort(0, _numValues, comparator, swapper);
 
-//    dump();
+    if (TRACE) {
+      LOGGER.info("After sorting");
+      dump();
+    }
     //FIND THE RANGES
+    //go over the sorted value to compute ranges
     List<Pair<Integer, Integer>> ranges = new ArrayList<>();
 
     int boundary = _numDocsPerRange;
@@ -204,15 +213,21 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     }
     ranges.add(new Pair(start, _numValues - 1));
 
+    //Dump ranges
+    if (TRACE) {
+      dumpRanges(ranges);
+    }
+
     // Create bitmaps from inverted index buffers and serialize them to file
     //HEADER
     //   # VERSION (INT)
     //   # DATA_TYPE (String -> INT (length) (ACTUAL BYTES)
     //   # OF RANGES (INT)
-    //   <RANGE START VALUE BUFFER> #R & ValueSize
-    //   Range Start 0
+    //   <RANGE START VALUE BUFFER> #2 * R & ValueSize
+    //   Range Start 0, Range End 0
     //    .........
-    //   Range Start R - 1
+    //   Range Start R - 1, Range End R - 1
+    //   Range MAX VALUE
     //   Bitmap for Range 0 Start Offset
     //      .....
     //   Bitmap for Range R Start Offset
@@ -222,9 +237,9 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     //    ......
     //   Bitmap for range R - 1
     long bytesWritten = 0;
-    try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(_invertedIndexFile));
+    try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(_rangeIndexFile));
         DataOutputStream header = new DataOutputStream(bos);
-        FileOutputStream fos = new FileOutputStream(_invertedIndexFile);
+        FileOutputStream fos = new FileOutputStream(_rangeIndexFile);
         DataOutputStream dataOutputStream = new DataOutputStream(new BufferedOutputStream(fos))) {
 
       //VERSION
@@ -240,31 +255,37 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
       header.write(valueDataTypeBytes);
       bytesWritten += valueDataTypeBytes.length;
 
-      //Write the Range values
+      //Write the number of ranges
       header.writeInt(ranges.size());
       bytesWritten += Integer.BYTES;
 
+      //write the range start,end values
       for (Pair<Integer, Integer> range : ranges) {
-        Number value = _valueBuffer.get(_docIdBuffer.get(range.getFirst()).intValue());
+        Number rangeStart = _numberValueBuffer.get(range.getFirst());
+        Number rangeEnd = _numberValueBuffer.get(range.getSecond());
         switch (_valueType) {
           case INT:
-            header.writeInt(value.intValue());
+            header.writeInt(rangeStart.intValue());
+            header.writeInt(rangeEnd.intValue());
             break;
           case LONG:
-            header.writeLong(value.longValue());
+            header.writeLong(rangeStart.longValue());
+            header.writeLong(rangeEnd.longValue());
             break;
           case FLOAT:
-            header.writeFloat(value.floatValue());
+            header.writeFloat(rangeStart.floatValue());
+            header.writeFloat(rangeEnd.floatValue());
             break;
           case DOUBLE:
-            header.writeDouble(value.doubleValue());
+            header.writeDouble(rangeStart.doubleValue());
+            header.writeDouble(rangeEnd.doubleValue());
             break;
           default:
             throw new RuntimeException("Range index not supported for dataType: " + _valueType);
         }
       }
 
-      bytesWritten += (ranges.size()) * _valueType.size(); // Range start values
+      bytesWritten += (2* ranges.size()) * _valueType.size(); // Range (start,end) values
 
       //compute the offset where the bitmap for the first range would be written
       //bitmap start offset for each range, one extra to make it easy to get the length for last one.
@@ -286,7 +307,7 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
         bitmapOffset += sizeInBytes;
 
         // Check for int overflow
-        Preconditions.checkState(bitmapOffset > 0, "Inverted index file: %s exceeds 2GB limit", _invertedIndexFile);
+        Preconditions.checkState(bitmapOffset > 0, "Inverted index file: %s exceeds 2GB limit", _rangeIndexFile);
 
         header.writeLong(bitmapOffset);
         bytesWritten += Long.BYTES;
@@ -297,20 +318,33 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
         bytesWritten += bytes.length;
       }
     } catch (IOException e) {
-      FileUtils.deleteQuietly(_invertedIndexFile);
+      FileUtils.deleteQuietly(_rangeIndexFile);
       throw e;
     }
-    Preconditions.checkState(bytesWritten == _invertedIndexFile.length(),
-        "Length of inverted index file: " + _invertedIndexFile.length()
-            + " does not match the number of bytes written: " + bytesWritten);
+    Preconditions.checkState(bytesWritten == _rangeIndexFile.length(),
+        "Length of inverted index file: " + _rangeIndexFile.length() + " does not match the number of bytes written: "
+            + bytesWritten);
+  }
+
+  private void dumpRanges(List<Pair<Integer, Integer>> ranges) {
+    StringBuilder rangeOffsets = new StringBuilder("[ ");
+    StringBuilder rangeValues = new StringBuilder("[ ");
+    for (Pair<Integer, Integer> range : ranges) {
+      rangeOffsets.append("(").append(range.getFirst()).append(",").append(range.getSecond()).append(") ,");
+      rangeValues.append("(").append(_numberValueBuffer.get(range.getFirst())).append(",")
+          .append(_numberValueBuffer.get(range.getSecond())).append(") ,");
+    }
+    rangeOffsets.append(" ]");
+    rangeValues.append(" ]");
+    LOGGER.debug("rangeOffsets = " + rangeOffsets);
+    LOGGER.debug("rangeValues = " + rangeValues);
   }
 
   @Override
   public void close()
       throws IOException {
-    org.apache.pinot.common.utils.FileUtils
-        .close(new DataBufferAndFile(_forwardIndexValueBuffer, _forwardIndexValueBufferFile),
-            new DataBufferAndFile(_docIdValueBuffer, _docIdBufferFileForSorting));
+    org.apache.pinot.common.utils.FileUtils.close(new DataBufferAndFile(_tempValueBuffer, _tempValueBufferFile),
+        new DataBufferAndFile(_docIdValueBuffer, _tempDocIdBufferFile));
   }
 
   private class DataBufferAndFile implements Closeable {
@@ -330,22 +364,22 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
   }
 
   void dump() {
-    System.out.print("[ ");
+    System.out.print("DocId  [ ");
     for (int i = 0; i < _numValues; i++) {
-      System.out.print(_valueBuffer.get(_docIdBuffer.get(i).intValue()) + ", ");
+      System.out.print(_docIdBuffer.get(i) + ", ");
     }
     System.out.println("]");
+    System.out.print("Values [ ");
+    for (int i = 0; i < _numValues; i++) {
+      System.out.print(_numberValueBuffer.get(i) + ", ");
+    }
+    System.out.println("] ");
   }
 
   private PinotDataBuffer createTempBuffer(long size, File mmapFile)
       throws IOException {
-    if (_useMMapBuffer) {
-      return PinotDataBuffer.mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER,
-          "OffHeapBitmapInvertedIndexCreator: temp buffer");
-    } else {
-      return PinotDataBuffer.allocateDirect(size, PinotDataBuffer.NATIVE_ORDER,
-          "OffHeapBitmapInvertedIndexCreator: temp buffer for " + mmapFile.getName());
-    }
+    return PinotDataBuffer
+        .mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER, "RangeIndexCreator: temp buffer");
   }
 
   private void destroyBuffer(PinotDataBuffer buffer, File mmapFile)
@@ -466,6 +500,4 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
       return Long.compare(val1.longValue(), val2.longValue());
     }
   }
-
-
 }
