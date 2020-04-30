@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 // The final segment location would be in the URI _segmentStoreUriStr/_tableNameWithType/segmentName if
 // successful. If a segment upload fails or there is no segment store uri configured, it sets the segment location as
 // the default URI.
-public class BestEffortSegmentUploader implements SegmentUploader {
+public class PinotFSSegmentUploader implements SegmentUploader {
   private Logger LOGGER = LoggerFactory.getLogger(BestEffortSegmentUploader.class);
   private String _segmentStoreUriStr;
   private ExecutorService _executorService = Executors.newCachedThreadPool();
