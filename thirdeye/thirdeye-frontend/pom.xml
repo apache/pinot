@@ -30,8 +30,8 @@
               <goal>install-node-and-yarn</goal>
             </goals>
             <configuration>
-              <nodeVersion>v12.16.2</nodeVersion>
-              <yarnVersion>v1.22.4</yarnVersion>
+              <nodeVersion>v10.16.3</nodeVersion>
+              <yarnVersion>v1.12.0</yarnVersion>
             </configuration>
           </execution>
           <execution>
