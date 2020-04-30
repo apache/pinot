@@ -87,7 +87,7 @@
     "toastr": "^2.1.4"
   },
   "engines": {
-    "node": "12.*"
+    "node": ">=10.*"
   },
   "dependencies": {
     "bower": "^1.8.8",
