@@ -85,7 +85,7 @@ public class PinotSegmentRecordReaderTest {
   }
 
   private TableConfig createTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(TIME).build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME).build();
   }
 
   @Test

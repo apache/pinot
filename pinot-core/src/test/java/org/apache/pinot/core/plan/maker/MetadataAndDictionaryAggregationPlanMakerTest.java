@@ -84,7 +84,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
         .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
         .addMetric("column18", FieldSpec.DataType.INT).addTime("daysSinceEpoch", 1, TimeUnit.DAYS, DataType.INT)
         .build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName("daysSinceEpoch").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
 
     // Create the segment generator config.
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);

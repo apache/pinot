@@ -44,7 +44,8 @@ public class RealtimeSegmentConverterTest {
         new TimeFieldSpec("col1", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "col2", FieldSpec.DataType.LONG,
             TimeUnit.DAYS);
     schema.addField(tfs);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTimeColumnName("col2").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("test").setTimeColumnName("col2").build();
     String segmentName = "segment1";
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
     Assert.assertEquals(schema.getColumnNames().size(), 5);

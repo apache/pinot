@@ -78,7 +78,7 @@ public class MergeRollupSegmentConverterTest {
     schema.addField(new MetricFieldSpec(M1, FieldSpec.DataType.LONG));
     schema.addField(new MetricFieldSpec(M2, FieldSpec.DataType.DOUBLE));
     schema.addField(new TimeFieldSpec(T, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(T).build();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(T).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     long timestamp = _referenceTimestamp;

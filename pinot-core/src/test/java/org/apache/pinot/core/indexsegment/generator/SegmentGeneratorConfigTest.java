@@ -38,7 +38,8 @@ public class SegmentGeneratorConfigTest {
   public void testEpochTime() {
     Schema schema = new Schema.SchemaBuilder()
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch")).build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName("daysSinceEpoch").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
     // table config provided
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertEquals(segmentGeneratorConfig.getTimeColumnName(), "daysSinceEpoch");
@@ -58,7 +59,8 @@ public class SegmentGeneratorConfigTest {
   public void testSimpleDateFormat() {
     Schema schema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.STRING, TimeUnit.DAYS,
         TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date")).build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName("Date").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("Date").build();
 
     // Table config provided
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);

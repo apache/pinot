@@ -122,7 +122,7 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   private TableConfig createTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(TIME_COL_NAME).build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COL_NAME).build();
   }
 
   private File buildSegment(final TableConfig tableConfig, final Schema schema, final boolean isSimpleDate,

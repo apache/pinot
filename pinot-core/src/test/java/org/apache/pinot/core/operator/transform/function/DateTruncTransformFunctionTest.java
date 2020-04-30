@@ -85,7 +85,8 @@ public class DateTruncTransformFunctionTest
     List<GenericRow> rows = ImmutableList.of(row);
     Schema schema = new Schema();
     schema.addField(new TimeFieldSpec(TIME_COLUMN, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(TIME_COLUMN).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     String segmentName = "testSegment";

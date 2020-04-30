@@ -75,7 +75,7 @@ public class SegmentConverterTest {
     schema.addField(new DimensionFieldSpec(D2, FieldSpec.DataType.STRING, true));
     schema.addField(new MetricFieldSpec(M1, FieldSpec.DataType.INT));
     schema.addField(new TimeFieldSpec(T, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(T).build();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(T).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {

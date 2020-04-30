@@ -156,7 +156,7 @@ public class SegmentConverter {
     segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setSkipTimeValueCheck(_skipTimeValueCheck);
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    if (indexingConfig != null) {
+    if (indexingConfig != null && indexingConfig.getInvertedIndexColumns() != null) {
       segmentGeneratorConfig.setInvertedIndexCreationColumns(indexingConfig.getInvertedIndexColumns());
     }
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
