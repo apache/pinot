@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.minion.generator;
 
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.helix.task.JobConfig;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -29,14 +28,12 @@ import org.apache.pinot.spi.config.table.TableConfig;
  * The interface <code>PinotTaskGenerator</code> defines the APIs for task generators.
  */
 public interface PinotTaskGenerator {
-  int DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE = JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
 
   /**
    * Returns the task type of the generator.
    *
    * @return Task type of the generator
    */
-  @Nonnull
   String getTaskType();
 
   /**
@@ -44,18 +41,29 @@ public interface PinotTaskGenerator {
    *
    * @return List of tasks to schedule
    */
-  @Nonnull
-  List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs);
+  List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs);
 
   /**
-   * Returns the maximum number of concurrent tasks allowed per instance.
+   * Returns the timeout in milliseconds for each task, 3600000 (1 hour) by default.
+   *
+   * @return Timeout in milliseconds for each task.
+   */
+  default long getTaskTimeoutMs() {
+    return JobConfig.DEFAULT_TIMEOUT_PER_TASK;
+  }
+
+  /**
+   * Returns the maximum number of concurrent tasks allowed per instance, 1 by default.
    *
    * @return Maximum number of concurrent tasks allowed per instance
    */
-  int getNumConcurrentTasksPerInstance();
+  default int getNumConcurrentTasksPerInstance() {
+    return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+  }
 
   /**
    * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
    */
-  void nonLeaderCleanUp();
+  default void nonLeaderCleanUp() {
+  }
 }

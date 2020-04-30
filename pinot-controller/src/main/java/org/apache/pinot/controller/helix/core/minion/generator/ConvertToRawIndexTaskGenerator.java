@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
@@ -46,15 +45,13 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
     _clusterInfoProvider = clusterInfoProvider;
   }
 
-  @Nonnull
   @Override
   public String getTaskType() {
     return MinionConstants.ConvertToRawIndexTask.TASK_TYPE;
   }
 
-  @Nonnull
   @Override
-  public List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs) {
+  public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
     // Get the segments that are being converted so that we don't submit them again
@@ -80,7 +77,7 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
       String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
       if (tableMaxNumTasksConfig != null) {
         try {
-          tableMaxNumTasks = Integer.valueOf(tableMaxNumTasksConfig);
+          tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
         } catch (Exception e) {
           tableMaxNumTasks = Integer.MAX_VALUE;
         }
@@ -126,14 +123,5 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
     }
 
     return pinotTaskConfigs;
-  }
-
-  @Override
-  public int getNumConcurrentTasksPerInstance() {
-    return DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
-  }
-
-  @Override
-  public void nonLeaderCleanUp() {
   }
 }
