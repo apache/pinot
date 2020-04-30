@@ -68,6 +68,7 @@ public class PinotOutputFormatTest {
     PinotOutputFormat.setOutputPath(job, outDir);
     PinotOutputFormat.setTableName(job, "emp");
     PinotOutputFormat.setSegmentName(job, indexType + "segment_one");
+    PinotOutputFormat.setTimeColumnName(job, "epochDays");
     PinotOutputFormat.setTempSegmentDir(job, workingTempDir.getAbsolutePath());
 
     Schema schema = Schema.fromString(getSchema());

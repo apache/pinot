@@ -348,7 +348,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
               config.setSegmentName(_segmentName + "_" + segCnt);
               Schema schema = Schema.fromFile(new File(_schemaFile));
               config.setSchema(schema);
-              config.setTime(schema.getTimeFieldSpec());
+              config.setTime(_timeColumnName, schema);
 
               final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
               switch (config.getFormat()) {

@@ -175,16 +175,15 @@ public class SegmentGeneratorConfig {
     //  Hence, if table config is null, but timeFieldSpec is not null, read time from schema
     //  Once we move to multiple time columns - DateTimeFieldSpec - table config has to be provided with valid time
     //  If more than 1 dateTimeFieldSpec is found along with null table config, throw exception.
+    String timeColumnName = null;
+    if (tableConfig != null && tableConfig.getValidationConfig() != null) {
+      timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    }
+    setTime(timeColumnName, schema);
+
     if (tableConfig == null) {
-      setTime(schema.getTimeFieldSpec());
       return;
     }
-
-    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    if (timeColumnName != null) {
-      setTime(schema.getFieldSpecFor(timeColumnName));
-    }
-
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig != null) {
       List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
@@ -225,7 +224,24 @@ public class SegmentGeneratorConfig {
     }
   }
 
-  public void setTime(FieldSpec timeSpec) {
+  /**
+   * Set time column details using the given time column. If not found, use schema
+   */
+  public void setTime(String timeColumnName, Schema schema) {
+    if (timeColumnName != null) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
+      if (fieldSpec != null) {
+        setTime(fieldSpec);
+        return;
+      }
+    }
+    setTime(schema.getTimeFieldSpec());
+  }
+
+  /**
+   * Set time column details using the given field spec
+   */
+  private void setTime(FieldSpec timeSpec) {
     if (timeSpec == null) {
       return;
     }
