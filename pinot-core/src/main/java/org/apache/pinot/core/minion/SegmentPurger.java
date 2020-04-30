@@ -48,6 +48,7 @@ public class SegmentPurger {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPurger.class);
 
   private final String _rawTableName;
+  private final String _timeColumnName;
   private final File _originalIndexDir;
   private final File _workingDir;
   private final RecordPurger _recordPurger;
@@ -56,11 +57,12 @@ public class SegmentPurger {
   private int _numRecordsPurged;
   private int _numRecordsModified;
 
-  public SegmentPurger(String rawTableName, File originalIndexDir, File workingDir, @Nullable RecordPurger recordPurger,
-      @Nullable RecordModifier recordModifier) {
+  public SegmentPurger(String rawTableName, String timeColumnName, File originalIndexDir, File workingDir,
+      @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier) {
     Preconditions.checkArgument(recordPurger != null || recordModifier != null,
         "At least one of record purger and modifier should be non-null");
     _rawTableName = rawTableName;
+    _timeColumnName = timeColumnName;
     _originalIndexDir = originalIndexDir;
     _workingDir = workingDir;
     _recordPurger = recordPurger;
@@ -85,12 +87,11 @@ public class SegmentPurger {
       }
 
       Schema schema = purgeRecordReader.getSchema();
-      // FIXME: figure out how to get table config here.
-      //  Fine for now, since we will only have timeFieldSpec.
-      //  Will be an issue once we start using DateTimeFieldSpec
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig();
+      config.setSchema(schema);
       config.setOutDir(_workingDir.getPath());
       config.setTableName(_rawTableName);
+      config.setTime(_timeColumnName, schema);
       config.setSegmentName(segmentName);
 
       // Keep index creation time the same as original segment because both segments use the same raw data.
