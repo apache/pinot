@@ -45,7 +45,7 @@ public class BestEffortSegmentUploader implements SegmentUploader {
   private URI _defaultSegmentLocationURI;
   private int _timeoutInMs;
 
-  public BestEffortSegmentUploader(String segmentStoreUriStr, int timeoutInMs, String defaultSegment) {
+  public BestEffortSegmentUploader(String segmentStoreDirUri, int timeoutMillis, String defaultSegment) {
     _segmentStoreUriStr = segmentStoreUriStr;
     _timeoutInMs = timeoutInMs;
     _defaultSegmentLocationURI = URI.create(defaultSegment);
