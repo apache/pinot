@@ -52,7 +52,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   }
 
   @Override
-  public URI uploadSegment(File segmentFile, String tableName, String segmentName) {
+  public URI uploadSegment(File segmentFile,  LLCSegmentName segmentName) {
     SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile);
     if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS) {
       try {
