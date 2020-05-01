@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.segments.v1.creator;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Field;
@@ -38,18 +34,15 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +55,7 @@ public class SegmentTestUtils {
       @Nonnull File outputDir, @Nonnull String tableName)
       throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig =
-        new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(avroFile));
+        new SegmentGeneratorConfig(null, extractSchemaFromAvroWithoutTime(avroFile));
     segmentGeneratorConfig.setInputFilePath(avroFile.getAbsolutePath());
     segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
     segmentGeneratorConfig.setTableName(tableName);
@@ -73,7 +66,7 @@ public class SegmentTestUtils {
       String timeColumn, TimeUnit timeUnit, String tableName)
       throws IOException {
     final SegmentGeneratorConfig segmentGenSpec =
-        new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(inputAvro));
+        new SegmentGeneratorConfig(null, extractSchemaFromAvroWithoutTime(inputAvro));
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeColumnName(timeColumn);
     segmentGenSpec.setSegmentTimeUnit(timeUnit);
@@ -87,61 +80,14 @@ public class SegmentTestUtils {
 
   public static SegmentGeneratorConfig getSegmentGeneratorConfigWithSchema(File inputAvro, File outputDir,
       String tableName, Schema schema) {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
     segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
     segmentGeneratorConfig.setFormat(FileFormat.AVRO);
     segmentGeneratorConfig.setSegmentVersion(SegmentVersion.v1);
     segmentGeneratorConfig.setTableName(tableName);
-    segmentGeneratorConfig.setTimeColumnName(schema.getTimeColumnName());
-    segmentGeneratorConfig.setSegmentTimeUnit(schema.getOutgoingTimeUnit());
+    segmentGeneratorConfig.setTime(null, schema);
     return segmentGeneratorConfig;
-  }
-
-  public static List<String> getColumnNamesFromAvro(File avro)
-      throws IOException {
-    List<String> ret = new ArrayList<String>();
-    DataFileStream<GenericRecord> dataStream =
-        new DataFileStream<GenericRecord>(new FileInputStream(avro), new GenericDatumReader<GenericRecord>());
-    for (final Field field : dataStream.getSchema().getFields()) {
-      ret.add(field.name());
-    }
-    return ret;
-  }
-
-  public static Schema extractSchemaFromAvro(File avroFile, Map<String, FieldType> fieldTypeMap, TimeUnit granularity)
-      throws IOException {
-    DataFileStream<GenericRecord> dataStream =
-        new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
-    Schema schema = new Schema();
-
-    for (final Field field : dataStream.getSchema().getFields()) {
-      final String columnName = field.name();
-      FieldType fieldType = fieldTypeMap.get(columnName);
-      Preconditions.checkNotNull(fieldType);
-
-      switch (fieldType) {
-        case TIME:
-          final TimeGranularitySpec gSpec = new TimeGranularitySpec(getColumnType(field), granularity, columnName);
-          final TimeFieldSpec fSpec = new TimeFieldSpec(gSpec);
-          schema.addField(fSpec);
-          continue;
-        case DIMENSION:
-          final FieldSpec dimensionFieldSpec =
-              new DimensionFieldSpec(columnName, getColumnType(field), isSingleValueField(field));
-          schema.addField(dimensionFieldSpec);
-          continue;
-        case METRIC:
-          final FieldSpec metricFieldSpec = new MetricFieldSpec(columnName, getColumnType(field));
-          schema.addField(metricFieldSpec);
-          continue;
-        default:
-          throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
-      }
-    }
-
-    dataStream.close();
-    return schema;
   }
 
   public static Schema extractSchemaFromAvroWithoutTime(File avroFile)

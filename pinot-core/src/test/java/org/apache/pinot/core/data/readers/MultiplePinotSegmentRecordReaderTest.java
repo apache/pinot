@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -32,6 +34,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -60,6 +63,7 @@ public class MultiplePinotSegmentRecordReaderTest {
   public void setup()
       throws Exception {
     Schema schema = createPinotSchema();
+    TableConfig tableConfig = createTableConfig();
     _segmentOutputDir = Files.createTempDir().toString();
     _rowsList = new ArrayList<>(NUM_SEGMENTS);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
@@ -69,7 +73,8 @@ public class MultiplePinotSegmentRecordReaderTest {
       List<GenericRow> rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
       _rowsList.add(rows);
       RecordReader recordReader = new GenericRowRecordReader(rows);
-      _segmentIndexDirList.add(PinotSegmentUtil.createSegment(schema, segmentName, _segmentOutputDir, recordReader));
+      _segmentIndexDirList
+          .add(PinotSegmentUtil.createSegment(tableConfig, schema, segmentName, _segmentOutputDir, recordReader));
     }
   }
 
@@ -83,6 +88,10 @@ public class MultiplePinotSegmentRecordReaderTest {
     testSchema.addField(new MetricFieldSpec(M2, FieldSpec.DataType.FLOAT));
     testSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, TIME)));
     return testSchema;
+  }
+
+  private TableConfig createTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME).build();
   }
 
   @Test

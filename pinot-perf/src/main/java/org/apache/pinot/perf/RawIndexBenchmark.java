@@ -128,7 +128,7 @@ public class RawIndexBenchmark {
       schema.addField(dimensionFieldSpec);
     }
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
     config.setRawIndexCreationColumns(Collections.singletonList(_rawIndexColumn));
 
     config.setOutDir(SEGMENT_DIR_NAME);

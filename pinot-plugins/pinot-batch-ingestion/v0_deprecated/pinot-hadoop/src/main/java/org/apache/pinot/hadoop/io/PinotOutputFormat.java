@@ -49,6 +49,9 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
   // Name of the segment.
   public static final String SEGMENT_NAME = "pinot.segment_name";
 
+  // Name of the time column.
+  public static final String TIME_COLUMN_NAME = "pinot.time_column_name";
+
   // file containing schema for the data
   public static final String SCHEMA = "pinot.schema.file";
 
@@ -91,6 +94,14 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
       throw new RuntimeException("pinot segment name not set.");
     }
     return segment;
+  }
+
+  public static void setTimeColumnName(Job job, String timeColumnName) {
+    job.getConfiguration().set(PinotOutputFormat.TIME_COLUMN_NAME, timeColumnName);
+  }
+
+  public static String getTimeColumnName(JobContext context) {
+    return context.getConfiguration().get(PinotOutputFormat.TIME_COLUMN_NAME);
   }
 
   public static void setSchema(Job job, Schema schema) {
@@ -163,7 +174,9 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     _segmentConfig.setOverwrite(true);
     _segmentConfig.setTableName(PinotOutputFormat.getTableName(context));
     _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
-    _segmentConfig.setSchema(Schema.fromString(PinotOutputFormat.getSchema(context)));
+    Schema schema = Schema.fromString(PinotOutputFormat.getSchema(context));
+    _segmentConfig.setSchema(schema);
+    _segmentConfig.setTime(PinotOutputFormat.getTimeColumnName(context), schema);
     _segmentConfig.setReaderConfigFile(PinotOutputFormat.getReaderConfig(context));
   }
 }

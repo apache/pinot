@@ -204,7 +204,7 @@ public class RawIndexCreatorTest {
    */
   private RecordReader buildIndex(Schema schema)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
     config.setRawIndexCreationColumns(schema.getDimensionNames());
 
     config.setOutDir(SEGMENT_DIR_NAME);

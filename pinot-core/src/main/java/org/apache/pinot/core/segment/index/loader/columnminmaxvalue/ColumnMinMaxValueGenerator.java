@@ -62,6 +62,9 @@ public class ColumnMinMaxValueGenerator {
     if (timeColumnName != null) {
       addColumnMinMaxValueForColumn(timeColumnName);
     }
+    for (String dateTimeColumn : schema.getDateTimeNames()) {
+      addColumnMinMaxValueForColumn(dateTimeColumn);
+    }
     if (_columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.TIME) {
       saveMetadata();
       return;

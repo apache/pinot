@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.AggregationResult;
@@ -50,6 +52,7 @@ import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
@@ -73,6 +76,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TransformQueriesTest");
 
   private Schema _schema;
+  private TableConfig _tableConfig;
   private List<IndexSegment> _indexSegments = new ArrayList<>();
   private List<SegmentDataManager> _segmentDataManagers;
 
@@ -83,6 +87,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
             .addSingleValueDimension(M1, FieldSpec.DataType.INT).addSingleValueDimension(M2, FieldSpec.DataType.INT)
             .addSingleValueDimension(M3, FieldSpec.DataType.LONG).addSingleValueDimension(M4, FieldSpec.DataType.LONG)
             .addTime(TIME, TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG).build();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME).build();
   }
 
   @AfterClass
@@ -105,7 +110,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
     try {
       final List<GenericRow> rows = createDataSet(10);
       try (final RecordReader recordReader = new GenericRowRecordReader(rows)) {
-        createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
+        createSegment(_tableConfig, _schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
         final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
         _indexSegments.add(segment);
 
@@ -168,7 +173,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
     }
 
     try (final RecordReader recordReader = new GenericRowRecordReader(rows)) {
-      createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
+      createSegment(_tableConfig, _schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
       final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
       _indexSegments.add(segment);
 
@@ -207,8 +212,8 @@ public class TransformQueriesTest extends BaseQueriesTest {
 
       try (final RecordReader recordReaderOne = new GenericRowRecordReader(segmentOneRows);
           final RecordReader recordReaderTwo = new GenericRowRecordReader(segmentTwoRows)) {
-        createSegment(_schema, recordReaderOne, SEGMENT_NAME_1, TABLE_NAME);
-        createSegment(_schema, recordReaderTwo, SEGMENT_NAME_2, TABLE_NAME);
+        createSegment(_tableConfig, _schema, recordReaderOne, SEGMENT_NAME_1, TABLE_NAME);
+        createSegment(_tableConfig, _schema, recordReaderTwo, SEGMENT_NAME_2, TABLE_NAME);
 
         final ImmutableSegment segmentOne = loadSegment(SEGMENT_NAME_1);
         final ImmutableSegment segmentTwo = loadSegment(SEGMENT_NAME_2);
@@ -298,9 +303,10 @@ public class TransformQueriesTest extends BaseQueriesTest {
     return _segmentDataManagers;
   }
 
-  private void createSegment(Schema schema, RecordReader recordReader, String segmentName, String tableName)
+  private void createSegment(TableConfig tableConfig, Schema schema, RecordReader recordReader, String segmentName,
+      String tableName)
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);

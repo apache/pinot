@@ -63,6 +63,9 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -367,11 +370,19 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
     // and value
     if (validationConfig.getSegmentPushType().equalsIgnoreCase("APPEND")) {
       job.getConfiguration().set(InternalConfigConstants.IS_APPEND, "true");
-      String timeColumnName = _pinotTableSchema.getTimeFieldSpec().getName();
+      String timeColumnName = validationConfig.getTimeColumnName();
       job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_CONFIG, timeColumnName);
-      job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_TYPE, validationConfig.getTimeType().toString());
-      job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_FORMAT,
-          _pinotTableSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
+      if (timeColumnName != null) {
+        FieldSpec fieldSpec = _pinotTableSchema.getFieldSpecFor(timeColumnName);
+        if (fieldSpec != null) {
+          TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+          TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+          job.getConfiguration()
+              .set(InternalConfigConstants.SEGMENT_TIME_TYPE, outgoingGranularitySpec.getTimeType().toString());
+          job.getConfiguration()
+              .set(InternalConfigConstants.SEGMENT_TIME_FORMAT, outgoingGranularitySpec.getTimeFormat());
+        }
+      }
       job.getConfiguration()
           .set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
       try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(path)) {

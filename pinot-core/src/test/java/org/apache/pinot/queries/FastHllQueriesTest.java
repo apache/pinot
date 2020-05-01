@@ -169,7 +169,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension("column18_HLL", FieldSpec.DataType.STRING).build();
 
     // Create the segment generator config
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());

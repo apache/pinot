@@ -37,7 +37,9 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
@@ -191,7 +193,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
       MergeRollupSegmentConverter mergeRollupSegmentConverter =
           new MergeRollupSegmentConverter.Builder().setMergeType(_mergeType).setSegmentName(_outputSegmentName)
-              .setInputIndexDirs(inputIndexDirs).setWorkingDir(workingDir).setTableName(tableName).build();
+              .setInputIndexDirs(inputIndexDirs).setWorkingDir(workingDir).setTableName(tableName)
+              .setTableConfig(tableConfig).build();
 
       List<File> outputSegments = mergeRollupSegmentConverter.convert();
       Preconditions.checkState(outputSegments.size() == 1);
@@ -243,9 +246,18 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     // Fetch time related configurations from schema and table config.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String pushFrequency = validationConfig.getSegmentPushFrequency();
-    TimeUnit timeType = validationConfig.getTimeType();
     String pushType = validationConfig.getSegmentPushType();
-    String timeFormat = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat();
+    String timeColumnName = validationConfig.getTimeColumnName();
+    TimeUnit timeType = null;
+    String timeFormat = null;
+    if (timeColumnName != null) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
+      if (fieldSpec != null) {
+        TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+        timeType = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
+        timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
+      }
+    }
 
     // Generate the final segment name using segment name generator
     NormalizedDateSegmentNameGenerator segmentNameGenerator =

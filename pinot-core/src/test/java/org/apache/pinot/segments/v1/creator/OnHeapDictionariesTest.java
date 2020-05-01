@@ -166,7 +166,7 @@ public class OnHeapDictionariesTest {
   private Schema buildSegment(String segmentDirName, String segmentName, Schema schema)
       throws Exception {
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
     config.setOutDir(segmentDirName);
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);

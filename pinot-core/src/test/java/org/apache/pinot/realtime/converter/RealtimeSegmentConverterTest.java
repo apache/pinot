@@ -21,11 +21,14 @@ package org.apache.pinot.realtime.converter;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -41,13 +44,15 @@ public class RealtimeSegmentConverterTest {
         new TimeFieldSpec("col1", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "col2", FieldSpec.DataType.LONG,
             TimeUnit.DAYS);
     schema.addField(tfs);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("test").setTimeColumnName("col2").build();
     String segmentName = "segment1";
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
     Assert.assertEquals(schema.getColumnNames().size(), 5);
     Assert.assertEquals(schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType(), TimeUnit.MILLISECONDS);
 
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(null, "", schema, "testTable", "col1", segmentName, "col1");
+        new RealtimeSegmentConverter(null, "", schema, "testTable", tableConfig, segmentName, "col1");
 
     Schema newSchema = converter.getUpdatedSchema(schema);
     Assert.assertEquals(newSchema.getColumnNames().size(), 2);
@@ -64,7 +69,7 @@ public class RealtimeSegmentConverterTest {
     schema.addField(new MetricFieldSpec("met2", FieldSpec.DataType.LONG, 0));
     Assert.assertEquals(schema.getColumnNames().size(), 5);
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(null, "", schema, "testTable", "col1", "segment1", "col1");
+        new RealtimeSegmentConverter(null, "", schema, "testTable", null, "segment1", "col1");
     Schema newSchema = converter.getUpdatedSchema(schema);
     Assert.assertEquals(newSchema.getColumnNames().size(), 5);
   }

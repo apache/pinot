@@ -81,7 +81,7 @@ public class StringDictionaryPerfTest {
     _dictLength = dictLength;
     _inputStrings = new String[dictLength];
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
     config.setOutDir(_indexDir.getParent());
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);

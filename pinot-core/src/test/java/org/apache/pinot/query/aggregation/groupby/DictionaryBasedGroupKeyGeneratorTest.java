@@ -121,7 +121,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
       schema.addField(new DimensionFieldSpec(multiValueColumn, FieldSpec.DataType.INT, false));
     }
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
     config.setOutDir(INDEX_DIR_PATH);
     config.setSegmentName(SEGMENT_NAME);
 

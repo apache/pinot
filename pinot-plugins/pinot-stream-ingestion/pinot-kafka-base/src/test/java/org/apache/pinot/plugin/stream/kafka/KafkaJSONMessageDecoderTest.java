@@ -24,6 +24,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -39,43 +41,58 @@ public class KafkaJSONMessageDecoderTest {
   @Test
   public void testJsonDecoderWithoutOutgoingTimeSpec()
       throws Exception {
-    testJsonDecoderWithSchema(Schema.fromFile(new File(
+    Schema schema = Schema.fromFile(new File(
         getClass().getClassLoader().getResource("data/test_sample_data_schema_without_outgoing_time_spec.json")
-            .getFile())));
+            .getFile()));
+    Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      sourceFields.put(fieldSpec.getName(), fieldSpec.getDataType());
+    }
+    testJsonDecoder(sourceFields);
   }
 
   @Test
   public void testJsonDecoderWithOutgoingTimeSpec()
       throws Exception {
-    testJsonDecoderWithSchema(Schema.fromFile(new File(
-        getClass().getClassLoader().getResource("data/test_sample_data_schema_no_time_field.json").getFile())));
+    Schema schema = Schema.fromFile(new File(
+        getClass().getClassLoader().getResource("data/test_sample_data_schema_with_outgoing_time_spec.json")
+            .getFile()));
+    Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      sourceFields.put(fieldSpec.getName(), fieldSpec.getDataType());
+    }
+    sourceFields.remove("secondsSinceEpoch");
+    sourceFields.put("time_day", FieldSpec.DataType.INT);
+    testJsonDecoder(sourceFields);
   }
 
   @Test
   public void testJsonDecoderNoTimeSpec()
       throws Exception {
-    testJsonDecoderWithSchema(Schema.fromFile(new File(
-        getClass().getClassLoader().getResource("data/test_sample_data_schema_no_time_field.json").getFile())));
+    Schema schema = Schema.fromFile(
+        new File(getClass().getClassLoader().getResource("data/test_sample_data_schema_no_time_field.json").getFile()));
+    Map<String, FieldSpec.DataType> sourceFields = new HashMap<>();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      sourceFields.put(fieldSpec.getName(), fieldSpec.getDataType());
+    }
+    testJsonDecoder(sourceFields);
   }
 
-  private void testJsonDecoderWithSchema(Schema schema)
+  private void testJsonDecoder(Map<String, FieldSpec.DataType> sourceFields)
       throws Exception {
     try (BufferedReader reader = new BufferedReader(
         new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()))) {
       KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
-      decoder.init(new HashMap<>(), schema.getColumnNames(), "testTopic");
+      decoder.init(new HashMap<>(), sourceFields.keySet(), "testTopic");
       GenericRow r = new GenericRow();
       String line = reader.readLine();
       while (line != null) {
         JsonNode jsonNode = objectMapper.reader().readTree(line);
         decoder.decode(line.getBytes(), r);
-        for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-          FieldSpec incomingFieldSpec = fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? new TimeFieldSpec(
-              schema.getTimeFieldSpec().getIncomingGranularitySpec()) : fieldSpec;
-          String fieldSpecName = incomingFieldSpec.getName();
-          Object actualValue = r.getValue(fieldSpecName);
-          JsonNode expectedValue = jsonNode.get(fieldSpecName);
-          switch (incomingFieldSpec.getDataType()) {
+        for (String field : sourceFields.keySet()) {
+          Object actualValue = r.getValue(field);
+          JsonNode expectedValue = jsonNode.get(field);
+          switch (sourceFields.get(field)) {
             case STRING:
               Assert.assertEquals(actualValue, expectedValue.asText());
               break;

@@ -43,6 +43,7 @@ import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -157,54 +158,109 @@ public class SegmentGeneratorConfig {
   }
 
   /**
-   * This constructor is used during offline data generation. Note that it has an option that will generate inverted
-   * index.
+   * Construct the SegmentGeneratorConfig using schema and table config.
+   * If table config is passed, it will be used to initialize the time column details and the indexing config
+   * This constructor is used during offline data generation.
+   * @param tableConfig table config of the segment. Used for getting time column information and indexing information
+   * @param schema schema of the segment to be generated. The time column information should be taken from table config.
+   *               However, for maintaining backward compatibility, taking it from schema if table config is null.
+   *               This will not work once we start supporting multiple time columns (DateTimeFieldSpec)
    */
   public SegmentGeneratorConfig(@Nullable TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(schema);
     setSchema(schema);
 
+    // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
+    //  But table config is not mandatory, and cannot be easily enforced as the instantiation can happen in external code.
+    //  Hence, if table config is null, but timeFieldSpec is not null, read time from schema
+    //  Once we move to multiple time columns - DateTimeFieldSpec - table config has to be provided with valid time
+    //  If more than 1 dateTimeFieldSpec is found along with null table config, throw exception.
+    String timeColumnName = null;
+    if (tableConfig != null && tableConfig.getValidationConfig() != null) {
+      timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    }
+    setTime(timeColumnName, schema);
+
     if (tableConfig == null) {
       return;
     }
-
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
-    Map<String, String> noDictionaryColumnMap = indexingConfig.getNoDictionaryConfig();
+    if (indexingConfig != null) {
+      List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
+      Map<String, String> noDictionaryColumnMap = indexingConfig.getNoDictionaryConfig();
 
-    if (noDictionaryColumns != null) {
-      this.setRawIndexCreationColumns(noDictionaryColumns);
+      if (noDictionaryColumns != null) {
+        this.setRawIndexCreationColumns(noDictionaryColumns);
 
-      if (noDictionaryColumnMap != null) {
-        Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
-            noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType
-                    .valueOf(e.getValue())));
-        this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
+        if (noDictionaryColumnMap != null) {
+          Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
+              noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                  e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
+          this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
+        }
+      }
+      if (indexingConfig.getVarLengthDictionaryColumns() != null) {
+        setVarLengthDictionaryColumns(indexingConfig.getVarLengthDictionaryColumns());
+      }
+      _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+
+      // Star-tree V2 configs
+      List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+      if (starTreeIndexConfigs != null && !starTreeIndexConfigs.isEmpty()) {
+        List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = new ArrayList<>(starTreeIndexConfigs.size());
+        for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
+          starTreeV2BuilderConfigs.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig));
+        }
+        setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
+      }
+
+      if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+        _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+      }
+
+      extractTextIndexColumnsFromTableConfig(tableConfig);
+
+      _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+    }
+  }
+
+  /**
+   * Set time column details using the given time column. If not found, use schema
+   */
+  public void setTime(String timeColumnName, Schema schema) {
+    if (timeColumnName != null) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
+      if (fieldSpec != null) {
+        setTime(fieldSpec);
+        return;
       }
     }
-    if (indexingConfig.getVarLengthDictionaryColumns() != null) {
-      setVarLengthDictionaryColumns(indexingConfig.getVarLengthDictionaryColumns());
+    setTime(schema.getTimeFieldSpec());
+  }
+
+  /**
+   * Set time column details using the given field spec
+   */
+  private void setTime(FieldSpec timeSpec) {
+    if (timeSpec == null) {
+      return;
     }
-    _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) timeSpec;
+    setTimeColumnName(timeFieldSpec.getName());
 
-    // Star-tree V2 configs
-    List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
-    if (starTreeIndexConfigs != null && !starTreeIndexConfigs.isEmpty()) {
-      List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = new ArrayList<>(starTreeIndexConfigs.size());
-      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
-        starTreeV2BuilderConfigs.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig));
-      }
-      setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
+    TimeGranularitySpec timeGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+
+    String timeFormat = timeGranularitySpec.getTimeFormat();
+    if (timeFormat.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
+      // Time format: 'EPOCH'
+      setSegmentTimeUnit(timeGranularitySpec.getTimeType());
+    } else {
+      // Time format: 'SIMPLE_DATE_FORMAT:<pattern>'
+      Preconditions.checkArgument(timeFormat.startsWith(TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+          "Invalid time format: %s, must be one of '%s' or '%s:<pattern>'", timeFormat,
+          TimeGranularitySpec.TimeFormat.EPOCH, TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT);
+      setSimpleDateFormat(timeFormat.substring(timeFormat.indexOf(':') + 1));
     }
-
-    if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
-      _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
-    }
-
-    extractTextIndexColumnsFromTableConfig(tableConfig);
-
-    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
   }
 
   /**
@@ -224,10 +280,6 @@ public class SegmentGeneratorConfig {
         }
       }
     }
-  }
-
-  public SegmentGeneratorConfig(Schema schema) {
-    setSchema(schema);
   }
 
   public Map<String, String> getCustomProperties() {
@@ -506,25 +558,6 @@ public class SegmentGeneratorConfig {
   public void setSchema(Schema schema) {
     Preconditions.checkNotNull(schema);
     _schema = schema;
-
-    // Set time related fields
-    // TODO: support datetime field as time column
-    TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
-    if (timeFieldSpec != null) {
-      TimeGranularitySpec timeGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
-      setTimeColumnName(timeGranularitySpec.getName());
-      String timeFormat = timeGranularitySpec.getTimeFormat();
-      if (timeFormat.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-        // Time format: 'EPOCH'
-        setSegmentTimeUnit(timeGranularitySpec.getTimeType());
-      } else {
-        // Time format: 'SIMPLE_DATE_FORMAT:<pattern>'
-        Preconditions.checkArgument(timeFormat.startsWith(TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-            "Invalid time format: %s, must be one of '%s' or '%s:<pattern>'", timeFormat,
-            TimeGranularitySpec.TimeFormat.EPOCH, TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT);
-        setSimpleDateFormat(timeFormat.substring(timeFormat.indexOf(':') + 1));
-      }
-    }
 
     // Remove inverted index columns not in schema
     // TODO: add a validate() method to perform all validations

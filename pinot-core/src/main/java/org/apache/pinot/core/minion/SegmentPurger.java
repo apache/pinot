@@ -85,7 +85,8 @@ public class SegmentPurger {
       }
 
       Schema schema = purgeRecordReader.getSchema();
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+      // FIXME: make table config available here, and pass it to the SegmentGeneratorConfig
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
       config.setOutDir(_workingDir.getPath());
       config.setTableName(_rawTableName);
       config.setSegmentName(segmentName);

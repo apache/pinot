@@ -38,7 +38,9 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
@@ -53,6 +55,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   // Default settings
   private static final String DEFAULT_TABLE_NAME = "mytable";
   private static final String DEFAULT_SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
+  private static final String DEFAULT_TIME_COLUMN_NAME = "DaysSinceEpoch";
   private static final String DEFAULT_AVRO_TAR_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz";
   private static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
@@ -89,6 +92,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected String getSchemaFileName() {
     return DEFAULT_SCHEMA_FILE_NAME;
+  }
+
+  protected String getTimeColumnName() {
+    return DEFAULT_TIME_COLUMN_NAME;
   }
 
   protected String getAvroTarFileName() {
@@ -402,9 +409,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     String schemaName = schema.getSchemaName();
     addSchema(schemaFile, schemaName);
 
-    String timeColumnName = schema.getTimeColumnName();
-    Assert.assertNotNull(timeColumnName);
-    TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
+    String timeColumnName = getTimeColumnName();
+    FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
+    Assert.assertNotNull(fieldSpec);
+    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+    TimeUnit outgoingTimeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 

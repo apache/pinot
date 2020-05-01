@@ -36,6 +36,7 @@ import org.apache.pinot.core.data.readers.PinotSegmentUtil;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -142,11 +143,12 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
   public void buildSegment()
       throws Exception {
     Schema schema = _helixResourceManager.getSchema(getTableName());
+    TableConfig tableConfig = _helixResourceManager.getTableConfig(getTableName());
     String _segmentOutputDir = Files.createTempDir().toString();
     List<GenericRow> _rows = PinotSegmentUtil.createTestData(schema, 1);
     RecordReader _recordReader = new GenericRowRecordReader(_rows);
 
-    _indexDir = PinotSegmentUtil.createSegment(schema, "segmentName", _segmentOutputDir, _recordReader);
+    _indexDir = PinotSegmentUtil.createSegment(tableConfig, schema, "segmentName", _segmentOutputDir, _recordReader);
   }
 
   private JsonNode getSegmentsFromJsonSegmentAPI(String json, String type)

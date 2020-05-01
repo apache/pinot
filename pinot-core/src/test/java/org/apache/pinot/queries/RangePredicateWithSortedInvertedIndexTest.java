@@ -116,7 +116,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
 
   private void createSegment(Schema schema, RecordReader recordReader, String segmentName, String tableName)
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);

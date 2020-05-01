@@ -40,9 +40,9 @@ public class SegmentTestUtils {
       throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig;
     if (pinotSchema == null) {
-      segmentGeneratorConfig = new SegmentGeneratorConfig(AvroUtils.getPinotSchemaFromAvroDataFile(inputAvro));
+      segmentGeneratorConfig = new SegmentGeneratorConfig(null, AvroUtils.getPinotSchemaFromAvroDataFile(inputAvro));
     } else {
-      segmentGeneratorConfig = new SegmentGeneratorConfig(pinotSchema);
+      segmentGeneratorConfig = new SegmentGeneratorConfig(null, pinotSchema);
     }
 
     segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());

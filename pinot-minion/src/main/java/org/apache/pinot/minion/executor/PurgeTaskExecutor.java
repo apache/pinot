@@ -49,7 +49,8 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     SegmentPurger.RecordModifierFactory recordModifierFactory = MINION_CONTEXT.getRecordModifierFactory();
     SegmentPurger.RecordModifier recordModifier =
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
-    SegmentPurger segmentPurger = new SegmentPurger(rawTableName, originalIndexDir, workingDir, recordPurger, recordModifier);
+    SegmentPurger segmentPurger =
+        new SegmentPurger(rawTableName, originalIndexDir, workingDir, recordPurger, recordModifier);
 
     File purgedSegmentFile = segmentPurger.purgeSegment();
     if (purgedSegmentFile == null) {

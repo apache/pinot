@@ -126,7 +126,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
     segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));

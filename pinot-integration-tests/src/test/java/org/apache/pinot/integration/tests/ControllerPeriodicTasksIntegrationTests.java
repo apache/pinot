@@ -48,7 +48,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -183,9 +185,11 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     String schemaName = schema.getSchemaName();
     addSchema(schemaFile, schemaName);
 
-    String timeColumnName = schema.getTimeColumnName();
-    Assert.assertNotNull(timeColumnName);
-    TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
+    String timeColumnName = getTimeColumnName();
+    FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
+    Assert.assertNotNull(fieldSpec);
+    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+    TimeUnit outgoingTimeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 
@@ -211,9 +215,11 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     String schemaName = schema.getSchemaName();
     addSchema(schemaFile, schemaName);
 
-    String timeColumnName = schema.getTimeColumnName();
-    Assert.assertNotNull(timeColumnName);
-    TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
+    String timeColumnName = getTimeColumnName();
+    FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
+    Assert.assertNotNull(fieldSpec);
+    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+    TimeUnit outgoingTimeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 

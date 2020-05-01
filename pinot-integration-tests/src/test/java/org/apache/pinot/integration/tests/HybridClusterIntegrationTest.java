@@ -31,7 +31,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -127,9 +129,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     String schemaName = _schema.getSchemaName();
     addSchema(getSchemaFile(), schemaName);
 
-    String timeColumnName = _schema.getTimeColumnName();
-    Assert.assertNotNull(timeColumnName);
-    TimeUnit outgoingTimeUnit = _schema.getOutgoingTimeUnit();
+    String timeColumnName = getTimeColumnName();
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(timeColumnName);
+    Assert.assertNotNull(fieldSpec);
+    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+    TimeUnit outgoingTimeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 

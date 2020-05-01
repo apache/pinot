@@ -37,7 +37,9 @@ import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
@@ -289,9 +291,11 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       // Create Pinot table
       String schemaName = schema.getSchemaName();
       addSchema(_schemaFile, schemaName);
-      String timeColumnName = schema.getTimeColumnName();
-      Assert.assertNotNull(timeColumnName);
-      TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
+      String timeColumnName = getTimeColumnName();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
+      Assert.assertNotNull(fieldSpec);
+      TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+      TimeUnit outgoingTimeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
       Assert.assertNotNull(outgoingTimeUnit);
       String timeType = outgoingTimeUnit.toString();
       addHybridTable(_tableName, _useLlc, KAFKA_BROKER, KAFKA_ZK_STR, getKafkaTopic(), getRealtimeSegmentFlushSize(),
