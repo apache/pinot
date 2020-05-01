@@ -88,11 +88,4 @@ public class FunctionRegistry {
     list.add(functionInfo);
     _functionInfoMap.put(method.getName().toLowerCase(), list);
   }
-
-  public static void registerFunction(Method method) {
-    List<FunctionInfo> list = new ArrayList<>();
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
-    list.add(functionInfo);
-    _functionInfoMap.put(method.getName().toLowerCase(), list);
-  }
 }
