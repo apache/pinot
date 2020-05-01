@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -38,28 +39,25 @@ import org.slf4j.LoggerFactory;
 // successful. If a segment upload fails or there is no segment store uri configured, it sets the segment location as
 // the default URI.
 public class PinotFSSegmentUploader implements SegmentUploader {
-  private Logger LOGGER = LoggerFactory.getLogger(BestEffortSegmentUploader.class);
+  private Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   private String _segmentStoreUriStr;
   private ExecutorService _executorService = Executors.newCachedThreadPool();
-  // The default segment location URI to return if the upload fails.
-  private URI _defaultSegmentLocationURI;
   private int _timeoutInMs;
 
-  public BestEffortSegmentUploader(String segmentStoreDirUri, int timeoutMillis, String defaultSegment) {
-    _segmentStoreUriStr = segmentStoreUriStr;
-    _timeoutInMs = timeoutInMs;
-    _defaultSegmentLocationURI = URI.create(defaultSegment);
+  public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis) {
+    _segmentStoreUriStr = segmentStoreDirUri;
+    _timeoutInMs = timeoutMillis;
   }
 
-  public URI uploadSegment(File segmentFile, String tableNameWithType, String segmentName) {
+  public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
     if (_segmentStoreUriStr == null || _segmentStoreUriStr.isEmpty()) {
-      return _defaultSegmentLocationURI;
+      return null;
     }
-
     Callable<URI> uploadTask = () -> {
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
-        URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, tableNameWithType, segmentName));
+        URI destUri = new URI(StringUtil
+            .join(File.separator, _segmentStoreUriStr, segmentName.getTableName(), segmentName.getSegmentName()));
         // Check and delete any existing segment file.
         if (pinotFS.exists(destUri)) {
           pinotFS.delete(destUri, true);
@@ -67,19 +65,22 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         pinotFS.copyFromLocalFile(segmentFile, destUri);
         return destUri;
       } catch (Exception e) {
-        LOGGER.error("Failed copy segment tar file to segment store {}: {}", segmentFile.getName(), e);
+        LOGGER.warn("Failed copy segment tar file to segment store {}: {}", segmentFile.getName(), e);
       }
-      return _defaultSegmentLocationURI;
+      return null;
     };
     Future<URI> future = _executorService.submit(uploadTask);
     try {
       URI segmentLocation = future.get(_timeoutInMs, TimeUnit.MILLISECONDS);
       return segmentLocation;
+    } catch (InterruptedException e) {
+      LOGGER.info("Interrupted while waiting for segment upload.");
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
-      LOGGER.error("Failed to upload file {} of segment {} for table {} ", segmentFile.getAbsolutePath(), segmentName,
-          tableNameWithType, e);
+      LOGGER
+          .warn("Failed to upload file {} of segment {} for table {} ", segmentFile.getAbsolutePath(), segmentName, e);
     }
 
-    return _defaultSegmentLocationURI;
+    return null;
   }
 }

@@ -28,6 +28,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,6 +52,7 @@ public class Server2ControllerSegmentUploaderTest {
   private static Logger _logger = LoggerFactory.getLogger(Server2ControllerSegmentUploaderTest.class);
   private FileUploadDownloadClient _fileUploadDownloadClient;
   private File _file;
+  private LLCSegmentName _llcSegmentName;
 
   @BeforeClass
   public void setUp()
@@ -75,6 +77,8 @@ public class Server2ControllerSegmentUploaderTest {
 
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
+
+    _llcSegmentName = new LLCSegmentName("test_REALTIME", 1, 0, System.currentTimeMillis());
   }
 
   @AfterClass
@@ -88,7 +92,7 @@ public class Server2ControllerSegmentUploaderTest {
     Server2ControllerSegmentUploader uploader =
         new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, GOOD_CONTROLLER_VIP, "segmentName",
             10000, mock(ServerMetrics.class));
-    URI segmentURI = uploader.uploadSegment(_file, "table_REALTIME", "segment1");
+    URI segmentURI = uploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertEquals(segmentURI.toString(), SEGMENT_LOCATION);
   }
 
@@ -98,7 +102,7 @@ public class Server2ControllerSegmentUploaderTest {
     Server2ControllerSegmentUploader uploader =
         new Server2ControllerSegmentUploader(_logger, _fileUploadDownloadClient, BAD_CONTROLLER_VIP, "segmentName",
             10000, mock(ServerMetrics.class));
-    URI segmentURI = uploader.uploadSegment(_file, "table_REALTIME", "segment1");
+    URI segmentURI = uploader.uploadSegment(_file, _llcSegmentName);
     Assert.assertNull(segmentURI);
   }
 }

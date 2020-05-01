@@ -38,16 +38,34 @@ public class SplitSegmentCommitter implements SegmentCommitter {
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final SegmentUploader _segmentUploader;
+  // The default segment location uri str, could be null.
+  private final String _defaultSegmentLocation;
 
   private final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
+    this(segmentLogger, protocolHandler, indexLoadingConfig, params, segmentUploader, null);
+  }
+
+  /**
+   *
+   * @param segmentLogger
+   * @param protocolHandler
+   * @param indexLoadingConfig
+   * @param params
+   * @param segmentUploader
+   * @param defaultSegmentLocation The default segment location uri str, could be null.
+   */
+  public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
+      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
+      String defaultSegmentLocation) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _indexLoadingConfig = indexLoadingConfig;
     _params = new SegmentCompletionProtocol.Request.Params(params);
     _segmentUploader = segmentUploader;
+    _defaultSegmentLocation = defaultSegmentLocation;
   }
 
   @Override
@@ -61,12 +79,11 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(new LLCSegmentName(_params.getSegmentName()).getTableName());
-    URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile, tableNameWithType, _params.getSegmentName());
-    if (segmentLocation == null) {
-        return SegmentCompletionProtocol.RESP_FAILED;
+    URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(_params.getSegmentName()));
+    if (segmentLocation == null && _defaultSegmentLocation == null) {
+      return SegmentCompletionProtocol.RESP_FAILED;
     }
-    _params.withSegmentLocation(segmentLocation.toString());
+    _params.withSegmentLocation(segmentLocation == null ? _defaultSegmentLocation : segmentLocation.toString());
 
     SegmentCompletionProtocol.Response commitEndResponse;
     if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
