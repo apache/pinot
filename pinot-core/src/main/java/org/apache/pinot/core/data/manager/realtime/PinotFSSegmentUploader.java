@@ -33,11 +33,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-// A segment uploader which does best effort segment upload to a segment store (with store root dir configured as
-// _segmentStoreUriStr). The upload is successful if it is done within a configurable timeout period.
-// The final segment location would be in the URI _segmentStoreUriStr/_tableNameWithType/segmentName if
-// successful. If a segment upload fails or there is no segment store uri configured, it sets the segment location as
-// the default URI.
+// A segment uploader which does segment upload to a segment store (with store root dir configured as
+// _segmentStoreUriStr) using PinotFS within a configurable timeout period. The final segment location would be in the
+// URI _segmentStoreUriStr/_tableNameWithType/segmentName if successful.
 public class PinotFSSegmentUploader implements SegmentUploader {
   private Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   private String _segmentStoreUriStr;
