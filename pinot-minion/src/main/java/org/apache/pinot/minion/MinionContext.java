@@ -20,6 +20,8 @@ package org.apache.pinot.minion;
 
 import java.io.File;
 import javax.net.ssl.SSLContext;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.core.minion.SegmentPurger;
 import org.apache.pinot.minion.metrics.MinionMetrics;
 
@@ -39,7 +41,7 @@ public class MinionContext {
 
   private File _dataDir;
   private MinionMetrics _minionMetrics;
-  private String _minionVersion;
+  private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
 
   // For segment upload
   private SSLContext _sslContext;
@@ -64,12 +66,12 @@ public class MinionContext {
     _minionMetrics = minionMetrics;
   }
 
-  public String getMinionVersion() {
-    return _minionVersion;
+  public ZkHelixPropertyStore<ZNRecord> getHelixPropertyStore() {
+    return _helixPropertyStore;
   }
 
-  public void setMinionVersion(String minionVersion) {
-    _minionVersion = minionVersion;
+  public void setHelixPropertyStore(ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
+    _helixPropertyStore = helixPropertyStore;
   }
 
   public SSLContext getSSLContext() {

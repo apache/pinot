@@ -43,7 +43,6 @@ import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -195,7 +194,8 @@ public class SegmentGeneratorConfig {
         if (noDictionaryColumnMap != null) {
           Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
               noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                  e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
+                  e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType
+                      .valueOf(e.getValue())));
           this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
         }
       }
@@ -214,7 +214,13 @@ public class SegmentGeneratorConfig {
         setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
       }
 
-      if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+      // NOTE: There are 2 ways to configure creating inverted index during segment generation:
+      //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
+      //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
+      // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
+      Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
+      if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
+          || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
         _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
       }
 
@@ -340,6 +346,8 @@ public class SegmentGeneratorConfig {
     _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
   }
 
+  // NOTE: Should always be extracted from the table config
+  @Deprecated
   public void setInvertedIndexCreationColumns(List<String> indexCreationColumns) {
     Preconditions.checkNotNull(indexCreationColumns);
     _invertedIndexCreationColumns.addAll(indexCreationColumns);

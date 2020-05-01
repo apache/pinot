@@ -77,6 +77,7 @@ public class TableConfigBuilder {
   private String _segmentVersion;
   private String _sortedColumn;
   private List<String> _invertedIndexColumns;
+  private boolean _createInvertedIndexDuringSegmentGeneration;
   private List<String> _noDictionaryColumns;
   private List<String> _onHeapDictionaryColumns;
   private List<String> _bloomFilterColumns;
@@ -207,6 +208,12 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(
+      boolean createInvertedIndexDuringSegmentGeneration) {
+    _createInvertedIndexDuringSegmentGeneration = createInvertedIndexDuringSegmentGeneration;
+    return this;
+  }
+
   public TableConfigBuilder setNoDictionaryColumns(List<String> noDictionaryColumns) {
     _noDictionaryColumns = noDictionaryColumns;
     return this;
@@ -303,6 +310,7 @@ public class TableConfigBuilder {
       indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
     }
     indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
+    indexingConfig.setCreateInvertedIndexDuringSegmentGeneration(_createInvertedIndexDuringSegmentGeneration);
     indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
     indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
     indexingConfig.setBloomFilterColumns(_bloomFilterColumns);

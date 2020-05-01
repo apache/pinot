@@ -20,7 +20,6 @@ package org.apache.pinot.minion.events;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
 
 
 /**
@@ -35,8 +34,7 @@ public class EventObserverFactoryRegistry {
    * @param taskType Task type
    * @param eventObserverFactory Event observer factory associated with the task type
    */
-  public void registerEventObserverFactory(@Nonnull String taskType,
-      @Nonnull MinionEventObserverFactory eventObserverFactory) {
+  public void registerEventObserverFactory(String taskType, MinionEventObserverFactory eventObserverFactory) {
     _eventObserverFactoryRegistry.put(taskType, eventObserverFactory);
   }
 
@@ -46,7 +44,7 @@ public class EventObserverFactoryRegistry {
    * @param taskType Task type
    * @return Event observer factory associated with the given task type, or default event observer if no one registered
    */
-  public MinionEventObserverFactory getEventObserverFactory(@Nonnull String taskType) {
+  public MinionEventObserverFactory getEventObserverFactory(String taskType) {
     return _eventObserverFactoryRegistry.getOrDefault(taskType, DefaultMinionEventObserverFactory.getInstance());
   }
 }

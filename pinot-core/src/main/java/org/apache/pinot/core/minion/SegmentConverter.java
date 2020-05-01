@@ -75,8 +75,8 @@ public class SegmentConverter {
 
   public SegmentConverter(List<File> inputIndexDirs, File workingDir, String tableName, String segmentName,
       int totalNumPartition, RecordTransformer recordTransformer, @Nullable RecordPartitioner recordPartitioner,
-      @Nullable RecordAggregator recordAggregator, @Nullable List<String> groupByColumns,
-      TableConfig tableConfig, boolean skipTimeValueCheck) {
+      @Nullable RecordAggregator recordAggregator, @Nullable List<String> groupByColumns, TableConfig tableConfig,
+      boolean skipTimeValueCheck) {
     _inputIndexDirs = inputIndexDirs;
     _workingDir = workingDir;
     _recordTransformer = recordTransformer;
@@ -152,13 +152,8 @@ public class SegmentConverter {
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setOutDir(outputPath);
-    segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setSkipTimeValueCheck(_skipTimeValueCheck);
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    if (indexingConfig != null && indexingConfig.getInvertedIndexColumns() != null) {
-      segmentGeneratorConfig.setInvertedIndexCreationColumns(indexingConfig.getInvertedIndexColumns());
-    }
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, recordReader);
     driver.build();

@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -79,7 +78,9 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -87,14 +88,13 @@ import org.testng.Assert;
  */
 public abstract class ClusterTest extends ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
-  private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
   protected String _brokerBaseApiUrl;
 
-  private List<HelixBrokerStarter> _brokerStarters = new ArrayList<>();
-  private List<HelixServerStarter> _serverStarters = new ArrayList<>();
-  private List<MinionStarter> _minionStarters = new ArrayList<>();
+  private List<HelixBrokerStarter> _brokerStarters;
+  private List<HelixServerStarter> _serverStarters;
+  private MinionStarter _minionStarter;
 
   // TODO: clean this up
   private TableConfig _realtimeTableConfig;
@@ -117,6 +117,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected void startBrokers(int numBrokers, int basePort, String zkStr)
       throws Exception {
     _brokerBaseApiUrl = "http://localhost:" + basePort;
+    _brokerStarters = new ArrayList<>(numBrokers);
     for (int i = 0; i < numBrokers; i++) {
       Configuration brokerConf = new BaseConfiguration();
       brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
@@ -157,8 +158,9 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServers(int numServers, Configuration configuration, int baseAdminApiPort, int baseNettyPort,
       String zkStr) {
+    _serverStarters = new ArrayList<>(numServers);
+    overrideServerConf(configuration);
     try {
-      overrideServerConf(configuration);
       for (int i = 0; i < numServers; i++) {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
         configuration
@@ -172,38 +174,26 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void startMinion() {
-    startMinions(1, null, null);
-  }
-
-  protected void startMinions(int minionCount,
-      @Nullable Map<String, PinotTaskExecutorFactory> taskExecutorFactoryRegistry,
+  // NOTE: We don't allow multiple Minion instances in the same JVM because Minion uses singleton class MinionContext
+  //       to manage the instance level configs
+  protected void startMinion(@Nullable Map<String, PinotTaskExecutorFactory> taskExecutorFactoryRegistry,
       @Nullable Map<String, MinionEventObserverFactory> eventObserverFactoryRegistry) {
     try {
-      for (int i = 0; i < minionCount; i++) {
-        Configuration config = new PropertiesConfiguration();
-        config.setProperty(Helix.Instance.INSTANCE_ID_KEY,
-            Helix.PREFIX_OF_MINION_INSTANCE + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
-        config.setProperty(Helix.Instance.DATA_DIR_KEY, Minion.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), config);
-
-        // Register task executor factories
-        if (taskExecutorFactoryRegistry != null) {
-          for (Map.Entry<String, PinotTaskExecutorFactory> entry : taskExecutorFactoryRegistry.entrySet()) {
-            minionStarter.registerTaskExecutorFactory(entry.getKey(), entry.getValue());
-          }
+      _minionStarter =
+          new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), new PropertiesConfiguration());
+      // Register task executor factories
+      if (taskExecutorFactoryRegistry != null) {
+        for (Map.Entry<String, PinotTaskExecutorFactory> entry : taskExecutorFactoryRegistry.entrySet()) {
+          _minionStarter.registerTaskExecutorFactory(entry.getKey(), entry.getValue());
         }
-
-        // Register event observer factories
-        if (eventObserverFactoryRegistry != null) {
-          for (Map.Entry<String, MinionEventObserverFactory> entry : eventObserverFactoryRegistry.entrySet()) {
-            minionStarter.registerEventObserverFactory(entry.getKey(), entry.getValue());
-          }
-        }
-
-        minionStarter.start();
-        _minionStarters.add(minionStarter);
       }
+      // Register event observer factories
+      if (eventObserverFactoryRegistry != null) {
+        for (Map.Entry<String, MinionEventObserverFactory> entry : eventObserverFactoryRegistry.entrySet()) {
+          _minionStarter.registerEventObserverFactory(entry.getKey(), entry.getValue());
+        }
+      }
+      _minionStarter.start();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -218,6 +208,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void stopBroker() {
+    assertNotNull(_brokerStarters, "Brokers are not started");
     for (HelixBrokerStarter brokerStarter : _brokerStarters) {
       try {
         brokerStarter.shutdown();
@@ -225,9 +216,11 @@ public abstract class ClusterTest extends ControllerTest {
         LOGGER.error("Encountered exception while stopping broker {}", e.getMessage());
       }
     }
+    _brokerStarters = null;
   }
 
   protected void stopServer() {
+    assertNotNull(_serverStarters, "Servers are not started");
     for (HelixServerStarter helixServerStarter : _serverStarters) {
       try {
         helixServerStarter.stop();
@@ -236,17 +229,18 @@ public abstract class ClusterTest extends ControllerTest {
       }
     }
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
+    _serverStarters = null;
   }
 
   protected void stopMinion() {
-    for (MinionStarter minionStarter : _minionStarters) {
-      try {
-        minionStarter.stop();
-      } catch (Exception e) {
-        LOGGER.error("Encountered exception while stopping minion {}", e.getMessage());
-      }
+    assertNotNull(_minionStarter, "Minion is not started");
+    try {
+      _minionStarter.stop();
+    } catch (Exception e) {
+      LOGGER.error("Encountered exception while stopping minion {}", e.getMessage());
     }
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
+    _minionStarter = null;
   }
 
   protected void addSchema(File schemaFile, String schemaName)
@@ -266,7 +260,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected void uploadSegments(String tableName, File segmentDir)
       throws Exception {
     String[] segmentNames = segmentDir.list();
-    Assert.assertNotNull(segmentNames);
+    assertNotNull(segmentNames);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       final URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
 
@@ -286,7 +280,7 @@ public abstract class ClusterTest extends ControllerTest {
         }));
       }
       for (Future<Integer> task : tasks) {
-        Assert.assertEquals((int) task.get(), HttpStatus.SC_OK);
+        assertEquals((int) task.get(), HttpStatus.SC_OK);
       }
       executor.shutdown();
     }
