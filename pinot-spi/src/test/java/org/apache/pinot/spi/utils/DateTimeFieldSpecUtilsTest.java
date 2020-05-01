@@ -188,11 +188,4 @@ public class DateTimeFieldSpecUtilsTest {
       // expected
     }
   }
-
-  @DataProvider(name = "timeFieldSpecConversionDataProvider")
-  public Object[][] dataProvider() {
-    List<Object[]> inputs = new ArrayList<>();
-
-    return inputs.toArray(new Object[0][]);
-  }
 }
