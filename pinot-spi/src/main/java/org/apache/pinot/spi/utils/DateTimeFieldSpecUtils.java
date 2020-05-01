@@ -94,28 +94,28 @@ public final class DateTimeFieldSpecUtils {
         break;
       case SECONDS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochSeconds(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = String.format("fromEpochSecondsBucket(%s, %d)", incomingName, incomingTimeSize);
         } else {
           innerFunction = String.format("fromEpochSeconds(%s)", incomingName);
         }
         break;
       case MINUTES:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochMinutes(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = String.format("fromEpochMinutesBucket(%s, %d)", incomingName, incomingTimeSize);
         } else {
           innerFunction = String.format("fromEpochMinutes(%s)", incomingName);
         }
         break;
       case HOURS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochHours(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = String.format("fromEpochHoursBucket(%s, %d)", incomingName, incomingTimeSize);
         } else {
           innerFunction = String.format("fromEpochHours(%s)", incomingName);
         }
         break;
       case DAYS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochDays(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = String.format("fromEpochDaysBucket(%s, %d)", incomingName, incomingTimeSize);
         } else {
           innerFunction = String.format("fromEpochDays(%s)", incomingName);
         }
@@ -129,28 +129,28 @@ public final class DateTimeFieldSpecUtils {
         break;
       case SECONDS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochSeconds(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = String.format("toEpochSecondsBucket(%s, %d)", innerFunction, outgoingTimeSize);
         } else {
           outerFunction = String.format("toEpochSeconds(%s)", innerFunction);
         }
         break;
       case MINUTES:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochMinutes(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = String.format("toEpochMinutesBucket(%s, %d)", innerFunction, outgoingTimeSize);
         } else {
           outerFunction = String.format("toEpochMinutes(%s)", innerFunction);
         }
         break;
       case HOURS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochHours(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = String.format("toEpochHoursBucket(%s, %d)", innerFunction, outgoingTimeSize);
         } else {
           outerFunction = String.format("toEpochHours(%s)", innerFunction);
         }
         break;
       case DAYS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochDays(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = String.format("toEpochDaysBucket(%s, %d)", innerFunction, outgoingTimeSize);
         } else {
           outerFunction = String.format("toEpochDays(%s)", innerFunction);
         }

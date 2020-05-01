@@ -116,7 +116,7 @@ public class DateTimeFieldSpecUtilsTest {
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
         new TimeGranularitySpec(DataType.LONG, 10, TimeUnit.MINUTES, "outgoing"));
     expectedDateTimeFieldSpec = new DateTimeFieldSpec("outgoing", DataType.LONG, "10:MINUTES:EPOCH", "10:MINUTES");
-    expectedDateTimeFieldSpec.setTransformFunction("toEpochMinutes(incoming, 10)");
+    expectedDateTimeFieldSpec.setTransformFunction("toEpochMinutesBucket(incoming, 10)");
     actualDateTimeFieldSpec = DateTimeFieldSpecUtils.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
@@ -132,7 +132,7 @@ public class DateTimeFieldSpecUtilsTest {
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, 5, TimeUnit.MINUTES, "incoming"),
         new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
     expectedDateTimeFieldSpec = new DateTimeFieldSpec("outgoing", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
-    expectedDateTimeFieldSpec.setTransformFunction("fromEpochMinutes(incoming, 5)");
+    expectedDateTimeFieldSpec.setTransformFunction("fromEpochMinutesBucket(incoming, 5)");
     actualDateTimeFieldSpec = DateTimeFieldSpecUtils.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
@@ -156,7 +156,7 @@ public class DateTimeFieldSpecUtilsTest {
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, 10, TimeUnit.MINUTES, "incoming"),
         new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "outgoing"));
     expectedDateTimeFieldSpec = new DateTimeFieldSpec("outgoing", DataType.LONG, "1:DAYS:EPOCH", "1:DAYS");
-    expectedDateTimeFieldSpec.setTransformFunction("toEpochDays(fromEpochMinutes(incoming, 10))");
+    expectedDateTimeFieldSpec.setTransformFunction("toEpochDays(fromEpochMinutesBucket(incoming, 10))");
     actualDateTimeFieldSpec = DateTimeFieldSpecUtils.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
@@ -164,7 +164,7 @@ public class DateTimeFieldSpecUtilsTest {
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.SECONDS, "incoming"),
         new TimeGranularitySpec(DataType.LONG, 5, TimeUnit.MINUTES, "outgoing"));
     expectedDateTimeFieldSpec = new DateTimeFieldSpec("outgoing", DataType.LONG, "5:MINUTES:EPOCH", "5:MINUTES");
-    expectedDateTimeFieldSpec.setTransformFunction("toEpochMinutes(fromEpochSeconds(incoming), 5)");
+    expectedDateTimeFieldSpec.setTransformFunction("toEpochMinutesBucket(fromEpochSeconds(incoming), 5)");
     actualDateTimeFieldSpec = DateTimeFieldSpecUtils.convertToDateTimeFieldSpec(timeFieldSpec);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
