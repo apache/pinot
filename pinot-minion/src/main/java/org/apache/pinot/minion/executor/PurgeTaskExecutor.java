@@ -43,7 +43,6 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
-    String timeColumnName = configs.get(MinionConstants.TIME_COLUMN_NAME_KEY);
     SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
     SegmentPurger.RecordPurger recordPurger =
         recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;
@@ -51,7 +50,7 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     SegmentPurger.RecordModifier recordModifier =
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
     SegmentPurger segmentPurger =
-        new SegmentPurger(rawTableName, timeColumnName, originalIndexDir, workingDir, recordPurger, recordModifier);
+        new SegmentPurger(rawTableName, originalIndexDir, workingDir, recordPurger, recordModifier);
 
     File purgedSegmentFile = segmentPurger.purgeSegment();
     if (purgedSegmentFile == null) {

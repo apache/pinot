@@ -25,7 +25,6 @@ public class MinionConstants {
   public static final String TASK_TIME_SUFFIX = ".time";
 
   public static final String TABLE_NAME_KEY = "tableName";
-  public static final String TIME_COLUMN_NAME_KEY = "timeColumnName";
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
