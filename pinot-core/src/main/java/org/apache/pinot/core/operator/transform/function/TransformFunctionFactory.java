@@ -65,7 +65,8 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.SQRT.getName().toLowerCase(), SqrtTransformFunction.class);
 
           put(TransformFunctionType.CAST.getName().toLowerCase(), CastTransformFunction.class);
-          put(TransformFunctionType.JSONPATH.getName().toLowerCase(), JsonPathTransformFunction.class);
+          put(TransformFunctionType.JSONEXTRACTSCALAR.getName().toLowerCase(), JsonExtractScalarTransformFunction.class);
+          put(TransformFunctionType.JSONEXTRACTKEY.getName().toLowerCase(), JsonExtractKeyTransformFunction.class);
           put(TransformFunctionType.TIMECONVERT.getName().toLowerCase(), TimeConversionTransformFunction.class);
           put(TransformFunctionType.DATETIMECONVERT.getName().toLowerCase(), DateTimeConversionTransformFunction.class);
           put(TransformFunctionType.DATETRUNC.getName().toLowerCase(), DateTruncTransformFunction.class);

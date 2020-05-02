@@ -39,7 +39,8 @@ public enum TransformFunctionType {
   SQRT("sqrt"),
 
   CAST("cast"),
-  JSONPATH("jsonPath"),
+  JSONEXTRACTSCALAR("jsonExtractScalar"),
+  JSONEXTRACTKEY("jsonExtractKey"),
   TIMECONVERT("timeConvert"),
   DATETIMECONVERT("dateTimeConvert"),
   DATETRUNC("dateTrunc"),
@@ -61,6 +62,10 @@ public enum TransformFunctionType {
     try {
       return TransformFunctionType.valueOf(upperCaseFunctionName);
     } catch (Exception e) {
+      // Support function name of both jsonExtractScalar and json_extract_scalar
+      if (upperCaseFunctionName.contains("_")) {
+        return getTransformFunctionType(upperCaseFunctionName.replace("_", ""));
+      }
       throw new IllegalArgumentException("Invalid transform function name: " + functionName);
     }
   }

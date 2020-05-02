@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -345,6 +348,13 @@ public enum PinotDataType {
 
     @Override
     public String convert(Object value, PinotDataType sourceType) {
+      if (value instanceof Map) {
+        try {
+          return JsonUtils.objectToString(value);
+        } catch (JsonProcessingException e) {
+          // Swallow unexpected exception and fall back to old way.
+        }
+      }
       return sourceType.toString(value);
     }
   },

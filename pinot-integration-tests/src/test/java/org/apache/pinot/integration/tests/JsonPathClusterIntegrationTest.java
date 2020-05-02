@@ -195,8 +195,8 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Filter Query
-    pqlQuery = "Select jsonPath(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
-        + "  where jsonPath(myMapStr,'$.k1','STRING') = 'value-k1-0'";
+    pqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
+        + "  where jsonExtractScalar(myMapStr,'$.k1','STRING') = 'value-k1-0'";
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
@@ -207,8 +207,8 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //selection order by
-    pqlQuery = "Select jsonPath(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
-        + " order by jsonPath(myMapStr,'$.k1','STRING')";
+    pqlQuery = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
+        + " order by jsonExtractScalar(myMapStr,'$.k1','STRING')";
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
@@ -219,7 +219,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Group By Query
-    pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by jsonPath(myMapStr,'$.k1','STRING')";
+    pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by jsonExtractScalar(myMapStr,'$.k1','STRING')";
     pinotResponse = postQuery(pqlQuery);
     Assert.assertNotNull(pinotResponse.get("aggregationResults"));
     JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
@@ -260,8 +260,8 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Filter Query
-    pqlQuery = "Select jsonPath(complexMapStr,'$.k4','STRING') from " + DEFAULT_TABLE_NAME
-        + "  where jsonPath(complexMapStr,'$.k4.k4-k1','STRING') = 'value-k4-k1-0'";
+    pqlQuery = "Select jsonExtractScalar(complexMapStr,'$.k4','STRING') from " + DEFAULT_TABLE_NAME
+        + "  where jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') = 'value-k4-k1-0'";
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     LOGGER.info("PQL Query: {}, Response: {}", pqlQuery, selectionResults);
@@ -269,12 +269,12 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(selectionResults.size() == 1);
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertEquals(value, "{k4-k1=value-k4-k1-0, k4-k2=value-k4-k2-0, k4-k3=value-k4-k3-0, met=0}");
+      Assert.assertEquals(value, "{\"k4-k1\":\"value-k4-k1-0\",\"k4-k2\":\"value-k4-k2-0\",\"k4-k3\":\"value-k4-k3-0\",\"met\":0}");
     }
 
     //selection order by
     pqlQuery = "Select complexMapStr from " + DEFAULT_TABLE_NAME
-        + " order by jsonPath(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + TOTAL_DOCS;
+        + " order by jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + TOTAL_DOCS;
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     LOGGER.info("PQL Query: {}, Response: {}", pqlQuery, selectionResults);
@@ -299,8 +299,8 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Group By Query
-    pqlQuery = "Select sum(jsonPath(complexMapStr,'$.k4.met','INT')) from " + DEFAULT_TABLE_NAME
-        + " group by jsonPath(complexMapStr,'$.k1','STRING')";
+    pqlQuery = "Select sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT')) from " + DEFAULT_TABLE_NAME
+        + " group by jsonExtractScalar(complexMapStr,'$.k1','STRING')";
     pinotResponse = postQuery(pqlQuery);
     LOGGER.info("PQL Query: {}, Response: {}", pqlQuery, pinotResponse);
     Assert.assertNotNull(pinotResponse.get("aggregationResults"));

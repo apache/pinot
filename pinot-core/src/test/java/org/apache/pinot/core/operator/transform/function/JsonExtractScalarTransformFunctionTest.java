@@ -18,27 +18,28 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
+public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testJsonPathTransformFunctionArguments")
   public void testJsonPathTransformFunction(String expressionStr, FieldSpec.DataType resultsDataType,
       boolean isSingleValue) {
     TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
 
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), resultsDataType);
     Assert.assertEquals(transformFunction.getResultMetadata().isSingleValue(), isSingleValue);
@@ -96,28 +97,28 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testJsonPathTransformFunctionArguments")
   public Object[][] testJsonPathTransformFunctionArguments() {
-    return new Object[][]{new Object[]{"jsonPath(json,'$.intSV','INT')", FieldSpec.DataType.INT, true}, new Object[]{"jsonPath(json,'$.intMV','INT_ARRAY')", FieldSpec.DataType.INT, false}, new Object[]{"jsonPath(json,'$.longSV','LONG')", FieldSpec.DataType.LONG, true}, new Object[]{"jsonPath(json,'$.floatSV','FLOAT')", FieldSpec.DataType.FLOAT, true}, new Object[]{"jsonPath(json,'$.doubleSV','DOUBLE')", FieldSpec.DataType.DOUBLE, true}, new Object[]{"jsonPath(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true},};
+    return new Object[][]{new Object[]{"jsonExtractScalar(json,'$.intSV','INT')", FieldSpec.DataType.INT, true}, new Object[]{"jsonExtractScalar(json,'$.intMV','INT_ARRAY')", FieldSpec.DataType.INT, false}, new Object[]{"jsonExtractScalar(json,'$.longSV','LONG')", FieldSpec.DataType.LONG, true}, new Object[]{"jsonExtractScalar(json,'$.floatSV','FLOAT')", FieldSpec.DataType.FLOAT, true}, new Object[]{"jsonExtractScalar(json,'$.doubleSV','DOUBLE')", FieldSpec.DataType.DOUBLE, true}, new Object[]{"jsonExtractScalar(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true},};
   }
 
   @Test
   public void testJsonPathTransformFunctionWithPredicate() {
     String jsonPathExpressionStr =
-        String.format("jsonPath(json,'[?($.stringSV==''%s'')]','STRING')", _stringSVValues[0]);
+        String.format("jsonExtractScalar(json,'[?($.stringSV==''%s'')]','STRING')", _stringSVValues[0]);
     TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(jsonPathExpressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
     String[] resultValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       if (_stringSVValues[i].equals(_stringSVValues[0])) {
         try {
-          final List<HashMap<String, Object>> resultMap = new ObjectMapper().readValue(resultValues[i], List.class);
+          final List<HashMap<String, Object>> resultMap = JsonUtils.stringToObject(resultValues[i], List.class);
           Assert.assertEquals(_intSVValues[i], resultMap.get(0).get("intSV"));
           for (int j = 0; j < _intMVValues[i].length; j++) {
             Assert.assertEquals(_intMVValues[i][j], ((List) resultMap.get(0).get("intMV")).get(j));
           }
           Assert.assertEquals(_longSVValues[i], resultMap.get(0).get("longSV"));
-          Assert.assertEquals(new Double(_floatSVValues[i]), resultMap.get(0).get("floatSV"));
+          Assert.assertEquals(Float.compare(_floatSVValues[i], ((Double) resultMap.get(0).get("floatSV")).floatValue()), 0);
           Assert.assertEquals(_doubleSVValues[i], resultMap.get(0).get("doubleSV"));
           Assert.assertEquals(_stringSVValues[i], resultMap.get(0).get("stringSV"));
         } catch (IOException e) {
@@ -132,10 +133,10 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForIntMV() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.intMV','INT_ARRAY')");
+        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.intMV','INT_ARRAY')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
     int[][] intValues = transformFunction.transformToIntValuesMV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i].length, _intMVValues[i].length);
@@ -148,10 +149,10 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForLong() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.longSV','LONG')");
+        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.longSV','LONG')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(longValues[i], _longSVValues[i]);
@@ -161,10 +162,10 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForFloat() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.floatSV','FLOAT')");
+        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.floatSV','FLOAT')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(floatValues[i], _floatSVValues[i]);
@@ -174,10 +175,10 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForDouble() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.doubleSV','DOUBLE')");
+        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.doubleSV','DOUBLE')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(doubleValues[i], _doubleSVValues[i]);
@@ -187,13 +188,32 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForString() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.stringSV','STRING')");
+        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.stringSV','STRING')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(stringValues[i], _stringSVValues[i]);
+    }
+  }
+
+  @Test
+  public void testJsonPathKeyTransformFunction() {
+    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree("jsonExtractKey(json,'$.*')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractKeyTransformFunction.FUNCTION_NAME);
+    String[][] keysResults = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      List<String> keys = Arrays.asList(keysResults[i]);
+      Assert.assertTrue(keys.contains(String.format("$['%s']", INT_SV_COLUMN)));
+      Assert.assertTrue(keys.contains(String.format("$['%s']", LONG_SV_COLUMN)));
+      Assert.assertTrue(keys.contains(String.format("$['%s']", FLOAT_SV_COLUMN)));
+      Assert.assertTrue(keys.contains(String.format("$['%s']", DOUBLE_SV_COLUMN)));
+      Assert.assertTrue(keys.contains(String.format("$['%s']", STRING_SV_COLUMN)));
+      Assert.assertTrue(keys.contains(String.format("$['%s']", INT_MV_COLUMN)));
+      Assert.assertTrue(keys.contains(String.format("$['%s']", TIME_COLUMN)));
     }
   }
 
@@ -205,11 +225,11 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("jsonPath(%s)",
-        JSON_COLUMN)}, new Object[]{"jsonPath(5,'$.store.book[0].author','$.store.book[0].author')"}, new Object[]{String.format(
-        "jsonPath(%s,'$.store.book[0].author')", INT_MV_COLUMN)}, new Object[]{String.format(
-        "jsonPath(%s,'$.store.book[0].author')", STRING_SV_COLUMN)}, new Object[]{String.format(
-        "jsonPath(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}, new Object[]{String.format(
-        "jsonPath(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN, INT_SV_COLUMN)}};
+    return new Object[][]{new Object[]{String.format("jsonExtractScalar(%s)",
+        JSON_COLUMN)}, new Object[]{"jsonExtractScalar(5,'$.store.book[0].author','$.store.book[0].author')"}, new Object[]{String.format(
+        "jsonExtractScalar(%s,'$.store.book[0].author')", INT_MV_COLUMN)}, new Object[]{String.format(
+        "jsonExtractScalar(%s,'$.store.book[0].author')", STRING_SV_COLUMN)}, new Object[]{String.format(
+        "jsonExtractScalar(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}, new Object[]{String.format(
+        "jsonExtractScalar(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN, INT_SV_COLUMN)}};
   }
 }
