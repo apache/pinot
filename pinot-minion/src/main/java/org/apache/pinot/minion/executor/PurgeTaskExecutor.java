@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.minion.executor;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
-import javax.annotation.Nonnull;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.minion.SegmentPurger;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -36,25 +38,26 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
   public static final String NUM_RECORDS_MODIFIED_KEY = "numRecordsModified";
 
   @Override
-  protected SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
-      @Nonnull File workingDir)
+  protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
+    TableConfig tableConfig =
+        ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
     SegmentPurger.RecordPurger recordPurger =
         recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;
     SegmentPurger.RecordModifierFactory recordModifierFactory = MINION_CONTEXT.getRecordModifierFactory();
     SegmentPurger.RecordModifier recordModifier =
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
-    SegmentPurger segmentPurger =
-        new SegmentPurger(rawTableName, originalIndexDir, workingDir, recordPurger, recordModifier);
 
+    SegmentPurger segmentPurger = new SegmentPurger(indexDir, workingDir, tableConfig, recordPurger, recordModifier);
     File purgedSegmentFile = segmentPurger.purgeSegment();
     if (purgedSegmentFile == null) {
-      purgedSegmentFile = originalIndexDir;
+      purgedSegmentFile = indexDir;
     }
 
     return new SegmentConversionResult.Builder().setFile(purgedSegmentFile).setTableNameWithType(tableNameWithType)

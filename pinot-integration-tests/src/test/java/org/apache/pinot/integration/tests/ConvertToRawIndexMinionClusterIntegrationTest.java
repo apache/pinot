@@ -49,7 +49,6 @@ import org.testng.annotations.Test;
  * columns' index into raw index for OFFLINE segments.
  */
 public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridClusterIntegrationTest {
-  private static final int NUM_MINIONS = 3;
   private static final String COLUMNS_TO_CONVERT = "ActualElapsedTime,ArrDelay,DepDelay,CRSDepTime";
 
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
@@ -75,8 +74,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     // The parent setUp() sets up Zookeeper, Kafka, controller, broker and servers
     super.setUp();
 
-    startMinions(NUM_MINIONS, null, null);
-
+    startMinion(null, null);
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
   }
@@ -84,14 +82,14 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   @Test
   public void testConvertToRawIndexTask()
       throws Exception {
-    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     File testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-0", offlineTableName);
     if (!testDataDir.isDirectory()) {
       testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-1", offlineTableName);
     }
     Assert.assertTrue(testDataDir.isDirectory());
-    final File tableDataDir = testDataDir;
+    File tableDataDir = testDataDir;
 
     // Check that all columns have dictionary
     File[] indexDirs = tableDataDir.listFiles();
@@ -168,8 +166,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   @Test
   public void testPinotHelixResourceManagerAPIs() {
     // Instance APIs
-    Assert.assertEquals(_helixResourceManager.getAllInstances().size(), 7);
-    Assert.assertEquals(_helixResourceManager.getOnlineInstanceList().size(), 7);
+    Assert.assertEquals(_helixResourceManager.getAllInstances().size(), 5);
+    Assert.assertEquals(_helixResourceManager.getOnlineInstanceList().size(), 5);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), 0);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);
 

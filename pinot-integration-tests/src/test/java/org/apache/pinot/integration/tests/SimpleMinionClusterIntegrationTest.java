@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
@@ -63,7 +62,6 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "testTable2";
   private static final String TABLE_NAME_3 = "testTable3";
-  private static final int NUM_MINIONS = 1;
   private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
 
   private static final AtomicBoolean HOLD = new AtomicBoolean();
@@ -100,7 +98,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
         Collections.singletonMap(TestTaskGenerator.TASK_TYPE, new TestTaskExecutorFactory());
     Map<String, MinionEventObserverFactory> eventObserverFactoryRegistry =
         Collections.singletonMap(TestTaskGenerator.TASK_TYPE, new TestEventObserverFactory());
-    startMinions(NUM_MINIONS, taskExecutorFactoryRegistry, eventObserverFactoryRegistry);
+    startMinion(taskExecutorFactoryRegistry, eventObserverFactoryRegistry);
   }
 
   @Test
@@ -235,10 +233,10 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     public PinotTaskExecutor create() {
       return new BaseTaskExecutor() {
         @Override
-        public Boolean executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
+        public Boolean executeTask(PinotTaskConfig pinotTaskConfig) {
           assertTrue(MINION_CONTEXT.getDataDir().exists());
           assertNotNull(MINION_CONTEXT.getMinionMetrics());
-          assertNotNull(MINION_CONTEXT.getMinionVersion());
+          assertNotNull(MINION_CONTEXT.getHelixPropertyStore());
 
           assertEquals(pinotTaskConfig.getTaskType(), TestTaskGenerator.TASK_TYPE);
           Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -266,24 +264,24 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     public MinionEventObserver create() {
       return new MinionEventObserver() {
         @Override
-        public void notifyTaskStart(@Nonnull PinotTaskConfig pinotTaskConfig) {
+        public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
           TASK_START_NOTIFIED.set(true);
         }
 
         @Override
-        public void notifyTaskSuccess(@Nonnull PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
+        public void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
           assertTrue(executionResult instanceof Boolean);
           assertTrue((Boolean) executionResult);
           TASK_SUCCESS_NOTIFIED.set(true);
         }
 
         @Override
-        public void notifyTaskCancelled(@Nonnull PinotTaskConfig pinotTaskConfig) {
+        public void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
           TASK_CANCELLED_NOTIFIED.set(true);
         }
 
         @Override
-        public void notifyTaskError(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull Exception exception) {
+        public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
           TASK_ERROR_NOTIFIED.set(true);
         }
       };

@@ -23,6 +23,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -30,15 +34,20 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -62,20 +71,19 @@ public class PurgeTaskExecutorTest {
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(D1, FieldSpec.DataType.INT, true));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
-      row.putField(D1, i);
+      row.putValue(D1, i);
       rows.add(row);
     }
     GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows);
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
-    config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -84,6 +92,11 @@ public class PurgeTaskExecutorTest {
     _originalIndexDir = new File(ORIGINAL_SEGMENT_DIR, SEGMENT_NAME);
 
     MinionContext minionContext = MinionContext.getInstance();
+    @SuppressWarnings("unchecked")
+    ZkHelixPropertyStore<ZNRecord> helixPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(helixPropertyStore.get("/CONFIGS/TABLE/testTable_OFFLINE", null, AccessOption.PERSISTENT))
+        .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+    minionContext.setHelixPropertyStore(helixPropertyStore);
     minionContext.setRecordPurgerFactory(rawTableName -> {
       if (rawTableName.equals(TABLE_NAME)) {
         return row -> row.getValue(D1).equals(0);
@@ -94,7 +107,7 @@ public class PurgeTaskExecutorTest {
     minionContext.setRecordModifierFactory(rawTableName -> {
       if (rawTableName.equals(TABLE_NAME)) {
         return row -> {
-          row.putField(D1, Integer.MAX_VALUE);
+          row.putValue(D1, Integer.MAX_VALUE);
           return true;
         };
       } else {
@@ -124,8 +137,8 @@ public class PurgeTaskExecutorTest {
         }
       }
 
-      Assert.assertEquals(numRecordsRemaining, NUM_ROWS - 1);
-      Assert.assertEquals(numRecordsModified, NUM_ROWS - 1);
+      assertEquals(numRecordsRemaining, NUM_ROWS - 1);
+      assertEquals(numRecordsModified, NUM_ROWS - 1);
     }
   }
 

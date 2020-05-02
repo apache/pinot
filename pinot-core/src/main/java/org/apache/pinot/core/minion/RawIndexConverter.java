@@ -21,7 +21,6 @@ package org.apache.pinot.core.minion;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -84,8 +83,8 @@ public class RawIndexConverter {
    * NOTE: original segment should be in V1 format.
    * TODO: support V3 format
    */
-  public RawIndexConverter(@Nonnull String rawTableName, @Nonnull File originalIndexDir,
-      @Nonnull File convertedIndexDir, @Nullable String columnsToConvert)
+  public RawIndexConverter(String rawTableName, File originalIndexDir, File convertedIndexDir,
+      @Nullable String columnsToConvert)
       throws Exception {
     FileUtils.copyDirectory(originalIndexDir, convertedIndexDir);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
@@ -119,15 +118,15 @@ public class RawIndexConverter {
       for (String columnToConvert : StringUtils.split(_columnsToConvert, ',')) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(columnToConvert);
         if (fieldSpec == null) {
-          LOGGER.warn("Skip converting column: {} because is does not exist in the schema");
+          LOGGER.warn("Skip converting column: {} because is does not exist in the schema", columnsToConvert);
           continue;
         }
         if (!fieldSpec.isSingleValueField()) {
-          LOGGER.warn("Skip converting column: {} because it's a multi-value column");
+          LOGGER.warn("Skip converting column: {} because it's a multi-value column", columnsToConvert);
           continue;
         }
         if (!_originalSegmentMetadata.hasDictionary(columnToConvert)) {
-          LOGGER.warn("Skip converting column: {} because its index is not dictionary-based");
+          LOGGER.warn("Skip converting column: {} because its index is not dictionary-based", columnsToConvert);
           continue;
         }
         columnsToConvert.add(fieldSpec);

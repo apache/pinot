@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.minion.events;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 
@@ -33,7 +32,7 @@ public interface MinionEventObserver {
    *
    * @param pinotTaskConfig Pinot task config
    */
-  void notifyTaskStart(@Nonnull PinotTaskConfig pinotTaskConfig);
+  void notifyTaskStart(PinotTaskConfig pinotTaskConfig);
 
   /**
    * Invoked when a minion task succeeds.
@@ -41,14 +40,14 @@ public interface MinionEventObserver {
    * @param pinotTaskConfig Pinot task config
    * @param executionResult Execution result
    */
-  void notifyTaskSuccess(@Nonnull PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult);
+  void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult);
 
   /**
    * Invoked when a minion task gets cancelled.
    *
    * @param pinotTaskConfig Pinot task config
    */
-  void notifyTaskCancelled(@Nonnull PinotTaskConfig pinotTaskConfig);
+  void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig);
 
   /**
    * Invoked when a minion task encounters exception.
@@ -56,5 +55,5 @@ public interface MinionEventObserver {
    * @param pinotTaskConfig Pinot task config
    * @param exception Exception encountered during execution
    */
-  void notifyTaskError(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull Exception exception);
+  void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception);
 }
