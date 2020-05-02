@@ -22,10 +22,8 @@ import java.io.File;
 import java.net.URI;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 
 
@@ -36,36 +34,20 @@ import org.slf4j.Logger;
 public class SplitSegmentCommitter implements SegmentCommitter {
   private final SegmentCompletionProtocol.Request.Params _params;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private final IndexLoadingConfig _indexLoadingConfig;
+  private final TableConfig _tableConfig;
   private final SegmentUploader _segmentUploader;
-  // The default segment location uri str, could be null.
-  private final String _defaultSegmentLocation;
-
   private final Logger _segmentLogger;
+  private final boolean _isEnableSplitCommitEndWithMetadata;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
-    this(segmentLogger, protocolHandler, indexLoadingConfig, params, segmentUploader, null);
-  }
-
-  /**
-   *
-   * @param segmentLogger
-   * @param protocolHandler
-   * @param indexLoadingConfig
-   * @param params
-   * @param segmentUploader
-   * @param defaultSegmentLocation The default segment location uri str, could be null.
-   */
-  public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
-      String defaultSegmentLocation) {
+      TableConfig tableConfig, SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
+      boolean isEnableSplitCommitEndWithMetadata) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
-    _indexLoadingConfig = indexLoadingConfig;
+    _tableConfig = tableConfig;
     _params = new SegmentCompletionProtocol.Request.Params(params);
     _segmentUploader = segmentUploader;
-    _defaultSegmentLocation = defaultSegmentLocation;
+    _isEnableSplitCommitEndWithMetadata = isEnableSplitCommitEndWithMetadata;
   }
 
   @Override
@@ -80,13 +62,13 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     }
 
     URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(_params.getSegmentName()));
-    if (segmentLocation == null && _defaultSegmentLocation == null) {
+    if (segmentLocation == null) {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
-    _params.withSegmentLocation(segmentLocation == null ? _defaultSegmentLocation : segmentLocation.toString());
+    _params.withSegmentLocation(segmentLocation.toString());
 
     SegmentCompletionProtocol.Response commitEndResponse;
-    if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
+    if (_isEnableSplitCommitEndWithMetadata) {
       commitEndResponse =
           _protocolHandler.segmentCommitEndWithMetadata(_params, segmentBuildDescriptor.getMetadataFiles());
     } else {

@@ -824,7 +824,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         segmentLogger.error("Segment commit upload url error: ", e);
         return SegmentCompletionProtocol.RESP_NOT_SENT;
       }
-      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
+      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader,
+          _indexLoadingConfig.isEnableSplitCommitEndWithMetadata());
     } else {
       segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
     }
@@ -1229,7 +1230,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _consumeEndTime = now + minConsumeTimeMillis;
     }
 
-    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _indexLoadingConfig, _protocolHandler);
+    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _tableConfig, _protocolHandler);
 
     segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,

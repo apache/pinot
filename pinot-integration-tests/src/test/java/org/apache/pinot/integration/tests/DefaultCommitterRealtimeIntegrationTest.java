@@ -33,9 +33,9 @@ import org.apache.pinot.core.data.manager.realtime.SegmentCommitter;
 import org.apache.pinot.core.data.manager.realtime.SegmentCommitterFactory;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentUtil;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -95,7 +95,6 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
   @Test
   public void testDefaultCommitter()
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     ServerMetrics serverMetrics = new ServerMetrics(new MetricsRegistry());
     ServerSegmentCompletionProtocolHandler protocolHandler =
         new ServerSegmentCompletionProtocolHandler(serverMetrics, getTableName());
@@ -134,7 +133,7 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
         + segmentName + "&offset=" + END_OFFSET);
 
     SegmentCommitterFactory segmentCommitterFactory =
-        new SegmentCommitterFactory(LOGGER, indexLoadingConfig, protocolHandler);
+        new SegmentCommitterFactory(LOGGER, mock(TableConfig.class), protocolHandler);
     SegmentCommitter segmentCommitter = segmentCommitterFactory.createDefaultSegmentCommitter(params);
     segmentCommitter.commit(END_OFFSET, 3, segmentBuildDescriptor);
   }

@@ -33,9 +33,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-// A segment uploader which does segment upload to a segment store (with store root dir configured as
-// _segmentStoreUriStr) using PinotFS within a configurable timeout period. The final segment location would be in the
-// URI _segmentStoreUriStr/_tableNameWithType/segmentName if successful.
+/**
+ * A segment uploader which does segment upload to a segment store (with store root dir configured as
+ * _segmentStoreUriStr) using PinotFS within a configurable timeout period. The final segment location would be in the
+ * URI _segmentStoreUriStr/_tableNameWithType/segmentName if successful.
+ */
 public class PinotFSSegmentUploader implements SegmentUploader {
   private Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   private String _segmentStoreUriStr;
@@ -52,10 +54,10 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       return null;
     }
     Callable<URI> uploadTask = () -> {
+      URI destUri = new URI(StringUtil
+          .join(File.separator, _segmentStoreUriStr, segmentName.getTableName(), segmentName.getSegmentName()));
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
-        URI destUri = new URI(StringUtil
-            .join(File.separator, _segmentStoreUriStr, segmentName.getTableName(), segmentName.getSegmentName()));
         // Check and delete any existing segment file.
         if (pinotFS.exists(destUri)) {
           pinotFS.delete(destUri, true);
@@ -63,7 +65,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         pinotFS.copyFromLocalFile(segmentFile, destUri);
         return destUri;
       } catch (Exception e) {
-        LOGGER.warn("Failed copy segment tar file to segment store {}: {}", segmentFile.getName(), e);
+        LOGGER.warn("Failed copy segment tar file {} to segment store {}: {}", segmentFile.getName(), destUri, e);
       }
       return null;
     };

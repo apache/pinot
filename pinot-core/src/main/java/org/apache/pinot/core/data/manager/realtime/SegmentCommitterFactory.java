@@ -19,8 +19,8 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 
 
@@ -29,18 +29,20 @@ import org.slf4j.Logger;
  */
 public class SegmentCommitterFactory {
   private static Logger LOGGER;
-  private final IndexLoadingConfig _indexLoadingConfig;
+  private final TableConfig _tableConfig;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
 
-  public SegmentCommitterFactory(Logger segmentLogger, IndexLoadingConfig indexLoadingConfig,
+  public SegmentCommitterFactory(Logger segmentLogger, TableConfig tableConfig,
       ServerSegmentCompletionProtocolHandler protocolHandler) {
     LOGGER = segmentLogger;
-    _indexLoadingConfig = indexLoadingConfig;
+    _tableConfig = tableConfig;
     _protocolHandler = protocolHandler;
   }
   
-  public SegmentCommitter createSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
-    return new SplitSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, segmentUploader);
+  public SegmentCommitter createSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
+      SegmentUploader segmentUploader, boolean isEnableSplitCommitEndWithMetadata) {
+    return new SplitSegmentCommitter(LOGGER, _protocolHandler, _tableConfig, params, segmentUploader,
+        isEnableSplitCommitEndWithMetadata);
   }
 
   public SegmentCommitter createDefaultSegmentCommitter(SegmentCompletionProtocol.Request.Params params) {
