@@ -30,9 +30,8 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
  */
 public class FunctionEvaluatorFactory {
 
-  private FunctionEvaluatorFactory() {
-
-  }
+  private final InbuiltFunctionRegistry _inbuiltFunctionRegistry =
+      FunctionRegistryFactory.getInbuiltFunctionRegistry();
 
   /**
    * Creates the {@link FunctionEvaluator} for the given field spec
@@ -43,7 +42,7 @@ public class FunctionEvaluatorFactory {
    * 4. Return null, if none of the above
    */
   @Nullable
-  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
+  public FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
     FunctionEvaluator functionEvaluator = null;
 
     String columnName = fieldSpec.getName();
@@ -73,12 +72,10 @@ public class FunctionEvaluatorFactory {
                   .getName() + " is same");
         }
       }
-
     } else if (columnName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)) {
 
       // for backward compatible handling of Map type (currently only in Avro)
-      String sourceMapName =
-          columnName.substring(0, columnName.length() - SchemaUtils.MAP_KEY_COLUMN_SUFFIX.length());
+      String sourceMapName = columnName.substring(0, columnName.length() - SchemaUtils.MAP_KEY_COLUMN_SUFFIX.length());
       String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
       functionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
     } else if (columnName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX)) {
@@ -91,13 +88,13 @@ public class FunctionEvaluatorFactory {
     return functionEvaluator;
   }
 
-  private static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
+  private FunctionEvaluator getExpressionEvaluator(String transformExpression) {
     FunctionEvaluator functionEvaluator;
     try {
       if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
         functionEvaluator = new GroovyFunctionEvaluator(transformExpression);
       } else {
-        functionEvaluator = new DefaultFunctionEvaluator(transformExpression);
+        functionEvaluator = new InbuiltFunctionEvaluator(transformExpression, _inbuiltFunctionRegistry);
       }
     } catch (Exception e) {
       throw new IllegalStateException(
