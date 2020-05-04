@@ -47,7 +47,7 @@ public class DateTimeFunctionEvaluatorTest {
     // toEpochSeconds
     GenericRow row1_0 = new GenericRow();
     row1_0.putValue("timestamp", 1578685189000L);
-    inputs.add(new Object[]{"toEpochSeconds(timestamp)", Lists.newArrayList("timestamp"), row1_0, 1578685189});
+    inputs.add(new Object[]{"toEpochSeconds(timestamp)", Lists.newArrayList("timestamp"), row1_0, 1578685189L});
 
     // toEpochSeconds w/ rounding
     GenericRow row1_1 = new GenericRow();
