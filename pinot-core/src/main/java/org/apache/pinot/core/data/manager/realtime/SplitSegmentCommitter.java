@@ -23,7 +23,6 @@ import java.net.URI;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 
 
@@ -34,20 +33,15 @@ import org.slf4j.Logger;
 public class SplitSegmentCommitter implements SegmentCommitter {
   private final SegmentCompletionProtocol.Request.Params _params;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private final TableConfig _tableConfig;
   private final SegmentUploader _segmentUploader;
   private final Logger _segmentLogger;
-  private final boolean _isEnableSplitCommitEndWithMetadata;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      TableConfig tableConfig, SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader,
-      boolean isEnableSplitCommitEndWithMetadata) {
+      SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
-    _tableConfig = tableConfig;
     _params = new SegmentCompletionProtocol.Request.Params(params);
     _segmentUploader = segmentUploader;
-    _isEnableSplitCommitEndWithMetadata = isEnableSplitCommitEndWithMetadata;
   }
 
   @Override
@@ -67,13 +61,8 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     }
     _params.withSegmentLocation(segmentLocation.toString());
 
-    SegmentCompletionProtocol.Response commitEndResponse;
-    if (_isEnableSplitCommitEndWithMetadata) {
-      commitEndResponse =
-          _protocolHandler.segmentCommitEndWithMetadata(_params, segmentBuildDescriptor.getMetadataFiles());
-    } else {
-      commitEndResponse = _protocolHandler.segmentCommitEnd(_params);
-    }
+    SegmentCompletionProtocol.Response commitEndResponse =
+        _protocolHandler.segmentCommitEndWithMetadata(_params, segmentBuildDescriptor.getMetadataFiles());
 
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       _segmentLogger.warn("CommitEnd failed with response {}", commitEndResponse.toJsonString());
