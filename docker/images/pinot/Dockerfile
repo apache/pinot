@@ -67,6 +67,10 @@ ENV PINOT_HOME=/opt/pinot
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends vim wget curl git python && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=pinot_build_env ${PINOT_HOME} ${PINOT_HOME}
 COPY ingestion-job-specs ${PINOT_HOME}/examples/docker/ingestion-job-specs
 COPY table-configs ${PINOT_HOME}/examples/docker/table-configs

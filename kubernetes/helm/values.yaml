@@ -21,7 +21,7 @@
 
 image:
   repository: apachepinot/pinot
-  tag: 0.3.0-SNAPSHOT
+  tag: latest
   pullPolicy: IfNotPresent
 
 cluster:
@@ -63,7 +63,7 @@ controller:
     nodePort: ""
 
   external:
-    enabled: false
+    enabled: true
     type: LoadBalancer
     port: 9000
 
@@ -106,7 +106,7 @@ broker:
     nodePort: ""
 
   external:
-    enabled: false
+    enabled: true
     type: LoadBalancer
     port: 8099
 
