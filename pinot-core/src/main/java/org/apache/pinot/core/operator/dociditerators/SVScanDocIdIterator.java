@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -80,6 +80,16 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
    */
   public void setEndDocId(int endDocId) {
     _endDocId = endDocId;
+  }
+
+  @Override
+  public boolean isMatch(int docId) {
+    if (_currentDocId == Constants.EOF) {
+      return false;
+    }
+    _valueIterator.skipTo(docId);
+    _numEntriesScanned++;
+    return _valueMatcher.doesCurrentEntryMatch(_valueIterator);
   }
 
   @Override
