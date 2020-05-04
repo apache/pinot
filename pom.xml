@@ -1435,6 +1435,8 @@
             <!-- Top level directories -->
             <exclude>thirdeye/**</exclude>
             <exclude>website/**</exclude>
+            <exclude>docker/**</exclude>
+            <exclude>kubernetes/**</exclude>
 
             <!-- Docker image configs -->
             <exclude>docker/images/pinot-thirdeye/**</exclude>
@@ -1536,11 +1538,15 @@
             <!-- Top level -->
             <exclude>.codecov*</exclude>
 
-            <!-- Top level Directory -->
-            <exclude>website/**</exclude>
-
             <!-- Test Resources -->
             <exclude>**/test/resources/**</exclude>
+
+            <!-- Pinot Website (not part of the distribution) -->
+            <exclude>website/**</exclude>
+
+            <!-- Docker and Kubernetes (not part of the distribution) -->
+            <exclude>kubernetes/**</exclude>
+            <exclude>docker/**</exclude>
 
             <!-- Pinot-Druid Benchmark (not part of the distribution) -->
             <exclude>contrib/**</exclude>
