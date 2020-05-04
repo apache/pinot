@@ -38,7 +38,7 @@ public class DateTimeFunctions {
    * Convert epoch millis to epoch seconds, bucketed by given bucket granularity
    */
   static Long toEpochSecondsBucket(Long millis, String bucket) {
-    return TimeUnit.MILLISECONDS.toSeconds(millis) / Integer.parseInt(bucket);
+    return TimeUnit.MILLISECONDS.toSeconds(millis) / Integer.valueOf(bucket);
   }
 
   /**
@@ -52,7 +52,7 @@ public class DateTimeFunctions {
    * Convert epoch millis to epoch minutes, bucketed by given bucket granularity
    */
   static Long toEpochMinutesBucket(Long millis, String bucket) {
-    return TimeUnit.MILLISECONDS.toMinutes(millis) / Integer.parseInt(bucket);
+    return TimeUnit.MILLISECONDS.toMinutes(millis) / Integer.valueOf(bucket);
   }
 
   /**
@@ -66,7 +66,7 @@ public class DateTimeFunctions {
    * Convert epoch millis to epoch hours, bucketed by given bucket granularity
    */
   static Long toEpochHoursBucket(Long millis, String bucket) {
-    return TimeUnit.MILLISECONDS.toHours(millis) / Integer.parseInt(bucket);
+    return TimeUnit.MILLISECONDS.toHours(millis) / Integer.valueOf(bucket);
   }
 
   /**
@@ -80,7 +80,7 @@ public class DateTimeFunctions {
    * Convert epoch millis to epoch days, bucketed by given bucket granularity
    */
   static Long toEpochDaysBucket(Long millis, String bucket) {
-    return TimeUnit.MILLISECONDS.toDays(millis) / Integer.parseInt(bucket);
+    return TimeUnit.MILLISECONDS.toDays(millis) / Integer.valueOf(bucket);
   }
 
   /**
@@ -94,7 +94,7 @@ public class DateTimeFunctions {
    * Converts bucketed seconds, to epoch millis
    */
   static Long fromEpochSecondsBucket(Long seconds, String bucket) {
-    return TimeUnit.SECONDS.toMillis(seconds * Integer.parseInt(bucket));
+    return TimeUnit.SECONDS.toMillis(seconds * Integer.valueOf(bucket));
   }
 
   /**
@@ -108,7 +108,7 @@ public class DateTimeFunctions {
    * Converts bucketed minutes, to epoch millis
    */
   static Long fromEpochMinutesBucket(Number minutes, String bucket) {
-    return TimeUnit.MINUTES.toMillis(minutes.longValue() * Integer.parseInt(bucket));
+    return TimeUnit.MINUTES.toMillis(minutes.longValue() * Integer.valueOf(bucket));
   }
 
   /**
@@ -122,7 +122,7 @@ public class DateTimeFunctions {
    * Converts bucketed hours, to epoch millis
    */
   static Long fromEpochHoursBucket(Number hours, String bucket) {
-    return TimeUnit.HOURS.toMillis(hours.longValue() * Integer.parseInt(bucket));
+    return TimeUnit.HOURS.toMillis(hours.longValue() * Integer.valueOf(bucket));
   }
 
   /**
@@ -136,6 +136,6 @@ public class DateTimeFunctions {
    * Converts bucketed days, to epoch millis
    */
   static Long fromEpochDaysBucket(Number daysSinceEpoch, String bucket) {
-    return TimeUnit.DAYS.toMillis(daysSinceEpoch.longValue() * Integer.parseInt(bucket));
+    return TimeUnit.DAYS.toMillis(daysSinceEpoch.longValue() * Integer.valueOf(bucket));
   }
 }
