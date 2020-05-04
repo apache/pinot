@@ -74,7 +74,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       URI segmentLocation = future.get(_timeoutInMs, TimeUnit.MILLISECONDS);
       return segmentLocation;
     } catch (InterruptedException e) {
-      LOGGER.info("Interrupted while waiting for segment upload.");
+      LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
       Thread.currentThread().interrupt();
     } catch (Exception e) {
       LOGGER
