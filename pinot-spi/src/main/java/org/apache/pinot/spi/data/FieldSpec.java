@@ -263,6 +263,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
       jsonObject.put("maxLength", _maxLength);
     }
     appendDefaultNullValue(jsonObject);
+    if (_transformFunction != null) {
+      jsonObject.put("transformFunction", _transformFunction);
+    }
     return jsonObject;
   }
 
