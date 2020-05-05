@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.broker;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.BaseConfiguration;
@@ -28,6 +27,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -36,7 +36,6 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -139,17 +138,19 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertTrue(routingManager.routingExists(REALTIME_TABLE_NAME));
 
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest("SELECT * FROM " + OFFLINE_TABLE_NAME);
-    Map<ServerInstance, List<String>> routingTable = routingManager.getRoutingTable(brokerRequest);
+    RoutingTable routingTable = routingManager.getRoutingTable(brokerRequest);
     assertNotNull(routingTable);
-    assertEquals(routingTable.size(), NUM_SERVERS);
-    assertEquals(routingTable.values().iterator().next().size(), NUM_OFFLINE_SEGMENTS);
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().size(), NUM_SERVERS);
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().values().iterator().next().size(), NUM_OFFLINE_SEGMENTS);
+    assertTrue(routingTable.getUnavailableSegments().isEmpty());
 
     // Add a new segment into the OFFLINE table
     _helixResourceManager
         .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
 
-    TestUtils.waitForCondition(aVoid -> routingManager.getRoutingTable(brokerRequest).values().iterator().next().size()
-        == NUM_OFFLINE_SEGMENTS + 1, 30_000L, "Failed to add the new segment into the routing table");
+    TestUtils.waitForCondition(aVoid ->
+        routingManager.getRoutingTable(brokerRequest).getServerInstanceToSegmentsMap().values().iterator().next().size()
+            == NUM_OFFLINE_SEGMENTS + 1, 30_000L, "Failed to add the new segment into the routing table");
 
     // Add a new table with different broker tenant
     String newRawTableName = "newTable";

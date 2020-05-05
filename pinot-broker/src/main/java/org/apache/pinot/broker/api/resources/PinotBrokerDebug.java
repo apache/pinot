@@ -36,6 +36,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
@@ -45,6 +46,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 @Api(tags = "Debug")
 @Path("/")
+// TODO: Add APIs to return the RoutingTable (with unavailable segments)
 public class PinotBrokerDebug {
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
 
@@ -79,18 +81,18 @@ public class PinotBrokerDebug {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      Map<ServerInstance, List<String>> routingTable =
+      RoutingTable routingTable =
           _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest("SELECT * FROM " + offlineTableName));
       if (routingTable != null) {
-        result.put(offlineTableName, routingTable);
+        result.put(offlineTableName, routingTable.getServerInstanceToSegmentsMap());
       }
     }
     if (tableType != TableType.OFFLINE) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      Map<ServerInstance, List<String>> routingTable =
+      RoutingTable routingTable =
           _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest("SELECT * FROM " + realtimeTableName));
       if (routingTable != null) {
-        result.put(realtimeTableName, routingTable);
+        result.put(realtimeTableName, routingTable.getServerInstanceToSegmentsMap());
       }
     }
     if (!result.isEmpty()) {
@@ -107,10 +109,9 @@ public class PinotBrokerDebug {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Routing table"), @ApiResponse(code = 404, message = "Routing not found"), @ApiResponse(code = 500, message = "Internal server error")})
   public Map<ServerInstance, List<String>> getRoutingTableForQuery(
       @ApiParam(value = "Pql query (table name should have type suffix)") @QueryParam("pql") String pql) {
-    Map<ServerInstance, List<String>> routingTable =
-        _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest(pql));
+    RoutingTable routingTable = _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest(pql));
     if (routingTable != null) {
-      return routingTable;
+      return routingTable.getServerInstanceToSegmentsMap();
     } else {
       throw new WebApplicationException("Cannot find routing for query: " + pql, Response.Status.NOT_FOUND);
     }

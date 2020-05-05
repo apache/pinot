@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,6 +46,7 @@ import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.AggregationFunctionType;
@@ -286,24 +286,39 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long routingStartTimeNs = System.nanoTime();
     Map<ServerInstance, List<String>> offlineRoutingTable = null;
     Map<ServerInstance, List<String>> realtimeRoutingTable = null;
+    int numUnavailableSegments = 0;
     if (offlineBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
-      offlineRoutingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
-      if (offlineRoutingTable == null || offlineRoutingTable.isEmpty()) {
-        LOGGER.debug("No OFFLINE server found for request {}: {}", requestId, query);
+      RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
+      if (routingTable != null) {
+        numUnavailableSegments += routingTable.getUnavailableSegments().size();
+        Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+        if (!serverInstanceToSegmentsMap.isEmpty()) {
+          offlineRoutingTable = serverInstanceToSegmentsMap;
+        } else {
+          offlineBrokerRequest = null;
+        }
+      } else {
         offlineBrokerRequest = null;
-        offlineRoutingTable = null;
       }
     }
     if (realtimeBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
-      realtimeRoutingTable = _routingManager.getRoutingTable(realtimeBrokerRequest);
-      if (realtimeRoutingTable == null || realtimeRoutingTable.isEmpty()) {
-        LOGGER.debug("No REALTIME server found for request {}: {}", requestId, query);
+      RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest);
+      if (routingTable != null) {
+        numUnavailableSegments += routingTable.getUnavailableSegments().size();
+        Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+        if (!serverInstanceToSegmentsMap.isEmpty()) {
+          realtimeRoutingTable = serverInstanceToSegmentsMap;
+        } else {
+          realtimeBrokerRequest = null;
+        }
+      } else {
         realtimeBrokerRequest = null;
-        realtimeRoutingTable = null;
       }
     }
+    requestStatistics.setNumUnavailableSegments(numUnavailableSegments);
+
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       LOGGER.info("No server found for request {}: {}", requestId, query);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
@@ -361,15 +376,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info("RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{},"
-              + " segments(queried/processed/matched/consuming):{}/{}/{}/{}, consumingFreshnessTimeMs:{},"
+              + " segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{}, consumingFreshnessTimeMs:{},"
               + " servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
           brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
           brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
           brokerResponse.getNumSegmentsProcessed(), brokerResponse.getNumSegmentsMatched(),
-          brokerResponse.getNumConsumingSegmentsQueried(), brokerResponse.getMinConsumingFreshnessTimeMs(),
-          brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
-          brokerResponse.isNumGroupsLimitReached(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
+          brokerResponse.getNumConsumingSegmentsQueried(), numUnavailableSegments,
+          brokerResponse.getMinConsumingFreshnessTimeMs(), brokerResponse.getNumServersResponded(),
+          brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
+          brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
           StringUtils.substring(query, 0, _queryLogLength));
 
       // Limit the dropping log message at most once per second.

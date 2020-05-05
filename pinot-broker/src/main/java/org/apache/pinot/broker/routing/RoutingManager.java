@@ -418,29 +418,30 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   /**
-   * Returns the routing table (map from server instance to list of segments hosted by the server) based on the broker
-   * request, or {@code null} if the routing does not exist.
+   * Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
+   * unavailable segments) based on the broker request, or {@code null} if the routing does not exist.
    * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
    */
   @Nullable
-  public Map<ServerInstance, List<String>> getRoutingTable(BrokerRequest brokerRequest) {
+  public RoutingTable getRoutingTable(BrokerRequest brokerRequest) {
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {
       return null;
     }
-    Map<String, String> segmentToInstanceMap = routingEntry.calculateSegmentToInstanceMap(brokerRequest);
-    Map<ServerInstance, List<String>> routingTable = new HashMap<>();
+    InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest);
+    Map<String, String> segmentToInstanceMap = selectionResult.getSegmentToInstanceMap();
+    Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        routingTable.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(entry.getKey());
+        serverInstanceToSegmentsMap.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(entry.getKey());
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
       }
     }
-    return routingTable;
+    return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments());
   }
 
   /**
@@ -541,15 +542,18 @@ public class RoutingManager implements ClusterChangeHandler {
       }
     }
 
-    Map<String, String> calculateSegmentToInstanceMap(BrokerRequest brokerRequest) {
+    InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest) {
       List<String> selectedSegments = _segmentSelector.select(brokerRequest);
-      if (selectedSegments.isEmpty()) {
-        return Collections.emptyMap();
+      if (!selectedSegments.isEmpty()) {
+        for (SegmentPruner segmentPruner : _segmentPruners) {
+          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+        }
       }
-      for (SegmentPruner segmentPruner : _segmentPruners) {
-        selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+      if (!selectedSegments.isEmpty()) {
+        return _instanceSelector.select(brokerRequest, selectedSegments);
+      } else {
+        return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList());
       }
-      return _instanceSelector.select(brokerRequest, selectedSegments);
     }
   }
 }

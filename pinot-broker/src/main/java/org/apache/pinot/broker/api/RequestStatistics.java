@@ -74,6 +74,7 @@ public class RequestStatistics {
   }
 
   private FanoutType _fanoutType;
+  private int _numUnavailableSegments;
 
   public RequestStatistics() {
   }
@@ -131,6 +132,14 @@ public class RequestStatistics {
 
   public FanoutType getFanoutType() {
     return _fanoutType;
+  }
+
+  public void setNumUnavailableSegments(int numUnavailableSegments) {
+    _numUnavailableSegments = numUnavailableSegments;
+  }
+
+  public int getNumUnavailableSegments() {
+    return _numUnavailableSegments;
   }
 
   public int getErrorCode() {
