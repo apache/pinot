@@ -28,14 +28,19 @@ import org.apache.pinot.common.response.BrokerResponse;
  * post-processing at a finer level than metrics.
  */
 public class RequestStatistics {
+  public enum FanoutType {
+    OFFLINE, REALTIME, HYBRID
+  }
 
   private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
 
-  private int _errorCode = 0;
+  private String _brokerId;
+  private long _requestId;
   private String _pql;
+  private FanoutType _fanoutType;
+  private int _errorCode = 0;
   private String _tableName = DEFAULT_TABLE_NAME;
   private long _processingTimeMillis = -1;
-
   private long _totalDocs;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -47,51 +52,11 @@ public class RequestStatistics {
   private int _numServersResponded;
   private boolean _isNumGroupsLimitReached;
   private int _numExceptions;
-  private String _brokerId;
-  private long _requestId;
-
-  public String getBrokerId() {
-    return _brokerId;
-  }
-
-  public long getRequestId() {
-    return _requestId;
-  }
-
-  public long getRequestArrivalTimeMillis() {
-    return _requestArrivalTimeMillis;
-  }
-
-  public long getReduceTimeMillis() {
-    return _reduceTimeMillis;
-  }
-
+  private boolean _queryNoReplicaSegments;
   private long _requestArrivalTimeMillis;
   private long _reduceTimeMillis;
 
-  public enum FanoutType {
-    OFFLINE, REALTIME, HYBRID
-  }
-
-  private FanoutType _fanoutType;
-
   public RequestStatistics() {
-  }
-
-  public void setErrorCode(int errorCode) {
-    _errorCode = errorCode;
-  }
-
-  public void setPql(String pql) {
-    _pql = pql;
-  }
-
-  public void setTableName(String tableName) {
-    _tableName = tableName;
-  }
-
-  public void setQueryProcessingTime(long processingTimeMillis) {
-    _processingTimeMillis = processingTimeMillis;
   }
 
   public void setStatistics(BrokerResponse brokerResponse) {
@@ -109,16 +74,32 @@ public class RequestStatistics {
     _numExceptions = brokerResponse.getExceptionsSize();
   }
 
+  public String getBrokerId() {
+    return _brokerId;
+  }
+
   public void setBrokerId(String brokerId) {
     _brokerId = brokerId;
+  }
+
+  public long getRequestId() {
+    return _requestId;
   }
 
   public void setRequestId(long requestId) {
     _requestId = requestId;
   }
 
+  public long getRequestArrivalTimeMillis() {
+    return _requestArrivalTimeMillis;
+  }
+
   public void setRequestArrivalTimeMillis(long requestArrivalTimeMillis) {
     _requestArrivalTimeMillis = requestArrivalTimeMillis;
+  }
+
+  public long getReduceTimeMillis() {
+    return _reduceTimeMillis;
   }
 
   public void setReduceTimeNanos(long reduceTimeNanos) {
@@ -137,16 +118,32 @@ public class RequestStatistics {
     return _errorCode;
   }
 
+  public void setErrorCode(int errorCode) {
+    _errorCode = errorCode;
+  }
+
   public String getPql() {
     return _pql;
+  }
+
+  public void setPql(String pql) {
+    _pql = pql;
   }
 
   public String getTableName() {
     return _tableName;
   }
 
+  public void setTableName(String tableName) {
+    _tableName = tableName;
+  }
+
   public long getProcessingTimeMillis() {
     return _processingTimeMillis;
+  }
+
+  public void setQueryProcessingTime(long processingTimeMillis) {
+    _processingTimeMillis = processingTimeMillis;
   }
 
   public long getTotalDocs() {
@@ -194,6 +191,14 @@ public class RequestStatistics {
   }
 
   public boolean hasValidTableName() {
-    return ! DEFAULT_TABLE_NAME.equals(_tableName);
+    return !DEFAULT_TABLE_NAME.equals(_tableName);
+  }
+
+  public boolean isQueryNoReplicaSegments() {
+    return _queryNoReplicaSegments;
+  }
+
+  public void setQueryNoReplicaSegments(boolean queryNoReplicaSegments) {
+    _queryNoReplicaSegments = queryNoReplicaSegments;
   }
 }

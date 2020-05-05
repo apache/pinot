@@ -52,6 +52,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -324,6 +325,7 @@ public class RoutingManager implements ClusterChangeHandler {
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    Set<String> noReplicaSegments = new HashSet<>();
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
       // Current table is offline
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
@@ -332,6 +334,7 @@ public class RoutingManager implements ClusterChangeHandler {
         timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
         timeBoundaryManager.init(externalView, onlineSegments);
       }
+      fetchSegmentsInErrorState(externalView, noReplicaSegments);
     } else {
       // Current table is real-time
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -364,7 +367,7 @@ public class RoutingManager implements ClusterChangeHandler {
 
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, segmentSelector, segmentPruners, instanceSelector, externalViewVersion,
-            timeBoundaryManager, queryTimeoutMs);
+            noReplicaSegments, timeBoundaryManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -459,6 +462,35 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   /**
+   * Fetches segments which replicas are all in ERROR state, put the result to noReplicaSegments set.
+   */
+  public void fetchSegmentsInErrorState(ExternalView externalView, Set<String> noReplicaSegments) {
+    Set<String> partitionSet = externalView.getPartitionSet();
+    for (String partitionName : partitionSet) {
+      Map<String, String> stateMap = externalView.getStateMap(partitionName);
+      int numReplicas = stateMap.size();
+      int errorCount = 0;
+      for (String segmentState : stateMap.values()) {
+        if (SegmentOnlineOfflineStateModel.ERROR.equals(segmentState)) {
+          errorCount++;
+        }
+      }
+      if (errorCount == numReplicas) {
+        noReplicaSegments.add(partitionName);
+      }
+    }
+  }
+
+  /**
+   * Checks whether the broker request matches with any segments which replicas are all in ERROR state.
+   */
+  public boolean containsNoReplicaSegments(BrokerRequest brokerRequest) {
+    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    return routingEntry.containsNoReplicaSegments(brokerRequest);
+  }
+
+  /**
    * Returns the table-level query timeout in milliseconds for the given table, or {@code null} if the timeout is not
    * configured in the table config.
    */
@@ -473,6 +505,7 @@ public class RoutingManager implements ClusterChangeHandler {
     final SegmentSelector _segmentSelector;
     final List<SegmentPruner> _segmentPruners;
     final InstanceSelector _instanceSelector;
+    final Set<String> _noReplicaSegments;
     final Long _queryTimeoutMs;
 
     // Cache the ExternalView version for the last update
@@ -481,13 +514,14 @@ public class RoutingManager implements ClusterChangeHandler {
     transient TimeBoundaryManager _timeBoundaryManager;
 
     RoutingEntry(String tableNameWithType, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
-        InstanceSelector instanceSelector, int lastUpdateExternalViewVersion,
+        InstanceSelector instanceSelector, int lastUpdateExternalViewVersion, Set<String> noReplicaSegments,
         @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
       _segmentSelector = segmentSelector;
       _segmentPruners = segmentPruners;
       _instanceSelector = instanceSelector;
       _lastUpdateExternalViewVersion = lastUpdateExternalViewVersion;
+      _noReplicaSegments = noReplicaSegments;
       _timeBoundaryManager = timeBoundaryManager;
       _queryTimeoutMs = queryTimeoutMs;
     }
@@ -550,6 +584,17 @@ public class RoutingManager implements ClusterChangeHandler {
         selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
       }
       return _instanceSelector.select(brokerRequest, selectedSegments);
+    }
+
+    boolean containsNoReplicaSegments(BrokerRequest brokerRequest) {
+      if (_noReplicaSegments.isEmpty()) {
+        return false;
+      }
+      List<String> selectedSegments = new ArrayList<>(_noReplicaSegments);
+      for (SegmentPruner segmentPruner : _segmentPruners) {
+        selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+      }
+      return !selectedSegments.isEmpty();
     }
   }
 }
