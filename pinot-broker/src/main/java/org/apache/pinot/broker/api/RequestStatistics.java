@@ -52,7 +52,7 @@ public class RequestStatistics {
   private int _numServersResponded;
   private boolean _isNumGroupsLimitReached;
   private int _numExceptions;
-  private boolean _queryNoReplicaSegments;
+  private int _unavailableSegmentCount;
   private long _requestArrivalTimeMillis;
   private long _reduceTimeMillis;
 
@@ -194,11 +194,11 @@ public class RequestStatistics {
     return !DEFAULT_TABLE_NAME.equals(_tableName);
   }
 
-  public boolean isQueryNoReplicaSegments() {
-    return _queryNoReplicaSegments;
+  public int getUnavailableSegmentCount() {
+    return _unavailableSegmentCount;
   }
 
-  public void setQueryNoReplicaSegments(boolean queryNoReplicaSegments) {
-    _queryNoReplicaSegments = queryNoReplicaSegments;
+  public void setUnavailableSegmentCount(int unavailableSegmentCount) {
+    _unavailableSegmentCount = unavailableSegmentCount;
   }
 }

@@ -312,10 +312,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long routingEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING, routingEndTimeNs - routingStartTimeNs);
 
-    // Set querying no replica segment to true
-    if (offlineBrokerRequest != null && _routingManager.containsNoReplicaSegments(offlineBrokerRequest)) {
-      requestStatistics.setQueryNoReplicaSegments(true);
-    }
+    // Set number of segments with no replicas matched with this query
+    int unavailableSegmentCount = _routingManager.getNumSegmentsWithNoReplicas(offlineBrokerRequest)
+        + _routingManager.getNumSegmentsWithNoReplicas(realtimeBrokerRequest);
+    requestStatistics.setUnavailableSegmentCount(unavailableSegmentCount);
 
     // Set timeout in the requests
     long timeSpentMs = TimeUnit.NANOSECONDS.toMillis(routingEndTimeNs - compilationStartTimeNs);

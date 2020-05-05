@@ -51,7 +51,8 @@ import static org.mockito.Mockito.when;
 public class RoutingManagerTest {
   private static String TABLE_NAME = "testTable";
   private static String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
-  private static String SEGMENT_NAME = "segment1";
+  private static String SEGMENT_NAME_1 = "segment1";
+  private static String SEGMENT_NAME_2 = "segment2";
   private static String INSTANCE_NAME = "host1";
 
   @Test
@@ -70,13 +71,16 @@ public class RoutingManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    when(propertyStore.get("/CONFIGS/TABLE/testTable_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
+    when(propertyStore.get("/CONFIGS/TABLE/" + OFFLINE_TABLE_NAME, null, AccessOption.PERSISTENT)).thenReturn(
         TableConfigUtils.toZNRecord(tableConfig));
     ZNRecord znRecord = mock(ZNRecord.class);
     Map<String, Map<String, String>> mapFields = new HashMap<>();
-    Map<String, String> instanceToStateMap = new HashMap<>();
-    instanceToStateMap.put(INSTANCE_NAME, SegmentOnlineOfflineStateModel.ERROR);
-    mapFields.put(SEGMENT_NAME, instanceToStateMap);
+    Map<String, String> instanceToStateMap1 = new HashMap<>();
+    instanceToStateMap1.put(INSTANCE_NAME, SegmentOnlineOfflineStateModel.ERROR);
+    mapFields.put(SEGMENT_NAME_1, instanceToStateMap1);
+    Map<String, String> instanceToStateMap2 = new HashMap<>();
+    instanceToStateMap2.put(INSTANCE_NAME, SegmentOnlineOfflineStateModel.ONLINE);
+    mapFields.put(SEGMENT_NAME_2, instanceToStateMap2);
     when(znRecord.getMapFields()).thenReturn(mapFields);
     znRecord.setMapFields(mapFields);
     when(zkDataAccessor.get(helixDataAccessor.keyBuilder().idealStates().getPath() + "/" + OFFLINE_TABLE_NAME, null,
@@ -92,14 +96,14 @@ public class RoutingManagerTest {
 
     ExternalView externalView = mock(ExternalView.class);
     Set<String> partitionSet = new HashSet<>();
-    partitionSet.add(SEGMENT_NAME);
+    partitionSet.add(SEGMENT_NAME_1);
+    partitionSet.add(SEGMENT_NAME_2);
     when(externalView.getPartitionSet()).thenReturn(partitionSet);
-    Map<String, String> partitionMap = new HashMap<>();
-    partitionMap.put(INSTANCE_NAME, SegmentOnlineOfflineStateModel.ERROR);
-    when(externalView.getStateMap(anyString())).thenReturn(partitionMap);
+    when(externalView.getStateMap(SEGMENT_NAME_1)).thenReturn(instanceToStateMap1);
+    when(externalView.getStateMap(SEGMENT_NAME_2)).thenReturn(instanceToStateMap2);
 
     Set<String> noReplicasSegments = new HashSet<>();
-    routingManager.fetchSegmentsInErrorState(externalView, noReplicasSegments);
+    routingManager.findUnavailableSegments(externalView, noReplicasSegments);
     Assert.assertFalse(noReplicasSegments.isEmpty());
 
     BrokerRequest brokerRequest = new BrokerRequest();
@@ -109,6 +113,7 @@ public class RoutingManagerTest {
 
     // Constructs routing entry map
     routingManager.buildRouting(OFFLINE_TABLE_NAME);
-    Assert.assertTrue(routingManager.containsNoReplicaSegments(brokerRequest));
+    // There is 1 segment which is in ERROR state on all replicas
+    Assert.assertEquals(routingManager.getNumSegmentsWithNoReplicas(brokerRequest), 1);
   }
 }

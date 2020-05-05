@@ -322,10 +322,13 @@ public class RoutingManager implements ClusterChangeHandler {
     InstanceSelector instanceSelector = InstanceSelectorFactory.getInstanceSelector(tableConfig, _brokerMetrics);
     instanceSelector.init(enabledInstances, externalView, onlineSegments);
 
+    // Fetches segments which are in error state on all of of their replicas.
+    Set<String> segmentsWithNoReplicas = new HashSet<>();
+    findUnavailableSegments(externalView, segmentsWithNoReplicas);
+
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    Set<String> noReplicaSegments = new HashSet<>();
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
       // Current table is offline
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
@@ -334,7 +337,6 @@ public class RoutingManager implements ClusterChangeHandler {
         timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
         timeBoundaryManager.init(externalView, onlineSegments);
       }
-      fetchSegmentsInErrorState(externalView, noReplicaSegments);
     } else {
       // Current table is real-time
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -367,7 +369,7 @@ public class RoutingManager implements ClusterChangeHandler {
 
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, segmentSelector, segmentPruners, instanceSelector, externalViewVersion,
-            noReplicaSegments, timeBoundaryManager, queryTimeoutMs);
+            segmentsWithNoReplicas, timeBoundaryManager, queryTimeoutMs);
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -462,9 +464,10 @@ public class RoutingManager implements ClusterChangeHandler {
   }
 
   /**
-   * Fetches segments which replicas are all in ERROR state, put the result to noReplicaSegments set.
+   * Fetches segments which are in error state on all of of their replicas. Note that these are only ERROR state immutable segments.
+   * Realtime consuming segments that may be unavailable are not treated here but are accounted for in the staleness.
    */
-  public void fetchSegmentsInErrorState(ExternalView externalView, Set<String> noReplicaSegments) {
+  public void findUnavailableSegments(ExternalView externalView, Set<String> segmentsWithNoReplicas) {
     Set<String> partitionSet = externalView.getPartitionSet();
     for (String partitionName : partitionSet) {
       Map<String, String> stateMap = externalView.getStateMap(partitionName);
@@ -473,21 +476,28 @@ public class RoutingManager implements ClusterChangeHandler {
       for (String segmentState : stateMap.values()) {
         if (SegmentOnlineOfflineStateModel.ERROR.equals(segmentState)) {
           errorCount++;
+        } else {
+          break;
         }
       }
       if (errorCount == numReplicas) {
-        noReplicaSegments.add(partitionName);
+        segmentsWithNoReplicas.add(partitionName);
       }
     }
   }
 
   /**
    * Checks whether the broker request matches with any segments which replicas are all in ERROR state.
+   * Note that these are only ERROR state immutable segments.
+   * Realtime consuming segments that may be unavailable are not treated here but are accounted for in the staleness.
    */
-  public boolean containsNoReplicaSegments(BrokerRequest brokerRequest) {
+  public int getNumSegmentsWithNoReplicas(BrokerRequest brokerRequest) {
+    if (brokerRequest == null) {
+      return 0;
+    }
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-    return routingEntry.containsNoReplicaSegments(brokerRequest);
+    return routingEntry.getNumSegmentsWithNoReplicas(brokerRequest);
   }
 
   /**
@@ -505,7 +515,7 @@ public class RoutingManager implements ClusterChangeHandler {
     final SegmentSelector _segmentSelector;
     final List<SegmentPruner> _segmentPruners;
     final InstanceSelector _instanceSelector;
-    final Set<String> _noReplicaSegments;
+    final Set<String> _segmentsWithNoReplicas;
     final Long _queryTimeoutMs;
 
     // Cache the ExternalView version for the last update
@@ -514,14 +524,14 @@ public class RoutingManager implements ClusterChangeHandler {
     transient TimeBoundaryManager _timeBoundaryManager;
 
     RoutingEntry(String tableNameWithType, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
-        InstanceSelector instanceSelector, int lastUpdateExternalViewVersion, Set<String> noReplicaSegments,
+        InstanceSelector instanceSelector, int lastUpdateExternalViewVersion, Set<String> segmentsWithNoReplicas,
         @Nullable TimeBoundaryManager timeBoundaryManager, @Nullable Long queryTimeoutMs) {
       _tableNameWithType = tableNameWithType;
       _segmentSelector = segmentSelector;
       _segmentPruners = segmentPruners;
       _instanceSelector = instanceSelector;
       _lastUpdateExternalViewVersion = lastUpdateExternalViewVersion;
-      _noReplicaSegments = noReplicaSegments;
+      _segmentsWithNoReplicas = segmentsWithNoReplicas;
       _timeBoundaryManager = timeBoundaryManager;
       _queryTimeoutMs = queryTimeoutMs;
     }
@@ -586,15 +596,21 @@ public class RoutingManager implements ClusterChangeHandler {
       return _instanceSelector.select(brokerRequest, selectedSegments);
     }
 
-    boolean containsNoReplicaSegments(BrokerRequest brokerRequest) {
-      if (_noReplicaSegments.isEmpty()) {
-        return false;
+    /**
+     * returns the number of segments with no replicas given a query.
+     */
+    int getNumSegmentsWithNoReplicas(BrokerRequest brokerRequest) {
+      if (_segmentsWithNoReplicas.isEmpty()) {
+        return 0;
       }
-      List<String> selectedSegments = new ArrayList<>(_noReplicaSegments);
+      // Check if the unavailable segments would never have been hit by a query.
+      // If that is the case, we are good for this query
+      // (e.g. in a partitioned use case, we may prune the unavailable segments).
+      List<String> selectedSegments = new ArrayList<>(_segmentsWithNoReplicas);
       for (SegmentPruner segmentPruner : _segmentPruners) {
         selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
       }
-      return !selectedSegments.isEmpty();
+      return selectedSegments.size();
     }
   }
 }
