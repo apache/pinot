@@ -131,12 +131,15 @@ public class DefaultFunctionEvaluator implements FunctionEvaluator {
 
   private static class ConstantExecutionNode implements ExecutableNode {
     private Object _value;
+    private Class<?> _returnType;
 
     public ConstantExecutionNode(String value) {
       if (NumberUtils.isCreatable(value)) {
         _value = NumberUtils.createNumber(value);
+        _returnType = Number.class;
       } else {
         _value = value;
+        _returnType = String.class;
       }
     }
 
@@ -147,7 +150,7 @@ public class DefaultFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Class<?> getReturnType() {
-      return String.class;
+      return _returnType;
     }
   }
 

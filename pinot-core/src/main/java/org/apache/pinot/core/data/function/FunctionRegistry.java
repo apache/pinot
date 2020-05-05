@@ -45,31 +45,31 @@ public class FunctionRegistry {
       registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHours", Long.class));
       registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDays", Long.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("toEpochSecondsRounded", Long.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("toEpochSecondsRounded", Long.class, Number.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("toEpochMinutesRounded", Long.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("toEpochMinutesRounded", Long.class, Number.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("toEpochHoursRounded", Long.class, String.class));
-      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDaysRounded", Long.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("toEpochHoursRounded", Long.class, Number.class));
+      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDaysRounded", Long.class, Number.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("toEpochSecondsBucket", Long.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("toEpochSecondsBucket", Long.class, Number.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("toEpochMinutesBucket", Long.class, String.class));
-      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHoursBucket", Long.class, String.class));
-      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDaysBucket", Long.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("toEpochMinutesBucket", Long.class, Number.class));
+      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHoursBucket", Long.class, Number.class));
+      registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDaysBucket", Long.class, Number.class));
 
       registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochSeconds", Long.class));
       registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochMinutes", Number.class));
       registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochHours", Number.class));
       registerStaticFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochDays", Number.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("fromEpochSecondsBucket", Long.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("fromEpochSecondsBucket", Long.class, Number.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("fromEpochMinutesBucket", Number.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("fromEpochMinutesBucket", Number.class, Number.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("fromEpochHoursBucket", Number.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("fromEpochHoursBucket", Number.class, Number.class));
       registerStaticFunction(
-          DateTimeFunctions.class.getDeclaredMethod("fromEpochDaysBucket", Number.class, String.class));
+          DateTimeFunctions.class.getDeclaredMethod("fromEpochDaysBucket", Number.class, Number.class));
     } catch (NoSuchMethodException e) {
       LOGGER.error("Caught exception when registering function", e);
     }

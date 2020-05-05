@@ -33,7 +33,7 @@ import org.testng.annotations.Test;
 public class DateTimeFunctionEvaluatorTest {
 
   @Test(dataProvider = "dateTimeFunctionsTestDataProvider")
-  public void testExpressionWithColumn(String transformFunction, List<String> arguments, GenericRow row, Object result)
+  public void testDateTimeTransformFunctions(String transformFunction, List<String> arguments, GenericRow row, Object result)
       throws Exception {
     DefaultFunctionEvaluator evaluator = new DefaultFunctionEvaluator(transformFunction);
     Assert.assertEquals(evaluator.getArguments(), arguments);
