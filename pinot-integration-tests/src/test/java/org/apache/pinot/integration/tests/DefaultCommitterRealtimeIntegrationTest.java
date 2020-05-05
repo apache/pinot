@@ -33,7 +33,6 @@ import org.apache.pinot.core.data.manager.realtime.SegmentCommitter;
 import org.apache.pinot.core.data.manager.realtime.SegmentCommitterFactory;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentUtil;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -96,12 +95,10 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
   @Test
   public void testDefaultCommitter()
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     ServerMetrics serverMetrics = new ServerMetrics(new MetricsRegistry());
     ServerSegmentCompletionProtocolHandler protocolHandler =
         new ServerSegmentCompletionProtocolHandler(serverMetrics, getTableName());
 
-    SegmentCompletionProtocol.Response prevResponse = new SegmentCompletionProtocol.Response();
     LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
         mock(LLRealtimeSegmentDataManager.SegmentBuildDescriptor.class);
 
@@ -134,8 +131,7 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
     sendGetRequest("http://localhost:" + DEFAULT_CONTROLLER_PORT + "/segmentConsumed?instance=" + instanceId + "&name="
         + segmentName + "&offset=" + END_OFFSET);
 
-    SegmentCommitterFactory segmentCommitterFactory =
-        new SegmentCommitterFactory(LOGGER, indexLoadingConfig, protocolHandler);
+    SegmentCommitterFactory segmentCommitterFactory = new SegmentCommitterFactory(LOGGER, protocolHandler);
     SegmentCommitter segmentCommitter = segmentCommitterFactory.createDefaultSegmentCommitter(params);
     segmentCommitter.commit(END_OFFSET, 3, segmentBuildDescriptor);
   }

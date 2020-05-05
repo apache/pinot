@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
 
@@ -29,18 +28,16 @@ import org.slf4j.Logger;
  */
 public class SegmentCommitterFactory {
   private static Logger LOGGER;
-  private final IndexLoadingConfig _indexLoadingConfig;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
 
-  public SegmentCommitterFactory(Logger segmentLogger, IndexLoadingConfig indexLoadingConfig,
-      ServerSegmentCompletionProtocolHandler protocolHandler) {
+  public SegmentCommitterFactory(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler) {
     LOGGER = segmentLogger;
-    _indexLoadingConfig = indexLoadingConfig;
     _protocolHandler = protocolHandler;
   }
-  
-  public SegmentCommitter createSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
-    return new SplitSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, segmentUploader);
+
+  public SegmentCommitter createSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
+      SegmentUploader segmentUploader) {
+    return new SplitSegmentCommitter(LOGGER, _protocolHandler, params, segmentUploader);
   }
 
   public SegmentCommitter createDefaultSegmentCommitter(SegmentCompletionProtocol.Request.Params params) {

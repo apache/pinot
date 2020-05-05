@@ -24,6 +24,7 @@ import java.net.URISyntaxException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.slf4j.Logger;
@@ -52,7 +53,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   }
 
   @Override
-  public URI uploadSegment(File segmentFile) {
+  public URI uploadSegment(File segmentFile,  LLCSegmentName segmentName) {
     SegmentCompletionProtocol.Response response = uploadSegmentToController(segmentFile);
     if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS) {
       try {

@@ -20,9 +20,10 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
+import org.apache.pinot.common.utils.LLCSegmentName;
 
 
 public interface SegmentUploader {
   // Returns the URI of the uploaded segment. null if the upload fails.
-  URI uploadSegment(File segmentFile);
+  URI uploadSegment(File segmentFile, LLCSegmentName segmentName);
 }
