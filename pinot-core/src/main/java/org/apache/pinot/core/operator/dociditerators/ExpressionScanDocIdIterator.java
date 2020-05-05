@@ -30,6 +30,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -48,8 +49,9 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _numDocIdsFilled;
 
   private int _currentDocId = -1;
-  private IntIterator _intIterator = null;
-  private int _blockEndDocId = 0;
+  private MutableRoaringBitmap _matchingDocIds;
+  private PeekableIntIterator _docIdIterator;
+  private int _blockEndDocId;
 
   // NOTE: Number of entries scanned is not accurate because we might need to scan multiple columns in order to solve
   // the expression, but we only track the number of entries for the resolved expression
@@ -65,14 +67,35 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
+  public boolean isMatch(int docId) {
+    if (_currentDocId == Constants.EOF) {
+      return false;
+    }
+    if (docId < _blockEndDocId) {
+      // Document id within the current block
+      return _matchingDocIds.contains(docId);
+    } else {
+      // Search the block following the document id
+      _blockEndDocId = docId;
+      _matchingDocIds = null;
+      _docIdIterator = null;
+      if (next() == Constants.EOF) {
+        return false;
+      } else {
+        return _matchingDocIds.contains(docId);
+      }
+    }
+  }
+
+  @Override
   public int next() {
     if (_currentDocId == Constants.EOF) {
       return Constants.EOF;
     }
 
     // If there are remaining records in the current block, return them first
-    if (_intIterator != null && _intIterator.hasNext()) {
-      _currentDocId = _intIterator.next();
+    if (_docIdIterator != null && _docIdIterator.hasNext()) {
+      _currentDocId = _docIdIterator.next();
       return _currentDocId;
     }
 
@@ -86,8 +109,9 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       processProjectionBlock(projectionBlock, matchingDocIds);
       if (!matchingDocIds.isEmpty()) {
-        _intIterator = matchingDocIds.getIntIterator();
-        _currentDocId = _intIterator.next();
+        _matchingDocIds = matchingDocIds;
+        _docIdIterator = matchingDocIds.getIntIterator();
+        _currentDocId = _docIdIterator.next();
         return _currentDocId;
       }
     }
@@ -105,19 +129,21 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
       return _currentDocId;
     }
 
-    // Search the current block first
     if (targetDocId < _blockEndDocId) {
-      while (_intIterator.hasNext()) {
-        _currentDocId = _intIterator.next();
-        if (_currentDocId >= targetDocId) {
-          return _currentDocId;
-        }
+      // Search the current block first
+      _docIdIterator.advanceIfNeeded(targetDocId);
+      if (_docIdIterator.hasNext()) {
+        _currentDocId = _docIdIterator.next();
+        return _currentDocId;
       }
+    } else {
+      // Skipping the blocks before the target document id
+      _blockEndDocId = targetDocId;
     }
 
     // Search the block following the target document id
-    _intIterator = null;
-    _blockEndDocId = targetDocId;
+    _matchingDocIds = null;
+    _docIdIterator = null;
     return next();
   }
 
@@ -283,34 +309,6 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
     return _numEntriesScanned;
   }
 
-  private class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
-    static final String OPERATOR_NAME = "BitmapDocIdSetOperator";
-
-    final IntIterator _intIterator;
-
-    BitmapDocIdSetOperator(ImmutableRoaringBitmap bitmap) {
-      _intIterator = bitmap.getIntIterator();
-    }
-
-    @Override
-    protected DocIdSetBlock getNextBlock() {
-      _numDocIdsFilled = 0;
-      while (_numDocIdsFilled < DocIdSetPlanNode.MAX_DOC_PER_CALL && _intIterator.hasNext()) {
-        _docIdBuffer[_numDocIdsFilled++] = _intIterator.next();
-      }
-      if (_numDocIdsFilled > 0) {
-        return new DocIdSetBlock(_docIdBuffer, _numDocIdsFilled);
-      } else {
-        return null;
-      }
-    }
-
-    @Override
-    public String getOperatorName() {
-      return OPERATOR_NAME;
-    }
-  }
-
   /**
    * NOTE: This operator contains only one block.
    */
@@ -332,6 +330,37 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
       DocIdSetBlock docIdSetBlock = _docIdSetBlock;
       _docIdSetBlock = null;
       return docIdSetBlock;
+    }
+
+    @Override
+    public String getOperatorName() {
+      return OPERATOR_NAME;
+    }
+  }
+
+  /**
+   * NOTE: This operator may contain multiple blocks.
+   */
+  private class BitmapDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+    static final String OPERATOR_NAME = "BitmapDocIdSetOperator";
+
+    final IntIterator _intIterator;
+
+    BitmapDocIdSetOperator(ImmutableRoaringBitmap bitmap) {
+      _intIterator = bitmap.getIntIterator();
+    }
+
+    @Override
+    protected DocIdSetBlock getNextBlock() {
+      _numDocIdsFilled = 0;
+      while (_numDocIdsFilled < DocIdSetPlanNode.MAX_DOC_PER_CALL && _intIterator.hasNext()) {
+        _docIdBuffer[_numDocIdsFilled++] = _intIterator.next();
+      }
+      if (_numDocIdsFilled > 0) {
+        return new DocIdSetBlock(_docIdBuffer, _numDocIdsFilled);
+      } else {
+        return null;
+      }
     }
 
     @Override

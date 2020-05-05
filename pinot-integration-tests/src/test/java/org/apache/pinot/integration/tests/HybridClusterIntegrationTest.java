@@ -244,9 +244,30 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
+  public void testHardcodedQueries()
+      throws Exception {
+    super.testHardcodedQueries();
+  }
+
+  @Test
+  @Override
+  public void testHardcodedSqlQueries()
+      throws Exception {
+    super.testHardcodedSqlQueries();
+  }
+
+  @Test
+  @Override
   public void testQueriesFromQueryFile()
       throws Exception {
     super.testQueriesFromQueryFile();
+  }
+
+  @Test
+  @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    super.testSqlQueriesFromQueryFile();
   }
 
   @Test

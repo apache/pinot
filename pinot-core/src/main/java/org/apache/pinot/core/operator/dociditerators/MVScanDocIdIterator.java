@@ -75,6 +75,17 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
+  public boolean isMatch(int docId) {
+    if (currentDocId == Constants.EOF) {
+      return false;
+    }
+    valueIterator.skipTo(docId);
+    int length = valueIterator.nextIntVal(intArray);
+    _numEntriesScanned += length;
+    return evaluator.applyMV(intArray, length);
+  }
+
+  @Override
   public int advance(int targetDocId) {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
@@ -89,8 +100,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     } else {
       currentDocId = targetDocId - 1;
       valueIterator.skipTo(targetDocId);
-      int next = next();
-      return next;
+      return next();
     }
   }
 
