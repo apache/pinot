@@ -21,9 +21,11 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -37,6 +39,7 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   protected final int _percentile;
   protected final String _column;
+  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -53,6 +56,7 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
     _column = arguments.get(0);
     _percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
@@ -68,6 +72,11 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + _percentile + "(" + _column + ")";
+  }
+
+  @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
   }
 
   @Override

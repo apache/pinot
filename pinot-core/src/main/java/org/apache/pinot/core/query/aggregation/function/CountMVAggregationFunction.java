@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -27,12 +30,15 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
 
+  private final List<TransformExpressionTree> _inputExpressions;
+
   /**
    * Constructor for the class.
    * @param column Column name to aggregate on.
    */
   public CountMVAggregationFunction(String column) {
     super(column);
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(column));
   }
 
   @Override
@@ -51,12 +57,18 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   }
 
   @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<String, BlockValSet> blockValSetMap) {
     int[] valueArray = blockValSetMap.get(_column).getNumMVEntries();
     long count = 0L;
     for (int i = 0; i < length; i++) {

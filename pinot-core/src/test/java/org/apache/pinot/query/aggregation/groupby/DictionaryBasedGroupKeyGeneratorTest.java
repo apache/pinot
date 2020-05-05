@@ -24,18 +24,15 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -48,6 +45,10 @@ import org.apache.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGe
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -137,8 +138,18 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     String query = String
         .format("SELECT COUNT(*) FROM table WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1, docId2,
             StringUtils.join(SV_COLUMNS, ", "), StringUtils.join(MV_COLUMNS, ", "));
+
+    // Compute the transform expressions
+    Set<TransformExpressionTree> expressionTrees = new LinkedHashSet<>();
+    ArrayList<String> allColumns = new ArrayList<>(Arrays.asList(SV_COLUMNS));
+    allColumns.addAll(Arrays.asList(MV_COLUMNS));
+
+    for (String columnName: allColumns) {
+      expressionTrees.add(TransformExpressionTree.compileToExpressionTree(columnName));
+    }
+
     TransformPlanNode transformPlanNode =
-        new TransformPlanNode(indexSegment, new Pql2Compiler().compileToBrokerRequest(query));
+        new TransformPlanNode(indexSegment, new Pql2Compiler().compileToBrokerRequest(query), expressionTrees);
     _transformOperator = transformPlanNode.run();
     _transformBlock = _transformOperator.nextBlock();
   }

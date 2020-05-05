@@ -21,7 +21,6 @@ package org.apache.pinot.core.plan;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
@@ -91,7 +90,9 @@ public class AggregationGroupByPlanNode implements PlanNode {
       }
     }
 
-    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
+    Set<TransformExpressionTree> expressionsToTransform =
+        AggregationFunctionUtils.collectExpressionsToTransform(brokerRequest, _functionContexts);
+    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest, expressionsToTransform);
     _starTreeTransformPlanNode = null;
   }
 

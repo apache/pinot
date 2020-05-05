@@ -18,14 +18,20 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +49,8 @@ public class SelectionPlanNode implements PlanNode {
   public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _selection = brokerRequest.getSelections();
-    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
+    _transformPlanNode =
+        new TransformPlanNode(_indexSegment, brokerRequest, collectExpressionsToTransform(indexSegment, brokerRequest));
   }
 
   @Override
@@ -76,5 +83,36 @@ public class SelectionPlanNode implements PlanNode {
     LOGGER.debug(prefix + "Argument 1: Selections - " + _selection);
     LOGGER.debug(prefix + "Argument 2: Transform -");
     _transformPlanNode.showTree(prefix + "    ");
+  }
+
+  private Set<TransformExpressionTree> collectExpressionsToTransform(IndexSegment indexSegment,
+      BrokerRequest brokerRequest) {
+
+    Set<TransformExpressionTree> expressionTrees = new LinkedHashSet<>();
+    Selection selection = brokerRequest.getSelections();
+
+    // Extract selection expressions
+    List<String> selectionColumns = selection.getSelectionColumns();
+    if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
+      for (String column : indexSegment.getPhysicalColumnNames()) {
+        expressionTrees.add(new TransformExpressionTree(new IdentifierAstNode(column)));
+      }
+    } else {
+      for (String selectionColumn : selectionColumns) {
+        expressionTrees.add(TransformExpressionTree.compileToExpressionTree(selectionColumn));
+      }
+    }
+
+    // Extract order-by expressions.
+    if (selection.getSize() > 0) {
+      List<SelectionSort> sortSequence = selection.getSelectionSortSequence();
+      if (sortSequence != null) {
+        for (SelectionSort selectionSort : sortSequence) {
+          String orderByColumn = selectionSort.getColumn();
+          expressionTrees.add(TransformExpressionTree.compileToExpressionTree(orderByColumn));
+        }
+      }
+    }
+    return expressionTrees;
   }
 }

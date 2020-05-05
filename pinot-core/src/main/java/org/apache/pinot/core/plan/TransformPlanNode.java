@@ -21,16 +21,12 @@ package org.apache.pinot.core.plan;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,75 +39,69 @@ public class TransformPlanNode implements PlanNode {
 
   private final String _segmentName;
   private final ProjectionPlanNode _projectionPlanNode;
-  private final Set<String> _projectionColumns = new HashSet<>();
-  private final Set<TransformExpressionTree> _expressions = new HashSet<>();
+  private final Set<TransformExpressionTree> _expressions;
   private int _maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
-  public TransformPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+  public TransformPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest,
+      Set<TransformExpressionTree> expressionsToPlan) {
     _segmentName = indexSegment.getSegmentName();
-    extractColumnsAndTransforms(brokerRequest, indexSegment);
-    _projectionPlanNode = new ProjectionPlanNode(indexSegment, _projectionColumns,
+
+    setMaxDocsForSelection(brokerRequest);
+    Set<String> projectionColumns = new HashSet<>();
+    extractProjectionColumns(expressionsToPlan, projectionColumns);
+
+    _expressions = expressionsToPlan;
+    _projectionPlanNode = new ProjectionPlanNode(indexSegment, projectionColumns,
         new DocIdSetPlanNode(indexSegment, brokerRequest, _maxDocPerNextCall));
   }
 
-  /**
-   * Helper method to extract projection columns and transform expressions from the given broker request.
-   */
-  private void extractColumnsAndTransforms(BrokerRequest brokerRequest, IndexSegment indexSegment) {
-    Set<String> columns = new HashSet<>();
-    if (brokerRequest.isSetAggregationsInfo()) {
-      // Extract aggregation expressions
-      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        if (aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
-          // 'DISTINCT(col1, col2 ...)' is modeled as one single aggregation function
-          List<String> distinctColumns = AggregationFunctionUtils.getAggregationExpressions(aggregationInfo);
-          columns.addAll(distinctColumns);
-        } else if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          columns.addAll(AggregationFunctionUtils.getAggregationExpressions(aggregationInfo));
+  private void extractProjectionColumns(Set<TransformExpressionTree> expressionsToPlan, Set<String> projectionColumns) {
+    for (TransformExpressionTree expression : expressionsToPlan) {
+      extractProjectionColumns(expression, projectionColumns);
+    }
+  }
+
+  private void extractProjectionColumns(TransformExpressionTree expression, Set<String> projectionColumns) {
+    TransformExpressionTree.ExpressionType expressionType = expression.getExpressionType();
+    switch (expressionType) {
+      case FUNCTION:
+        for (TransformExpressionTree child : expression.getChildren()) {
+          extractProjectionColumns(child, projectionColumns);
         }
-      }
-      // Extract group-by expressions
-      if (brokerRequest.isSetGroupBy()) {
-        columns.addAll(brokerRequest.getGroupBy().getExpressions());
-      }
-    } else {
+        break;
+
+      case IDENTIFIER:
+        projectionColumns.add(expression.getValue());
+        break;
+
+      case LITERAL:
+        // Do nothing.
+        break;
+
+      default:
+        throw new UnsupportedOperationException("Unsupported expression type: " + expressionType);
+    }
+  }
+
+  /**
+   * Helper method to set the max number of docs to return for selection queries
+   */
+  private void setMaxDocsForSelection(BrokerRequest brokerRequest) {
+    if (!brokerRequest.isSetAggregationsInfo()) {
       Selection selection = brokerRequest.getSelections();
 
-      // Extract selection expressions
-      List<String> selectionColumns = selection.getSelectionColumns();
-      if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
-        for (String column : indexSegment.getPhysicalColumnNames()) {
-          _projectionColumns.add(column);
-          _expressions.add(new TransformExpressionTree(new IdentifierAstNode(column)));
-        }
-      } else {
-        columns.addAll(selectionColumns);
-      }
-
-      // Extract order-by expressions and update maxDocPerNextCall
+      // Update MaxDocPerNextCall
       if (selection.getSize() > 0) {
         List<SelectionSort> sortSequence = selection.getSelectionSortSequence();
         if (sortSequence == null) {
           // For selection only queries, select minimum number of documents
           _maxDocPerNextCall = Math.min(selection.getSize(), _maxDocPerNextCall);
-        } else {
-          for (SelectionSort selectionSort : sortSequence) {
-            String orderByColumn = selectionSort.getColumn();
-            if (!_projectionColumns.contains(orderByColumn)) {
-              columns.add(orderByColumn);
-            }
-          }
         }
       } else {
         // For LIMIT 0 queries, fetch at least 1 document per DocIdSetPlanNode's requirement
         // TODO: Skip the filtering phase and document fetching for LIMIT 0 case
         _maxDocPerNextCall = 1;
       }
-    }
-    for (String column : columns) {
-      TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(column);
-      expression.getColumns(_projectionColumns);
-      _expressions.add(expression);
     }
   }
 

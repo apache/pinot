@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -28,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -35,6 +39,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   protected final String _column;
+  protected final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -42,6 +47,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
    */
   public AvgAggregationFunction(String column) {
     _column = column;
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
@@ -60,6 +66,11 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
@@ -75,7 +86,8 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<String, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_column);
 
     if (blockValSet.getValueType() != DataType.BYTES) {

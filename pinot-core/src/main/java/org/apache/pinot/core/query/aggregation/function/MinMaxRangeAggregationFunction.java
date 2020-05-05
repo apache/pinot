@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -34,6 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMaxRangePair, Double> {
 
   protected final String _column;
+  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -41,6 +45,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
    */
   public MinMaxRangeAggregationFunction(String column) {
     _column = column;
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
@@ -59,6 +64,11 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   }
 
   @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
@@ -74,7 +84,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<String, BlockValSet> blockValSetMap) {
     double min = Double.POSITIVE_INFINITY;
     double max = Double.NEGATIVE_INFINITY;
 

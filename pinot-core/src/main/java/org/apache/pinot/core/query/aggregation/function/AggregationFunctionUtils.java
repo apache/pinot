@@ -22,12 +22,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.parsers.CompilerConstants;
@@ -181,5 +184,34 @@ public class AggregationFunctionUtils {
   public static String concatArgs(List<String> arguments) {
     return (arguments.size() > 1) ? String.join(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR, arguments)
         : arguments.get(0);
+  }
+
+  /**
+   * Compiles and returns all transform expressions required for computing the aggregation, group-by
+   * and order-by
+   *
+   * @param brokerRequest Broker Request
+   * @param functionContexts Aggregation Function contexts
+   * @return Set of compiled expressions in the aggregation, group-by and order-by clauses
+   */
+  public static Set<TransformExpressionTree> collectExpressionsToTransform(BrokerRequest brokerRequest,
+      AggregationFunctionContext[] functionContexts) {
+
+    Set<TransformExpressionTree> expressionTrees = new LinkedHashSet<>();
+    for (AggregationFunctionContext functionContext : functionContexts) {
+      AggregationFunction function = functionContext.getAggregationFunction();
+      expressionTrees.addAll(function.getInputExpressions());
+    }
+
+    // Extract group-by expressions
+    if (brokerRequest.isSetGroupBy()) {
+      for (String expression : brokerRequest.getGroupBy().getExpressions()) {
+        expressionTrees.add(TransformExpressionTree.compileToExpressionTree(expression));
+      }
+    }
+
+    // TODO: Add order-by expressions when available in brokerRequest for aggregation queries.
+    // The current order-by implementation assumes that ordering will be on aggregation/group-by columns.
+    return expressionTrees;
   }
 }

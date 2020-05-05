@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -32,6 +35,7 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
 
   protected final String _column;
+  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -39,6 +43,7 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
    */
   public MaxAggregationFunction(String column) {
     _column = column;
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
@@ -54,6 +59,11 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _column + ")";
+  }
+
+  @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
   }
 
   @Override
