@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +42,7 @@ public class SegmentFetcherFactory {
   private static final Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new HashMap<>();
   private static final String HTTP_PROTOCOL = "http";
   private static final String HTTPS_PROTOCOL = "https";
+  private static final String PEER_2_PEER_PROTOCOL = "server";
   private static final SegmentFetcher DEFAULT_HTTP_SEGMENT_FETCHER = new HttpSegmentFetcher();
   private static final SegmentFetcher DEFAULT_PINOT_FS_SEGMENT_FETCHER = new PinotFSSegmentFetcher();
 
@@ -53,6 +56,16 @@ public class SegmentFetcherFactory {
    * Initializes the segment fetcher factory. This method should only be called once.
    */
   public static void init(Configuration config)
+      throws Exception {
+    initSegmentFetcherFactory(config, null, null);
+  }
+
+  public static void init(Configuration config, HelixManager helixManager, String helixClusterName)
+      throws Exception {
+    initSegmentFetcherFactory(config, helixManager, helixClusterName);
+  }
+
+  private static void initSegmentFetcherFactory(Configuration config, HelixManager helixManager, String helixClusterName)
       throws Exception {
     @SuppressWarnings("unchecked")
     List<String> protocols = config.getList(PROTOCOLS_KEY);
@@ -68,6 +81,11 @@ public class SegmentFetcherFactory {
           case HTTPS_PROTOCOL:
             segmentFetcher = new HttpsSegmentFetcher();
             break;
+          case PEER_2_PEER_PROTOCOL:
+            if (helixManager != null && helixClusterName != null) {
+              segmentFetcher = new PeerServerSegmentFetcher(config, helixManager, helixClusterName);
+              break;
+            }
           default:
             segmentFetcher = new PinotFSSegmentFetcher();
         }
