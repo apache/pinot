@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -65,6 +66,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -83,6 +85,7 @@ import org.apache.pinot.thirdeye.formatter.DetectionAlertConfigFormatter;
 import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.AnomalyOffset;
+import org.h2.command.dml.Merge;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -115,6 +118,7 @@ public class DetectionResource {
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
   private final DetectionConfigFormatter detectionConfigFormatter;
   private final DetectionAlertConfigFormatter subscriptionConfigFormatter;
+  private final AggregationLoader aggregationLoader;
 
   public DetectionResource() {
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -129,7 +133,7 @@ public class DetectionResource {
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
 
-    AggregationLoader aggregationLoader =
+    this.aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
@@ -519,7 +523,8 @@ public class DetectionResource {
       @QueryParam("endTime") @ApiParam("end time utc (in millis)") Long endTime,
       @QueryParam("metricUrn") @ApiParam("the metric urn of the anomaly") String metricUrn,
       @QueryParam("feedbackType") @ApiParam("the metric urn of the anomaly") AnomalyFeedbackType feedbackType,
-      @QueryParam("comment") @ApiParam("comments") String comment) {
+      @QueryParam("comment") @ApiParam("comments") String comment,
+      @QueryParam("baselineValue") @ApiParam("the baseline value for the anomaly") @DefaultValue("NaN") double baselineValue) {
 
     DetectionConfigDTO detectionConfigDTO = this.configDAO.findById(detectionConfigId);
     if (detectionConfigDTO == null) {
@@ -531,8 +536,24 @@ public class DetectionResource {
     anomaly.setEndTime(endTime);
     anomaly.setDetectionConfigId(detectionConfigId);
     anomaly.setAnomalyResultSource(AnomalyResultSource.USER_LABELED_ANOMALY);
-    anomaly.setMetricUrn(metricUrn);
     anomaly.setProperties(Collections.<String, String>emptyMap());
+
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
+    MetricConfigDTO metric = this.metricDAO.findById(me.getId());
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    anomaly.setMetricUrn(metricUrn);
+    anomaly.setMetric(metric.getName());
+    anomaly.setCollection(dataset.getDataset());
+
+    try {
+      MetricSlice currentSlice = MetricSlice.from(me.getId(), startTime, endTime, me.getFilters());
+      DataFrame df = this.aggregationLoader.loadAggregate(currentSlice, Collections.<String>emptyList(), -1);
+      anomaly.setAvgCurrentVal(df.getDouble(COL_VALUE, 0));
+    } catch (Exception e) {
+      LOG.warn("Can't get the current value for {}, from {}-{}", me.getId(), startTime, endTime, e);
+      anomaly.setAvgCurrentVal(Double.NaN);
+    }
+    anomaly.setAvgBaselineVal(baselineValue);
 
     if (this.anomalyDAO.save(anomaly) == null) {
       throw new IllegalArgumentException(String.format("Could not store user reported anomaly: '%s'", anomaly));
@@ -542,10 +563,20 @@ public class DetectionResource {
     feedback.setFeedbackType(feedbackType);
     feedback.setComment(comment);
     anomaly.setFeedback(feedback);
-
-    this.anomalyDAO.save(anomaly);
+    this.anomalyDAO.updateAnomalyFeedback(anomaly);
 
     return Response.ok(anomaly.getId()).build();
+  }
+
+  @DELETE
+  @Path(value="/report-anomaly/{id}")
+  public Response deleteUserReportedAnomaly(@PathParam("id") long anomalyId) {
+    MergedAnomalyResultDTO anomaly = this.anomalyDAO.findById(anomalyId);
+    if (anomaly == null || !anomaly.getAnomalyResultSource().equals(AnomalyResultSource.USER_LABELED_ANOMALY)) {
+      return Response.status(Response.Status.BAD_REQUEST).entity(String.format("Couldn't delete anomaly %d", anomalyId)).build();
+    }
+    this.anomalyDAO.deleteById(anomalyId);
+    return Response.ok().build();
   }
 
   @GET
