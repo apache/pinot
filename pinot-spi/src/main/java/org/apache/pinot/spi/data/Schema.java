@@ -722,7 +722,7 @@ public final class Schema {
         break;
     }
 
-    String outerFunction = null;
+    String outerFunction = innerFunction;
     switch (outgoingTimeUnit) {
 
       case MILLISECONDS:

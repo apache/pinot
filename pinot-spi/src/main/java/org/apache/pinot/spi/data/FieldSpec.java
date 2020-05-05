@@ -263,6 +263,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
       jsonObject.put("maxLength", _maxLength);
     }
     appendDefaultNullValue(jsonObject);
+    if (_transformFunction != null) {
+      jsonObject.put("transformFunction", _transformFunction);
+    }
     return jsonObject;
   }
 
@@ -292,7 +295,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength);
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction);
   }
 
   @Override
@@ -302,6 +305,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
+    result = EqualityUtils.hashCodeOf(result, _transformFunction);
     return result;
   }
 
