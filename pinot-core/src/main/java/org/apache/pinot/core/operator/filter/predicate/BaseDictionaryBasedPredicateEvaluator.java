@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.commons.lang3.mutable.MutableInt;
-
-
 public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
   protected boolean _alwaysTrue;
   protected boolean _alwaysFalse;

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.common.predicate.InPredicate;
@@ -29,13 +28,15 @@ import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.common.predicate.TextMatchPredicate;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, Dictionary dictionary, DataType dataType) {
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, Dictionary dictionary,
+      DataType dataType) {
     try {
       if (dictionary != null) {
         // dictionary based predicate evaluators
@@ -49,7 +50,8 @@ public class PredicateEvaluatorProvider {
           case NOT_IN:
             return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary);
           case RANGE:
-            return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary);
+            return RangePredicateEvaluatorFactory
+                .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary);

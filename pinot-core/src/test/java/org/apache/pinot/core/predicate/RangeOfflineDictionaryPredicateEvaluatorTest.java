@@ -22,6 +22,7 @@ import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -41,7 +42,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = 5;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
@@ -62,7 +64,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = 5;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, true);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertFalse(evaluator.applySV(rangeStart));
@@ -83,7 +86,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = 5;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, false);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
@@ -104,7 +108,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = 5;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, false);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertFalse(evaluator.applySV(rangeStart));
@@ -137,7 +142,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = 5;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, false);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
@@ -157,7 +163,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = 5;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
@@ -171,7 +178,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = DICT_LEN - 1;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
@@ -191,7 +199,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = DICT_LEN - 1;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, true);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertFalse(evaluator.applySV(rangeStart));
@@ -205,7 +214,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = DICT_LEN - 1;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertFalse(evaluator.isAlwaysFalse());
       Assert.assertTrue(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
@@ -224,7 +234,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       rangeEnd = 5;
       BaseImmutableDictionary reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, false);
-      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      PredicateEvaluator evaluator =
+          RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader, DataType.INT);
       Assert.assertTrue(evaluator.isAlwaysFalse());
       Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertFalse(evaluator.applySV(rangeStart));
