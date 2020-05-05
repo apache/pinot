@@ -108,7 +108,7 @@ public class SchemaUtilsTest {
     // inbuilt functions with literal
     schema = new Schema();
     dimensionFieldSpec = new DimensionFieldSpec("tenMinutesSinceEpoch", FieldSpec.DataType.LONG, true);
-    dimensionFieldSpec.setTransformFunction("toEpochMinutes(timestamp, 10)");
+    dimensionFieldSpec.setTransformFunction("toEpochMinutesBucket(timestamp, 10)");
     schema.addField(dimensionFieldSpec);
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);

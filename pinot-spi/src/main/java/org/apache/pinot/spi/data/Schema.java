@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -630,5 +631,131 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     return result;
+  }
+
+  /**
+   * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
+   * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec
+   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct the dateTimeFieldSpec,
+   *    and configure a transform function for the conversion from incoming
+   */
+  @VisibleForTesting
+  static DateTimeFieldSpec convertToDateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
+    DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec();
+    TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
+    TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+
+    dateTimeFieldSpec.setName(outgoingGranularitySpec.getName());
+    dateTimeFieldSpec.setDataType(outgoingGranularitySpec.getDataType());
+
+    int outgoingTimeSize = outgoingGranularitySpec.getTimeUnitSize();
+    TimeUnit outgoingTimeUnit = outgoingGranularitySpec.getTimeType();
+    String outgoingTimeFormat = outgoingGranularitySpec.getTimeFormat();
+    String[] split = outgoingTimeFormat.split(DateTimeFormatSpec.COLON_SEPARATOR);
+    DateTimeFormatSpec formatSpec;
+    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
+      formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0]);
+    } else {
+      formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0], split[1]);
+    }
+    dateTimeFieldSpec.setFormat(formatSpec.getFormat());
+    DateTimeGranularitySpec granularitySpec = new DateTimeGranularitySpec(outgoingTimeSize, outgoingTimeUnit);
+    dateTimeFieldSpec.setGranularity(granularitySpec.getGranularity());
+
+    if (timeFieldSpec.getTransformFunction() != null) {
+      dateTimeFieldSpec.setTransformFunction(timeFieldSpec.getTransformFunction());
+    } else if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
+      String incomingName = incomingGranularitySpec.getName();
+      int incomingTimeSize = incomingGranularitySpec.getTimeUnitSize();
+      TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
+      String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
+      Preconditions.checkState(incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
+              .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
+          "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
+      String transformFunction =
+          getTransformFunction(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize, outgoingTimeUnit);
+      dateTimeFieldSpec.setTransformFunction(transformFunction);
+    }
+
+    dateTimeFieldSpec.setMaxLength(timeFieldSpec.getMaxLength());
+    dateTimeFieldSpec.setDefaultNullValue(timeFieldSpec.getDefaultNullValue());
+
+    return dateTimeFieldSpec;
+  }
+
+  private static String getTransformFunction(String incomingName, int incomingTimeSize, TimeUnit incomingTimeUnit,
+      int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
+
+    String innerFunction = incomingName;
+    switch (incomingTimeUnit) {
+
+      case MILLISECONDS:
+        // do nothing
+        break;
+      case SECONDS:
+        if (incomingTimeSize > 1) {
+          innerFunction = String.format("fromEpochSecondsBucket(%s, %d)", incomingName, incomingTimeSize);
+        } else {
+          innerFunction = String.format("fromEpochSeconds(%s)", incomingName);
+        }
+        break;
+      case MINUTES:
+        if (incomingTimeSize > 1) {
+          innerFunction = String.format("fromEpochMinutesBucket(%s, %d)", incomingName, incomingTimeSize);
+        } else {
+          innerFunction = String.format("fromEpochMinutes(%s)", incomingName);
+        }
+        break;
+      case HOURS:
+        if (incomingTimeSize > 1) {
+          innerFunction = String.format("fromEpochHoursBucket(%s, %d)", incomingName, incomingTimeSize);
+        } else {
+          innerFunction = String.format("fromEpochHours(%s)", incomingName);
+        }
+        break;
+      case DAYS:
+        if (incomingTimeSize > 1) {
+          innerFunction = String.format("fromEpochDaysBucket(%s, %d)", incomingName, incomingTimeSize);
+        } else {
+          innerFunction = String.format("fromEpochDays(%s)", incomingName);
+        }
+        break;
+    }
+
+    String outerFunction = null;
+    switch (outgoingTimeUnit) {
+
+      case MILLISECONDS:
+        break;
+      case SECONDS:
+        if (outgoingTimeSize > 1) {
+          outerFunction = String.format("toEpochSecondsBucket(%s, %d)", innerFunction, outgoingTimeSize);
+        } else {
+          outerFunction = String.format("toEpochSeconds(%s)", innerFunction);
+        }
+        break;
+      case MINUTES:
+        if (outgoingTimeSize > 1) {
+          outerFunction = String.format("toEpochMinutesBucket(%s, %d)", innerFunction, outgoingTimeSize);
+        } else {
+          outerFunction = String.format("toEpochMinutes(%s)", innerFunction);
+        }
+        break;
+      case HOURS:
+        if (outgoingTimeSize > 1) {
+          outerFunction = String.format("toEpochHoursBucket(%s, %d)", innerFunction, outgoingTimeSize);
+        } else {
+          outerFunction = String.format("toEpochHours(%s)", innerFunction);
+        }
+        break;
+      case DAYS:
+        if (outgoingTimeSize > 1) {
+          outerFunction = String.format("toEpochDaysBucket(%s, %d)", innerFunction, outgoingTimeSize);
+        } else {
+          outerFunction = String.format("toEpochDays(%s)", innerFunction);
+        }
+        break;
+    }
+    return outerFunction;
   }
 }
