@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.function;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -129,10 +130,14 @@ public class DefaultFunctionEvaluator implements FunctionEvaluator {
   }
 
   private static class ConstantExecutionNode implements ExecutableNode {
-    private String _value;
+    private Object _value;
 
     public ConstantExecutionNode(String value) {
-      _value = value;
+      if (NumberUtils.isCreatable(value)) {
+        _value = NumberUtils.createNumber(value);
+      } else {
+        _value = value;
+      }
     }
 
     @Override
