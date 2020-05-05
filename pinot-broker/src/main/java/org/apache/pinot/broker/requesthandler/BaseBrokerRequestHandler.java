@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ZNRecord;
@@ -47,6 +49,7 @@ import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.AggregationFunctionType;
@@ -284,24 +287,32 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Calculate routing table for the query
     long routingStartTimeNs = System.nanoTime();
-    Map<ServerInstance, List<String>> offlineRoutingTable = null;
-    Map<ServerInstance, List<String>> realtimeRoutingTable = null;
+    Map<ServerInstance, List<String>> offlineServerInstanceToSegmentsMap = null;
+    Map<ServerInstance, List<String>> realtimeServerInstanceToSegmentsMap = null;
+    // Set number of segments with no replicas matched with this query
+    int unavailableSegmentCount = 0;
     if (offlineBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
-      offlineRoutingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
-      if (offlineRoutingTable == null || offlineRoutingTable.isEmpty()) {
+      RoutingTable offlineRoutingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
+      if (MapUtils.isEmpty(offlineRoutingTable.getServerInstanceToSegmentsMap())) {
         LOGGER.debug("No OFFLINE server found for request {}: {}", requestId, query);
         offlineBrokerRequest = null;
-        offlineRoutingTable = null;
+        offlineServerInstanceToSegmentsMap = null;
+      } else {
+        offlineServerInstanceToSegmentsMap = offlineRoutingTable.getServerInstanceToSegmentsMap();
+        unavailableSegmentCount += offlineRoutingTable.getSegmentsWithNoReplicas().size();
       }
     }
     if (realtimeBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
-      realtimeRoutingTable = _routingManager.getRoutingTable(realtimeBrokerRequest);
-      if (realtimeRoutingTable == null || realtimeRoutingTable.isEmpty()) {
+      RoutingTable realtimeRoutingTable = _routingManager.getRoutingTable(realtimeBrokerRequest);
+      if (MapUtils.isEmpty(realtimeRoutingTable.getServerInstanceToSegmentsMap())) {
         LOGGER.debug("No REALTIME server found for request {}: {}", requestId, query);
         realtimeBrokerRequest = null;
-        realtimeRoutingTable = null;
+        realtimeServerInstanceToSegmentsMap = null;
+      } else {
+        realtimeServerInstanceToSegmentsMap = realtimeRoutingTable.getServerInstanceToSegmentsMap();
+        unavailableSegmentCount += realtimeRoutingTable.getSegmentsWithNoReplicas().size();
       }
     }
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
@@ -309,13 +320,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
       return BrokerResponseNative.EMPTY_RESULT;
     }
-    long routingEndTimeNs = System.nanoTime();
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING, routingEndTimeNs - routingStartTimeNs);
 
     // Set number of segments with no replicas matched with this query
-    int unavailableSegmentCount = _routingManager.getNumSegmentsWithNoReplicas(offlineBrokerRequest)
-        + _routingManager.getNumSegmentsWithNoReplicas(realtimeBrokerRequest);
     requestStatistics.setUnavailableSegmentCount(unavailableSegmentCount);
+
+    long routingEndTimeNs = System.nanoTime();
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING, routingEndTimeNs - routingStartTimeNs);
 
     // Set timeout in the requests
     long timeSpentMs = TimeUnit.NANOSECONDS.toMillis(routingEndTimeNs - compilationStartTimeNs);
@@ -344,8 +354,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Execute the query
     ServerStats serverStats = new ServerStats();
     BrokerResponse brokerResponse =
-        processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
+        processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineServerInstanceToSegmentsMap, realtimeBrokerRequest,
+            realtimeServerInstanceToSegmentsMap, remainingTimeMs, serverStats, requestStatistics);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics
         .addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - routingEndTimeNs);

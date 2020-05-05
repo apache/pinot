@@ -55,7 +55,9 @@ public class PinotBrokerDebug {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/timeBoundary/{tableName}")
   @ApiOperation(value = "Get the time boundary information for a table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Time boundary information for a table"), @ApiResponse(code = 404, message = "Time boundary not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Time boundary information for a table"),
+      @ApiResponse(code = 404, message = "Time boundary not found"),
+      @ApiResponse(code = 500, message = "Internal server error")})
   public TimeBoundaryInfo getTimeBoundary(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
     String offlineTableName =
@@ -72,7 +74,9 @@ public class PinotBrokerDebug {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/{tableName}")
   @ApiOperation(value = "Get the routing table for a table")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Routing table"), @ApiResponse(code = 404, message = "Routing not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 404, message = "Routing not found"),
+      @ApiResponse(code = 500, message = "Internal server error")})
   public Map<String, Map<ServerInstance, List<String>>> getRoutingTable(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
     Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
@@ -80,7 +84,8 @@ public class PinotBrokerDebug {
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       Map<ServerInstance, List<String>> routingTable =
-          _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest("SELECT * FROM " + offlineTableName));
+          _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest("SELECT * FROM " + offlineTableName))
+              .getServerInstanceToSegmentsMap();
       if (routingTable != null) {
         result.put(offlineTableName, routingTable);
       }
@@ -88,7 +93,8 @@ public class PinotBrokerDebug {
     if (tableType != TableType.OFFLINE) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       Map<ServerInstance, List<String>> routingTable =
-          _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest("SELECT * FROM " + realtimeTableName));
+          _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest("SELECT * FROM " + realtimeTableName))
+              .getServerInstanceToSegmentsMap();
       if (routingTable != null) {
         result.put(realtimeTableName, routingTable);
       }
@@ -104,11 +110,13 @@ public class PinotBrokerDebug {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable")
   @ApiOperation(value = "Get the routing table for a query")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Routing table"), @ApiResponse(code = 404, message = "Routing not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 404, message = "Routing not found"),
+      @ApiResponse(code = 500, message = "Internal server error")})
   public Map<ServerInstance, List<String>> getRoutingTableForQuery(
       @ApiParam(value = "Pql query (table name should have type suffix)") @QueryParam("pql") String pql) {
     Map<ServerInstance, List<String>> routingTable =
-        _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest(pql));
+        _routingManager.getRoutingTable(COMPILER.compileToBrokerRequest(pql)).getServerInstanceToSegmentsMap();
     if (routingTable != null) {
       return routingTable;
     } else {

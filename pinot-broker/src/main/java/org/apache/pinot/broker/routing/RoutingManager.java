@@ -427,12 +427,11 @@ public class RoutingManager implements ClusterChangeHandler {
    * request, or {@code null} if the routing does not exist.
    * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
    */
-  @Nullable
-  public Map<ServerInstance, List<String>> getRoutingTable(BrokerRequest brokerRequest) {
+  public RoutingTable getRoutingTable(BrokerRequest brokerRequest) {
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {
-      return null;
+      return new RoutingTable(null,  Collections.emptyList());
     }
     Map<String, String> segmentToInstanceMap = routingEntry.calculateSegmentToInstanceMap(brokerRequest);
     Map<ServerInstance, List<String>> routingTable = new HashMap<>();
@@ -445,7 +444,10 @@ public class RoutingManager implements ClusterChangeHandler {
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
       }
     }
-    return routingTable;
+
+    // segmentsWithNoReplicas is the list of remaining segments that were supposed to be queried but on replica available.
+    List<String> segmentsWithNoReplicas = routingEntry.getSegmentsWithNoReplicas(brokerRequest);
+    return new RoutingTable(routingTable, segmentsWithNoReplicas);
   }
 
   /**
@@ -484,20 +486,6 @@ public class RoutingManager implements ClusterChangeHandler {
         segmentsWithNoReplicas.add(partitionName);
       }
     }
-  }
-
-  /**
-   * Checks whether the broker request matches with any segments which replicas are all in ERROR state.
-   * Note that these are only ERROR state immutable segments.
-   * Realtime consuming segments that may be unavailable are not treated here but are accounted for in the staleness.
-   */
-  public int getNumSegmentsWithNoReplicas(BrokerRequest brokerRequest) {
-    if (brokerRequest == null) {
-      return 0;
-    }
-    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
-    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
-    return routingEntry.getNumSegmentsWithNoReplicas(brokerRequest);
   }
 
   /**
@@ -597,11 +585,11 @@ public class RoutingManager implements ClusterChangeHandler {
     }
 
     /**
-     * returns the number of segments with no replicas given a query.
+     * given a query, returns the list of segments with no available replicas.
      */
-    int getNumSegmentsWithNoReplicas(BrokerRequest brokerRequest) {
+    List<String> getSegmentsWithNoReplicas(BrokerRequest brokerRequest) {
       if (_segmentsWithNoReplicas.isEmpty()) {
-        return 0;
+        return Collections.emptyList();
       }
       // Check if the unavailable segments would never have been hit by a query.
       // If that is the case, we are good for this query
@@ -610,7 +598,7 @@ public class RoutingManager implements ClusterChangeHandler {
       for (SegmentPruner segmentPruner : _segmentPruners) {
         selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
       }
-      return selectedSegments.size();
+      return selectedSegments;
     }
   }
 }

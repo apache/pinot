@@ -113,7 +113,9 @@ public class RoutingManagerTest {
 
     // Constructs routing entry map
     routingManager.buildRouting(OFFLINE_TABLE_NAME);
+
+    RoutingTable routingTable = routingManager.getRoutingTable(brokerRequest);
     // There is 1 segment which is in ERROR state on all replicas
-    Assert.assertEquals(routingManager.getNumSegmentsWithNoReplicas(brokerRequest), 1);
+    Assert.assertEquals(routingTable.getSegmentsWithNoReplicas().size(), 1);
   }
 }
