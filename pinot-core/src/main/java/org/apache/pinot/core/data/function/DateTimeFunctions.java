@@ -27,7 +27,40 @@ import java.util.concurrent.TimeUnit;
  *  eg:
  *   1) round(time, roundingValue) - round(minutes, 10), round(millis, 15:MINUTES)
  *   2) simple date time transformations
- *   3) convert(from_format, to_format, bucketing)  
+ *   3) convert(from_format, to_format, bucketing)
+ *
+ *   NOTE:
+ *   <code>toEpochXXXBucket</code> methods are only needed to convert from TimeFieldSpec to DateTimeFieldSpec, to maintain the backward compatibility.
+ *   Practically, we should only need the <code>toEpochXXXRounded</code> methods.
+ *   Use of <code>toEpochXXXBucket</code> bucket functions is discouraged unless you know what you are doing -
+ *   (e.g. 5-minutes-since-epoch does not make sense to someone looking at the timestamp, or writing queries. instead, Millis-since-epoch rounded to 5 minutes makes a lot more sense)
+ *
+ *   An example timeFieldSpec that needs the bucketing function:
+ *   <code>
+ *     "timeFieldSpec": {
+ *     "incomingGranularitySpec": {
+ *       "name": "incoming",
+ *       "dataType": "LONG",
+ *       "timeType": "MILLISECONDS"
+ *     },
+ *     "outgoingGranularitySpec": {
+ *        "name": "outgoing",
+ *        "dataType": "LONG",
+ *        "timeType": "MINUTES",
+ *        "timeSize": 5
+ *      }
+ *   }
+ *   </code>
+ *   An equivalent dateTimeFieldSpec is
+ *   <code>
+ *     "dateTimeFieldSpecs": [{
+ *       "name": "outgoing",
+ *       "dataType": "LONG",
+ *       "format": "5:MINUTES:EPOCH",
+ *       "granularity": "5:MINUTES",
+ *       "transformFunction": "toEpochMinutesBucket(incoming, 5)"
+ *     }]
+ *   </code>
  */
 public class DateTimeFunctions {
 
@@ -62,63 +95,57 @@ public class DateTimeFunctions {
   /**
    * Convert epoch millis to epoch seconds, round to nearest rounding bucket
    */
-  static Long toEpochSecondsRounded(Long millis, String roundingValue) {
-    int roundToNearest = Integer.parseInt(roundingValue);
-    return (TimeUnit.MILLISECONDS.toSeconds(millis) / roundToNearest) * roundToNearest;
+  static Long toEpochSecondsRounded(Long millis, Number roundToNearest) {
+    return (TimeUnit.MILLISECONDS.toSeconds(millis) / roundToNearest.intValue()) * roundToNearest.intValue();
   }
 
   /**
    * Convert epoch millis to epoch minutes, round to nearest rounding bucket
    */
-  static Long toEpochMinutesRounded(Long millis, String roundingValue) {
-    int roundToNearest = Integer.parseInt(roundingValue);
-    return (TimeUnit.MILLISECONDS.toMinutes(millis) / roundToNearest) * roundToNearest;
+  static Long toEpochMinutesRounded(Long millis, Number roundToNearest) {
+    return (TimeUnit.MILLISECONDS.toMinutes(millis) / roundToNearest.intValue()) * roundToNearest.intValue();
   }
 
   /**
    * Convert epoch millis to epoch hours, round to nearest rounding bucket
    */
-  static Long toEpochHoursRounded(Long millis, String roundingValue) {
-    int roundToNearest = Integer.parseInt(roundingValue);
-    return (TimeUnit.MILLISECONDS.toHours(millis) / roundToNearest) * roundToNearest;
+  static Long toEpochHoursRounded(Long millis, Number roundToNearest) {
+    return (TimeUnit.MILLISECONDS.toHours(millis) / roundToNearest.intValue()) * roundToNearest.intValue();
   }
 
   /**
    * Convert epoch millis to epoch days, round to nearest rounding bucket
    */
-  static Long toEpochDaysRounded(Long millis, String roundingValue) {
-    int roundToNearest = Integer.parseInt(roundingValue);
-    return (TimeUnit.MILLISECONDS.toDays(millis) / roundToNearest) * roundToNearest;
+  static Long toEpochDaysRounded(Long millis, Number roundToNearest) {
+    return (TimeUnit.MILLISECONDS.toDays(millis) / roundToNearest.intValue()) * roundToNearest.intValue();
   }
 
-  // TODO: toEpochXXXBucket methods are only needed to convert from TimeFieldSpec to DateTimeFieldSpec.
-  //  Practically, we need the toEpochXXXRounded methods.
   /**
    * Convert epoch millis to epoch seconds, divided by given bucket, to get nSecondsSinceEpoch
    */
-  static Long toEpochSecondsBucket(Long millis, String bucket) {
-    return TimeUnit.MILLISECONDS.toSeconds(millis) / Integer.valueOf(bucket);
+  static Long toEpochSecondsBucket(Long millis, Number bucket) {
+    return TimeUnit.MILLISECONDS.toSeconds(millis) / bucket.intValue();
   }
 
   /**
    * Convert epoch millis to epoch minutes, divided by given bucket, to get nMinutesSinceEpoch
    */
-  static Long toEpochMinutesBucket(Long millis, String bucket) {
-    return TimeUnit.MILLISECONDS.toMinutes(millis) / Integer.valueOf(bucket);
+  static Long toEpochMinutesBucket(Long millis, Number bucket) {
+    return TimeUnit.MILLISECONDS.toMinutes(millis) / bucket.intValue();
   }
 
   /**
    * Convert epoch millis to epoch hours, divided by given bucket, to get nHoursSinceEpoch
    */
-  static Long toEpochHoursBucket(Long millis, String bucket) {
-    return TimeUnit.MILLISECONDS.toHours(millis) / Integer.valueOf(bucket);
+  static Long toEpochHoursBucket(Long millis, Number bucket) {
+    return TimeUnit.MILLISECONDS.toHours(millis) / bucket.intValue();
   }
 
   /**
    * Convert epoch millis to epoch days, divided by given bucket, to get nDaysSinceEpoch
    */
-  static Long toEpochDaysBucket(Long millis, String bucket) {
-    return TimeUnit.MILLISECONDS.toDays(millis) / Integer.valueOf(bucket);
+  static Long toEpochDaysBucket(Long millis, Number bucket) {
+    return TimeUnit.MILLISECONDS.toDays(millis) / bucket.intValue();
   }
 
   /**
@@ -152,28 +179,28 @@ public class DateTimeFunctions {
   /**
    * Converts nSecondsSinceEpoch (seconds that have been divided by a bucket), to epoch millis
    */
-  static Long fromEpochSecondsBucket(Long seconds, String bucket) {
-    return TimeUnit.SECONDS.toMillis(seconds * Integer.valueOf(bucket));
+  static Long fromEpochSecondsBucket(Long seconds, Number bucket) {
+    return TimeUnit.SECONDS.toMillis(seconds * bucket.intValue());
   }
 
   /**
    * Converts nMinutesSinceEpoch (minutes that have been divided by a bucket), to epoch millis
    */
-  static Long fromEpochMinutesBucket(Number minutes, String bucket) {
-    return TimeUnit.MINUTES.toMillis(minutes.longValue() * Integer.valueOf(bucket));
+  static Long fromEpochMinutesBucket(Number minutes, Number bucket) {
+    return TimeUnit.MINUTES.toMillis(minutes.longValue() * bucket.intValue());
   }
 
   /**
    * Converts nHoursSinceEpoch (hours that have been divided by a bucket), to epoch millis
    */
-  static Long fromEpochHoursBucket(Number hours, String bucket) {
-    return TimeUnit.HOURS.toMillis(hours.longValue() * Integer.valueOf(bucket));
+  static Long fromEpochHoursBucket(Number hours, Number bucket) {
+    return TimeUnit.HOURS.toMillis(hours.longValue() * bucket.intValue());
   }
 
   /**
    * Converts nDaysSinceEpoch (days that have been divided by a bucket), to epoch millis
    */
-  static Long fromEpochDaysBucket(Number daysSinceEpoch, String bucket) {
-    return TimeUnit.DAYS.toMillis(daysSinceEpoch.longValue() * Integer.valueOf(bucket));
+  static Long fromEpochDaysBucket(Number daysSinceEpoch, Number bucket) {
+    return TimeUnit.DAYS.toMillis(daysSinceEpoch.longValue() * bucket.intValue());
   }
 }
