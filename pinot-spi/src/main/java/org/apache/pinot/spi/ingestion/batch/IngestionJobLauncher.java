@@ -20,13 +20,18 @@ package org.apache.pinot.spi.ingestion.batch;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.Reader;
+import java.io.IOException;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
 import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.JinjaTemplateUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -36,7 +41,7 @@ public class IngestionJobLauncher {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(IngestionJobLauncher.class);
 
-  private static final String USAGE = "usage: [jobSpec.yaml]";
+  private static final String USAGE = "usage: [jobSpec.yaml] [template_key=template_value]...";
 
   private static void usage() {
     System.err.println(USAGE);
@@ -44,16 +49,26 @@ public class IngestionJobLauncher {
 
   public static void main(String[] args)
       throws Exception {
-    if (args.length != 1) {
+    if (args.length < 1) {
       usage();
       System.exit(1);
     }
     String jobSpecFilePath = args[0];
-
-    try (Reader reader = new BufferedReader(new FileReader(jobSpecFilePath))) {
-      SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
-      runIngestionJob(spec);
+    List<String> valueList = new ArrayList<>();
+    for (int i = 1; i < args.length; i++) {
+      valueList.add(args[i]);
     }
+    SegmentGenerationJobSpec spec =
+        getSegmentGenerationJobSpec(jobSpecFilePath, JinjaTemplateUtils.getTemplateContext(valueList));
+    runIngestionJob(spec);
+  }
+
+  public static SegmentGenerationJobSpec getSegmentGenerationJobSpec(String jobSpecFilePath,
+      Map<String, Object> context)
+      throws IOException {
+    String yamlTemplate = IOUtils.toString(new BufferedReader(new FileReader(jobSpecFilePath)));
+    String yamlStr = JinjaTemplateUtils.renderTemplate(yamlTemplate, context);
+    return new Yaml().loadAs(yamlStr, SegmentGenerationJobSpec.class);
   }
 
   public static void runIngestionJob(SegmentGenerationJobSpec spec)
