@@ -34,7 +34,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ERROR;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.OFFLINE;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -151,14 +153,17 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment1, instance2);
     expectedBalancedInstanceSelectorResult.put(segment2, instance1);
     expectedBalancedInstanceSelectorResult.put(segment3, instance3);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    InstanceSelector.SelectionResult selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     Map<String, String> expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment0, instance0);
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance0);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance1);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance1);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // For the second request:
     //   BalancedInstanceSelector:
@@ -176,14 +181,17 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment1, instance0);
     expectedBalancedInstanceSelectorResult.put(segment2, instance3);
     expectedBalancedInstanceSelectorResult.put(segment3, instance1);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment0, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance3);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance3);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Disable instance0
     enabledInstances.remove(instance0);
@@ -206,14 +214,17 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment1, instance2);
     expectedBalancedInstanceSelectorResult.put(segment2, instance1);
     expectedBalancedInstanceSelectorResult.put(segment3, instance3);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment0, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance1);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance1);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // For the fourth request:
     //   BalancedInstanceSelector:
@@ -231,14 +242,17 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment1, instance2);
     expectedBalancedInstanceSelectorResult.put(segment2, instance3);
     expectedBalancedInstanceSelectorResult.put(segment3, instance1);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment0, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance3);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance3);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Remove segment0 and add segment4
     segmentAssignment.remove(segment0);
@@ -263,13 +277,16 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment1, instance2);
     expectedBalancedInstanceSelectorResult.put(segment2, instance3);
     expectedBalancedInstanceSelectorResult.put(segment3, instance1);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance1);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance1);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // For the sixth request:
     //   BalancedInstanceSelector:
@@ -286,13 +303,16 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment1, instance2);
     expectedBalancedInstanceSelectorResult.put(segment2, instance1);
     expectedBalancedInstanceSelectorResult.put(segment3, instance3);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance3);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance3);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Process the changes
     balancedInstanceSelector.onExternalViewChange(externalView, onlineSegments);
@@ -314,14 +334,17 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment2, instance3);
     expectedBalancedInstanceSelectorResult.put(segment3, instance1);
     expectedBalancedInstanceSelectorResult.put(segment4, instance2);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance1);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance1);
     expectedReplicaGroupInstanceSelectorResult.put(segment4, instance2);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // For the eighth request:
     //   BalancedInstanceSelector:
@@ -339,14 +362,17 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment2, instance1);
     expectedBalancedInstanceSelectorResult.put(segment3, instance3);
     expectedBalancedInstanceSelectorResult.put(segment4, instance2);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance3);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance3);
     expectedReplicaGroupInstanceSelectorResult.put(segment4, instance2);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Re-enable instance0
     enabledInstances.add(instance0);
@@ -369,14 +395,17 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment2, instance3);
     expectedBalancedInstanceSelectorResult.put(segment3, instance1);
     expectedBalancedInstanceSelectorResult.put(segment4, instance2);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance0);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance1);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance1);
     expectedReplicaGroupInstanceSelectorResult.put(segment4, instance0);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // For the tenth request:
     //   BalancedInstanceSelector:
@@ -394,13 +423,142 @@ public class InstanceSelectorTest {
     expectedBalancedInstanceSelectorResult.put(segment2, instance1);
     expectedBalancedInstanceSelectorResult.put(segment3, instance3);
     expectedBalancedInstanceSelectorResult.put(segment4, instance0);
-    assertEquals(balancedInstanceSelector.select(brokerRequest, segments), expectedBalancedInstanceSelectorResult);
+    selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     expectedReplicaGroupInstanceSelectorResult = new HashMap<>();
     expectedReplicaGroupInstanceSelectorResult.put(segment1, instance2);
     expectedReplicaGroupInstanceSelectorResult.put(segment2, instance3);
     expectedReplicaGroupInstanceSelectorResult.put(segment3, instance3);
     expectedReplicaGroupInstanceSelectorResult.put(segment4, instance2);
-    assertEquals(replicaGroupInstanceSelector.select(brokerRequest, segments),
-        expectedReplicaGroupInstanceSelectorResult);
+    selectionResult = replicaGroupInstanceSelector.select(brokerRequest, segments);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
+  @Test
+  public void testUnavailableSegments() {
+    String offlineTableName = "testTable_OFFLINE";
+    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    BalancedInstanceSelector balancedInstanceSelector = new BalancedInstanceSelector(offlineTableName, brokerMetrics);
+
+    Set<String> enabledInstances = new HashSet<>();
+    ExternalView externalView = new ExternalView(offlineTableName);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    // NOTE: Online segments is not used in the current implementation
+    Set<String> onlineSegments = Collections.emptySet();
+
+    String instance = "instance";
+    String errorInstance = "errorInstance";
+    Map<String, String> instanceStateMap = new TreeMap<>();
+    instanceStateMap.put(instance, CONSUMING);
+    instanceStateMap.put(errorInstance, ERROR);
+    String segment = "segment";
+    segmentAssignment.put(segment, instanceStateMap);
+    List<String> segments = Collections.singletonList(segment);
+
+    // Initialize with no enabled instance, segment should be unavailable
+    // {
+    //   (disabled) instance: CONSUMING
+    //   (disabled) errorInstance: ERROR
+    // }
+    balancedInstanceSelector.init(enabledInstances, externalView, onlineSegments);
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    InstanceSelector.SelectionResult selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+    assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+    assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment));
+
+    // Iterate 5 times
+    for (int i = 0; i < 5; i++) {
+
+      // Enable the ERROR instance, segment should be unavailable
+      // {
+      //   (disabled) instance: CONSUMING
+      //   (enabled)  errorInstance: ERROR
+      // }
+      enabledInstances.add(errorInstance);
+      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
+      selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+      assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+      assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment));
+
+      // Enable the CONSUMING instance, segment should be available
+      // {
+      //   (enabled)  instance: CONSUMING
+      //   (enabled)  errorInstance: ERROR
+      // }
+      enabledInstances.add(instance);
+      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
+      selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+      assertEquals(selectionResult.getSegmentToInstanceMap(), Collections.singletonMap(segment, instance));
+      assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+
+      // Change the CONSUMING instance to ONLINE, segment should be available
+      // {
+      //   (enabled)  instance: ONLINE
+      //   (enabled)  errorInstance: ERROR
+      // }
+      instanceStateMap.put(instance, ONLINE);
+      balancedInstanceSelector.onExternalViewChange(externalView, onlineSegments);
+      selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+      assertEquals(selectionResult.getSegmentToInstanceMap(), Collections.singletonMap(segment, instance));
+      assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+
+      // Change the ONLINE instance to OFFLINE, both segment to instance map and unavailable segment should be empty
+      // {
+      //   (enabled)  instance: OFFLINE
+      //   (enabled)  errorInstance: ERROR
+      // }
+      instanceStateMap.put(instance, OFFLINE);
+      balancedInstanceSelector.onExternalViewChange(externalView, onlineSegments);
+      selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+      assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+      assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+
+      // Disable the OFFLINE instance, segment should be unavailable
+      // {
+      //   (disabled) instance: OFFLINE
+      //   (enabled)  errorInstance: ERROR
+      // }
+      enabledInstances.remove(instance);
+      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(instance));
+      selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+      assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+      assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment));
+
+      // Change the ERROR instance to ONLINE, segment should be available
+      // {
+      //   (disabled) instance: OFFLINE
+      //   (enabled)  errorInstance: ONLINE
+      // }
+      instanceStateMap.put(errorInstance, ONLINE);
+      balancedInstanceSelector.onExternalViewChange(externalView, onlineSegments);
+      selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+      assertEquals(selectionResult.getSegmentToInstanceMap(), Collections.singletonMap(segment, errorInstance));
+      assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+
+      // Disable the ONLINE instance, segment should be unavailable
+      // {
+      //   (disabled) instance: OFFLINE
+      //   (disabled) errorInstance: ONLINE
+      // }
+      enabledInstances.remove(errorInstance);
+      balancedInstanceSelector.onInstancesChange(enabledInstances, Collections.singletonList(errorInstance));
+      selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+      assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+      assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment));
+
+      // Change back to initial state, segment should be unavailable
+      // {
+      //   (disabled) instance: CONSUMING
+      //   (disabled) errorInstance: ERROR
+      // }
+      instanceStateMap.put(instance, CONSUMING);
+      instanceStateMap.put(errorInstance, ERROR);
+      balancedInstanceSelector.onExternalViewChange(externalView, onlineSegments);
+      selectionResult = balancedInstanceSelector.select(brokerRequest, segments);
+      assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+      assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment));
+    }
   }
 }

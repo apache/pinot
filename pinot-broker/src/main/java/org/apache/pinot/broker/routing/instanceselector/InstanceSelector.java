@@ -54,7 +54,32 @@ public interface InstanceSelector {
 
   /**
    * Selects the server instances for the given segments queried by the given broker request, returns a map from segment
-   * to selected server instance hosting the segment.
+   * to selected server instance hosting the segment and a set of unavailable segments (no enabled instance or all
+   * enabled instances are in ERROR state).
    */
-  Map<String, String> select(BrokerRequest brokerRequest, List<String> segments);
+  SelectionResult select(BrokerRequest brokerRequest, List<String> segments);
+
+  class SelectionResult {
+    private final Map<String, String> _segmentToInstanceMap;
+    private final List<String> _unavailableSegments;
+
+    public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments) {
+      _segmentToInstanceMap = segmentToInstanceMap;
+      _unavailableSegments = unavailableSegments;
+    }
+
+    /**
+     * Returns the map from segment to selected server instance hosting the segment.
+     */
+    public Map<String, String> getSegmentToInstanceMap() {
+      return _segmentToInstanceMap;
+    }
+
+    /**
+     * Returns the unavailable segments (no enabled instance or all enabled instances are in ERROR state).
+     */
+    public List<String> getUnavailableSegments() {
+      return _unavailableSegments;
+    }
+  }
 }
