@@ -150,23 +150,6 @@ export default Component.extend({
   ),
 
   /**
-   * Separate time range for anomalies in preview mode
-   * @type {Array}
-   */
-  anomaliesRange: computed(
-    'analysisRange',
-    function() {
-      const analysisRange = get(this, 'analysisRange');
-      let range = [];
-      range.push(analysisRange[0]);
-      // set end to now if the end time is in the future
-      const end = Math.min(moment().valueOf(), analysisRange[1]);
-      range.push(end);
-      return range;
-    }
-  ),
-
-  /**
    * Flag for the stats box to show one or two values
    * @type {Boolean}
    */
@@ -852,18 +835,15 @@ export default Component.extend({
   _getAnomalies: task (function * (alertYaml) {//TODO: need to add to anomaly util - LH
     const {
       analysisRange,
-      anomaliesRange,
       notifications,
       showRules,
       alertId,
       stateOfAnomaliesAndTimeSeries
-    } = this.getProperties('analysisRange', 'anomaliesRange', 'notifications',
+    } = this.getProperties('analysisRange', 'notifications',
       'showRules', 'alertId', 'stateOfAnomaliesAndTimeSeries');
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
-    const startAnomalies = anomaliesRange[0];
-    const endAnomalies = anomaliesRange[1];
     let anomalies;
     let uniqueTimeSeries;
     let applicationAnomalies;
@@ -872,7 +852,7 @@ export default Component.extend({
     try {
       // case 4 is anomaliesOld for Edit Alert Preview, so we only need the real anomalies without time series
       if(showRules && stateOfAnomaliesAndTimeSeries !== 4){
-        applicationAnomalies = (!this.get('isPreviewMode')) ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
+        applicationAnomalies = (!this.get('isPreviewMode')) ? yield getBounds(alertId, start, end) : yield getYamlPreviewAnomalies(alertYaml, start, end, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
