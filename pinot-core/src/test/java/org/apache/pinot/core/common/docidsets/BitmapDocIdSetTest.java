@@ -21,6 +21,7 @@ package org.apache.pinot.core.common.docidsets;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +59,7 @@ public class BitmapDocIdSetTest {
       // there were runs to compress
       final ByteBuffer buffer = ByteBuffer.allocate(mutableRoaringBitmap.serializedSizeInBytes());
       mutableRoaringBitmap.serialize(buffer);
-      buffer.flip();
+      ((Buffer) buffer).flip();
       ImmutableRoaringBitmap immutableRoaringBitmap = new ImmutableRoaringBitmap(buffer);
       list.add(immutableRoaringBitmap);
     }

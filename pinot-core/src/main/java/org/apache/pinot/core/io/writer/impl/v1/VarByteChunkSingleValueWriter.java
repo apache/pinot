@@ -21,6 +21,7 @@ package org.apache.pinot.core.io.writer.impl.v1;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.Buffer;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
@@ -94,7 +95,7 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
-    _chunkBuffer.position(_chunkDataOffSet);
+    ((Buffer) _chunkBuffer).position(_chunkDataOffSet);
     _chunkBuffer.put(bytes);
     _chunkDataOffSet += bytes.length;
 
@@ -114,7 +115,7 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
     }
 
     // Write the header and close the file.
-    _header.flip();
+    ((Buffer) _header).flip();
     _dataFile.write(_header, 0);
     _dataFile.close();
   }

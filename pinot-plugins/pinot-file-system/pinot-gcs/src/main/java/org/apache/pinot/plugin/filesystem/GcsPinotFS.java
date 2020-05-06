@@ -28,6 +28,7 @@ import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.collect.ImmutableList;
+import java.nio.Buffer;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
@@ -339,9 +340,9 @@ public class GcsPinotFS  extends PinotFS {
     ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
     SeekableByteChannel channel = Files.newByteChannel(srcFile.toPath());
     for (int bytesRead = channel.read(buffer); bytesRead != -1; bytesRead = channel.read(buffer)) {
-      buffer.flip();
+      ((Buffer) buffer).flip();
       writeChannel.write(buffer);
-      buffer.clear();
+      ((Buffer) buffer).clear();
     }
     writeChannel.close();
   }

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.io.reader.impl.v1;
 
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
@@ -130,7 +131,7 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
 
     byte[] bytes = _reusableBytes.get();
-    chunkBuffer.position(chunkRowId * _lengthOfLongestEntry);
+    ((Buffer) chunkBuffer).position(chunkRowId * _lengthOfLongestEntry);
     chunkBuffer.get(bytes);
     return bytes;
   }

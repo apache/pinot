@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import org.apache.pinot.core.io.compression.ChunkCompressor;
@@ -138,7 +139,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
     }
 
     // Write the header and close the file.
-    _header.flip();
+    ((Buffer) _header).flip();
     _dataFile.write(_header, 0);
     _dataFile.close();
   }
@@ -202,12 +203,12 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
    */
   protected void writeChunk() {
     int sizeToWrite;
-    _chunkBuffer.flip();
+    ((Buffer) _chunkBuffer).flip();
 
     try {
       sizeToWrite = _chunkCompressor.compress(_chunkBuffer, _compressedBuffer);
       _dataFile.write(_compressedBuffer, _dataOffset);
-      _compressedBuffer.clear();
+      ((Buffer) _compressedBuffer).clear();
     } catch (IOException e) {
       LOGGER.error("Exception caught while compressing/writing data chunk", e);
       throw new RuntimeException(e);
@@ -221,6 +222,6 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
 
     _dataOffset += sizeToWrite;
 
-    _chunkBuffer.clear();
+    ((Buffer) _chunkBuffer).clear();
   }
 }

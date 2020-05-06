@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
@@ -61,7 +62,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
     int length = nextRowOffset - rowOffset;
     byte[] bytes = _reusableBytes.get();
 
-    chunkBuffer.position(rowOffset);
+    ((Buffer) chunkBuffer).position(rowOffset);
     chunkBuffer.get(bytes, 0, length);
 
     return StringUtil.decodeUtf8(bytes, 0, length);
@@ -83,7 +84,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
     int length = nextRowOffset - rowOffset;
     byte[] bytes = new byte[length];
 
-    chunkBuffer.position(rowOffset);
+    ((Buffer) chunkBuffer).position(rowOffset);
     chunkBuffer.get(bytes, 0, length);
     return bytes;
   }

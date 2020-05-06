@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.io.compression;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 
@@ -32,7 +33,7 @@ public class PassThroughDecompressor implements ChunkDecompressor {
     decompressedOutput.put(compressedInput);
 
     // Flip the output ByteBuffer for reading.
-    decompressedOutput.flip();
+    ((Buffer) decompressedOutput).flip();
     return decompressedOutput.limit();
   }
 }
