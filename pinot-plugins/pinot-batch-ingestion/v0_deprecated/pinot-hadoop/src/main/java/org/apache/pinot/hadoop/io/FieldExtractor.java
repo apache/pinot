@@ -19,29 +19,25 @@
 package org.apache.pinot.hadoop.io;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.pinot.spi.data.Schema;
 
 
-public interface PinotRecordSerialization<T> {
-
-  /**
-   * init method, called during the {@link PinotRecordWriter()} object creation
-   */
-  void init(Configuration conf, Schema schema);
+/**
+ * The FieldExtractor extracts fields from the records.
+ * @param <T> Type of the record
+ */
+public interface FieldExtractor<T> {
 
   /**
-   * Serialize object to {@link PinotRecord}, called during the {@link
-   * PinotRecordWriter#write(Object, Object)}
+   * Initializes the FieldExtractor.
    */
-  PinotRecord serialize(T t)
+  void init(Configuration conf, Set<String> fields);
+
+  /**
+   * Extracts the fields from the given record.
+   */
+  Map<String, Object> extractFields(T record)
       throws IOException;
-
-  /**
-   * Deserialize {@link PinotRecord} to Object.
-   */
-  T deserialize(PinotRecord record)
-      throws IOException;
-
-  void close();
 }

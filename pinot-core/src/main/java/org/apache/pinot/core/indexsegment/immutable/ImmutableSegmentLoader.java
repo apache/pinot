@@ -72,7 +72,7 @@ public class ImmutableSegmentLoader {
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
     Preconditions
-        .checkArgument(indexDir.isDirectory(), "Index directory: {} does not exist or is not a directory", indexDir);
+        .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
 
     // Convert segment version if necessary
     // NOTE: this step may modify the segment metadata
