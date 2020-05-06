@@ -55,9 +55,6 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
   // file containing schema for the data
   public static final String SCHEMA = "pinot.schema.file";
 
-  // config file for the record reader
-  public static final String READER_CONFIG = "pinot.reader.config.file";
-
   public static final String PINOT_RECORD_SERIALIZATION_CLASS = "pinot.record.serialization.class";
 
   public PinotOutputFormat() {
@@ -116,14 +113,6 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     return schemaFile;
   }
 
-  public static void setReaderConfig(Job job, String readConfig) {
-    job.getConfiguration().set(PinotOutputFormat.READER_CONFIG, readConfig);
-  }
-
-  public static String getReaderConfig(JobContext context) {
-    return context.getConfiguration().get(PinotOutputFormat.READER_CONFIG);
-  }
-
   public static void setDataWriteSupportClass(Job job, Class<? extends PinotRecordSerialization> pinotSerialization) {
     job.getConfiguration().set(PinotOutputFormat.PINOT_RECORD_SERIALIZATION_CLASS, pinotSerialization.getName());
   }
@@ -171,12 +160,10 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
       throws IOException {
     _segmentConfig.setFormat(FileFormat.JSON);
     _segmentConfig.setOutDir(PinotOutputFormat.getTempSegmentDir(context) + "/segmentDir");
-    _segmentConfig.setOverwrite(true);
     _segmentConfig.setTableName(PinotOutputFormat.getTableName(context));
     _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
     Schema schema = Schema.fromString(PinotOutputFormat.getSchema(context));
     _segmentConfig.setSchema(schema);
     _segmentConfig.setTime(PinotOutputFormat.getTimeColumnName(context), schema);
-    _segmentConfig.setReaderConfigFile(PinotOutputFormat.getReaderConfig(context));
   }
 }

@@ -218,8 +218,8 @@ public class ClusterStarter {
       throws Exception {
     if (_inputDataDir != null) {
       CreateSegmentCommand segmentCreator =
-          new CreateSegmentCommand().setDataDir(_inputDataDir).setSchemaFile(_schemaFileName).setTableName(_tableName)
-              .setSegmentName(_segmentName).setOutDir(_segmentDirName).setOverwrite(true);
+          new CreateSegmentCommand().setDataDir(_inputDataDir).setOutDir(_segmentDirName).setOverwrite(true)
+              .setTableConfigFile(_tableConfigFile).setSchemaFile(_schemaFileName);
 
       segmentCreator.execute();
     }

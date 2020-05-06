@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.indexsegment.generator;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
@@ -60,8 +58,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Configuration properties used in the creation of index segments.
  */
-@SuppressWarnings("unused")
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentGeneratorConfig {
   public enum TimeColumnType {
     EPOCH, SIMPLE_DATE
@@ -76,12 +72,10 @@ public class SegmentGeneratorConfig {
   private List<String> _textIndexCreationColumns = new ArrayList<>();
   private List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
-  private String _dataDir = null;
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
   private String _recordReaderPath = null; //TODO: this should be renamed to recordReaderClass or even better removed
   private String _outDir = null;
-  private boolean _overwrite = false;
   private String _tableName = null;
   private String _segmentName = null;
   private String _segmentNamePostfix = null;
@@ -91,9 +85,7 @@ public class SegmentGeneratorConfig {
   private String _segmentStartTime = null;
   private String _segmentEndTime = null;
   private SegmentVersion _segmentVersion = SegmentVersion.v3;
-  private String _schemaFile = null;
   private Schema _schema = null;
-  private String _readerConfigFile = null;
   private RecordReaderConfig _readerConfig = null;
   private List<StarTreeV2BuilderConfig> _starTreeV2BuilderConfigs = null;
   private String _creatorVersion = null;
@@ -107,53 +99,8 @@ public class SegmentGeneratorConfig {
   private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
 
-  public SegmentGeneratorConfig() {
-  }
-
-  /**
-   * @deprecated To be replaced by a builder pattern. Use set methods in the meantime.
-   * For now, this works only if no setters are called after this copy constructor.
-   * @param config to copy from
-   */
   @Deprecated
-  public SegmentGeneratorConfig(SegmentGeneratorConfig config) {
-    Preconditions.checkNotNull(config);
-    _customProperties.putAll(config._customProperties);
-    _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
-    _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
-    _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
-    _textIndexCreationColumns.addAll(config._textIndexCreationColumns);
-    _columnSortOrder.addAll(config._columnSortOrder);
-    _varLengthDictionaryColumns.addAll(config._varLengthDictionaryColumns);
-    _dataDir = config._dataDir;
-    _inputFilePath = config._inputFilePath;
-    _format = config._format;
-    _outDir = config._outDir;
-    _overwrite = config._overwrite;
-    _tableName = config._tableName;
-    _segmentName = config._segmentName;
-    _segmentNamePostfix = config._segmentNamePostfix;
-    _segmentTimeColumnName = config._segmentTimeColumnName;
-    _segmentTimeUnit = config._segmentTimeUnit;
-    _segmentCreationTime = config._segmentCreationTime;
-    _segmentStartTime = config._segmentStartTime;
-    _segmentEndTime = config._segmentEndTime;
-    _segmentVersion = config._segmentVersion;
-    _schemaFile = config._schemaFile;
-    _schema = config._schema;
-    _readerConfigFile = config._readerConfigFile;
-    _readerConfig = config._readerConfig;
-    _starTreeV2BuilderConfigs = config._starTreeV2BuilderConfigs;
-    _creatorVersion = config._creatorVersion;
-    _segmentNameGenerator = config._segmentNameGenerator;
-    _segmentPartitionConfig = config._segmentPartitionConfig;
-    _sequenceId = config._sequenceId;
-    _timeColumnType = config._timeColumnType;
-    _simpleDateFormat = config._simpleDateFormat;
-    _onHeap = config._onHeap;
-    _recordReaderPath = config._recordReaderPath;
-    _skipTimeValueCheck = config._skipTimeValueCheck;
-    _nullHandlingEnabled = config._nullHandlingEnabled;
+  public SegmentGeneratorConfig() {
   }
 
   /**
@@ -399,14 +346,6 @@ public class SegmentGeneratorConfig {
     }
   }
 
-  public String getDataDir() {
-    return _dataDir;
-  }
-
-  public void setDataDir(String dataDir) {
-    _dataDir = dataDir;
-  }
-
   public String getInputFilePath() {
     return _inputFilePath;
   }
@@ -447,14 +386,6 @@ public class SegmentGeneratorConfig {
       Preconditions.checkState(outputDir.mkdirs(), "Cannot create output dir: {}", dir);
     }
     _outDir = outputDir.getAbsolutePath();
-  }
-
-  public boolean isOverwrite() {
-    return _overwrite;
-  }
-
-  public void setOverwrite(boolean overwrite) {
-    _overwrite = overwrite;
   }
 
   public String getTableName() {
@@ -551,14 +482,6 @@ public class SegmentGeneratorConfig {
     _segmentVersion = segmentVersion;
   }
 
-  public String getSchemaFile() {
-    return _schemaFile;
-  }
-
-  public void setSchemaFile(String schemaFile) {
-    _schemaFile = schemaFile;
-  }
-
   public Schema getSchema() {
     return _schema;
   }
@@ -579,14 +502,6 @@ public class SegmentGeneratorConfig {
         }
       }
     }
-  }
-
-  public String getReaderConfigFile() {
-    return _readerConfigFile;
-  }
-
-  public void setReaderConfigFile(String readerConfigFile) {
-    _readerConfigFile = readerConfigFile;
   }
 
   public RecordReaderConfig getReaderConfig() {
@@ -644,17 +559,14 @@ public class SegmentGeneratorConfig {
     _rawIndexCompressionType.putAll(rawIndexCompressionType);
   }
 
-  @JsonIgnore
   public String getMetrics() {
     return getQualifyingFields(FieldType.METRIC, true);
   }
 
-  @JsonIgnore
   public String getDimensions() {
     return getQualifyingFields(FieldType.DIMENSION, true);
   }
 
-  @JsonIgnore
   public String getDateTimeColumnNames() {
     return getQualifyingFields(FieldType.DATE_TIME, true);
   }
@@ -672,7 +584,6 @@ public class SegmentGeneratorConfig {
    * @param type FieldType to filter on
    * @return Comma separate qualifying fields names.
    */
-  @JsonIgnore
   private String getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 
