@@ -25,6 +25,7 @@ import java.util.TreeSet;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
@@ -119,6 +120,11 @@ public class FunctionCallAstNode extends BaseAstNode {
     aggregationInfo.setAggregationType(_name);
     aggregationInfo.setExpressions(functionArgs);
     aggregationInfo.setIsInSelectList(_isInSelectList);
+
+    // For backward compatibility (new broker - old server), also set the old way.
+    // TODO: remove with a major version change.
+    aggregationInfo.putToAggregationParams(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO,
+        String.join(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR, functionArgs));
 
     return aggregationInfo;
   }

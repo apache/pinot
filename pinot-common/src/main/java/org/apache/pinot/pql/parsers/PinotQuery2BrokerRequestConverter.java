@@ -42,6 +42,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 
@@ -259,6 +260,12 @@ public class PinotQuery2BrokerRequestConverter {
     aggregationInfo.setAggregationType(functionName);
     aggregationInfo.setExpressions(args);
     aggregationInfo.setIsInSelectList(true);
+
+    // For backward compatibility (new broker - old server), also set the old way.
+    // TODO: remove with a major version change.
+    aggregationInfo.putToAggregationParams(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO,
+        String.join(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR, args));
+
     return aggregationInfo;
   }
 
