@@ -111,7 +111,7 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
-  public Map<MetricSlice, DataFrame> fetchAggregates(Collection<MetricSlice> slices, final List<String> dimensions) {
+  public Map<MetricSlice, DataFrame> fetchAggregates(Collection<MetricSlice> slices, final List<String> dimensions, int limit) {
     Map<MetricSlice, DataFrame> result = new HashMap<>();
     for (MetricSlice slice : slices) {
       List<String> expr = new ArrayList<>();

@@ -69,9 +69,10 @@ public interface DataProvider {
    *
    * @param slices metric slices
    * @param dimensions dimensions to group by
+   * @param limit max number of records to return. No limitation if it is a non-positive number.
    * @return map of aggregation values (keyed by slice)
    */
-  Map<MetricSlice, DataFrame> fetchAggregates(Collection<MetricSlice> slices, List<String> dimensions);
+  Map<MetricSlice, DataFrame> fetchAggregates(Collection<MetricSlice> slices, List<String> dimensions, int limit);
 
   /**
    * Returns a multimap of anomalies (keyed by slice) for a given set of slices.

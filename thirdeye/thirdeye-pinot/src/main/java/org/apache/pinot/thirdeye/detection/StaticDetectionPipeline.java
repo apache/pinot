@@ -81,7 +81,7 @@ public abstract class StaticDetectionPipeline extends DetectionPipeline {
   public final DetectionPipelineResult run() throws Exception {
     InputDataSpec dataSpec = this.getInputDataSpec();
     Map<MetricSlice, DataFrame> timeseries = this.provider.fetchTimeseries(dataSpec.getTimeseriesSlices());
-    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(dataSpec.getAggregateSlices(), Collections.<String>emptyList());
+    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(dataSpec.getAggregateSlices(), Collections.<String>emptyList(), -1);
 
     Collection<AnomalySlice> updatedSlices = new HashSet<>();
     for (AnomalySlice slice : dataSpec.getAnomalySlices()) {
