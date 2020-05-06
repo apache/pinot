@@ -20,8 +20,11 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -36,6 +39,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   protected final String _column;
 
   public static final int DEFAULT_LOG2M = 8;
+  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -43,6 +47,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    */
   public DistinctCountHLLAggregationFunction(String column) {
     _column = column;
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
@@ -58,6 +63,11 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _column + ")";
+  }
+
+  @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
   }
 
   @Override

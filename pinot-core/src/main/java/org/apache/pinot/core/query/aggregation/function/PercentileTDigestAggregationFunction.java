@@ -20,9 +20,11 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import com.tdunning.math.stats.TDigest;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -41,6 +43,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   protected final int _percentile;
   protected final String _column;
+  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -56,6 +59,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     Preconditions.checkArgument(numArgs == 2, getType() + " expects two argument, got: " + numArgs);
     _column = arguments.get(0);
     _percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
@@ -71,6 +75,11 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   @Override
   public String getResultColumnName() {
     return AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + _percentile + "(" + _column + ")";
+  }
+
+  @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
   }
 
   @Override

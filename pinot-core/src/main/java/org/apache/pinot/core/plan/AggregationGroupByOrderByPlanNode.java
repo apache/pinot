@@ -64,6 +64,9 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
     _functionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest);
     _groupBy = brokerRequest.getGroupBy();
 
+    Set<TransformExpressionTree> expressionsToTransform =
+        AggregationFunctionUtils.collectExpressionsToTransform(brokerRequest, _functionContexts);
+
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {
       if (!StarTreeUtils.isStarTreeDisabled(brokerRequest)) {
@@ -90,7 +93,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
       }
     }
 
-    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
+    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest, expressionsToTransform);
     _starTreeTransformPlanNode = null;
   }
 

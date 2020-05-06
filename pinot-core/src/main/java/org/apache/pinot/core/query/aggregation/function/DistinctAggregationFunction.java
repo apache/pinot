@@ -19,12 +19,14 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -35,6 +37,7 @@ import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 
 
 /**
@@ -45,6 +48,7 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   private final String[] _columns;
   private final List<SelectionSort> _orderBy;
   private final int _capacity;
+  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -54,12 +58,18 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
    * @param limit Limit clause
    */
   public DistinctAggregationFunction(List<String> columns, List<SelectionSort> orderBy, int limit) {
-    _columns = columns.toArray(new String[columns.size()]);
+    int numColumns = columns.size();
+    _columns = columns.toArray(new String[numColumns]);
     _orderBy = orderBy;
     // NOTE: DISTINCT with order-by is similar to group-by with order-by, where we limit the maximum number of unique
     //       records (groups) for each query to reduce the memory footprint. The result might not be 100% accurate in
     //       certain scenarios, but should give a good enough approximation.
     _capacity = CollectionUtils.isNotEmpty(_orderBy) ? GroupByUtils.getTableCapacity(limit) : limit;
+
+    _inputExpressions = new ArrayList<>(numColumns);
+    for (String column : columns) {
+      _inputExpressions.add(TransformExpressionTree.compileToExpressionTree(column));
+    }
   }
 
   @Override
@@ -75,6 +85,11 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + AggregationFunctionUtils.concatArgs(Arrays.asList(_columns)) + ")";
+  }
+
+  @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
   }
 
   @Override

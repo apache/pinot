@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -48,6 +50,12 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    * Returns the column name to be used in the data schema of results. e.g. 'MINMAXRANGEMV( foo)' -> 'minmaxrangemv(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
    */
   String getResultColumnName();
+
+  /**
+   * Returns a list of input expressions needed for performing aggregation.
+   *
+   */
+  List<TransformExpressionTree> getInputExpressions();
 
   /**
    * Accepts an aggregation function visitor to visit.

@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -58,6 +61,11 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return Collections.emptyList();
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
@@ -73,7 +81,8 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<String, BlockValSet> blockValSetMap) {
     if (blockValSetMap.size() == 0) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
     } else {

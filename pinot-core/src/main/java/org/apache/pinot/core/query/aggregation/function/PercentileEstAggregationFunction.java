@@ -19,9 +19,11 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -38,6 +40,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   protected final int _percentile;
   protected final String _column;
+  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -54,6 +57,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
     _column = arguments.get(0);
     _percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
@@ -72,6 +76,11 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
@@ -87,7 +96,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<String, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_column);
     if (blockValSet.getValueType() != DataType.BYTES) {
       long[] longValues = blockValSet.getLongValuesSV();

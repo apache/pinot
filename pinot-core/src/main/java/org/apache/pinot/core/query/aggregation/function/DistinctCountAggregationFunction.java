@@ -19,8 +19,11 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -33,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
 
   protected final String _column;
+  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
@@ -40,6 +44,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
    */
   public DistinctCountAggregationFunction(String column) {
     _column = column;
+    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
@@ -55,6 +60,11 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _column + ")";
+  }
+
+  @Override
+  public List<TransformExpressionTree> getInputExpressions() {
+    return _inputExpressions;
   }
 
   @Override
