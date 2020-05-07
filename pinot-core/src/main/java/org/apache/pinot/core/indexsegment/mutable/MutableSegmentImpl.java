@@ -70,7 +70,6 @@ import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -130,7 +129,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<FieldSpec> _physicalFieldSpecs;
   private final Collection<DimensionFieldSpec> _physicalDimensionFieldSpecs;
   private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
-  private final Collection<DateTimeFieldSpec> _physicalDateTimeFieldSpecs;
+  private final Collection<String> _physicalTimeColumnNames;
 
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
@@ -174,7 +173,7 @@ public class MutableSegmentImpl implements MutableSegment {
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
     List<DimensionFieldSpec> physicalDimensionFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
     List<MetricFieldSpec> physicalMetricFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
-    List<DateTimeFieldSpec> physicalDateTimeFieldSpecs = new ArrayList<>(_schema.getDateTimeFieldSpecs().size());
+    List<String> physicalTimeColumnNames = new ArrayList<>();
 
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -185,16 +184,17 @@ public class MutableSegmentImpl implements MutableSegment {
           physicalDimensionFieldSpecs.add((DimensionFieldSpec) fieldSpec);
         } else if (fieldType == FieldSpec.FieldType.METRIC) {
           physicalMetricFieldSpecs.add((MetricFieldSpec) fieldSpec);
-        } else if (fieldType == FieldSpec.FieldType.DATE_TIME) {
-          physicalDateTimeFieldSpecs.add((DateTimeFieldSpec) fieldSpec);
+        } else if (fieldType == FieldSpec.FieldType.DATE_TIME || fieldType == FieldSpec.FieldType.TIME) {
+          physicalTimeColumnNames.add(fieldSpec.getName());
         }
       }
     }
     _physicalFieldSpecs = Collections.unmodifiableCollection(physicalFieldSpecs);
     _physicalDimensionFieldSpecs = Collections.unmodifiableCollection(physicalDimensionFieldSpecs);
     _physicalMetricFieldSpecs = Collections.unmodifiableCollection(physicalMetricFieldSpecs);
-    _physicalDateTimeFieldSpecs = Collections.unmodifiableCollection(physicalDateTimeFieldSpecs);
-    _numKeyColumns = _physicalDimensionFieldSpecs.size() + _physicalDateTimeFieldSpecs.size() + 1;  // Add 1 for time column
+    _physicalTimeColumnNames = Collections.unmodifiableCollection(physicalTimeColumnNames);
+
+    _numKeyColumns = _physicalDimensionFieldSpecs.size() + _physicalTimeColumnNames.size();
 
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
@@ -802,13 +802,8 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalDimensionFieldSpecs) {
       dictIds[i++] = (Integer) dictIdMap.get(fieldSpec.getName());
     }
-    for (FieldSpec fieldSpec : _physicalDateTimeFieldSpecs) {
-      dictIds[i++] = (Integer) dictIdMap.get(fieldSpec.getName());
-    }
-
-    String timeColumnName = _schema.getTimeColumnName();
-    if (timeColumnName != null) {
-      dictIds[i] = (Integer) dictIdMap.get(timeColumnName);
+    for (String timeColumnName : _physicalTimeColumnNames) {
+      dictIds[i++] = (Integer) dictIdMap.get(timeColumnName);
     }
     return _recordIdMap.put(new FixedIntArray(dictIds));
   }
@@ -876,23 +871,14 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
 
-    // Date time columns should be dictionary encoded.
-    for (FieldSpec fieldSpec : _physicalDateTimeFieldSpecs) {
-      String dateTimeColumn = fieldSpec.getName();
-      if (noDictionaryColumns.contains(dateTimeColumn)) {
-        _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary datetime columns, eg: {}",
-            dateTimeColumn);
+    // Time columns should be dictionary encoded.
+    for (String timeColumnName : _physicalTimeColumnNames) {
+      if (noDictionaryColumns.contains(timeColumnName)) {
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
+            timeColumnName);
         _aggregateMetrics = false;
         break;
       }
-    }
-
-    // Time column should be dictionary encoded.
-    String timeColumn = _schema.getTimeColumnName();
-    if (noDictionaryColumns.contains(timeColumn)) {
-      _logger
-          .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary time column, eg: {}", timeColumn);
-      _aggregateMetrics = false;
     }
 
     if (!_aggregateMetrics) {

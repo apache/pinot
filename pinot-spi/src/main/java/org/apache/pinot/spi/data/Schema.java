@@ -313,21 +313,6 @@ public final class Schema {
     return _dateTimeNames;
   }
 
-  @JsonIgnore
-  public String getTimeColumnName() {
-    return (_timeFieldSpec != null) ? _timeFieldSpec.getName() : null;
-  }
-
-  @JsonIgnore
-  public TimeUnit getIncomingTimeUnit() {
-    return (_timeFieldSpec != null) ? _timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
-  }
-
-  @JsonIgnore
-  public TimeUnit getOutgoingTimeUnit() {
-    return (_timeFieldSpec != null) ? _timeFieldSpec.getOutgoingGranularitySpec().getTimeType() : null;
-  }
-
   /**
    * Returns a json representation of the schema.
    */
@@ -673,7 +658,7 @@ public final class Schema {
               .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
           "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
       String transformFunction =
-          getTransformFunction(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize, outgoingTimeUnit);
+          constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize, outgoingTimeUnit);
       dateTimeFieldSpec.setTransformFunction(transformFunction);
     }
 
@@ -683,7 +668,10 @@ public final class Schema {
     return dateTimeFieldSpec;
   }
 
-  private static String getTransformFunction(String incomingName, int incomingTimeSize, TimeUnit incomingTimeUnit,
+  /**
+   * Constructs a transformFunction string for the time column, based on incoming and outgoing timeGranularitySpec
+   */
+  private static String constructTransformFunctionString(String incomingName, int incomingTimeSize, TimeUnit incomingTimeUnit,
       int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
 
     String innerFunction = incomingName;

@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -105,15 +106,10 @@ public class MergeRollupSegmentConverter {
       throws Exception {
     // Compute group by columns for roll-up preparation (all dimensions + date time columns + time column)
     List<String> groupByColumns = new ArrayList<>();
-    for (DimensionFieldSpec dimensionFieldSpec : schema.getDimensionFieldSpecs()) {
-      groupByColumns.add(dimensionFieldSpec.getName());
-    }
-    for (DateTimeFieldSpec dateTimeFieldSpec : schema.getDateTimeFieldSpecs()) {
-      groupByColumns.add(dateTimeFieldSpec.getName());
-    }
-    String timeColumn = schema.getTimeColumnName();
-    if (timeColumn != null) {
-      groupByColumns.add(timeColumn);
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn() && !fieldSpec.getFieldType().equals(FieldSpec.FieldType.METRIC)) {
+        groupByColumns.add(fieldSpec.getName());
+      }
     }
 
     // Initialize roll-up record transformer
