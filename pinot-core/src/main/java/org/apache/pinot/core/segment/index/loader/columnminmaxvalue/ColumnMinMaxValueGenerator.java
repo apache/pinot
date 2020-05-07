@@ -60,9 +60,13 @@ public class ColumnMinMaxValueGenerator {
     Schema schema = _segmentMetadata.getSchema();
     Set<String> columnsToAddMinMaxValue = new HashSet<>(schema.getPhysicalColumnNames());
 
+    // mode ALL - use all columns
+    // mode NON_METRIC - use all dimensions and time columns 
+    // mode TIME - use only time columns
     switch (_columnMinMaxValueGeneratorMode) {
       case TIME:
         columnsToAddMinMaxValue.removeAll(schema.getDimensionNames());
+        // Intentionally falling through to next case
       case NON_METRIC:
         columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
     }
