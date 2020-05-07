@@ -530,7 +530,8 @@ public final class Schema {
      */
     public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity,
         @Nullable Object defaultNullValue, @Nullable String transformFunction) {
-      DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue, transformFunction);
+      DateTimeFieldSpec dateTimeFieldSpec =
+          new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue, transformFunction);
       _schema.addField(dateTimeFieldSpec);
       return this;
     }
