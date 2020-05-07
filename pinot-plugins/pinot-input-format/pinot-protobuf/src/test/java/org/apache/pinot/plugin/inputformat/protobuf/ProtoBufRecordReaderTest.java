@@ -21,6 +21,8 @@ package org.apache.pinot.plugin.inputformat.protobuf;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -159,10 +161,11 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
     return File.createTempFile(ProtoBufRecordReaderTest.class.getName(), PROTO_DATA);
   }
 
-  private ProtoBufRecordReaderConfig getProtoRecordReaderConfig() {
+  private ProtoBufRecordReaderConfig getProtoRecordReaderConfig()
+      throws URISyntaxException {
     ProtoBufRecordReaderConfig config = new ProtoBufRecordReaderConfig();
-    String descriptorFile = getClass().getClassLoader().getResource(DESCRIPTOR_FILE).getPath();
-    config.setDescriptorFile(descriptorFile);
+    URL descriptorFile = getClass().getClassLoader().getResource(DESCRIPTOR_FILE);
+    config.setDescriptorFile(descriptorFile.toURI());
     return config;
   }
 }

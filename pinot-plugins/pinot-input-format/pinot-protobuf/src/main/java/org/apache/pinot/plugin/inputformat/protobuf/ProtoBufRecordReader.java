@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.Schema;
@@ -33,6 +34,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
+import org.apache.pinot.spi.utils.ResourceFinder;
 import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
 
 
@@ -72,8 +74,15 @@ public class ProtoBufRecordReader implements RecordReader {
     Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     ProtoBufRecordExtractorConfig recordExtractorConfig = new ProtoBufRecordExtractorConfig();
     ProtoBufRecordReaderConfig protoBufRecordReaderConfig = (ProtoBufRecordReaderConfig) recordReaderConfig;
-    String descriptorFile = protoBufRecordReaderConfig.getDescriptorFile();
-    FileInputStream fin = new FileInputStream(descriptorFile);
+    InputStream fin = getDescriptorFileInputStream(protoBufRecordReaderConfig);
+    buildProtoBufDescriptor(fin);
+    _recordExtractor = new ProtoBufRecordExtractor();
+    _recordExtractor.init(sourceFields, recordExtractorConfig);
+    init();
+  }
+
+  private void buildProtoBufDescriptor(InputStream fin)
+      throws IOException {
     try {
       DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(fin);
       Descriptors.FileDescriptor fileDescriptor =
@@ -82,10 +91,12 @@ public class ProtoBufRecordReader implements RecordReader {
     } catch (Descriptors.DescriptorValidationException e) {
       throw new IOException("Descriptor file validation failed", e);
     }
-    _recordExtractor = new ProtoBufRecordExtractor();
-    _recordExtractor.init(sourceFields, recordExtractorConfig);
+  }
 
-    init();
+  private InputStream getDescriptorFileInputStream(ProtoBufRecordReaderConfig protoBufRecordReaderConfig)
+      throws IOException {
+    URI descriptorFileURI = protoBufRecordReaderConfig.getDescriptorFile();
+    return ResourceFinder.openResource(descriptorFileURI);
   }
 
   @Override

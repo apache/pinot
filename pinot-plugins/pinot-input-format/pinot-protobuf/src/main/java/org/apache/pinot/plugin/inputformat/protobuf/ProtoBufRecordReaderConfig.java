@@ -18,17 +18,18 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import java.net.URI;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 public class ProtoBufRecordReaderConfig implements RecordReaderConfig {
-  private String _descriptorFile;
+  private URI _descriptorFile;
 
-  public String getDescriptorFile() {
+  public URI getDescriptorFile() {
     return _descriptorFile;
   }
 
-  public void setDescriptorFile(String descriptorFile) {
+  public void setDescriptorFile(URI descriptorFile) {
     _descriptorFile = descriptorFile;
   }
 }
