@@ -518,23 +518,6 @@ public final class Schema {
     }
 
     /**
-     * Add timeFieldSpec with incoming and outgoing granularity spec and defaultNullValue
-     * TODO: This is deprecated in favor of addDateTime().
-     *  Many tests use this to construct Schema with TimeFieldSpec.
-     *  This will continue to exist for a while, as it helps to test backward compatibility of schemas containing TimeFieldSpec
-     */
-    @Deprecated
-    public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
-        TimeGranularitySpec outgoingTimeGranularitySpec, Object defaultNullValue) {
-      if (outgoingTimeGranularitySpec != null) {
-        _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
-      } else {
-        _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
-      }
-      return this;
-    }
-
-    /**
      * Add dateTimeFieldSpec with basic fields
      */
     public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity) {

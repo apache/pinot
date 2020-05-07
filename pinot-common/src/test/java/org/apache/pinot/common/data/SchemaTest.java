@@ -164,9 +164,8 @@ public class SchemaTest {
 
     Schema schema11 = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
-    Schema schema12 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue).build();
-
+    Schema schema12 = new Schema.SchemaBuilder().setSchemaName("testSchema").build();
+    schema12.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
     Assert.assertNotNull(schema11.getTimeFieldSpec());
     Assert.assertNotNull(schema12.getTimeFieldSpec());
 
