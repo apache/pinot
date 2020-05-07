@@ -106,10 +106,16 @@ public class MergeRollupSegmentConverter {
       throws Exception {
     // Compute group by columns for roll-up preparation (all dimensions + date time columns + time column)
     List<String> groupByColumns = new ArrayList<>();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn() && !fieldSpec.getFieldType().equals(FieldSpec.FieldType.METRIC)) {
-        groupByColumns.add(fieldSpec.getName());
-      }
+    for (DimensionFieldSpec dimensionFieldSpec : schema.getDimensionFieldSpecs()) {
+      groupByColumns.add(dimensionFieldSpec.getName());
+    }
+    for (DateTimeFieldSpec dateTimeFieldSpec : schema.getDateTimeFieldSpecs()) {
+      groupByColumns.add(dateTimeFieldSpec.getName());
+    }
+    // TODO: once time column starts showing up as dateTimeFieldSpec (https://github.com/apache/incubator-pinot/issues/2756) below lines becomes redundant
+    String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
+    if (timeColumnName != null && !groupByColumns.contains(timeColumnName)) {
+      groupByColumns.add(timeColumnName);
     }
 
     // Initialize roll-up record transformer
