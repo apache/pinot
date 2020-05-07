@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -111,9 +112,10 @@ public class MergeRollupSegmentConverter {
     for (DateTimeFieldSpec dateTimeFieldSpec : schema.getDateTimeFieldSpecs()) {
       groupByColumns.add(dateTimeFieldSpec.getName());
     }
-    String timeColumn = schema.getTimeColumnName();
-    if (timeColumn != null) {
-      groupByColumns.add(timeColumn);
+    // TODO: once time column starts showing up as dateTimeFieldSpec (https://github.com/apache/incubator-pinot/issues/2756) below lines becomes redundant
+    String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
+    if (timeColumnName != null && !groupByColumns.contains(timeColumnName)) {
+      groupByColumns.add(timeColumnName);
     }
 
     // Initialize roll-up record transformer

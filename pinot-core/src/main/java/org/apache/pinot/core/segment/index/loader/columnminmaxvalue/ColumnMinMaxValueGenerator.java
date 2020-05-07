@@ -19,6 +19,8 @@
 package org.apache.pinot.core.segment.index.loader.columnminmaxvalue;
 
 import com.clearspring.analytics.util.Preconditions;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -56,32 +58,20 @@ public class ColumnMinMaxValueGenerator {
     Preconditions.checkState(_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE);
 
     Schema schema = _segmentMetadata.getSchema();
+    Set<String> columnsToAddMinMaxValue = new HashSet<>(schema.getPhysicalColumnNames());
 
-    // Process time column
-    String timeColumnName = schema.getTimeColumnName();
-    if (timeColumnName != null) {
-      addColumnMinMaxValueForColumn(timeColumnName);
+    // mode ALL - use all columns
+    // mode NON_METRIC - use all dimensions and time columns 
+    // mode TIME - use only time columns
+    switch (_columnMinMaxValueGeneratorMode) {
+      case TIME:
+        columnsToAddMinMaxValue.removeAll(schema.getDimensionNames());
+        // Intentionally falling through to next case
+      case NON_METRIC:
+        columnsToAddMinMaxValue.removeAll(schema.getMetricNames());
     }
-    for (String dateTimeColumn : schema.getDateTimeNames()) {
-      addColumnMinMaxValueForColumn(dateTimeColumn);
-    }
-    if (_columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.TIME) {
-      saveMetadata();
-      return;
-    }
-
-    // Process dimension columns
-    for (String dimensionColumnName : schema.getDimensionNames()) {
-      addColumnMinMaxValueForColumn(dimensionColumnName);
-    }
-    if (_columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.NON_METRIC) {
-      saveMetadata();
-      return;
-    }
-
-    // Process metric columns
-    for (String metricColumnName : schema.getMetricNames()) {
-      addColumnMinMaxValueForColumn(metricColumnName);
+    for (String column : columnsToAddMinMaxValue) {
+      addColumnMinMaxValueForColumn(column);
     }
     saveMetadata();
   }
