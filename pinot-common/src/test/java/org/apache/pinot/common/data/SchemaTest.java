@@ -76,7 +76,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
 
     DimensionFieldSpec dimensionFieldSpec = schema.getDimensionSpec("svDimension");
@@ -162,79 +162,19 @@ public class SchemaTest {
         new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
     int defaultNullValue = 17050;
 
-    Schema schema1 =
-        new Schema.SchemaBuilder().setSchemaName("testSchema").addTime(incomingName, incomingTimeUnit, incomingDataType)
-            .build();
-    Schema schema2 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingName, incomingTimeUnit, incomingDataType, defaultNullValue).build();
-    Schema schema3 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingName, incomingTimeUnit, incomingDataType, outgoingName, outgoingTimeUnit, outgoingDataType)
-        .build();
-    Schema schema4 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingName, incomingTimeUnit, incomingDataType, outgoingName, outgoingTimeUnit, outgoingDataType,
-            defaultNullValue).build();
-    Schema schema5 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingName, incomingTimeUnitSize, incomingTimeUnit, incomingDataType).build();
-    Schema schema6 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingName, incomingTimeUnitSize, incomingTimeUnit, incomingDataType, defaultNullValue).build();
-    Schema schema7 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingName, incomingTimeUnitSize, incomingTimeUnit, incomingDataType, outgoingName,
-            outgoingTimeUnitSize, outgoingTimeUnit, outgoingDataType).build();
-    Schema schema8 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingName, incomingTimeUnitSize, incomingTimeUnit, incomingDataType, outgoingName,
-            outgoingTimeUnitSize, outgoingTimeUnit, outgoingDataType, defaultNullValue).build();
-    Schema schema9 =
-        new Schema.SchemaBuilder().setSchemaName("testSchema").addTime(incomingTimeGranularitySpec).build();
-    Schema schema10 =
-        new Schema.SchemaBuilder().setSchemaName("testSchema").addTime(incomingTimeGranularitySpec, defaultNullValue)
-            .build();
     Schema schema11 = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     Schema schema12 = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue).build();
 
-    Assert.assertNotNull(schema1.getTimeFieldSpec());
-    Assert.assertNotNull(schema2.getTimeFieldSpec());
-    Assert.assertNotNull(schema3.getTimeFieldSpec());
-    Assert.assertNotNull(schema4.getTimeFieldSpec());
-    Assert.assertNotNull(schema5.getTimeFieldSpec());
-    Assert.assertNotNull(schema6.getTimeFieldSpec());
-    Assert.assertNotNull(schema7.getTimeFieldSpec());
-    Assert.assertNotNull(schema8.getTimeFieldSpec());
-    Assert.assertNotNull(schema9.getTimeFieldSpec());
-    Assert.assertNotNull(schema10.getTimeFieldSpec());
     Assert.assertNotNull(schema11.getTimeFieldSpec());
     Assert.assertNotNull(schema12.getTimeFieldSpec());
 
-    Assert.assertEquals(schema1, schema5);
-    Assert.assertEquals(schema1, schema9);
-    Assert.assertEquals(schema2, schema6);
-    Assert.assertEquals(schema2, schema10);
-    Assert.assertEquals(schema3, schema7);
-    Assert.assertEquals(schema3, schema11);
-    Assert.assertEquals(schema4, schema8);
-    Assert.assertEquals(schema4, schema12);
-
     // Before adding default null value.
-    Assert.assertFalse(schema1.equals(schema2));
-    Assert.assertFalse(schema3.equals(schema4));
-    Assert.assertFalse(schema5.equals(schema6));
-    Assert.assertFalse(schema7.equals(schema8));
-    Assert.assertFalse(schema9.equals(schema10));
-    Assert.assertFalse(schema11.equals(schema12));
+    Assert.assertNotEquals(schema12, schema11);
 
     // After adding default null value.
-    schema1.getTimeFieldSpec().setDefaultNullValue(defaultNullValue);
-    schema3.getTimeFieldSpec().setDefaultNullValue(defaultNullValue);
-    schema5.getTimeFieldSpec().setDefaultNullValue(defaultNullValue);
-    schema7.getTimeFieldSpec().setDefaultNullValue(defaultNullValue);
-    schema9.getTimeFieldSpec().setDefaultNullValue(defaultNullValue);
     schema11.getTimeFieldSpec().setDefaultNullValue(defaultNullValue);
-    Assert.assertEquals(schema1, schema2);
-    Assert.assertEquals(schema3, schema4);
-    Assert.assertEquals(schema5, schema6);
-    Assert.assertEquals(schema7, schema8);
-    Assert.assertEquals(schema9, schema10);
     Assert.assertEquals(schema11, schema12);
   }
 
@@ -312,7 +252,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
 
     Assert.assertThrows(NullPointerException.class, () -> oldSchema.isBackwardCompatibleWith(null));
@@ -323,7 +263,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertFalse(schema1.isBackwardCompatibleWith(oldSchema));
 
@@ -333,7 +273,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertFalse(schema2.isBackwardCompatibleWith(oldSchema));
 
@@ -343,7 +283,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addTime("time", TimeUnit.HOURS, FieldSpec.DataType.LONG) // DAYS -> HOURS
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertFalse(schema3.isBackwardCompatibleWith(oldSchema));
 
@@ -353,7 +293,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "2:HOURS:EPOCH", "1:HOURS").build();  // timeUnit 1 -> 2
     Assert.assertFalse(schema4.isBackwardCompatibleWith(oldSchema));
 
@@ -363,7 +303,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertFalse(schema5.isBackwardCompatibleWith(oldSchema));
 
@@ -374,7 +314,7 @@ public class SchemaTest {
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertTrue(schema6.isBackwardCompatibleWith(oldSchema));
   }

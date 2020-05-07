@@ -34,6 +34,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.Mockito;
@@ -148,7 +149,8 @@ public class TimeBoundaryManagerTest {
 
   private void setSchema(String rawTableName, TimeUnit timeUnit) {
     ZKMetadataProvider.setSchema(_propertyStore,
-        new Schema.SchemaBuilder().setSchemaName(rawTableName).addTime(TIME_COLUMN, timeUnit, FieldSpec.DataType.LONG)
+        new Schema.SchemaBuilder().setSchemaName(rawTableName)
+            .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, timeUnit, TIME_COLUMN), null)
             .build());
   }
 

@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -451,118 +452,103 @@ public final class Schema {
       return this;
     }
 
+    /**
+     * Add single value dimensionFieldSpec with basic fields
+     */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true));
       return this;
     }
 
+    /**
+     * Add single value dimensionFieldSpec with basic fields plus defaultNullValue
+     */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));
       return this;
     }
 
+    /**
+     * Add multi value dimensionFieldSpec with basic fields
+     */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false));
       return this;
     }
 
+    /**
+     * Add single value dimensionFieldSpec with basic fields plus defaultNullValue
+     */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
       return this;
     }
 
+    /**
+     * Add metricFieldSpec with basic fields
+     */
     public SchemaBuilder addMetric(String metricName, DataType dataType) {
       _schema.addField(new MetricFieldSpec(metricName, dataType));
       return this;
     }
 
+    /**
+     * Add metricFieldSpec with basic fields plus defaultNullValue
+     */
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
       return this;
     }
 
-    public SchemaBuilder addTime(String incomingName, TimeUnit incomingTimeUnit, DataType incomingDataType) {
-      _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, TimeUnit incomingTimeUnit, DataType incomingDataType,
-        Object defaultNullValue) {
-      _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, TimeUnit incomingTimeUnit, DataType incomingDataType,
-        String outgoingName, TimeUnit outgoingTimeUnit, DataType outgoingDataType) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
-              outgoingTimeUnit));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, TimeUnit incomingTimeUnit, DataType incomingDataType,
-        String outgoingName, TimeUnit outgoingTimeUnit, DataType outgoingDataType, Object defaultNullValue) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
-              outgoingTimeUnit, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType) {
-      _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType, Object defaultNullValue) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType, String outgoingName, int outgoingTimeUnitSize, TimeUnit outgoingTimeUnit,
-        DataType outgoingDataType) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
-              outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType, String outgoingName, int outgoingTimeUnitSize, TimeUnit outgoingTimeUnit,
-        DataType outgoingDataType, Object defaultNullValue) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
-              outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec) {
-      _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec));
-      return this;
-    }
-
-    public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec, Object defaultNullValue) {
-      _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
-      return this;
-    }
-
+    /**
+     * Add timeFieldSpec with incoming and outgoing granularity spec
+     * TODO: This is deprecated in favor of addDateTime().
+     *  Many tests use this to construct Schema with TimeFieldSpec.
+     *  This will continue to exist for a while, as it helps to test backward compatibility of schemas containing TimeFieldSpec
+     */
+    @Deprecated
     public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
-        TimeGranularitySpec outgoingTimeGranularitySpec) {
-      _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
+        @Nullable TimeGranularitySpec outgoingTimeGranularitySpec) {
+      if (outgoingTimeGranularitySpec != null) {
+        _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
+      } else {
+        _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec));
+      }
       return this;
     }
 
+    /**
+     * Add timeFieldSpec with incoming and outgoing granularity spec and defaultNullValue
+     * TODO: This is deprecated in favor of addDateTime().
+     *  Many tests use this to construct Schema with TimeFieldSpec.
+     *  This will continue to exist for a while, as it helps to test backward compatibility of schemas containing TimeFieldSpec
+     */
+    @Deprecated
     public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
         TimeGranularitySpec outgoingTimeGranularitySpec, Object defaultNullValue) {
-      _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
+      if (outgoingTimeGranularitySpec != null) {
+        _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
+      } else {
+        _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
+      }
       return this;
     }
 
+    /**
+     * Add dateTimeFieldSpec with basic fields
+     */
     public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity) {
       _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity));
+      return this;
+    }
+
+    /**
+     * Add dateTimeFieldSpec with basic fields plus defaultNullValue and transformFunction
+     */
+    public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity,
+        @Nullable Object defaultNullValue, @Nullable String transformFunction) {
+      DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue, transformFunction);
+      _schema.addField(dateTimeFieldSpec);
       return this;
     }
 

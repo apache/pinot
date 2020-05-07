@@ -26,6 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -60,7 +61,7 @@ public class AvroUtilsTest {
     Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
         .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
         .addMetric("m1", DataType.INT).addMetric("m2", DataType.INT)
-        .addTime("hoursSinceEpoch", TimeUnit.HOURS, DataType.LONG).build();
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "hoursSinceEpoch"), null).build();
     Assert.assertEquals(expectedSchema, inferredPinotSchema);
   }
 }

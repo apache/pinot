@@ -21,8 +21,8 @@ package org.apache.pinot.core.data.readers;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.File;
+import java.util.HashSet;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -54,19 +54,6 @@ public class RecordReaderSampleDataTest {
       .addSingleValueDimension("column7", FieldSpec.DataType.STRING)
       .addSingleValueDimension("unknown_dimension", FieldSpec.DataType.STRING)
       .addMetric("met_impressionCount", FieldSpec.DataType.LONG).addMetric("unknown_metric", FieldSpec.DataType.DOUBLE)
-      .build();
-  // Different incoming and outgoing time column name, should read both incoming and outgoing time
-  private final Schema SCHEMA_DIFFERENT_INCOMING_OUTGOING = new Schema.SchemaBuilder()
-      .addTime("time_day", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "column2", TimeUnit.DAYS, FieldSpec.DataType.INT)
-      .build();
-  // Incoming time column does not exist in the record, should read outgoing time only
-  private final Schema SCHEMA_NO_INCOMING = new Schema.SchemaBuilder()
-      .addTime("incoming", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "time_day", TimeUnit.DAYS, FieldSpec.DataType.INT)
-      .build();
-
-  // Outgoing time column does not exist in the record, should read incoming time only
-  private final Schema SCHEMA_NO_OUTGOING = new Schema.SchemaBuilder()
-      .addTime("time_day", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "outgoing", TimeUnit.DAYS, FieldSpec.DataType.INT)
       .build();
 
   @Test
@@ -115,15 +102,20 @@ public class RecordReaderSampleDataTest {
     }
   }
 
+  /**
+   * Tests that record extractor is able to handle missing fields correctly (incoming and outgoing are missing from data)
+   * @throws Exception
+   */
   @Test
-  public void testDifferentIncomingOutgoing()
+  public void testRecordExtractorAbsentFields()
       throws Exception {
+    HashSet<String> sourceFields = Sets.newHashSet("incoming", "time_day", "outgoing", "column2");
     try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, Sets.newHashSet("time_day", "column2"), null);
+        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, sourceFields, null);
         RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, Sets.newHashSet("time_day", "column2"), null);
+            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, sourceFields, null);
         RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, Sets.newHashSet("time_day", "column2"), null)) {
+            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, sourceFields, null)) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -138,78 +130,9 @@ public class RecordReaderSampleDataTest {
 
         // Check the values from the first record
         if (numRecords == 1) {
-          // Incoming time column
           assertEquals(Long.valueOf(avroRecord.getValue("time_day").toString()), new Long(1072889503L));
-
-          // Outgoing time column
           assertEquals(avroRecord.getValue("column2"), 231355578);
-        }
-      }
-      assertEquals(numRecords, 10001);
-    }
-  }
-
-  @Test
-  public void testNoIncoming()
-      throws Exception {
-    try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING.getColumnNames(), null);
-        RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING.getColumnNames(), null);
-        RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA_NO_INCOMING.getColumnNames(), null)) {
-      int numRecords = 0;
-      while (avroRecordReader.hasNext()) {
-        assertTrue(csvRecordReader.hasNext());
-        assertTrue(jsonRecordReader.hasNext());
-        numRecords++;
-
-        GenericRow avroRecord = avroRecordReader.next();
-        GenericRow csvRecord = csvRecordReader.next();
-        GenericRow jsonRecord = jsonRecordReader.next();
-        checkEqualCSV(avroRecord, csvRecord);
-        checkEqual(avroRecord, jsonRecord);
-
-        // Check the values from the first record
-        if (numRecords == 1) {
-          // Incoming time column should be null
           assertNull(avroRecord.getValue("incoming"));
-
-          // Outgoing time column
-          assertEquals(avroRecord.getValue("time_day"), 1072889503);
-        }
-      }
-      assertEquals(numRecords, 10001);
-    }
-  }
-
-  @Test
-  public void testNoOutgoing()
-      throws Exception {
-    try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, Sets.newHashSet("time_day", "outgoing"), null);
-        RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, Sets.newHashSet("time_day", "outgoing"), null);
-        RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, Sets.newHashSet("time_day", "outgoing"), null)) {
-      int numRecords = 0;
-      while (avroRecordReader.hasNext()) {
-        assertTrue(csvRecordReader.hasNext());
-        assertTrue(jsonRecordReader.hasNext());
-        numRecords++;
-
-        GenericRow avroRecord = avroRecordReader.next();
-        GenericRow csvRecord = csvRecordReader.next();
-        GenericRow jsonRecord = jsonRecordReader.next();
-        checkEqualCSV(avroRecord, csvRecord);
-        checkEqual(avroRecord, jsonRecord);
-
-        // Check the values from the first record
-        if (numRecords == 1) {
-          // Incoming time column
-          assertEquals(Long.valueOf(avroRecord.getValue("time_day").toString()), new Long(1072889503L));
-
-          // Outgoing time column should be null
           assertNull(avroRecord.getValue("outgoing"));
         }
       }

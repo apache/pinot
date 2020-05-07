@@ -44,6 +44,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -82,8 +83,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
         .addSingleValueDimension("column9", FieldSpec.DataType.INT)
         .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
-        .addMetric("column18", FieldSpec.DataType.INT).addTime("daysSinceEpoch", 1, TimeUnit.DAYS, DataType.INT)
-        .build();
+        .addMetric("column18", FieldSpec.DataType.INT)
+        .addTime(new TimeGranularitySpec(DataType.INT, 1, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
 

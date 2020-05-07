@@ -45,7 +45,7 @@ public class ExpressionTransformerTimeTest {
 
     // 1] only incoming defined - doesn't create DefaultTimeSpecEvaluator. Incoming value used as is.
     pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming")).build();
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"), null).build();
 
     // correct value for incoming - use incoming
     expressionTransformer = new ExpressionTransformer(pinotSchema);
@@ -163,7 +163,7 @@ public class ExpressionTransformerTimeTest {
     // 5] SIMPLE_DATE_FORMAT
     // When incoming and outgoing spec are the same, any time format should work
     pinotSchema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
-        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "time")).build();
+        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "time"), null).build();
     expressionTransformer = new ExpressionTransformer(pinotSchema);
     genericRow = new GenericRow();
     genericRow.putValue("time", 20180101);

@@ -43,6 +43,7 @@ import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -164,7 +165,8 @@ public class FastHllQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension("column9", FieldSpec.DataType.INT)
         .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
-        .addMetric("column18", FieldSpec.DataType.INT).addTime("daysSinceEpoch", TimeUnit.DAYS, FieldSpec.DataType.INT)
+        .addMetric("column18", FieldSpec.DataType.INT)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null)
         .addSingleValueDimension("column17_HLL", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column18_HLL", FieldSpec.DataType.STRING).build();
 
