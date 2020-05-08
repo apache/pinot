@@ -173,7 +173,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension("column17_HLL", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column18_HLL", FieldSpec.DataType.STRING).build();
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
 
     // Create the segment generator config
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);

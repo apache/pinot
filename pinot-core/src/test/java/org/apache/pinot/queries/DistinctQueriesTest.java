@@ -91,7 +91,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
       .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES).build();
-  private static final TableConfig TABLE = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+  private static final TableConfig TABLE = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
   private IndexSegment _indexSegment;
   private List<SegmentDataManager> _segmentDataManagers;

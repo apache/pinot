@@ -69,9 +69,9 @@ public class SegmentTestUtils {
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
       String timeColumn, TimeUnit timeUnit, String tableName)
       throws IOException {
-    final SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumn).build(),
-        extractSchemaFromAvroWithoutTime(inputAvro));
+    final SegmentGeneratorConfig segmentGenSpec =
+        new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),
+            extractSchemaFromAvroWithoutTime(inputAvro));
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeColumnName(timeColumn);
     segmentGenSpec.setSegmentTimeUnit(timeUnit);
