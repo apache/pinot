@@ -46,6 +46,8 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -58,6 +60,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -119,8 +122,9 @@ public class SegmentGenerationWithNullValueVectorTest {
     _schema.addField(new DimensionFieldSpec(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE, true));
     _schema.addField(new DimensionFieldSpec(STRING_COLUMN, FieldSpec.DataType.STRING, true));
 
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     _random = new Random(System.nanoTime());
-    buildIndex(_schema);
+    buildIndex(tableConfig, _schema);
     _segment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), ReadMode.heap);
 
     setupQueryServer();
@@ -162,9 +166,9 @@ public class SegmentGenerationWithNullValueVectorTest {
    * @throws Exception
    */
 
-  private void buildIndex(Schema schema)
+  private void buildIndex(TableConfig tableConfig, Schema schema)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
 
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);

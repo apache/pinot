@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -37,6 +39,7 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -110,9 +113,10 @@ public class DataFetcherTest {
     schema.addField(new MetricFieldSpec(NO_DICT_FLOAT_METRIC_NAME, FieldSpec.DataType.FLOAT));
     schema.addField(new MetricFieldSpec(NO_DICT_DOUBLE_METRIC_NAME, FieldSpec.DataType.DOUBLE));
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
-    config.setSchema(schema);
     config.setOutDir(INDEX_DIR_PATH);
     config.setSegmentName(SEGMENT_NAME);
     config.setRawIndexCreationColumns(Arrays

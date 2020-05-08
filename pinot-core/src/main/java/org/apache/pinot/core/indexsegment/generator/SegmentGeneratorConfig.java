@@ -119,8 +119,9 @@ public class SegmentGeneratorConfig {
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
     //  But table config is not mandatory, and cannot be easily enforced as the instantiation can happen in external code.
     //  Hence, if table config is null, but timeFieldSpec is not null, read time from schema
-    //  Once we move to multiple time columns - DateTimeFieldSpec - table config has to be provided with valid time
-    //  If more than 1 dateTimeFieldSpec is found along with null table config, throw exception.
+    // WARN: Once we move to DateTimeFieldSpec - table config has to be provided with valid time - if time needs to be set.
+    //  We cannot deduce whether 1) one of the provided DateTimes should be used as time column 2) if yes, which one
+    //  Even if only 1 DateTime exists, we cannot determine whether it should be primary time column (there could be no time column for table (REFRESH), but still multiple DateTimeFieldSpec)
     String timeColumnName = null;
     if (tableConfig != null && tableConfig.getValidationConfig() != null) {
       timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();

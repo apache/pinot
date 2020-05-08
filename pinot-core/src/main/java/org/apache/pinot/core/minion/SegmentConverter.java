@@ -104,7 +104,7 @@ public class SegmentConverter {
 
       try (MapperRecordReader mapperRecordReader = new MapperRecordReader(_inputIndexDirs, _recordTransformer,
           _recordPartitioner, _totalNumPartition, currentPartition)) {
-        buildSegment(mapperOutputPath, _tableName, outputSegmentName, mapperRecordReader,
+        buildSegment(mapperOutputPath, outputSegmentName, mapperRecordReader,
             mapperRecordReader.getSchema(), _tableConfig);
       }
       File outputSegment = new File(mapperOutputPath + File.separator + outputSegmentName);
@@ -114,7 +114,7 @@ public class SegmentConverter {
         String reducerOutputPath = _workingDir.getPath() + File.separator + REDUCER_PREFIX + currentPartition;
         try (ReducerRecordReader reducerRecordReader = new ReducerRecordReader(outputSegment, _recordAggregator,
             _groupByColumns)) {
-          buildSegment(reducerOutputPath, _tableName, outputSegmentName, reducerRecordReader,
+          buildSegment(reducerOutputPath, outputSegmentName, reducerRecordReader,
               reducerRecordReader.getSchema(), _tableConfig);
         }
         outputSegment = new File(reducerOutputPath + File.separator + outputSegmentName);
@@ -130,7 +130,7 @@ public class SegmentConverter {
           String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
           try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(outputSegment, null,
               sortedColumn)) {
-            buildSegment(indexGenerationOutputPath, _tableName, outputSegmentName, pinotSegmentRecordReader,
+            buildSegment(indexGenerationOutputPath, outputSegmentName, pinotSegmentRecordReader,
                 pinotSegmentRecordReader.getSchema(), _tableConfig);
           }
           outputSegment = new File(indexGenerationOutputPath + File.separator + outputSegmentName);
@@ -147,7 +147,7 @@ public class SegmentConverter {
    *
    * TODO: Support all kinds of indexing (no dictionary)
    */
-  private void buildSegment(String outputPath, String tableName, String segmentName, RecordReader recordReader,
+  private void buildSegment(String outputPath, String segmentName, RecordReader recordReader,
       Schema schema, TableConfig tableConfig)
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);

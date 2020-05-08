@@ -41,9 +41,12 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -169,9 +172,11 @@ public class FastHllQueriesTest extends BaseQueriesTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null)
         .addSingleValueDimension("column17_HLL", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column18_HLL", FieldSpec.DataType.STRING).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
 
     // Create the segment generator config
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());

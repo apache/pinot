@@ -24,10 +24,13 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
 public class SegmentTestUtils {
@@ -38,12 +41,16 @@ public class SegmentTestUtils {
   public static SegmentGeneratorConfig getSegmentGeneratorConfig(@Nonnull File inputAvro, @Nonnull File outputDir,
       @Nonnull TimeUnit timeUnit, @Nonnull String tableName, @Nullable Schema pinotSchema)
       throws IOException {
-    SegmentGeneratorConfig segmentGeneratorConfig;
     if (pinotSchema == null) {
-      segmentGeneratorConfig = new SegmentGeneratorConfig(null, AvroUtils.getPinotSchemaFromAvroDataFile(inputAvro));
-    } else {
-      segmentGeneratorConfig = new SegmentGeneratorConfig(null, pinotSchema);
+      pinotSchema = AvroUtils.getPinotSchemaFromAvroDataFile(inputAvro);
     }
+    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName);
+    // TODO: change to getDateTimeFieldSpecs().get(0)
+    if (pinotSchema.getTimeFieldSpec() != null) {
+      tableConfigBuilder.setTimeColumnName(pinotSchema.getTimeFieldSpec().getName());
+    }
+    TableConfig tableConfig = tableConfigBuilder.build();
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, pinotSchema);
 
     segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGeneratorConfig.setSegmentTimeUnit(timeUnit);

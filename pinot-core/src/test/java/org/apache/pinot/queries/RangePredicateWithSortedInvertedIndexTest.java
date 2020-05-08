@@ -36,10 +36,13 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -68,6 +71,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
   private final long[] longValues = new long[NUM_ROWS];
 
   private Schema _schema;
+  private TableConfig _tableConfig;
 
   @BeforeClass
   public void setUp() {
@@ -84,6 +88,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
     _schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addMetric(M1, FieldSpec.DataType.INT).addMetric(M2, FieldSpec.DataType.LONG).build();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
   }
 
   private void createTestData() {
@@ -114,9 +119,10 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
     return null;
   }
 
-  private void createSegment(Schema schema, RecordReader recordReader, String segmentName, String tableName)
+  private void createSegment(TableConfig tableConfig, Schema schema, RecordReader recordReader, String segmentName,
+      String tableName)
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);
@@ -141,7 +147,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
       throws Exception {
     Random random = new Random();
     try (RecordReader recordReader = new GenericRowRecordReader(_rows)) {
-      createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
+      createSegment(_tableConfig, _schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
       final ImmutableSegment immutableSegment = loadSegment(SEGMENT_NAME_1);
       _indexSegments.add(immutableSegment);
 

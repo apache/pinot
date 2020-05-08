@@ -42,8 +42,11 @@ import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -87,6 +90,7 @@ public class SegmentPreProcessorTest {
   private IndexLoadingConfig _indexLoadingConfig;
   private File _avroFile;
   private Schema _schema;
+  private TableConfig _tableConfig;
   private Schema _newColumnsSchema1;
   private Schema _newColumnsSchema2;
   private Schema _newColumnsSchema3;
@@ -113,6 +117,8 @@ public class SegmentPreProcessorTest {
     resourceUrl = classLoader.getResource(SCHEMA);
     Assert.assertNotNull(resourceUrl);
     _schema = Schema.fromFile(new File(resourceUrl.getFile()));
+    _tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daySinceEpoch").build();
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA1);
     Assert.assertNotNull(resourceUrl);
     _newColumnsSchema1 = Schema.fromFile(new File(resourceUrl.getFile()));
@@ -133,7 +139,7 @@ public class SegmentPreProcessorTest {
 
     // Create inverted index for 'column7' when constructing the segment.
     SegmentGeneratorConfig segmentGeneratorConfig =
-        SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, INDEX_DIR, "testTable", _schema);
+        SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, INDEX_DIR, "testTable", _tableConfig, _schema);
     segmentGeneratorConfig.setInvertedIndexCreationColumns(Collections.singletonList(COLUMN7_NAME));
     segmentGeneratorConfig.setRawIndexCreationColumns(Collections.singletonList(EXISTING_STRING_COL_RAW));
     // The segment generation code in SegmentColumnarIndexCreator will throw
