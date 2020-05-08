@@ -41,6 +41,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
@@ -139,7 +140,8 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
   public void buildSegment()
       throws Exception {
     Schema schema = _helixResourceManager.getSchema(getTableName());
-    TableConfig tableConfig = _helixResourceManager.getTableConfig(getTableName());
+    TableConfig tableConfig = _helixResourceManager
+        .getTableConfig(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(getTableName()));
     String _segmentOutputDir = Files.createTempDir().toString();
     List<GenericRow> _rows = PinotSegmentUtil.createTestData(schema, 1);
     RecordReader _recordReader = new GenericRowRecordReader(_rows);
