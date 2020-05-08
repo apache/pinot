@@ -25,6 +25,7 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
@@ -220,7 +221,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     schemaBuilder.addSingleValueDimension("name", DataType.STRING);
     schemaBuilder.addSingleValueDimension("age", DataType.INT);
     schemaBuilder.addMetric("percent", DataType.FLOAT);
-    schemaBuilder.addTime("days", TimeUnit.DAYS, DataType.LONG);
+    schemaBuilder.addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "days"), null);
 
     Schema schema = schemaBuilder.build();
     System.out.println(JsonUtils.objectToPrettyString(schema));

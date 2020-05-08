@@ -243,7 +243,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setTransformFunction(String transformFunction) {
+  public void setTransformFunction(@Nullable String transformFunction) {
     _transformFunction = transformFunction;
   }
 

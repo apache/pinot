@@ -213,10 +213,17 @@ public class FieldSpecTest {
 
     DateTimeFieldSpec dateTimeFieldSpec1 = new DateTimeFieldSpec(name, LONG, format, granularity);
     DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec(name, INT, format, granularity);
-    Assert.assertFalse(dateTimeFieldSpec1.equals(dateTimeFieldSpec2));
+    Assert.assertNotEquals(dateTimeFieldSpec2, dateTimeFieldSpec1);
 
     DateTimeFieldSpec dateTimeFieldSpec3 = new DateTimeFieldSpec(name, LONG, format, granularity);
     Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec3);
+
+    DateTimeFieldSpec dateTimeFieldSpec4 = new DateTimeFieldSpec(name, LONG, format, granularity, 100000000L, null);
+    DateTimeFieldSpec dateTimeFieldSpec5 = new DateTimeFieldSpec(name, INT, format, granularity, null, "toEpochHours(millis)");
+    Assert.assertNotEquals(dateTimeFieldSpec5, dateTimeFieldSpec4);
+
+    DateTimeFieldSpec dateTimeFieldSpec6 = new DateTimeFieldSpec(name, LONG, format, granularity, 100000000L, null);
+    Assert.assertEquals(dateTimeFieldSpec4, dateTimeFieldSpec6);
   }
 
   @Test(dataProvider = "testFormatDataProvider")

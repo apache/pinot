@@ -35,6 +35,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -86,7 +87,8 @@ public class TransformQueriesTest extends BaseQueriesTest {
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addSingleValueDimension(M1, FieldSpec.DataType.INT).addSingleValueDimension(M2, FieldSpec.DataType.INT)
             .addSingleValueDimension(M3, FieldSpec.DataType.LONG).addSingleValueDimension(M4, FieldSpec.DataType.LONG)
-            .addTime(TIME, TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG).build();
+            .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME), null)
+            .build();
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME).build();
   }
 

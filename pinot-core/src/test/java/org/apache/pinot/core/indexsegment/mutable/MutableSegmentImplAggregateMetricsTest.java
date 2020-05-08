@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.testng.Assert;
@@ -54,7 +55,8 @@ public class MutableSegmentImplAggregateMetricsTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING).addMetric(METRIC, FieldSpec.DataType.LONG)
-        .addMetric(METRIC_2, FieldSpec.DataType.FLOAT).addTime(TIME_COLUMN, TimeUnit.DAYS, FieldSpec.DataType.INT)
+        .addMetric(METRIC_2, FieldSpec.DataType.FLOAT)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, TIME_COLUMN), null)
         .build();
     // Add virtual columns, which should not be aggregated
     DimensionFieldSpec virtualDimensionFieldSpec =
