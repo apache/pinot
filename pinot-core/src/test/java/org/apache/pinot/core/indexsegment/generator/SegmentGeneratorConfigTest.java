@@ -48,12 +48,12 @@ public class SegmentGeneratorConfigTest {
     assertNull(segmentGeneratorConfig.getSimpleDateFormat());
 
     // table config not provided
-    // NOTE: this behavior will not hold true when we move to dateTimeFieldSpec.
     // MUST provide valid tableConfig with time column if time details are wanted
-    segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
-    assertEquals(segmentGeneratorConfig.getTimeColumnName(), "daysSinceEpoch");
-    assertEquals(segmentGeneratorConfig.getTimeColumnType(), SegmentGeneratorConfig.TimeColumnType.EPOCH);
-    assertEquals(segmentGeneratorConfig.getSegmentTimeUnit(), TimeUnit.DAYS);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    assertNull(segmentGeneratorConfig.getTimeColumnName());
+    assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
     assertNull(segmentGeneratorConfig.getSimpleDateFormat());
   }
 
@@ -72,12 +72,12 @@ public class SegmentGeneratorConfigTest {
     assertEquals(segmentGeneratorConfig.getSimpleDateFormat(), "yyyyMMdd");
 
     // Table config not provided
-    // NOTE: this behavior will not hold true when we move to dateTimeFieldSpec.
     // MUST provide valid tableConfig with time column if time details are wanted
-    segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
-    assertEquals(segmentGeneratorConfig.getTimeColumnName(), "Date");
-    assertEquals(segmentGeneratorConfig.getTimeColumnType(), SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    assertNull(segmentGeneratorConfig.getTimeColumnName());
     assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
-    assertEquals(segmentGeneratorConfig.getSimpleDateFormat(), "yyyyMMdd");
+    assertNull(segmentGeneratorConfig.getSimpleDateFormat());
   }
 }
