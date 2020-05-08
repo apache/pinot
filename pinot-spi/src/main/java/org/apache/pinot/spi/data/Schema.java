@@ -453,7 +453,7 @@ public final class Schema {
     }
 
     /**
-     * Add single value dimensionFieldSpec with basic fields
+     * Add single value dimensionFieldSpec
      */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true));
@@ -461,7 +461,7 @@ public final class Schema {
     }
 
     /**
-     * Add single value dimensionFieldSpec with basic fields plus defaultNullValue
+     * Add single value dimensionFieldSpec with a defaultNullValue
      */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));
@@ -469,7 +469,7 @@ public final class Schema {
     }
 
     /**
-     * Add multi value dimensionFieldSpec with basic fields
+     * Add multi value dimensionFieldSpec
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false));
@@ -477,7 +477,7 @@ public final class Schema {
     }
 
     /**
-     * Add single value dimensionFieldSpec with basic fields plus defaultNullValue
+     * Add single value dimensionFieldSpec with defaultNullValue
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
@@ -485,7 +485,7 @@ public final class Schema {
     }
 
     /**
-     * Add metricFieldSpec with basic fields
+     * Add metricFieldSpec
      */
     public SchemaBuilder addMetric(String metricName, DataType dataType) {
       _schema.addField(new MetricFieldSpec(metricName, dataType));
@@ -493,7 +493,7 @@ public final class Schema {
     }
 
     /**
-     * Add metricFieldSpec with basic fields plus defaultNullValue
+     * Add metricFieldSpec with defaultNullValue
      */
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
