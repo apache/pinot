@@ -34,6 +34,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean classifier = false;
   private boolean dataCompleteness = false;
   private boolean holidayEventsLoader = false;
+  private boolean mockEventsLoader = false;
   private boolean monitor = false;
   private boolean pinotProxy = false;
   private boolean scheduler = false;
@@ -46,6 +47,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private long id;
   private String dashboardHost;
   private HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration = new HolidayEventsLoaderConfiguration();
+  private MockEventsLoaderConfiguration mockEventsLoaderConfiguration = new MockEventsLoaderConfiguration();
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
   private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
@@ -61,6 +63,22 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setHolidayEventsLoaderConfiguration(HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration) {
     this.holidayEventsLoaderConfiguration = holidayEventsLoaderConfiguration;
+  }
+
+  public boolean isMockEventsLoader() {
+    return mockEventsLoader;
+  }
+
+  public void setMockEventsLoader(boolean mockEventsLoader) {
+    this.mockEventsLoader = mockEventsLoader;
+  }
+
+  public MockEventsLoaderConfiguration getMockEventsLoaderConfiguration() {
+    return mockEventsLoaderConfiguration;
+  }
+
+  public void setMockEventsLoaderConfiguration(MockEventsLoaderConfiguration mockEventsLoaderConfiguration) {
+    this.mockEventsLoaderConfiguration = mockEventsLoaderConfiguration;
   }
 
   public boolean isDetectionAlert() {

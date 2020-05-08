@@ -94,8 +94,6 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
    * @throws Exception if properties cannot be parsed
    */
   public MockThirdEyeDataSource(Map<String, Object> properties) throws Exception {
-    loadMockCSVData(properties);
-
     // datasets
     this.datasets = new HashMap<>();
     Map<String, Object> config = ConfigUtils.getMap(properties.get(DATASETS));
@@ -214,6 +212,8 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
       onboarding.runAdhoc();
     }
+
+    loadMockCSVData(properties);
   }
 
   private void loadMockCSVData(Map<String, Object> properties) throws Exception {

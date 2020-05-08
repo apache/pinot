@@ -28,6 +28,7 @@ import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityEvent
 import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityTaskScheduler;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventResource;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventsLoader;
+import org.apache.pinot.thirdeye.anomaly.events.MockEventsLoader;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import org.apache.pinot.thirdeye.anomaly.task.TaskDriver;
 import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
@@ -73,6 +74,7 @@ public class ThirdEyeAnomalyApplication
   private ClassificationJobScheduler classificationJobScheduler = null;
   private EmailResource emailResource = null;
   private HolidayEventsLoader holidayEventsLoader = null;
+  private MockEventsLoader mockEventsLoader = null;
   private RequestStatisticsLogger requestStatisticsLogger = null;
   private DataAvailabilityEventListenerDriver dataAvailabilityEventListenerDriver = null;
   private DataAvailabilityTaskScheduler dataAvailabilityTaskScheduler = null;
@@ -169,6 +171,10 @@ public class ThirdEyeAnomalyApplication
                   DAORegistry.getInstance().getEventDAO());
           holidayEventsLoader.start();
           environment.jersey().register(new HolidayEventResource(holidayEventsLoader));
+        }
+        if (config.isMockEventsLoader()) {
+          mockEventsLoader = new MockEventsLoader(config.getMockEventsLoaderConfiguration(), DAORegistry.getInstance().getEventDAO());
+          mockEventsLoader.run();
         }
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler = new DataCompletenessScheduler();

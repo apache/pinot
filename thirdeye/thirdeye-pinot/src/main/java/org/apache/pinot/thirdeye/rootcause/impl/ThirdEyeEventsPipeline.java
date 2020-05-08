@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.rootcause.impl;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
@@ -36,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
 import org.apache.commons.collections4.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,7 +142,7 @@ public class ThirdEyeEventsPipeline extends Pipeline {
     return this.eventDAO.findByPredicate(Predicate.AND(
         Predicate.GE("startTime", start - OVERFETCH),
         Predicate.LT("endTime", end + OVERFETCH),
-        Predicate.EQ("eventType", eventType.toUpperCase())
+        Predicate.EQ("eventType", this.eventType.toUpperCase())
     ));
   }
 
@@ -160,7 +163,7 @@ public class ThirdEyeEventsPipeline extends Pipeline {
         }
       }
 
-      ThirdEyeEventEntity entity = ThirdEyeEventEntity.fromDTO(1.0, related, dto, eventType);
+      ThirdEyeEventEntity entity = ThirdEyeEventEntity.fromDTO(1.0, related, dto, this.eventType.toLowerCase());
       entities.add(entity.withScore(strategy.score(entity) * coefficient));
     }
     return entities;

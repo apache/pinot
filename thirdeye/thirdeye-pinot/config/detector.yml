@@ -17,6 +17,7 @@ alert: false
 autoload: false
 classifier: false
 holidayEventsLoader: false
+mockEventsLoader: true
 monitor: false
 pinotProxy: false
 scheduler: false
@@ -82,3 +83,35 @@ holidayEventsLoaderConfiguration:
        - "en.vietnamese#holiday@group.v.calendar.google.com"
   holidayLoadRange: 2592000000
   runFrequency: 7
+mockEventsLoaderConfiguration:
+  generators:
+    - type: HOLIDAY
+      arrivalType: exponential
+      arrivalMean: 86400000
+      durationType: fixed
+      durationMean: 86400000
+      seed: 0
+    - type: INFORMED
+      arrivalType: exponential
+      arrivalMean: 43200000
+      durationType: exponential
+      durationMean: 3600000
+      seed: 1
+    - type: CM
+      arrivalType: exponential
+      arrivalMean: 21600000
+      durationType: fixed
+      durationMean: 1800000
+      seed: 2
+    - type: CUSTOM
+      arrivalType: exponential
+      arrivalMean: 432000000
+      durationType: exponential
+      durationMean: 86400000
+      seed: 3
+    - type: LIX
+      arrivalType: exponential
+      arrivalMean: 259200000
+      durationType: exponential
+      durationMean: 604800000
+      seed: 4
