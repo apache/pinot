@@ -20,16 +20,18 @@ package org.apache.pinot.hadoop.io;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,93 +39,88 @@ import org.slf4j.LoggerFactory;
 /**
  * Basic Single Threaded {@link RecordWriter}
  */
-public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
+public class PinotRecordWriter<T> extends RecordWriter<NullWritable, T> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotRecordWriter.class);
+  private static final long MAX_FILE_SIZE = 64 * 1000000L;
 
-  private final static Logger LOGGER = LoggerFactory.getLogger(PinotRecordWriter.class);
-
-  private final SegmentGeneratorConfig _segmentConfig;
-  private final Path _workDir;
-  private final String _baseDataDir;
-  private PinotRecordSerialization _pinotRecordSerialization;
+  private final SegmentGeneratorConfig _segmentGeneratorConfig;
+  private final FieldExtractor<T> _fieldExtractor;
+  private final File _tempSegmentDir;
+  private final File _dataFileDir;
+  private final File _segmentTarDir;
   private final FileHandler _handler;
-  private long MAX_FILE_SIZE = 64 * 1000000L;
+  private final FileSystem _fileSystem;
+  private final Path _outputDir;
 
-  public PinotRecordWriter(SegmentGeneratorConfig segmentConfig, TaskAttemptContext context, Path workDir,
-      PinotRecordSerialization pinotRecordSerialization) {
-    _segmentConfig = segmentConfig;
-    _workDir = workDir;
-    _baseDataDir = PinotOutputFormat.getTempSegmentDir(context) + "/data";
-    String filename = PinotOutputFormat.getTableName(context);
-    try {
-      _handler = new FileHandler(_baseDataDir, filename, ".json", MAX_FILE_SIZE);
-      _handler.open(true);
-      _pinotRecordSerialization = pinotRecordSerialization;
-      _pinotRecordSerialization.init(context.getConfiguration(), segmentConfig.getSchema());
-    } catch (Exception e) {
-      throw new RuntimeException("Error initialize PinotRecordReader", e);
+  public PinotRecordWriter(TaskAttemptContext job, SegmentGeneratorConfig segmentGeneratorConfig,
+      FieldExtractor<T> fieldExtractor)
+      throws IOException {
+    _segmentGeneratorConfig = segmentGeneratorConfig;
+    _fieldExtractor = fieldExtractor;
+
+    _tempSegmentDir = new File(PinotOutputFormat.getTempSegmentDir(job));
+    if (_tempSegmentDir.exists()) {
+      FileUtils.cleanDirectory(_tempSegmentDir);
     }
+    _dataFileDir = new File(_tempSegmentDir, "dataFile");
+    FileUtils.forceMkdir(_dataFileDir);
+    _segmentTarDir = new File(_tempSegmentDir, "segmentTar");
+    FileUtils.forceMkdir(_segmentTarDir);
+
+    _handler = new FileHandler(_dataFileDir.getPath(), "data", ".json", MAX_FILE_SIZE);
+    _handler.open(true);
+
+    _fileSystem = FileSystem.get(job.getConfiguration());
+    _outputDir = FileOutputFormat.getOutputPath(job);
   }
 
   @Override
-  public void write(K key, V value)
-      throws IOException, InterruptedException {
-    PinotRecord record = _pinotRecordSerialization.serialize(value);
-    _handler.write(record.toBytes());
+  public void write(NullWritable key, T value)
+      throws IOException {
+    _handler.write(JsonUtils.objectToBytes(_fieldExtractor.extractFields(value)));
   }
 
   @Override
   public void close(TaskAttemptContext context)
-      throws IOException, InterruptedException {
-    _pinotRecordSerialization.close();
+      throws IOException {
     _handler.close();
-    File dir = new File(_baseDataDir);
-    _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    for (File f : dir.listFiles()) {
-      createSegment(f.getPath(), driver);
+
+    File[] dataFiles = _dataFileDir.listFiles();
+    assert dataFiles != null;
+    int numDataFiles = dataFiles.length;
+    for (int i = 0; i < numDataFiles; i++) {
+      createSegment(dataFiles[i], i);
     }
 
-    final FileSystem fs = FileSystem.get(new Configuration());
-    String localSegmentPath = new File(_segmentConfig.getOutDir(), _segmentConfig.getSegmentName()).getAbsolutePath();
-    String localTarPath = getLocalTarFile(PinotOutputFormat.getTempSegmentDir(context));
-    LOGGER.info("Trying to tar the segment to: {}", localTarPath);
-    TarGzCompressionUtils.createTarGzOfDirectory(localSegmentPath, localTarPath);
-    String hdfsTarPath =
-        _workDir + "/segmentTar/" + _segmentConfig.getSegmentName() + JobConfigConstants.TAR_GZ_FILE_EXT;
-
-    LOGGER.info("*********************************************************************");
-    LOGGER.info("Copy from : {} to {}", localTarPath, hdfsTarPath);
-    LOGGER.info("*********************************************************************");
-    fs.copyFromLocalFile(true, true, new Path(localTarPath), new Path(hdfsTarPath));
-    clean(PinotOutputFormat.getTempSegmentDir(context));
+    FileUtils.deleteDirectory(_tempSegmentDir);
   }
 
-  private void createSegment(String inputFile, SegmentIndexCreationDriver driver) {
+  private void createSegment(File dataFile, int sequenceId)
+      throws IOException {
+    LOGGER.info("Creating segment from data file: {} of sequence id: {}", dataFile, sequenceId);
+    _segmentGeneratorConfig.setInputFilePath(dataFile.getPath());
+    _segmentGeneratorConfig.setSequenceId(sequenceId);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     try {
-      _segmentConfig.setInputFilePath(inputFile);
-      driver.init(_segmentConfig);
+      driver.init(_segmentGeneratorConfig);
       driver.build();
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new IllegalStateException("Caught exception while creating segment from data file: " + dataFile);
     }
-  }
+    String segmentName = driver.getSegmentName();
+    File indexDir = driver.getOutputDirectory();
+    LOGGER.info("Created segment: {} from data file: {} into directory: {}", segmentName, dataFile, indexDir);
 
-  private String getLocalTarFile(String baseDir) {
-    String localTarDir = baseDir + "/segmentTar";
-    File f = new File(localTarDir);
-    if (!f.exists()) {
-      f.mkdirs();
-    }
-    return localTarDir + "/" + _segmentConfig.getSegmentName() + JobConfigConstants.TAR_GZ_FILE_EXT;
-  }
+    File segmentTarFile = new File(_segmentTarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    LOGGER.info("Tarring segment: {} from directory: {} to: {}", segmentName, indexDir, segmentTarFile);
+    TarGzCompressionUtils.createTarGzOfDirectory(indexDir.getPath(), segmentTarFile.getPath());
 
-  /**
-   * delete the temp files
-   */
-  private void clean(String baseDir) {
-    File f = new File(baseDir);
-    if (f.exists()) {
-      f.delete();
-    }
+    Path hdfsSegmentTarPath = new Path(_outputDir, segmentTarFile.getName());
+    LOGGER.info("Copying segment tar file from local: {} to HDFS: {}", segmentTarFile, hdfsSegmentTarPath);
+    _fileSystem.copyFromLocalFile(true, new Path(segmentTarFile.getPath()), hdfsSegmentTarPath);
+
+    LOGGER
+        .info("Finish creating segment: {} from data file: {} of sequence id: {} into HDFS: {}", segmentName, dataFile,
+            sequenceId, hdfsSegmentTarPath);
   }
 }

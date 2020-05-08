@@ -20,150 +20,100 @@ package org.apache.pinot.hadoop.io;
 
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
  * Generic Pinot Output Format implementation.
- *
- * TODO: Support star-tree creation
  */
-public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
+public class PinotOutputFormat<T> extends FileOutputFormat<NullWritable, T> {
 
-  private final SegmentGeneratorConfig _segmentConfig;
-
-  // Pinot temp directory to create segment.
+  // Temp directory to create segment
   public static final String TEMP_SEGMENT_DIR = "pinot.temp.segment.dir";
 
-  // Name of the table
-  public static final String TABLE_NAME = "pinot.table.name";
+  // Serialized table config
+  public static final String TABLE_CONFIG = "pinot.table.config";
 
-  // Name of the segment.
-  public static final String SEGMENT_NAME = "pinot.segment_name";
+  // Serialized schema
+  public static final String SCHEMA = "pinot.schema";
 
-  // Name of the time column.
-  public static final String TIME_COLUMN_NAME = "pinot.time_column_name";
-
-  // file containing schema for the data
-  public static final String SCHEMA = "pinot.schema.file";
-
-  public static final String PINOT_RECORD_SERIALIZATION_CLASS = "pinot.record.serialization.class";
-
-  public PinotOutputFormat() {
-    _segmentConfig = new SegmentGeneratorConfig();
-  }
+  // Class for the field extractor
+  public static final String FIELD_EXTRACTOR_CLASS = "pinot.field.extractor.class";
 
   public static void setTempSegmentDir(Job job, String segmentDir) {
     job.getConfiguration().set(PinotOutputFormat.TEMP_SEGMENT_DIR, segmentDir);
   }
 
   public static String getTempSegmentDir(JobContext job) {
-    return job.getConfiguration().get(PinotOutputFormat.TEMP_SEGMENT_DIR, ".data_" + getTableName(job));
+    return job.getConfiguration().get(PinotOutputFormat.TEMP_SEGMENT_DIR);
   }
 
-  public static void setTableName(Job job, String table) {
-    job.getConfiguration().set(PinotOutputFormat.TABLE_NAME, table);
+  public static void setTableConfig(Job job, TableConfig tableConfig) {
+    job.getConfiguration().set(PinotOutputFormat.TABLE_CONFIG, tableConfig.toJsonString());
   }
 
-  public static String getTableName(JobContext job) {
-    String table = job.getConfiguration().get(PinotOutputFormat.TABLE_NAME);
-    if (table == null) {
-      throw new RuntimeException("pinot table name not set.");
-    }
-    return table;
-  }
-
-  public static void setSegmentName(Job job, String segmentName) {
-    job.getConfiguration().set(PinotOutputFormat.SEGMENT_NAME, segmentName);
-  }
-
-  public static String getSegmentName(JobContext context) {
-    String segment = context.getConfiguration().get(PinotOutputFormat.SEGMENT_NAME);
-    if (segment == null) {
-      throw new RuntimeException("pinot segment name not set.");
-    }
-    return segment;
-  }
-
-  public static void setTimeColumnName(Job job, String timeColumnName) {
-    job.getConfiguration().set(PinotOutputFormat.TIME_COLUMN_NAME, timeColumnName);
-  }
-
-  public static String getTimeColumnName(JobContext context) {
-    return context.getConfiguration().get(PinotOutputFormat.TIME_COLUMN_NAME);
+  public static TableConfig getTableConfig(JobContext job)
+      throws IOException {
+    return JsonUtils.stringToObject(job.getConfiguration().get(PinotOutputFormat.TABLE_CONFIG), TableConfig.class);
   }
 
   public static void setSchema(Job job, Schema schema) {
     job.getConfiguration().set(PinotOutputFormat.SCHEMA, schema.toSingleLineJsonString());
   }
 
-  public static String getSchema(JobContext context) {
-    String schemaFile = context.getConfiguration().get(PinotOutputFormat.SCHEMA);
-    if (schemaFile == null) {
-      throw new RuntimeException("pinot schema file not set");
-    }
-    return schemaFile;
+  public static Schema getSchema(JobContext job)
+      throws IOException {
+    return JsonUtils.stringToObject(job.getConfiguration().get(PinotOutputFormat.SCHEMA), Schema.class);
   }
 
-  public static void setDataWriteSupportClass(Job job, Class<? extends PinotRecordSerialization> pinotSerialization) {
-    job.getConfiguration().set(PinotOutputFormat.PINOT_RECORD_SERIALIZATION_CLASS, pinotSerialization.getName());
+  public static SegmentGeneratorConfig getSegmentGeneratorConfig(JobContext job)
+      throws IOException {
+    TableConfig tableConfig = getTableConfig(job);
+    Schema schema = getSchema(job);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setOutDir(getTempSegmentDir(job) + "/segmentDir");
+    segmentGeneratorConfig.setTableName(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
+    segmentGeneratorConfig.setFormat(FileFormat.JSON);
+    return segmentGeneratorConfig;
   }
 
-  public static Class<?> getDataWriteSupportClass(JobContext context) {
-    String className = context.getConfiguration().get(PinotOutputFormat.PINOT_RECORD_SERIALIZATION_CLASS);
-    if (className == null) {
-      throw new RuntimeException("pinot data write support class not set");
-    }
+  public static void setFieldExtractorClass(Job job, Class<? extends FieldExtractor> fieldExtractorClass) {
+    job.getConfiguration().set(PinotOutputFormat.FIELD_EXTRACTOR_CLASS, fieldExtractorClass.getName());
+  }
+
+  public static <T> FieldExtractor<T> getFieldExtractor(JobContext job) {
+    Configuration conf = job.getConfiguration();
     try {
-      return context.getConfiguration().getClassByName(className);
-    } catch (ClassNotFoundException e) {
-      throw new RuntimeException(e);
+      //noinspection unchecked
+      return (FieldExtractor<T>) conf.getClassByName(conf.get(PinotOutputFormat.FIELD_EXTRACTOR_CLASS)).newInstance();
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Caught exception while creating instance of field extractor configured with key: " + FIELD_EXTRACTOR_CLASS);
     }
+  }
+
+  public static <T> PinotRecordWriter<T> getPinotRecordWriter(TaskAttemptContext job)
+      throws IOException {
+    SegmentGeneratorConfig segmentGeneratorConfig = getSegmentGeneratorConfig(job);
+    FieldExtractor<T> fieldExtractor = getFieldExtractor(job);
+    fieldExtractor.init(job.getConfiguration(), SchemaUtils.extractSourceFields(segmentGeneratorConfig.getSchema()));
+    return new PinotRecordWriter<>(job, segmentGeneratorConfig, fieldExtractor);
   }
 
   @Override
-  public RecordWriter<K, V> getRecordWriter(TaskAttemptContext context)
+  public PinotRecordWriter<T> getRecordWriter(TaskAttemptContext job)
       throws IOException {
-    configure(context.getConfiguration());
-    final PinotRecordSerialization dataWriteSupport = getDataWriteSupport(context);
-    initSegmentConfig(context);
-    Path workDir = getDefaultWorkFile(context, "");
-    return new PinotRecordWriter<>(_segmentConfig, context, workDir, dataWriteSupport);
-  }
-
-  /**
-   * The {@link #configure(Configuration)} method called before initialize the  {@link
-   * RecordWriter} Any implementation of {@link PinotOutputFormat} can use it to set additional
-   * configuration properties.
-   */
-  public void configure(Configuration conf) {
-
-  }
-
-  private PinotRecordSerialization getDataWriteSupport(TaskAttemptContext context) {
-    try {
-      return (PinotRecordSerialization) PinotOutputFormat.getDataWriteSupportClass(context).newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException("Error initialize data write support class", e);
-    }
-  }
-
-  private void initSegmentConfig(JobContext context)
-      throws IOException {
-    _segmentConfig.setFormat(FileFormat.JSON);
-    _segmentConfig.setOutDir(PinotOutputFormat.getTempSegmentDir(context) + "/segmentDir");
-    _segmentConfig.setTableName(PinotOutputFormat.getTableName(context));
-    _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
-    Schema schema = Schema.fromString(PinotOutputFormat.getSchema(context));
-    _segmentConfig.setSchema(schema);
-    _segmentConfig.setTime(PinotOutputFormat.getTimeColumnName(context), schema);
+    return getPinotRecordWriter(job);
   }
 }

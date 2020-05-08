@@ -20,150 +20,111 @@ package org.apache.pinot.hadoop.io;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
-import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.hadoop.conf.Configuration;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskAttemptID;
-import org.apache.hadoop.mapreduce.TaskID;
-import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.testng.Assert;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 
 public class PinotOutputFormatTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "PinotOutputFormatTest");
+  private static final String RAW_TABLE_NAME = "testTable";
 
-  private TaskAttemptContext fakeTaskAttemptContext;
-  private Job job;
-  private Configuration conf;
-  private PinotOutputFormat outputFormat;
-  private File outputTempDir;
-  private String segmentTarPath;
-
-  private void init(String indexType)
-      throws IOException {
-    conf = new Configuration();
-    job = Job.getInstance(conf);
-    fakeTaskAttemptContext = mock(TaskAttemptContext.class);
-    outputFormat = new JsonPinotOutputFormat();
-    outputTempDir =
-        Files.createTempDirectory(PinotOutputFormatTest.class.getName() + indexType + "_io_output").toFile();
-    File workingTempDir =
-        Files.createTempDirectory(PinotOutputFormatTest.class.getName() + indexType + "_io_working_dir").toFile();
-    // output path
-    Path outDir = new Path(outputTempDir.getAbsolutePath());
-    PinotOutputFormat.setOutputPath(job, outDir);
-    PinotOutputFormat.setTableName(job, "emp");
-    PinotOutputFormat.setSegmentName(job, indexType + "segment_one");
-    PinotOutputFormat.setTimeColumnName(job, "epochDays");
-    PinotOutputFormat.setTempSegmentDir(job, workingTempDir.getAbsolutePath());
-
-    Schema schema = Schema.fromString(getSchema());
-    PinotOutputFormat.setSchema(job, schema);
-    mockTaskAttemptContext(indexType);
-    segmentTarPath =
-        "_temporary/0/_temporary/attempt_foo_task_" + indexType + "_0123_r_000002_2/part-r-00002/segmentTar";
+  @BeforeClass
+  public void setUp() {
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  private void mockTaskAttemptContext(String indexType) {
-    TaskAttemptID fakeTaskId = new TaskAttemptID(new TaskID("foo_task_" + indexType, 123, TaskType.REDUCE, 2), 2);
-    when(fakeTaskAttemptContext.getTaskAttemptID()).thenReturn(fakeTaskId);
-    when(fakeTaskAttemptContext.getConfiguration()).thenReturn(job.getConfiguration());
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    FileUtils.forceDelete(TEMP_DIR);
   }
 
   @Test
-  public void verifyRawIndex()
+  public void testPinotOutputFormat()
       throws Exception {
-    runPinotOutputFormatTest("raw");
-  }
+    Job job = Job.getInstance();
+    File outputDir = new File(TEMP_DIR, "output");
+    File tempSegmentDir = new File(TEMP_DIR, "tempSegment");
+    PinotOutputFormat.setOutputPath(job, new Path(outputDir.getAbsolutePath()));
+    PinotOutputFormat.setTempSegmentDir(job, tempSegmentDir.getAbsolutePath());
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    PinotOutputFormat.setTableConfig(job, tableConfig);
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension("id", FieldSpec.DataType.INT)
+            .addSingleValueDimension("name", FieldSpec.DataType.STRING).addMetric("salary", FieldSpec.DataType.INT)
+            .build();
+    PinotOutputFormat.setSchema(job, schema);
+    PinotOutputFormat.setFieldExtractorClass(job, JsonBasedFieldExtractor.class);
 
-  private void runPinotOutputFormatTest(String indexType)
-      throws Exception {
-    init(indexType);
-    Map<Integer, Emp> inputMap = addTestData();
-    validate(inputMap);
-  }
-
-  private void validate(Map<Integer, Emp> inputMap)
-      throws Exception {
-    File segmentTarOutput = new File(outputTempDir, segmentTarPath);
-    File untarOutput = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + "_segmentUnTar").toFile();
-    for (File tarFile : segmentTarOutput.listFiles()) {
-      TarGzCompressionUtils.unTar(tarFile, untarOutput);
+    TaskAttemptContext taskAttemptContext = mock(TaskAttemptContext.class);
+    when(taskAttemptContext.getConfiguration()).thenReturn(job.getConfiguration());
+    PinotRecordWriter<Employee> pinotRecordWriter = PinotOutputFormat.getPinotRecordWriter(taskAttemptContext);
+    int numRecords = 10;
+    List<Employee> records = new ArrayList<>();
+    for (int i = 0; i < numRecords; i++) {
+      Employee employee = new Employee(i, "name" + i, 1000 * i);
+      pinotRecordWriter.write(null, employee);
+      records.add(employee);
     }
+    pinotRecordWriter.close(taskAttemptContext);
 
-    File outputDir = new File(untarOutput, PinotOutputFormat.getSegmentName(fakeTaskAttemptContext));
-    RecordReader recordReader = new PinotSegmentRecordReader(outputDir, Schema.fromString(getSchema()), null);
-    Map<Integer, GenericRow> resultMap = new HashMap<>();
-    while (recordReader.hasNext()) {
+    String segmentName = RAW_TABLE_NAME + "_0";
+    File segmentDir = new File(TEMP_DIR, "segment");
+    TarGzCompressionUtils
+        .unTar(new File(outputDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), segmentDir);
+    File indexDir = new File(segmentDir, segmentName);
+    RecordReader recordReader = new PinotSegmentRecordReader(indexDir, null, null);
+    for (Employee record : records) {
       GenericRow row = recordReader.next();
-      resultMap.put((Integer) row.getValue("id"), row);
+      assertEquals(row.getValue("id"), record.getId());
+      assertEquals(row.getValue("name"), record.getName());
+      assertEquals(row.getValue("salary"), record.getSalary());
     }
-
-    Assert.assertEquals(resultMap.size(), inputMap.size());
-    Assert.assertEquals(resultMap.get(8).getValue("name"), inputMap.get(8).name);
+    assertFalse(recordReader.hasNext());
   }
 
-  private Map<Integer, Emp> addTestData()
-      throws IOException, InterruptedException {
-    int days = 2000;
-    int sal = 20;
-    RecordWriter<Object, Emp> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
-    Map<Integer, Emp> inputMap = new HashMap<>();
-    for (int i = 0; i < 10; i++) {
-      String name = "name " + i;
-      Emp e = new Emp(i, name, days + i, sal + i);
-      writer.write(null, e);
-      inputMap.put(i, e);
-    }
-    writer.close(fakeTaskAttemptContext);
-    return inputMap;
-  }
+  public static class Employee {
+    private final int _id;
+    private final String _name;
+    private final int _salary;
 
-  private static class Emp implements Serializable {
-
-    public int id;
-    public String name;
-    public int epochDays;
-    public int salary;
-
-    public Emp(int id, String name, int epochDays, int salary) {
-      this.id = id;
-      this.name = name;
-      this.epochDays = epochDays;
-      this.salary = salary;
+    private Employee(int id, String name, int salary) {
+      _id = id;
+      _name = name;
+      _salary = salary;
     }
 
-    @Override
-    public String toString() {
-      return "{\"Emp\":{" + "                        \"id\":\"" + id + "\"" + ",                         \"name\":\""
-          + name + "\"" + ",                         \"epochDays\":\"" + epochDays + "\""
-          + ",                         \"salary\":\"" + salary + "\"" + "}}";
+    public int getId() {
+      return _id;
     }
-  }
 
-  private String getSchema() {
-    return "{\n" + "  \"dimensionFieldSpecs\" : [\n" + "    {\n" + "      \"name\": \"id\",\n"
-        + "      \"dataType\" : \"INT\",\n" + "      \"delimiter\" : null,\n" + "      \"singleValueField\" : true\n"
-        + "    },\n" + "    {\n" + "      \"name\": \"name\",\n" + "      \"dataType\" : \"STRING\",\n"
-        + "      \"delimiter\" : null,\n" + "      \"singleValueField\" : true\n" + "    }\n" + "  ],\n"
-        + "  \"timeFieldSpec\" : {\n" + "    \"incomingGranularitySpec\" : {\n" + "      \"timeType\" : \"DAYS\",\n"
-        + "      \"dataType\" : \"INT\",\n" + "      \"name\" : \"epochDays\"\n" + "    }\n" + "  },\n"
-        + "  \"metricFieldSpecs\" : [\n" + "    {\n" + "      \"name\" : \"salary\",\n"
-        + "      \"dataType\" : \"INT\",\n" + "      \"delimiter\" : null,\n" + "      \"singleValueField\" : true\n"
-        + "    }\n" + "   ],\n" + "  \"schemaName\" : \"emp\"\n" + "}";
+    public String getName() {
+      return _name;
+    }
+
+    public int getSalary() {
+      return _salary;
+    }
   }
 }
