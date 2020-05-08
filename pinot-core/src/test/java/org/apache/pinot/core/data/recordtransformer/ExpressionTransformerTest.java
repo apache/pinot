@@ -145,10 +145,9 @@ public class ExpressionTransformerTest {
     expressionTransformer.transform(genericRow);
     Assert.assertEquals(genericRow.getValue("fullName"), "John N Denver");
 
-    pinotSchema = new Schema();
-    TimeFieldSpec timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"), new TimeGranularitySpec(
-        FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing"));
-    pinotSchema.addField(timeFieldSpec);
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing")).build();
     expressionTransformer = new ExpressionTransformer(pinotSchema);
 
     genericRow = new GenericRow();

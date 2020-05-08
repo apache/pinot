@@ -29,6 +29,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -83,8 +84,8 @@ public class DateTruncTransformFunctionTest
     GenericRow row = new GenericRow();
     row.init(ImmutableMap.of(TIME_COLUMN, zmillisInput));
     List<GenericRow> rows = ImmutableList.of(row);
-    Schema schema = new Schema();
-    schema.addField(new TimeFieldSpec(TIME_COLUMN, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
+    Schema schema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
 

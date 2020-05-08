@@ -147,7 +147,7 @@ public class DataGenerator {
         break;
 
       case TIME:
-        spec = new TimeFieldSpec(column, dataType, genSpec.getTimeUnitMap().get(column));
+        spec = new TimeFieldSpec(new TimeGranularitySpec(dataType, genSpec.getTimeUnitMap().get(column), column));
         break;
 
       default:

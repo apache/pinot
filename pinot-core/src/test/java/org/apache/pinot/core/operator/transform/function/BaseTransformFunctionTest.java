@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -118,14 +119,15 @@ public abstract class BaseTransformFunctionTest {
       rows.add(row);
     }
 
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(INT_SV_COLUMN, FieldSpec.DataType.INT, true));
-    schema.addField(new DimensionFieldSpec(LONG_SV_COLUMN, FieldSpec.DataType.LONG, true));
-    schema.addField(new DimensionFieldSpec(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT, true));
-    schema.addField(new DimensionFieldSpec(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE, true));
-    schema.addField(new DimensionFieldSpec(STRING_SV_COLUMN, FieldSpec.DataType.STRING, true));
-    schema.addField(new DimensionFieldSpec(INT_MV_COLUMN, FieldSpec.DataType.INT, false));
-    schema.addField(new TimeFieldSpec(TIME_COLUMN, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(INT_SV_COLUMN, FieldSpec.DataType.INT)
+        .addSingleValueDimension(LONG_SV_COLUMN, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT)
+        .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null)
+        .build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
 

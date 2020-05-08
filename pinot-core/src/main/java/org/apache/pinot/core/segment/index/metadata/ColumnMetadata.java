@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -392,7 +393,7 @@ public class ColumnMetadata {
         this.fieldSpec = new MetricFieldSpec(columnName, dataType);
         break;
       case TIME:
-        this.fieldSpec = new TimeFieldSpec(columnName, dataType, timeUnit);
+        this.fieldSpec = new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, columnName));
         break;
       case DATE_TIME:
         this.fieldSpec = new DateTimeFieldSpec(columnName, dataType, dateTimeFormat, dateTimeGranularity);

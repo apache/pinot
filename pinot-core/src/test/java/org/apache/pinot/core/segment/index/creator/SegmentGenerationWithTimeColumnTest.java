@@ -37,6 +37,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -111,14 +112,15 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   private Schema createSchema(boolean isSimpleDate) {
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(STRING_COL_NAME, FieldSpec.DataType.STRING, true));
+    Schema.SchemaBuilder builder =
+        new Schema.SchemaBuilder().addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING);
     if (isSimpleDate) {
-      schema.addField(new TimeFieldSpec(TIME_COL_NAME, FieldSpec.DataType.INT, TimeUnit.DAYS));
+      builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
+          TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), TIME_COL_NAME), null);
     } else {
-      schema.addField(new TimeFieldSpec(TIME_COL_NAME, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
+      builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COL_NAME), null);
     }
-    return schema;
+    return builder.build();
   }
 
   private TableConfig createTableConfig() {
@@ -130,13 +132,8 @@ public class SegmentGenerationWithTimeColumnTest {
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setRawIndexCreationColumns(schema.getDimensionNames());
-
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setTimeColumnName(TIME_COL_NAME);
-    if (isSimpleDate) {
-      config.setSimpleDateFormat(TIME_COL_FORMAT);
-    }
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
