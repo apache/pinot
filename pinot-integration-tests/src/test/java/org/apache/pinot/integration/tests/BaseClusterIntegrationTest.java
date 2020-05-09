@@ -69,7 +69,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final String DEFAULT_SORTED_COLUMN = "Carrier";
   private static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
   private static final List<String> DEFAULT_RAW_INDEX_COLUMNS =
-      Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
+      Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "CancellationCode");
   private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Arrays.asList("FlightNum", "Origin");
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
