@@ -63,10 +63,13 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -94,6 +97,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   private List<GenericRow> _rows = new ArrayList<>();
   private RecordReader _recordReader;
   Schema _schema;
+  private TableConfig _tableConfig;
 
   private List<IndexSegment> _indexSegments = new ArrayList<>(1);
   private List<SegmentDataManager> _segmentDataManagers = new ArrayList<>();
@@ -139,13 +143,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension(QUERY_LOG_TEXT_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
   }
 
   private void createSegment()
       throws Exception {
     textIndexColumns.add(QUERY_LOG_TEXT_COL_NAME);
     textIndexColumns.add(SKILLS_TEXT_COL_NAME);
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, _schema);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(TABLE_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);

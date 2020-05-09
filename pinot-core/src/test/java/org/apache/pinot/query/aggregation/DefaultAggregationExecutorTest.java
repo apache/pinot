@@ -47,10 +47,12 @@ import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -169,12 +171,11 @@ public class DefaultAggregationExecutorTest {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig();
+    SegmentGeneratorConfig config =
+        new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build(),
+            buildSchema());
     config.setSegmentName(SEGMENT_NAME);
     config.setOutDir(INDEX_DIR.getAbsolutePath());
-
-    Schema schema = buildSchema();
-    config.setSchema(schema);
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {

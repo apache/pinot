@@ -37,12 +37,15 @@ import org.apache.commons.collections.Predicate;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +58,8 @@ public class SegmentTestUtils {
       @Nonnull File outputDir, @Nonnull String tableName)
       throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig =
-        new SegmentGeneratorConfig(null, extractSchemaFromAvroWithoutTime(avroFile));
+        new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),
+            extractSchemaFromAvroWithoutTime(avroFile));
     segmentGeneratorConfig.setInputFilePath(avroFile.getAbsolutePath());
     segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
     segmentGeneratorConfig.setTableName(tableName);
@@ -66,7 +70,8 @@ public class SegmentTestUtils {
       String timeColumn, TimeUnit timeUnit, String tableName)
       throws IOException {
     final SegmentGeneratorConfig segmentGenSpec =
-        new SegmentGeneratorConfig(null, extractSchemaFromAvroWithoutTime(inputAvro));
+        new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),
+            extractSchemaFromAvroWithoutTime(inputAvro));
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeColumnName(timeColumn);
     segmentGenSpec.setSegmentTimeUnit(timeUnit);
@@ -79,8 +84,8 @@ public class SegmentTestUtils {
   }
 
   public static SegmentGeneratorConfig getSegmentGeneratorConfigWithSchema(File inputAvro, File outputDir,
-      String tableName, Schema schema) {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(null, schema);
+      String tableName, TableConfig tableConfig, Schema schema) {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
     segmentGeneratorConfig.setFormat(FileFormat.AVRO);

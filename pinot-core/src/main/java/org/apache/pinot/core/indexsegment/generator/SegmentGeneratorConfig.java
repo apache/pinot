@@ -112,24 +112,22 @@ public class SegmentGeneratorConfig {
    *               However, for maintaining backward compatibility, taking it from schema if table config is null.
    *               This will not work once we start supporting multiple time columns (DateTimeFieldSpec)
    */
-  public SegmentGeneratorConfig(@Nullable TableConfig tableConfig, Schema schema) {
+  public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(schema);
+    Preconditions.checkNotNull(tableConfig);
     setSchema(schema);
 
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
-    //  But table config is not mandatory, and cannot be easily enforced as the instantiation can happen in external code.
-    //  Hence, if table config is null, but timeFieldSpec is not null, read time from schema
-    //  Once we move to multiple time columns - DateTimeFieldSpec - table config has to be provided with valid time
-    //  If more than 1 dateTimeFieldSpec is found along with null table config, throw exception.
+    //  If time column name is not set in table config, read time from schema.
+    // WARN: Once we move to DateTimeFieldSpec - table config has to be provided with valid time - if time needs to be set.
+    //  We cannot deduce whether 1) one of the provided DateTimes should be used as time column 2) if yes, which one
+    //  Even if only 1 DateTime exists, we cannot determine whether it should be primary time column (there could be no time column for table (REFRESH), but still multiple DateTimeFieldSpec)
     String timeColumnName = null;
-    if (tableConfig != null && tableConfig.getValidationConfig() != null) {
+    if (tableConfig.getValidationConfig() != null) {
       timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     }
     setTime(timeColumnName, schema);
 
-    if (tableConfig == null) {
-      return;
-    }
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig != null) {
       List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();

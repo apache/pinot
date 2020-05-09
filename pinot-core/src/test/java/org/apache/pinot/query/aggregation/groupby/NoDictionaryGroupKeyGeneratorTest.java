@@ -46,11 +46,14 @@ import org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGr
 import org.apache.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -217,7 +220,9 @@ public class NoDictionaryGroupKeyGeneratorTest {
       schema.addField(dimensionFieldSpec);
     }
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(null, schema);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setRawIndexCreationColumns(Arrays.asList(NO_DICT_COLUMN_NAMES));
 
     config.setOutDir(INDEX_DIR_PATH);
