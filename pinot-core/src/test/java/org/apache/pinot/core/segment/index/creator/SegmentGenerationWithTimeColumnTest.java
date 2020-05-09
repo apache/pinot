@@ -116,7 +116,7 @@ public class SegmentGenerationWithTimeColumnTest {
         new Schema.SchemaBuilder().addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING);
     if (isSimpleDate) {
       builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
-          TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), TIME_COL_NAME), null);
+          TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString() + ":" + TIME_COL_FORMAT, TIME_COL_NAME), null);
     } else {
       builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COL_NAME), null);
     }

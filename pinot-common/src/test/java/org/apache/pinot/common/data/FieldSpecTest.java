@@ -128,8 +128,6 @@ public class FieldSpecTest {
 
   /**
    * Test {@link TimeFieldSpec} constructors.
-   *
-   * NOTE:
    */
   @Test
   public void testTimeFieldSpecConstructor() {
