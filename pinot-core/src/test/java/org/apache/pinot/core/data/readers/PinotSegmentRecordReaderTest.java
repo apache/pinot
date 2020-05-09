@@ -77,7 +77,7 @@ public class PinotSegmentRecordReaderTest {
     return new Schema.SchemaBuilder()
         .setSchemaName("schema")
         .addSingleValueDimension(D_SV_1, DataType.STRING)
-        .addSingleValueDimension(D_MV_1, DataType.STRING)
+        .addMultiValueDimension(D_MV_1, DataType.STRING)
         .addMetric(M1, DataType.INT)
         .addMetric(M2, DataType.FLOAT)
         .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, TIME), null)
