@@ -1,255 +1,20 @@
-#
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
-#
-
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: superset-config
-  namespace: pinot-quickstart
-data:
-  superset_config.py: |-
-    #---------------------------------------------------------
-    # Superset specific config
-    #---------------------------------------------------------
-    ROW_LIMIT = 5000
-
-    SUPERSET_WEBSERVER_PORT = 8088
-    SUPERSET_HOME = '/app/superset_home/superset.db'
-    SUPERSET_ENV = 'production'
-    #---------------------------------------------------------
-
-    #---------------------------------------------------------
-    # Flask App Builder configuration
-    #---------------------------------------------------------
-    # Your App secret key
-    SECRET_KEY = '\2\1thisismyscretkey\1\2\e\y\y\h'
-
-    # The SQLAlchemy connection string to your database backend
-    # This connection defines the path to the database that stores your
-    # superset metadata (slices, connections, tables, dashboards, ...).
-    # Note that the connection information to connect to the datasources
-    # you want to explore are managed directly in the web UI
-    SQLALCHEMY_DATABASE_URI = 'sqlite:////app/superset_home/superset.db'
-
-    # Flask-WTF flag for CSRF
-    WTF_CSRF_ENABLED = True
-    # Add endpoints that need to be exempt from CSRF protection
-    WTF_CSRF_EXEMPT_LIST = []
-    # A CSRF token that expires in 1 year
-    WTF_CSRF_TIME_LIMIT = 60 * 60 * 24 * 365
-
-    # Set this API key to enable Mapbox visualizations
-    MAPBOX_API_KEY = ''
-
-  pinot_example_datasource.yaml: |-
-    databases:
-    - database_name: pinot-quickstart
-      sqlalchemy_uri: pinot+http://pinot-broker:8099/query?server=http://pinot-controller:9000/
-      tables:
-        - columns:
-            - column_name: SecondsSinceEpoch
-              is_dttm: true
-              python_date_format: epoch_s
-              type: LONG
-            - column_name: ArrDel15
-              type: LONG
-            - column_name: DepDel15
-              type: LONG
-            - column_name: ArrTimeBlk
-              type: STRING
-            - column_name: CRSArrTime
-              type: LONG
-            - column_name: DestAirportSeqID
-              type: LONG
-            - column_name: DivAirportSeqIDs
-              type: LONG
-            - column_name: DestAirportID
-              type: LONG
-            - column_name: DivAirportIDs
-              type: LONG
-            - column_name: DivArrDelay
-              type: LONG
-            - column_name: DivActualElapsedTime
-              type: LONG
-            - column_name: ArrivalDelayGroups
-              type: LONG
-            - column_name: OriginAirportSeqID
-              type: LONG
-            - column_name: OriginAirportID
-              type: LONG
-            - column_name: AirlineID
-              type: LONG
-            - column_name: DivAirports
-              type: STRING
-            - column_name: LateAircraftDelay
-              type: LONG
-            - column_name: DivAirportLandings
-              type: LONG
-            - column_name: ArrDelayMinutes
-              type: LONG
-            - column_name: NASDelay
-              type: LONG
-            - column_name: ArrDelay
-              type: LONG
-            - column_name: ActualElapsedTime
-              type: LONG
-            - column_name: LongestAddGTime
-              type: LONG
-            - column_name: TotalAddGTime
-              type: LONG
-            - column_name: RandomAirports
-              type: STRING
-            - column_name: AirTime
-              type: LONG
-            - column_name: ArrTime
-              type: LONG
-            - column_name: DepTimeBlk
-              type: STRING
-            - column_name: CancellationCode
-              type: STRING
-            - column_name: DestCityMarketID
-              type: LONG
-            - column_name: OriginCityMarketID
-              type: LONG
-            - column_name: DestCityName
-              type: STRING
-            - column_name: CRSDepTime
-              type: LONG
-            - column_name: CarrierDelay
-              type: LONG
-            - column_name: CRSElapsedTime
-              type: LONG
-            - column_name: OriginCityName
-              type: STRING
-            - column_name: UniqueCarrier
-              type: STRING
-            - column_name: Carrier
-              type: STRING
-            - column_name: Cancelled
-              type: LONG
-            - column_name: DepartureDelayGroups
-              type: LONG
-            - column_name: DepDelayMinutes
-              type: LONG
-            - column_name: DivReachedDest
-              type: LONG
-            - column_name: DivDistance
-              type: LONG
-            - column_name: DepDelay
-              type: LONG
-            - column_name: DaysSinceEpoch
-              type: LONG
-            - column_name: FlightDate
-              type: STRING
-            - column_name: DestStateFips
-              type: LONG
-            - column_name: FirstDepTime
-              type: LONG
-            - column_name: DivLongestGTimes
-              type: LONG
-            - column_name: DivTotalGTimes
-              type: LONG
-            - column_name: DistanceGroup
-              type: LONG
-            - column_name: DestStateName
-              type: STRING
-            - column_name: DivTailNums
-              type: STRING
-            - column_name: DestState
-              type: STRING
-            - column_name: Dest
-              type: STRING
-            - column_name: DayofMonth
-              type: LONG
-            - column_name: DayOfWeek
-              type: LONG
-            - column_name: DivWheelsOffs
-              type: LONG
-            - column_name: DivWheelsOns
-              type: LONG
-            - column_name: SecurityDelay
-              type: LONG
-            - column_name: DepTime
-              type: LONG
-            - column_name: WeatherDelay
-              type: LONG
-            - column_name: DestWac
-              type: LONG
-            - column_name: Distance
-              type: LONG
-            - column_name: Diverted
-              type: LONG
-            - column_name: FlightNum
-              type: LONG
-            - column_name: OriginStateFips
-              type: LONG
-            - column_name: Flights
-              type: LONG
-            - column_name: TaxiIn
-              type: LONG
-            - column_name: OriginStateName
-              type: STRING
-            - column_name: TailNum
-              type: STRING
-            - column_name: OriginState
-              type: STRING
-            - column_name: Origin
-              type: STRING
-            - column_name: Month
-              type: LONG
-            - column_name: TaxiOut
-              type: LONG
-            - column_name: OriginWac
-              type: LONG
-            - column_name: WheelsOff
-              type: LONG
-            - column_name: WheelsOn
-              type: LONG
-            - column_name: Quarter
-              type: LONG
-            - column_name: Year
-              type: LONG
-          metrics:
-            - expression: COUNT(*)
-              metric_name: count
-              metric_type: count
-              verbose_name: COUNT(*)
-          table_name: airlineStats
-
-  pinot_example_dashboard.json: |-
+{
+  "dashboards": [
     {
-      "dashboards": [
-      {
-        "__Dashboard__": {
-          "css": "",
-          "dashboard_title": "AirlineStats",
-          "description": null,
-          "json_metadata": "{\"remote_id\": 2, \"import_time\": 1572681302, \"filter_immune_slices\": [], \"timed_refresh_immune_slices\": [], \"filter_immune_slice_fields\": {}, \"expanded_slices\": {}, \"refresh_frequency\": 0, \"default_filters\": \"{}\"}",
-          "position_json": "{\"CHART-EPWTG21UAl\":{\"children\":[],\"id\":\"CHART-EPWTG21UAl\",\"meta\":{\"chartId\":2,\"height\":50,\"sliceName\":\"Destination States Flight Time Series\",\"width\":4},\"parents\":[\"ROOT_ID\",\"GRID_ID\",\"ROW-DHJKqb0-2\"],\"type\":\"CHART\"},\"CHART-F0aEdk-eR-\":{\"children\":[],\"id\":\"CHART-F0aEdk-eR-\",\"meta\":{\"chartId\":3,\"height\":50,\"sliceName\":\"Flight Count Per City\",\"width\":4},\"parents\":[\"ROOT_ID\",\"GRID_ID\",\"ROW-DHJKqb0-2\"],\"type\":\"CHART\"},\"CHART-YLcJ6aWYSa\":{\"children\":[],\"id\":\"CHART-YLcJ6aWYSa\",\"meta\":{\"chartId\":1,\"height\":50,\"sliceName\":\"Flight Destination City Count\",\"width\":4},\"parents\":[\"ROOT_ID\",\"GRID_ID\",\"ROW-DHJKqb0-2\"],\"type\":\"CHART\"},\"DASHBOARD_VERSION_KEY\":\"v2\",\"GRID_ID\":{\"children\":[\"ROW-DHJKqb0-2\"],\"id\":\"GRID_ID\",\"parents\":[\"ROOT_ID\"],\"type\":\"GRID\"},\"HEADER_ID\":{\"id\":\"HEADER_ID\",\"meta\":{\"text\":\"AirlineStats\"},\"type\":\"HEADER\"},\"ROOT_ID\":{\"children\":[\"GRID_ID\"],\"id\":\"ROOT_ID\",\"type\":\"ROOT\"},\"ROW-DHJKqb0-2\":{\"children\":[\"CHART-YLcJ6aWYSa\",\"CHART-EPWTG21UAl\",\"CHART-F0aEdk-eR-\"],\"id\":\"ROW-DHJKqb0-2\",\"meta\":{\"background\":\"BACKGROUND_TRANSPARENT\"},\"parents\":[\"ROOT_ID\",\"GRID_ID\"],\"type\":\"ROW\"}}",
-          "slices": [
+      "__Dashboard__": {
+        "css": "",
+        "dashboard_title": "AirlineStats",
+        "description": null,
+        "json_metadata": "{\"default_filters\": \"{}\", \"expanded_slices\": {}, \"import_time\": 1584979678, \"refresh_frequency\": 0, \"remote_id\": 1, \"timed_refresh_immune_slices\": []}",
+        "position_json": "{\"CHART-EPWTG21UAl\": {\"children\": [], \"id\": \"CHART-EPWTG21UAl\", \"meta\": {\"chartId\": 2, \"height\": 50, \"sliceName\": \"Destination States Flight Time Series\", \"width\": 4}, \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-DHJKqb0-2\"], \"type\": \"CHART\"}, \"CHART-F0aEdk-eR-\": {\"children\": [], \"id\": \"CHART-F0aEdk-eR-\", \"meta\": {\"chartId\": 3, \"height\": 50, \"sliceName\": \"Flight Count Per City\", \"width\": 4}, \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-DHJKqb0-2\"], \"type\": \"CHART\"}, \"CHART-YLcJ6aWYSa\": {\"children\": [], \"id\": \"CHART-YLcJ6aWYSa\", \"meta\": {\"chartId\": 1, \"height\": 50, \"sliceName\": \"Flight Destination City Count\", \"width\": 4}, \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-DHJKqb0-2\"], \"type\": \"CHART\"}, \"DASHBOARD_VERSION_KEY\": \"v2\", \"GRID_ID\": {\"children\": [\"ROW-DHJKqb0-2\"], \"id\": \"GRID_ID\", \"parents\": [\"ROOT_ID\"], \"type\": \"GRID\"}, \"HEADER_ID\": {\"id\": \"HEADER_ID\", \"meta\": {\"text\": \"AirlineStats\"}, \"type\": \"HEADER\"}, \"ROOT_ID\": {\"children\": [\"GRID_ID\"], \"id\": \"ROOT_ID\", \"type\": \"ROOT\"}, \"ROW-DHJKqb0-2\": {\"children\": [\"CHART-YLcJ6aWYSa\", \"CHART-EPWTG21UAl\", \"CHART-F0aEdk-eR-\"], \"id\": \"ROW-DHJKqb0-2\", \"meta\": {\"background\": \"BACKGROUND_TRANSPARENT\"}, \"parents\": [\"ROOT_ID\", \"GRID_ID\"], \"type\": \"ROW\"}}",
+        "slices": [
           {
             "__Slice__": {
               "cache_timeout": null,
               "datasource_name": "airlineStats",
               "datasource_type": "table",
               "id": 1,
-              "params": "{\"adhoc_filters\": [], \"bar_stacked\": false, \"bottom_margin\": \"auto\", \"color_scheme\": \"bnbColors\", \"columns\": [], \"contribution\": false, \"datasource\": \"1__table\", \"granularity_sqla\": null, \"groupby\": [\"DestCityName\"], \"label_colors\": {}, \"metrics\": [\"count\"], \"order_bars\": false, \"reduce_x_ticks\": false, \"row_limit\": 10000, \"show_bar_value\": false, \"show_controls\": false, \"show_legend\": true, \"slice_id\": 1, \"time_grain_sqla\": \"P1D\", \"time_range\": \"Last week\", \"url_params\": {}, \"viz_type\": \"dist_bar\", \"x_axis_label\": \"\", \"x_ticks_layout\": \"auto\", \"y_axis_format\": \"SMART_NUMBER\", \"y_axis_label\": \"\", \"remote_id\": 1, \"datasource_name\": \"airlineStats\", \"schema\": null, \"database_name\": \"pinot-quickstart\", \"import_time\": 1572681302}",
+              "params": "{\"adhoc_filters\": [], \"bar_stacked\": false, \"bottom_margin\": \"auto\", \"color_scheme\": \"bnbColors\", \"columns\": [], \"contribution\": false, \"database_name\": \"pinot-quickstart\", \"datasource\": \"1__table\", \"datasource_name\": \"airlineStats\", \"granularity_sqla\": null, \"groupby\": [\"DestCityName\"], \"import_time\": 1584979678, \"label_colors\": {}, \"metrics\": [\"count\"], \"order_bars\": false, \"reduce_x_ticks\": false, \"remote_id\": 1, \"row_limit\": 10000, \"schema\": null, \"show_bar_value\": false, \"show_controls\": false, \"show_legend\": true, \"slice_id\": 1, \"time_range\": \"Last week\", \"url_params\": {}, \"viz_type\": \"dist_bar\", \"x_axis_label\": \"\", \"x_ticks_layout\": \"auto\", \"y_axis_format\": \"SMART_NUMBER\", \"y_axis_label\": \"\"}",
               "slice_name": "Flight Destination City Count",
               "viz_type": "dist_bar"
             }
@@ -260,7 +25,7 @@ data:
               "datasource_name": "airlineStats",
               "datasource_type": "table",
               "id": 2,
-              "params": "{\"adhoc_filters\": [], \"annotation_layers\": [], \"bottom_margin\": \"auto\", \"color_scheme\": \"bnbColors\", \"comparison_type\": \"values\", \"contribution\": false, \"datasource\": \"1__table\", \"granularity_sqla\": \"SecondsSinceEpoch\", \"groupby\": [\"DestStateName\"], \"label_colors\": {}, \"left_margin\": \"auto\", \"line_interpolation\": \"linear\", \"metrics\": [\"count\"], \"order_desc\": true, \"resample_method\": null, \"resample_rule\": null, \"rich_tooltip\": true, \"rolling_type\": \"None\", \"row_limit\": 10000, \"send_time_range\": false, \"show_brush\": \"auto\", \"show_legend\": true, \"show_markers\": false, \"time_grain_sqla\": \"P1D\", \"time_range\": \"No filter\", \"timeseries_limit_metric\": null, \"url_params\": {}, \"viz_type\": \"line\", \"x_axis_format\": \"smart_date\", \"x_axis_label\": \"\", \"x_axis_showminmax\": false, \"x_ticks_layout\": \"auto\", \"y_axis_bounds\": [null, null], \"y_axis_format\": \"SMART_NUMBER\", \"y_axis_label\": \"\", \"y_axis_showminmax\": false, \"y_log_scale\": false, \"remote_id\": 2, \"datasource_name\": \"airlineStats\", \"schema\": null, \"database_name\": \"pinot-quickstart\", \"import_time\": 1572681302}",
+              "params": "{\"adhoc_filters\": [], \"annotation_layers\": [], \"bottom_margin\": \"auto\", \"color_scheme\": \"bnbColors\", \"comparison_type\": \"values\", \"contribution\": false, \"database_name\": \"pinot-quickstart\", \"datasource\": \"1__table\", \"datasource_name\": \"airlineStats\", \"granularity_sqla\": \"SecondsSinceEpoch\", \"groupby\": [\"DestStateName\"], \"import_time\": 1584979678, \"label_colors\": {}, \"left_margin\": \"auto\", \"line_interpolation\": \"linear\", \"metrics\": [\"count\"], \"order_desc\": true, \"remote_id\": 2, \"resample_method\": null, \"resample_rule\": null, \"rich_tooltip\": true, \"rolling_type\": \"None\", \"row_limit\": 10000, \"schema\": null, \"send_time_range\": false, \"show_brush\": \"auto\", \"show_legend\": true, \"show_markers\": false, \"time_grain_sqla\": \"P1D\", \"time_range\": \"No filter\", \"timeseries_limit_metric\": null, \"url_params\": {}, \"viz_type\": \"line\", \"x_axis_format\": \"smart_date\", \"x_axis_label\": \"\", \"x_axis_showminmax\": false, \"x_ticks_layout\": \"auto\", \"y_axis_bounds\": [null, null], \"y_axis_format\": \"SMART_NUMBER\", \"y_axis_label\": \"\", \"y_axis_showminmax\": false, \"y_log_scale\": false}",
               "slice_name": "Destination States Flight Time Series",
               "viz_type": "line"
             }
@@ -271,31 +36,31 @@ data:
               "datasource_name": "airlineStats",
               "datasource_type": "table",
               "id": 3,
-              "params": "{\"adhoc_filters\": [], \"columns\": [], \"combine_metric\": false, \"datasource\": \"1__table\", \"granularity_sqla\": \"SecondsSinceEpoch\", \"groupby\": [\"DestCityName\"], \"metrics\": [\"count\"], \"number_format\": \"SMART_NUMBER\", \"pandas_aggfunc\": \"sum\", \"pivot_margins\": true, \"row_limit\": 50000, \"time_grain_sqla\": \"P1D\", \"time_range\": \"No filter\", \"transpose_pivot\": false, \"url_params\": {}, \"viz_type\": \"pivot_table\", \"remote_id\": 3, \"datasource_name\": \"airlineStats\", \"schema\": null, \"database_name\": \"pinot-quickstart\"}",
+              "params": "{\"adhoc_filters\": [], \"columns\": [], \"combine_metric\": false, \"database_name\": \"pinot-quickstart\", \"datasource\": \"1__table\", \"datasource_name\": \"airlineStats\", \"granularity_sqla\": \"SecondsSinceEpoch\", \"groupby\": [\"DestCityName\"], \"import_time\": 1584979678, \"metrics\": [\"count\"], \"number_format\": \"SMART_NUMBER\", \"pandas_aggfunc\": \"sum\", \"pivot_margins\": true, \"remote_id\": 3, \"row_limit\": 50000, \"schema\": null, \"time_grain_sqla\": \"P1D\", \"time_range\": \"No filter\", \"transpose_pivot\": false, \"url_params\": {}, \"viz_type\": \"pivot_table\"}",
               "slice_name": "Flight Count Per City",
               "viz_type": "pivot_table"
             }
           }
-          ],
-          "slug": null
-        }
+        ],
+        "slug": null
       }
-      ],
-      "datasources": [
-      {
-        "__SqlaTable__": {
-          "cache_timeout": null,
-          "columns": [
+    }
+  ],
+  "datasources": [
+    {
+      "__SqlaTable__": {
+        "cache_timeout": null,
+        "columns": [
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "ActualElapsedTime",
-              "created_by_fk": 1,
+              "column_name": "SecondsSinceEpoch",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -303,8 +68,8 @@ data:
               "groupby": true,
               "id": 1,
               "is_active": true,
-              "is_dttm": false,
-              "python_date_format": null,
+              "is_dttm": true,
+              "python_date_format": "epoch_s",
               "table_id": 1,
               "type": "LONG",
               "verbose_name": null
@@ -312,14 +77,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "AirTime",
-              "created_by_fk": 1,
+              "column_name": "ArrDel15",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -336,14 +101,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "AirlineID",
-              "created_by_fk": 1,
+              "column_name": "DepDel15",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -360,14 +125,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "ArrDel15",
-              "created_by_fk": 1,
+              "column_name": "ArrTimeBlk",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -378,20 +143,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "ArrDelay",
-              "created_by_fk": 1,
+              "column_name": "CRSArrTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -408,14 +173,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "ArrDelayMinutes",
-              "created_by_fk": 1,
+              "column_name": "DestAirportSeqID",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -432,14 +197,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "ArrTime",
-              "created_by_fk": 1,
+              "column_name": "DivAirportSeqIDs",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -456,14 +221,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "ArrTimeBlk",
-              "created_by_fk": 1,
+              "column_name": "DestAirportID",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -474,20 +239,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "ArrivalDelayGroups",
-              "created_by_fk": 1,
+              "column_name": "DivAirportIDs",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -504,14 +269,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "CRSArrTime",
-              "created_by_fk": 1,
+              "column_name": "DivArrDelay",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -528,14 +293,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "CRSDepTime",
-              "created_by_fk": 1,
+              "column_name": "DivActualElapsedTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -552,14 +317,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "CRSElapsedTime",
-              "created_by_fk": 1,
+              "column_name": "ArrivalDelayGroups",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -576,14 +341,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "CancellationCode",
-              "created_by_fk": 1,
+              "column_name": "OriginAirportSeqID",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -594,20 +359,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "Cancelled",
-              "created_by_fk": 1,
+              "column_name": "OriginAirportID",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -624,14 +389,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "Carrier",
-              "created_by_fk": 1,
+              "column_name": "AirlineID",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -642,20 +407,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "CarrierDelay",
-              "created_by_fk": 1,
+              "column_name": "DivAirports",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -666,20 +431,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DayOfWeek",
-              "created_by_fk": 1,
+              "column_name": "LateAircraftDelay",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -696,14 +461,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DayofMonth",
-              "created_by_fk": 1,
+              "column_name": "DivAirportLandings",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -720,14 +485,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DepDel15",
-              "created_by_fk": 1,
+              "column_name": "ArrDelayMinutes",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -744,14 +509,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DepDelay",
-              "created_by_fk": 1,
+              "column_name": "NASDelay",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -768,14 +533,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DepDelayMinutes",
-              "created_by_fk": 1,
+              "column_name": "ArrDelay",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -792,14 +557,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DepTime",
-              "created_by_fk": 1,
+              "column_name": "ActualElapsedTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -816,14 +581,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DepTimeBlk",
-              "created_by_fk": 1,
+              "column_name": "LongestAddGTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -834,20 +599,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DepartureDelayGroups",
-              "created_by_fk": 1,
+              "column_name": "TotalAddGTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -864,14 +629,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "Dest",
-              "created_by_fk": 1,
+              "column_name": "RandomAirports",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -888,14 +653,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DestAirportID",
-              "created_by_fk": 1,
+              "column_name": "AirTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -912,14 +677,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DestAirportSeqID",
-              "created_by_fk": 1,
+              "column_name": "ArrTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -936,14 +701,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DestCityMarketID",
-              "created_by_fk": 1,
+              "column_name": "DepTimeBlk",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -954,20 +719,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DestCityName",
-              "created_by_fk": 1,
+              "column_name": "CancellationCode",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -984,14 +749,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DestState",
-              "created_by_fk": 1,
+              "column_name": "DestCityMarketID",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -1002,20 +767,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DestStateFips",
-              "created_by_fk": 1,
+              "column_name": "OriginCityMarketID",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -1032,14 +797,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DestStateName",
-              "created_by_fk": 1,
+              "column_name": "DestCityName",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -1056,14 +821,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DestWac",
-              "created_by_fk": 1,
+              "column_name": "CRSDepTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -1080,14 +845,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "Distance",
-              "created_by_fk": 1,
+              "column_name": "CarrierDelay",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -1104,14 +869,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DistanceGroup",
-              "created_by_fk": 1,
+              "column_name": "CRSElapsedTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -1128,14 +893,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "column_name": "DivActualElapsedTime",
-              "created_by_fk": 1,
+              "column_name": "OriginCityName",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "description": null,
               "expression": null,
@@ -1146,20 +911,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivAirportIDs",
-              "created_by_fk": 1,
+              "column_name": "UniqueCarrier",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1170,20 +935,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivAirportLandings",
-              "created_by_fk": 1,
+              "column_name": "Carrier",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1194,20 +959,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivAirportSeqIDs",
-              "created_by_fk": 1,
+              "column_name": "Cancelled",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1224,14 +989,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivAirports",
-              "created_by_fk": 1,
+              "column_name": "DepartureDelayGroups",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1242,20 +1007,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivArrDelay",
-              "created_by_fk": 1,
+              "column_name": "DepDelayMinutes",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1272,14 +1037,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivDistance",
-              "created_by_fk": 1,
+              "column_name": "DivReachedDest",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1296,14 +1061,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivLongestGTimes",
-              "created_by_fk": 1,
+              "column_name": "DivDistance",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1320,14 +1085,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivReachedDest",
-              "created_by_fk": 1,
+              "column_name": "DepDelay",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1344,14 +1109,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivTailNums",
-              "created_by_fk": 1,
+              "column_name": "DaysSinceEpoch",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1362,20 +1127,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivTotalGTimes",
-              "created_by_fk": 1,
+              "column_name": "FlightDate",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1386,20 +1151,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivWheelsOffs",
-              "created_by_fk": 1,
+              "column_name": "DestStateFips",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1416,14 +1181,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DivWheelsOns",
-              "created_by_fk": 1,
+              "column_name": "FirstDepTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1440,14 +1205,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "Diverted",
-              "created_by_fk": 1,
+              "column_name": "DivLongestGTimes",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1464,14 +1229,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "FirstDepTime",
-              "created_by_fk": 1,
+              "column_name": "DivTotalGTimes",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1488,14 +1253,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "FlightDate",
-              "created_by_fk": 1,
+              "column_name": "DistanceGroup",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1506,20 +1271,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "FlightNum",
-              "created_by_fk": 1,
+              "column_name": "DestStateName",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1530,20 +1295,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "Flights",
-              "created_by_fk": 1,
+              "column_name": "DivTailNums",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1554,20 +1319,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "LateAircraftDelay",
-              "created_by_fk": 1,
+              "column_name": "DestState",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1578,20 +1343,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "LongestAddGTime",
-              "created_by_fk": 1,
+              "column_name": "Dest",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1602,20 +1367,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "Month",
-              "created_by_fk": 1,
+              "column_name": "DayofMonth",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1632,14 +1397,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "NASDelay",
-              "created_by_fk": 1,
+              "column_name": "DayOfWeek",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1656,14 +1421,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "Origin",
-              "created_by_fk": 1,
+              "column_name": "DivWheelsOffs",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1674,20 +1439,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "OriginAirportID",
-              "created_by_fk": 1,
+              "column_name": "DivWheelsOns",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1704,14 +1469,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "OriginAirportSeqID",
-              "created_by_fk": 1,
+              "column_name": "SecurityDelay",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1728,14 +1493,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "OriginCityMarketID",
-              "created_by_fk": 1,
+              "column_name": "DepTime",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1752,14 +1517,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "OriginCityName",
-              "created_by_fk": 1,
+              "column_name": "WeatherDelay",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1770,20 +1535,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "OriginState",
-              "created_by_fk": 1,
+              "column_name": "DestWac",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1794,20 +1559,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "OriginStateFips",
-              "created_by_fk": 1,
+              "column_name": "Distance",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1824,14 +1589,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "OriginStateName",
-              "created_by_fk": 1,
+              "column_name": "Diverted",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1842,20 +1607,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "OriginWac",
-              "created_by_fk": 1,
+              "column_name": "FlightNum",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1872,14 +1637,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "Quarter",
-              "created_by_fk": 1,
+              "column_name": "OriginStateFips",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1896,14 +1661,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "RandomAirports",
-              "created_by_fk": 1,
+              "column_name": "Flights",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1914,20 +1679,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "SecurityDelay",
-              "created_by_fk": 1,
+              "column_name": "TaxiIn",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1944,14 +1709,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "TailNum",
-              "created_by_fk": 1,
+              "column_name": "OriginStateName",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1968,14 +1733,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "TaxiIn",
-              "created_by_fk": 1,
+              "column_name": "TailNum",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -1986,20 +1751,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "TaxiOut",
-              "created_by_fk": 1,
+              "column_name": "OriginState",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2010,20 +1775,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "Year",
-              "created_by_fk": 1,
+              "column_name": "Origin",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2034,20 +1799,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "LONG",
+              "type": "STRING",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "WheelsOn",
-              "created_by_fk": 1,
+              "column_name": "Month",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2064,14 +1829,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "WheelsOff",
-              "created_by_fk": 1,
+              "column_name": "TaxiOut",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2088,14 +1853,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "WeatherDelay",
-              "created_by_fk": 1,
+              "column_name": "OriginWac",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2112,14 +1877,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "UniqueCarrier",
-              "created_by_fk": 1,
+              "column_name": "WheelsOff",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2130,20 +1895,20 @@ data:
               "is_dttm": false,
               "python_date_format": null,
               "table_id": 1,
-              "type": "STRING",
+              "type": "LONG",
               "verbose_name": null
             }
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "TotalAddGTime",
-              "created_by_fk": 1,
+              "column_name": "WheelsOn",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2160,14 +1925,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "DaysSinceEpoch",
-              "created_by_fk": 1,
+              "column_name": "Quarter",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2184,14 +1949,14 @@ data:
           },
           {
             "__TableColumn__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
-              "column_name": "SecondsSinceEpoch",
-              "created_by_fk": 1,
+              "column_name": "Year",
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:55"
               },
               "description": null,
               "expression": null,
@@ -2199,36 +1964,35 @@ data:
               "groupby": true,
               "id": 80,
               "is_active": true,
-              "is_dttm": true,
-              "python_date_format": "epoch_s",
+              "is_dttm": false,
+              "python_date_format": null,
               "table_id": 1,
               "type": "LONG",
               "verbose_name": null
             }
           }
-          ],
-          "database_id": 3,
-          "default_endpoint": null,
-          "description": null,
-          "fetch_values_predicate": null,
-          "filter_select_enabled": false,
-          "main_dttm_col": null,
-          "metrics": [
+        ],
+        "database_id": 3,
+        "default_endpoint": null,
+        "description": null,
+        "fetch_values_predicate": null,
+        "filter_select_enabled": false,
+        "main_dttm_col": null,
+        "metrics": [
           {
             "__SqlMetric__": {
-              "changed_by_fk": 1,
+              "changed_by_fk": null,
               "changed_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
-              "created_by_fk": 1,
+              "created_by_fk": null,
               "created_on": {
-                "__datetime__": "2019-11-02T07:55:02"
+                "__datetime__": "2020-03-23T16:07:54"
               },
               "d3format": null,
               "description": null,
               "expression": "COUNT(*)",
               "id": 1,
-              "is_restricted": false,
               "metric_name": "count",
               "metric_type": "count",
               "table_id": 1,
@@ -2236,91 +2000,14 @@ data:
               "warning_text": null
             }
           }
-          ],
-          "offset": 0,
-          "params": "{\"remote_id\": 1, \"database_name\": \"pinot-quickstart\", \"import_time\": 1572681302}",
-          "schema": null,
-          "sql": null,
-          "table_name": "airlineStats",
-          "template_params": null
-        }
+        ],
+        "offset": 0,
+        "params": "{\"remote_id\": 1, \"database_name\": \"pinot-quickstart\", \"import_time\": 1584979678}",
+        "schema": null,
+        "sql": null,
+        "table_name": "airlineStats",
+        "template_params": null
       }
-      ]
     }
-
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: superset
-  namespace: pinot-quickstart
-spec:
-  selector:
-    matchLabels:
-      app: superset
-  serviceName: superset
-  replicas: 1
-  updateStrategy:
-    type: RollingUpdate
-  podManagementPolicy: Parallel
-  template:
-    metadata:
-      labels:
-        app: superset
-    spec:
-      terminationGracePeriodSeconds: 30
-      securityContext:
-        runAsGroup: 1000
-        fsGroup: 1000
-      containers:
-        - image: apachepinot/pinot-superset:0.36.0rc3
-          imagePullPolicy: Always
-          name: superset
-          args: [ "flask", "run", "-p", "8088", "--with-threads", "--reload", "--debugger", "--host=0.0.0.0" ]
-          env:
-            - name: PYTHONPATH
-              value: "/etc/superset"
-          ports:
-            - containerPort: 8088
-              protocol: TCP
-          resources:
-            requests:
-              memory: 1Gi
-          volumeMounts:
-            - name: superset-storage-vol
-              mountPath: "/app/superset_home"
-            - name: superset-config
-              mountPath: "/etc/superset"
-      nodeSelector: {}
-      restartPolicy: Always
-      volumes:
-        - name: superset-config
-          configMap:
-            name: superset-config
-  volumeClaimTemplates:
-    - metadata:
-        name: superset-storage-vol
-        annotations:
-          pv.beta.kubernetes.io/gid: "1000"
-          pv.beta.kubernetes.io/groups: "1000"
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        storageClassName: "default"   # "pd-ssd" or "standard" for GKE
-        resources:
-          requests:
-            storage: 1Gi
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: superset
-  namespace: pinot-quickstart
-spec:
-  ports:
-    # [podname].superset.pinot-quickstart.svc.cluster.local
-    - port: 8088
-  clusterIP: None
-  selector:
-    app: superset
+  ]
+}
