@@ -1,0 +1,121 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "presto.worker.fullname" . }}
+  labels:
+    app: {{ include "presto.name" . }}
+    chart: {{ include "presto.chart" . }}
+    component: {{ .Values.worker.name }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "presto.name" . }}
+      release: {{ .Release.Name }}
+      component: {{ .Values.worker.name }}
+  serviceName: {{ template "presto.worker.headless" . }}
+  replicas: {{ .Values.worker.replicaCount }}
+  updateStrategy:
+    type: {{ .Values.worker.updateStrategy.type }}
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: {{ include "presto.name" . }}
+        release: {{ .Release.Name }}
+        component: {{ .Values.worker.name }}
+      annotations:
+{{ toYaml .Values.worker.podAnnotations | indent 8 }}
+    spec:
+      nodeSelector:
+{{ toYaml .Values.worker.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.worker.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.worker.tolerations | indent 8 }}
+      securityContext:
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsUser: 1000
+      containers:
+      - name: coordinator
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: [ "run" ]
+        ports:
+          - containerPort: {{ .Values.worker.port }}
+            protocol: TCP
+        volumeMounts:
+          - name: presto-data
+            mountPath: {{ .Values.worker.node.dataDir }}
+          - name: presto-catalog
+            mountPath: "/home/presto/etc/catalog"
+            readOnly: true
+          - name: presto-etc
+            mountPath: "/home/presto/etc/config.properties"
+            subPath: config.properties
+            readOnly: true
+          - name: presto-etc
+            mountPath: "/home/presto/etc/log.properties"
+            subPath: log.properties
+            readOnly: true
+          - name: presto-etc
+            mountPath: "/home/presto/etc/node.properties"
+            subPath: node.properties
+            readOnly: true
+          - name: presto-etc
+            mountPath: "/home/presto/etc/jvm.config"
+            subPath: jvm.config
+            readOnly: true
+        resources:
+{{ toYaml .Values.worker.resources | indent 12 }}
+      restartPolicy: Always
+      volumes:
+        - name: presto-catalog
+          configMap:
+            name: presto-catalog
+        - name: presto-etc
+          configMap:
+            name: presto-worker-etc
+
+  {{- if .Values.worker.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: presto-data
+        annotations:
+          pv.beta.kubernetes.io/gid: "1000"
+          pv.beta.kubernetes.io/groups: "1000"
+      spec:
+        accessModes:
+          - {{ .Values.worker.persistence.accessMode | quote }}
+        {{- if .Values.worker.persistence.storageClass }}
+        {{- if (eq "-" .Values.worker.persistence.storageClass) }}
+        storageClassName: ""
+        {{- else }}
+        storageClassName: {{ .Values.worker.persistence.storageClass }}
+        {{- end }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.worker.persistence.size }}
+  {{ end }}
