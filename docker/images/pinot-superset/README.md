@@ -31,10 +31,7 @@ Below command will build docker image and tag it as `apachepinot/pinot-superset:
 You can also build directly with `docker build` command by setting arguments:
 
 ```bash
-docker build \
-	--build-arg SUPERSET_VERSION=0.36.0 \
-	--tag apachepinot/pinot-superset:0.36.0 \
-	--target build .
+docker build --build-arg SUPERSET_VERSION=0.36.0 --tag apachepinot/pinot-superset:0.36.0 .
 ```
 
 ## How to push

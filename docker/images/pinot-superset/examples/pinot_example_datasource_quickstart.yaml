@@ -1,0 +1,193 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+databases:
+  - database_name: pinot-quickstart
+    sqlalchemy_uri: pinot+http://pinot-quickstart:8000/query?server=http://pinot-quickstart:9000/
+    tables:
+      - columns:
+          - column_name: SecondsSinceEpoch
+            expression: MULT(DaysSinceEpoch,86400)
+            is_dttm: true
+            python_date_format: epoch_s
+            type: LONG
+          - column_name: ArrDel15
+            type: LONG
+          - column_name: DepDel15
+            type: LONG
+          - column_name: ArrTimeBlk
+            type: STRING
+          - column_name: CRSArrTime
+            type: LONG
+          - column_name: DestAirportSeqID
+            type: LONG
+          - column_name: DivAirportSeqIDs
+            type: LONG
+          - column_name: DestAirportID
+            type: LONG
+          - column_name: DivAirportIDs
+            type: LONG
+          - column_name: DivArrDelay
+            type: LONG
+          - column_name: DivActualElapsedTime
+            type: LONG
+          - column_name: ArrivalDelayGroups
+            type: LONG
+          - column_name: OriginAirportSeqID
+            type: LONG
+          - column_name: OriginAirportID
+            type: LONG
+          - column_name: AirlineID
+            type: LONG
+          - column_name: DivAirports
+            type: STRING
+          - column_name: LateAircraftDelay
+            type: LONG
+          - column_name: DivAirportLandings
+            type: LONG
+          - column_name: ArrDelayMinutes
+            type: LONG
+          - column_name: NASDelay
+            type: LONG
+          - column_name: ArrDelay
+            type: LONG
+          - column_name: ActualElapsedTime
+            type: LONG
+          - column_name: LongestAddGTime
+            type: LONG
+          - column_name: TotalAddGTime
+            type: LONG
+          - column_name: RandomAirports
+            type: STRING
+          - column_name: AirTime
+            type: LONG
+          - column_name: ArrTime
+            type: LONG
+          - column_name: DepTimeBlk
+            type: STRING
+          - column_name: CancellationCode
+            type: STRING
+          - column_name: DestCityMarketID
+            type: LONG
+          - column_name: OriginCityMarketID
+            type: LONG
+          - column_name: DestCityName
+            type: STRING
+          - column_name: CRSDepTime
+            type: LONG
+          - column_name: CarrierDelay
+            type: LONG
+          - column_name: CRSElapsedTime
+            type: LONG
+          - column_name: OriginCityName
+            type: STRING
+          - column_name: UniqueCarrier
+            type: STRING
+          - column_name: Carrier
+            type: STRING
+          - column_name: Cancelled
+            type: LONG
+          - column_name: DepartureDelayGroups
+            type: LONG
+          - column_name: DepDelayMinutes
+            type: LONG
+          - column_name: DivReachedDest
+            type: LONG
+          - column_name: DivDistance
+            type: LONG
+          - column_name: DepDelay
+            type: LONG
+          - column_name: DaysSinceEpoch
+            type: LONG
+          - column_name: FlightDate
+            type: STRING
+          - column_name: DestStateFips
+            type: LONG
+          - column_name: FirstDepTime
+            type: LONG
+          - column_name: DivLongestGTimes
+            type: LONG
+          - column_name: DivTotalGTimes
+            type: LONG
+          - column_name: DistanceGroup
+            type: LONG
+          - column_name: DestStateName
+            type: STRING
+          - column_name: DivTailNums
+            type: STRING
+          - column_name: DestState
+            type: STRING
+          - column_name: Dest
+            type: STRING
+          - column_name: DayofMonth
+            type: LONG
+          - column_name: DayOfWeek
+            type: LONG
+          - column_name: DivWheelsOffs
+            type: LONG
+          - column_name: DivWheelsOns
+            type: LONG
+          - column_name: SecurityDelay
+            type: LONG
+          - column_name: DepTime
+            type: LONG
+          - column_name: WeatherDelay
+            type: LONG
+          - column_name: DestWac
+            type: LONG
+          - column_name: Distance
+            type: LONG
+          - column_name: Diverted
+            type: LONG
+          - column_name: FlightNum
+            type: LONG
+          - column_name: OriginStateFips
+            type: LONG
+          - column_name: Flights
+            type: LONG
+          - column_name: TaxiIn
+            type: LONG
+          - column_name: OriginStateName
+            type: STRING
+          - column_name: TailNum
+            type: STRING
+          - column_name: OriginState
+            type: STRING
+          - column_name: Origin
+            type: STRING
+          - column_name: Month
+            type: LONG
+          - column_name: TaxiOut
+            type: LONG
+          - column_name: OriginWac
+            type: LONG
+          - column_name: WheelsOff
+            type: LONG
+          - column_name: WheelsOn
+            type: LONG
+          - column_name: Quarter
+            type: LONG
+          - column_name: Year
+            type: LONG
+        metrics:
+          - expression: COUNT(*)
+            metric_name: count
+            metric_type: count
+            verbose_name: COUNT(*)
+        table_name: airlineStats

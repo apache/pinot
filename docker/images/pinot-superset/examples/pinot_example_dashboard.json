@@ -1,0 +1,2013 @@
+{
+  "dashboards": [
+    {
+      "__Dashboard__": {
+        "css": "",
+        "dashboard_title": "AirlineStats",
+        "description": null,
+        "json_metadata": "{\"default_filters\": \"{}\", \"expanded_slices\": {}, \"import_time\": 1584979678, \"refresh_frequency\": 0, \"remote_id\": 1, \"timed_refresh_immune_slices\": []}",
+        "position_json": "{\"CHART-EPWTG21UAl\": {\"children\": [], \"id\": \"CHART-EPWTG21UAl\", \"meta\": {\"chartId\": 2, \"height\": 50, \"sliceName\": \"Destination States Flight Time Series\", \"width\": 4}, \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-DHJKqb0-2\"], \"type\": \"CHART\"}, \"CHART-F0aEdk-eR-\": {\"children\": [], \"id\": \"CHART-F0aEdk-eR-\", \"meta\": {\"chartId\": 3, \"height\": 50, \"sliceName\": \"Flight Count Per City\", \"width\": 4}, \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-DHJKqb0-2\"], \"type\": \"CHART\"}, \"CHART-YLcJ6aWYSa\": {\"children\": [], \"id\": \"CHART-YLcJ6aWYSa\", \"meta\": {\"chartId\": 1, \"height\": 50, \"sliceName\": \"Flight Destination City Count\", \"width\": 4}, \"parents\": [\"ROOT_ID\", \"GRID_ID\", \"ROW-DHJKqb0-2\"], \"type\": \"CHART\"}, \"DASHBOARD_VERSION_KEY\": \"v2\", \"GRID_ID\": {\"children\": [\"ROW-DHJKqb0-2\"], \"id\": \"GRID_ID\", \"parents\": [\"ROOT_ID\"], \"type\": \"GRID\"}, \"HEADER_ID\": {\"id\": \"HEADER_ID\", \"meta\": {\"text\": \"AirlineStats\"}, \"type\": \"HEADER\"}, \"ROOT_ID\": {\"children\": [\"GRID_ID\"], \"id\": \"ROOT_ID\", \"type\": \"ROOT\"}, \"ROW-DHJKqb0-2\": {\"children\": [\"CHART-YLcJ6aWYSa\", \"CHART-EPWTG21UAl\", \"CHART-F0aEdk-eR-\"], \"id\": \"ROW-DHJKqb0-2\", \"meta\": {\"background\": \"BACKGROUND_TRANSPARENT\"}, \"parents\": [\"ROOT_ID\", \"GRID_ID\"], \"type\": \"ROW\"}}",
+        "slices": [
+          {
+            "__Slice__": {
+              "cache_timeout": null,
+              "datasource_name": "airlineStats",
+              "datasource_type": "table",
+              "id": 1,
+              "params": "{\"adhoc_filters\": [], \"bar_stacked\": false, \"bottom_margin\": \"auto\", \"color_scheme\": \"bnbColors\", \"columns\": [], \"contribution\": false, \"database_name\": \"pinot-quickstart\", \"datasource\": \"1__table\", \"datasource_name\": \"airlineStats\", \"granularity_sqla\": null, \"groupby\": [\"DestCityName\"], \"import_time\": 1584979678, \"label_colors\": {}, \"metrics\": [\"count\"], \"order_bars\": false, \"reduce_x_ticks\": false, \"remote_id\": 1, \"row_limit\": 10000, \"schema\": null, \"show_bar_value\": false, \"show_controls\": false, \"show_legend\": true, \"slice_id\": 1, \"time_range\": \"Last week\", \"url_params\": {}, \"viz_type\": \"dist_bar\", \"x_axis_label\": \"\", \"x_ticks_layout\": \"auto\", \"y_axis_format\": \"SMART_NUMBER\", \"y_axis_label\": \"\"}",
+              "slice_name": "Flight Destination City Count",
+              "viz_type": "dist_bar"
+            }
+          },
+          {
+            "__Slice__": {
+              "cache_timeout": null,
+              "datasource_name": "airlineStats",
+              "datasource_type": "table",
+              "id": 2,
+              "params": "{\"adhoc_filters\": [], \"annotation_layers\": [], \"bottom_margin\": \"auto\", \"color_scheme\": \"bnbColors\", \"comparison_type\": \"values\", \"contribution\": false, \"database_name\": \"pinot-quickstart\", \"datasource\": \"1__table\", \"datasource_name\": \"airlineStats\", \"granularity_sqla\": \"SecondsSinceEpoch\", \"groupby\": [\"DestStateName\"], \"import_time\": 1584979678, \"label_colors\": {}, \"left_margin\": \"auto\", \"line_interpolation\": \"linear\", \"metrics\": [\"count\"], \"order_desc\": true, \"remote_id\": 2, \"resample_method\": null, \"resample_rule\": null, \"rich_tooltip\": true, \"rolling_type\": \"None\", \"row_limit\": 10000, \"schema\": null, \"send_time_range\": false, \"show_brush\": \"auto\", \"show_legend\": true, \"show_markers\": false, \"time_grain_sqla\": \"P1D\", \"time_range\": \"No filter\", \"timeseries_limit_metric\": null, \"url_params\": {}, \"viz_type\": \"line\", \"x_axis_format\": \"smart_date\", \"x_axis_label\": \"\", \"x_axis_showminmax\": false, \"x_ticks_layout\": \"auto\", \"y_axis_bounds\": [null, null], \"y_axis_format\": \"SMART_NUMBER\", \"y_axis_label\": \"\", \"y_axis_showminmax\": false, \"y_log_scale\": false}",
+              "slice_name": "Destination States Flight Time Series",
+              "viz_type": "line"
+            }
+          },
+          {
+            "__Slice__": {
+              "cache_timeout": null,
+              "datasource_name": "airlineStats",
+              "datasource_type": "table",
+              "id": 3,
+              "params": "{\"adhoc_filters\": [], \"columns\": [], \"combine_metric\": false, \"database_name\": \"pinot-quickstart\", \"datasource\": \"1__table\", \"datasource_name\": \"airlineStats\", \"granularity_sqla\": \"SecondsSinceEpoch\", \"groupby\": [\"DestCityName\"], \"import_time\": 1584979678, \"metrics\": [\"count\"], \"number_format\": \"SMART_NUMBER\", \"pandas_aggfunc\": \"sum\", \"pivot_margins\": true, \"remote_id\": 3, \"row_limit\": 50000, \"schema\": null, \"time_grain_sqla\": \"P1D\", \"time_range\": \"No filter\", \"transpose_pivot\": false, \"url_params\": {}, \"viz_type\": \"pivot_table\"}",
+              "slice_name": "Flight Count Per City",
+              "viz_type": "pivot_table"
+            }
+          }
+        ],
+        "slug": null
+      }
+    }
+  ],
+  "datasources": [
+    {
+      "__SqlaTable__": {
+        "cache_timeout": null,
+        "columns": [
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "SecondsSinceEpoch",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 1,
+              "is_active": true,
+              "is_dttm": true,
+              "python_date_format": "epoch_s",
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "ArrDel15",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 2,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DepDel15",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 3,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "ArrTimeBlk",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 4,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "CRSArrTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 5,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DestAirportSeqID",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 6,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DivAirportSeqIDs",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 7,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DestAirportID",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 8,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DivAirportIDs",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 9,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DivArrDelay",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 10,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DivActualElapsedTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 11,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "ArrivalDelayGroups",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 12,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "OriginAirportSeqID",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 13,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "OriginAirportID",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 14,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "AirlineID",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 15,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DivAirports",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 16,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "LateAircraftDelay",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 17,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DivAirportLandings",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 18,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "ArrDelayMinutes",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 19,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "NASDelay",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 20,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "ArrDelay",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 21,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "ActualElapsedTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 22,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "LongestAddGTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 23,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "TotalAddGTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 24,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "RandomAirports",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 25,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "AirTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 26,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "ArrTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 27,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DepTimeBlk",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 28,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "CancellationCode",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 29,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DestCityMarketID",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 30,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "OriginCityMarketID",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 31,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "DestCityName",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 32,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "CRSDepTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 33,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "CarrierDelay",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 34,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "CRSElapsedTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 35,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "column_name": "OriginCityName",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 36,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "UniqueCarrier",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 37,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Carrier",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 38,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Cancelled",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 39,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DepartureDelayGroups",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 40,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DepDelayMinutes",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 41,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DivReachedDest",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 42,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DivDistance",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 43,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DepDelay",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 44,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DaysSinceEpoch",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 45,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "FlightDate",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 46,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DestStateFips",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 47,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "FirstDepTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 48,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DivLongestGTimes",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 49,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DivTotalGTimes",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 50,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DistanceGroup",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 51,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DestStateName",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 52,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DivTailNums",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 53,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DestState",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 54,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Dest",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 55,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DayofMonth",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 56,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DayOfWeek",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 57,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DivWheelsOffs",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 58,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DivWheelsOns",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 59,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "SecurityDelay",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 60,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DepTime",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 61,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "WeatherDelay",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 62,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "DestWac",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 63,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Distance",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 64,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Diverted",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 65,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "FlightNum",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 66,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "OriginStateFips",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 67,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Flights",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 68,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "TaxiIn",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 69,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "OriginStateName",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 70,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "TailNum",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 71,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "OriginState",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 72,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Origin",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 73,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "STRING",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Month",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 74,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "TaxiOut",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 75,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "OriginWac",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 76,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "WheelsOff",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 77,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "WheelsOn",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 78,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Quarter",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 79,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          },
+          {
+            "__TableColumn__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "column_name": "Year",
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:55"
+              },
+              "description": null,
+              "expression": null,
+              "filterable": true,
+              "groupby": true,
+              "id": 80,
+              "is_active": true,
+              "is_dttm": false,
+              "python_date_format": null,
+              "table_id": 1,
+              "type": "LONG",
+              "verbose_name": null
+            }
+          }
+        ],
+        "database_id": 3,
+        "default_endpoint": null,
+        "description": null,
+        "fetch_values_predicate": null,
+        "filter_select_enabled": false,
+        "main_dttm_col": null,
+        "metrics": [
+          {
+            "__SqlMetric__": {
+              "changed_by_fk": null,
+              "changed_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "created_by_fk": null,
+              "created_on": {
+                "__datetime__": "2020-03-23T16:07:54"
+              },
+              "d3format": null,
+              "description": null,
+              "expression": "COUNT(*)",
+              "id": 1,
+              "metric_name": "count",
+              "metric_type": "count",
+              "table_id": 1,
+              "verbose_name": "COUNT(*)",
+              "warning_text": null
+            }
+          }
+        ],
+        "offset": 0,
+        "params": "{\"remote_id\": 1, \"database_name\": \"pinot-quickstart\", \"import_time\": 1584979678}",
+        "schema": null,
+        "sql": null,
+        "table_name": "airlineStats",
+        "template_params": null
+      }
+    }
+  ]
+}

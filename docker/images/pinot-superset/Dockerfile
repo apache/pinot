@@ -125,6 +125,7 @@ RUN cd /app \
 COPY --from=superset-py ${SUPERSET_SRC}/docker/docker-entrypoint.sh /usr/bin/
 
 COPY bin /usr/local/bin
+COPY examples /etc/examples/pinot
 
 WORKDIR /app
 
