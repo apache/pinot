@@ -259,33 +259,16 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
       header.writeInt(ranges.size());
       bytesWritten += Integer.BYTES;
 
-      //write the range start,end values
+      //write the range start values
       for (Pair<Integer, Integer> range : ranges) {
         Number rangeStart = _numberValueBuffer.get(range.getFirst());
-        Number rangeEnd = _numberValueBuffer.get(range.getSecond());
-        switch (_valueType) {
-          case INT:
-            header.writeInt(rangeStart.intValue());
-            header.writeInt(rangeEnd.intValue());
-            break;
-          case LONG:
-            header.writeLong(rangeStart.longValue());
-            header.writeLong(rangeEnd.longValue());
-            break;
-          case FLOAT:
-            header.writeFloat(rangeStart.floatValue());
-            header.writeFloat(rangeEnd.floatValue());
-            break;
-          case DOUBLE:
-            header.writeDouble(rangeStart.doubleValue());
-            header.writeDouble(rangeEnd.doubleValue());
-            break;
-          default:
-            throw new RuntimeException("Range index not supported for dataType: " + _valueType);
-        }
+        writeNumberToHeader(header, rangeStart);
       }
+      bytesWritten += ranges.size() * _valueType.size(); // Range start values
 
-      bytesWritten += (2* ranges.size()) * _valueType.size(); // Range (start,end) values
+      Number lastRangeEnd = _numberValueBuffer.get(ranges.get(ranges.size() - 1).getSecond());
+      writeNumberToHeader(header, lastRangeEnd);
+      bytesWritten += _valueType.size(); // Last range end value
 
       //compute the offset where the bitmap for the first range would be written
       //bitmap start offset for each range, one extra to make it easy to get the length for last one.
@@ -324,6 +307,26 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     Preconditions.checkState(bytesWritten == _rangeIndexFile.length(),
         "Length of inverted index file: " + _rangeIndexFile.length() + " does not match the number of bytes written: "
             + bytesWritten);
+  }
+
+  private void writeNumberToHeader(DataOutputStream header, Number number)
+      throws IOException {
+    switch (_valueType) {
+      case INT:
+        header.writeInt(number.intValue());
+        break;
+      case LONG:
+        header.writeLong(number.longValue());
+        break;
+      case FLOAT:
+        header.writeFloat(number.floatValue());
+        break;
+      case DOUBLE:
+        header.writeDouble(number.doubleValue());
+        break;
+      default:
+        throw new RuntimeException("Range index not supported for dataType: " + _valueType);
+    }
   }
 
   private void dumpRanges(List<Pair<Integer, Integer>> ranges) {
