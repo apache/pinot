@@ -141,21 +141,12 @@ public class FieldSpecTest {
     int outgoingTimeUnitSize = 1;
     TimeGranularitySpec outgoingTimeGranularitySpec =
         new TimeGranularitySpec(INT, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
-    int defaultNullValue = 17050;
-    TimeFieldSpec timeFieldSpec9 = new TimeFieldSpec(incomingTimeGranularitySpec);
-    TimeFieldSpec timeFieldSpec10 = new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue);
-    TimeFieldSpec timeFieldSpec11 = new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec);
-    TimeFieldSpec timeFieldSpec12 =
-        new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue);
+    TimeFieldSpec timeFieldSpec1 = new TimeFieldSpec(incomingTimeGranularitySpec);
+    TimeFieldSpec timeFieldSpec2 = new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec);
+    Assert.assertNotEquals(timeFieldSpec1, timeFieldSpec2);
 
-    Assert.assertNotEquals(timeFieldSpec10, timeFieldSpec9);
-    Assert.assertNotEquals(timeFieldSpec12, timeFieldSpec11);
-
-    // After adding default null value.
-    timeFieldSpec9.setDefaultNullValue(defaultNullValue);
-    timeFieldSpec11.setDefaultNullValue(defaultNullValue);
-    Assert.assertEquals(timeFieldSpec9, timeFieldSpec10);
-    Assert.assertEquals(timeFieldSpec11, timeFieldSpec12);
+    timeFieldSpec1.setOutgoingGranularitySpec(outgoingTimeGranularitySpec);
+    Assert.assertEquals(timeFieldSpec1, timeFieldSpec2);
   }
 
   /**

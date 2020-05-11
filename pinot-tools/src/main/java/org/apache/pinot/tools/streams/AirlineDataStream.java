@@ -125,7 +125,7 @@ public class AirlineDataStream {
             }
 
             TimeFieldSpec spec = pinotSchema.getTimeFieldSpec();
-            String timeColumn = spec.getName();
+            String timeColumn = spec.getIncomingGranularitySpec().getName();
             message.put(timeColumn, currentTimeValue);
 
             try {
