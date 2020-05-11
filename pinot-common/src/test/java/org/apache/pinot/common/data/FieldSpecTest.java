@@ -132,74 +132,21 @@ public class FieldSpecTest {
   @Test
   public void testTimeFieldSpecConstructor() {
     String incomingName = "incoming";
-    FieldSpec.DataType incomingDataType = LONG;
     TimeUnit incomingTimeUnit = TimeUnit.HOURS;
     int incomingTimeUnitSize = 1;
     TimeGranularitySpec incomingTimeGranularitySpec =
-        new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
+        new TimeGranularitySpec(LONG, incomingTimeUnitSize, incomingTimeUnit, incomingName);
     String outgoingName = "outgoing";
-    FieldSpec.DataType outgoingDataType = INT;
     TimeUnit outgoingTimeUnit = TimeUnit.DAYS;
     int outgoingTimeUnitSize = 1;
     TimeGranularitySpec outgoingTimeGranularitySpec =
-        new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
-    int defaultNullValue = 17050;
+        new TimeGranularitySpec(INT, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
+    TimeFieldSpec timeFieldSpec1 = new TimeFieldSpec(incomingTimeGranularitySpec);
+    TimeFieldSpec timeFieldSpec2 = new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec);
+    Assert.assertNotEquals(timeFieldSpec1, timeFieldSpec2);
 
-    TimeFieldSpec timeFieldSpec1 = new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit);
-    TimeFieldSpec timeFieldSpec2 =
-        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, defaultNullValue);
-    TimeFieldSpec timeFieldSpec3 =
-        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
-            outgoingTimeUnit);
-    TimeFieldSpec timeFieldSpec4 =
-        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
-            outgoingTimeUnit, defaultNullValue);
-    TimeFieldSpec timeFieldSpec5 =
-        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit);
-    TimeFieldSpec timeFieldSpec6 =
-        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, defaultNullValue);
-    TimeFieldSpec timeFieldSpec7 =
-        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
-            outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit);
-    TimeFieldSpec timeFieldSpec8 =
-        new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
-            outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue);
-    TimeFieldSpec timeFieldSpec9 = new TimeFieldSpec(incomingTimeGranularitySpec);
-    TimeFieldSpec timeFieldSpec10 = new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue);
-    TimeFieldSpec timeFieldSpec11 = new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec);
-    TimeFieldSpec timeFieldSpec12 =
-        new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue);
-
-    Assert.assertEquals(timeFieldSpec1, timeFieldSpec5);
-    Assert.assertEquals(timeFieldSpec1, timeFieldSpec9);
-    Assert.assertEquals(timeFieldSpec2, timeFieldSpec6);
-    Assert.assertEquals(timeFieldSpec2, timeFieldSpec10);
-    Assert.assertEquals(timeFieldSpec3, timeFieldSpec7);
-    Assert.assertEquals(timeFieldSpec3, timeFieldSpec11);
-    Assert.assertEquals(timeFieldSpec4, timeFieldSpec8);
-    Assert.assertEquals(timeFieldSpec4, timeFieldSpec12);
-
-    // Before adding default null value.
-    Assert.assertFalse(timeFieldSpec1.equals(timeFieldSpec2));
-    Assert.assertFalse(timeFieldSpec3.equals(timeFieldSpec4));
-    Assert.assertFalse(timeFieldSpec5.equals(timeFieldSpec6));
-    Assert.assertFalse(timeFieldSpec7.equals(timeFieldSpec8));
-    Assert.assertFalse(timeFieldSpec9.equals(timeFieldSpec10));
-    Assert.assertFalse(timeFieldSpec11.equals(timeFieldSpec12));
-
-    // After adding default null value.
-    timeFieldSpec1.setDefaultNullValue(defaultNullValue);
-    timeFieldSpec3.setDefaultNullValue(defaultNullValue);
-    timeFieldSpec5.setDefaultNullValue(defaultNullValue);
-    timeFieldSpec7.setDefaultNullValue(defaultNullValue);
-    timeFieldSpec9.setDefaultNullValue(defaultNullValue);
-    timeFieldSpec11.setDefaultNullValue(defaultNullValue);
+    timeFieldSpec1.setOutgoingGranularitySpec(outgoingTimeGranularitySpec);
     Assert.assertEquals(timeFieldSpec1, timeFieldSpec2);
-    Assert.assertEquals(timeFieldSpec3, timeFieldSpec4);
-    Assert.assertEquals(timeFieldSpec5, timeFieldSpec6);
-    Assert.assertEquals(timeFieldSpec7, timeFieldSpec8);
-    Assert.assertEquals(timeFieldSpec9, timeFieldSpec10);
-    Assert.assertEquals(timeFieldSpec11, timeFieldSpec12);
   }
 
   /**
@@ -295,15 +242,6 @@ public class FieldSpecTest {
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
-
-    // Time field with default null value.
-    String[] timeFields =
-        {"\"incomingGranularitySpec\":{\"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1"};
-    TimeFieldSpec timeFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
-    TimeFieldSpec timeFieldSpec2 =
-        new TimeFieldSpec("incomingTime", LONG, TimeUnit.MILLISECONDS, "outgoingTime", INT, TimeUnit.SECONDS, -1);
-    Assert.assertEquals(timeFieldSpec1, timeFieldSpec2, ERROR_MESSAGE);
-    Assert.assertEquals(timeFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
 
     // Date time field with default null value.
     String[] dateTimeFields =

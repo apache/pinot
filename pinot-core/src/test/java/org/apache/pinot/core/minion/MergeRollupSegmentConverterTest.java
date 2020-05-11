@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -72,12 +73,11 @@ public class MergeRollupSegmentConverterTest {
     FileUtils.deleteDirectory(WORKING_DIR);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
 
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(D1, FieldSpec.DataType.INT, true));
-    schema.addField(new DimensionFieldSpec(D2, FieldSpec.DataType.STRING, true));
-    schema.addField(new MetricFieldSpec(M1, FieldSpec.DataType.LONG));
-    schema.addField(new MetricFieldSpec(M2, FieldSpec.DataType.DOUBLE));
-    schema.addField(new TimeFieldSpec(T, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(D2, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.LONG)
+        .addMetric(M2, FieldSpec.DataType.DOUBLE)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, T), null).build();
+
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(T).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);

@@ -41,6 +41,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +85,7 @@ public class AvroUtils {
           case TIME:
             Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", fieldName);
             Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-            pinotSchema.addField(new TimeFieldSpec(field.name(), dataType, timeUnit));
+            pinotSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, field.name())));
             break;
           default:
             throw new UnsupportedOperationException(

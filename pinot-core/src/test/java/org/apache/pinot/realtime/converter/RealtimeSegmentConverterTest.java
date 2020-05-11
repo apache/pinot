@@ -28,6 +28,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -37,13 +38,9 @@ public class RealtimeSegmentConverterTest {
 
   @Test
   public void testNoVirtualColumnsInSchema() {
-    Schema schema = new Schema();
-    FieldSpec spec = new DimensionFieldSpec("col1", FieldSpec.DataType.STRING, true);
-    schema.addField(spec);
-    TimeFieldSpec tfs =
-        new TimeFieldSpec("col1", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "col2", FieldSpec.DataType.LONG,
-            TimeUnit.DAYS);
-    schema.addField(tfs);
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "col1"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "col2")).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("test").setTimeColumnName("col2").build();
     String segmentName = "segment1";

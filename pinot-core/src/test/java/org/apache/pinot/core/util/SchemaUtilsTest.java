@@ -79,19 +79,16 @@ public class SchemaUtilsTest {
 
     // Time field spec
     // only incoming
-    schema = new Schema();
-    TimeFieldSpec timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
-    schema.addField(timeFieldSpec);
+    schema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), null).build();
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("time"));
 
     // incoming and outgoing different column name
-    schema = new Schema();
-    timeFieldSpec =
-        new TimeFieldSpec("in", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out", FieldSpec.DataType.LONG,
-            TimeUnit.MILLISECONDS);
-    schema.addField(timeFieldSpec);
+    schema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "in"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out")).build();
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("in", "out")));
@@ -131,26 +128,22 @@ public class SchemaUtilsTest {
     pinotSchema.addField(metricFieldSpec);
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
 
-    pinotSchema = new Schema();
-    TimeFieldSpec timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
-    timeFieldSpec.setTransformFunction("Groovy({function}, time)");
-    pinotSchema.addField(timeFieldSpec);
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), null).build();
+    pinotSchema.getFieldSpecFor("time").setTransformFunction("Groovy({function}, time)");
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
 
     // time field spec using same name for incoming and outgoing
-    pinotSchema = new Schema();
-    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-        new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"));
-    pinotSchema.addField(timeFieldSpec);
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
+            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time")).build();
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
 
     // time field spec using SIMPLE_DATE_FORMAT, not allowed when conversion is needed
-    pinotSchema = new Schema();
-    timeFieldSpec =
-        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
             new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
-                TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "outgoing"));
-    pinotSchema.addField(timeFieldSpec);
+                TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "outgoing")).build();
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
 
     // incorrect groovy function syntax
@@ -168,24 +161,19 @@ public class SchemaUtilsTest {
     Assert.assertTrue(SchemaUtils.validate(pinotSchema));
 
     // valid schema
-    pinotSchema = new Schema();
-    dimensionFieldSpec = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
-    dimensionFieldSpec.setTransformFunction("Groovy({function}, argument1, argument2, argument3)");
-    pinotSchema.addField(dimensionFieldSpec);
-    metricFieldSpec = new MetricFieldSpec("m1", FieldSpec.DataType.LONG);
-    metricFieldSpec.setTransformFunction("Groovy({function}, m2, m3)");
-    pinotSchema.addField(metricFieldSpec);
-    timeFieldSpec = new TimeFieldSpec("time", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
-    timeFieldSpec.setTransformFunction("Groovy({function}, millis)");
-    pinotSchema.addField(timeFieldSpec);
+    pinotSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("dim1", FieldSpec.DataType.STRING)
+        .addMetric("m1", FieldSpec.DataType.LONG)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), null)
+        .build();
+    pinotSchema.getFieldSpecFor("dim1").setTransformFunction("Groovy({function}, argument1, argument2, argument3)");
+    pinotSchema.getFieldSpecFor("m1").setTransformFunction("Groovy({function}, m2, m3)");
+    pinotSchema.getFieldSpecFor("time").setTransformFunction("Groovy({function}, millis)");
     Assert.assertTrue(SchemaUtils.validate(pinotSchema));
 
     // valid time field spec
-    pinotSchema = new Schema();
-    timeFieldSpec =
-        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing"));
-    pinotSchema.addField(timeFieldSpec);
+    pinotSchema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing")).build();
     Assert.assertTrue(SchemaUtils.validate(pinotSchema));
   }
 }

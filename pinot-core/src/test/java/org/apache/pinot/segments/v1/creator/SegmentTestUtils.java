@@ -91,7 +91,6 @@ public class SegmentTestUtils {
     segmentGeneratorConfig.setFormat(FileFormat.AVRO);
     segmentGeneratorConfig.setSegmentVersion(SegmentVersion.v1);
     segmentGeneratorConfig.setTableName(tableName);
-    segmentGeneratorConfig.setTime(null, schema);
     return segmentGeneratorConfig;
   }
 
