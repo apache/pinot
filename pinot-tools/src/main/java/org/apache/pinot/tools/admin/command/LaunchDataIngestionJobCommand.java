@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +39,9 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   @Option(name = "-jobSpecFile", required = true, metaVar = "<string>", usage = "Ingestion job spec file")
   private String _jobSpecFile;
 
+  @Option(name = "-values", required = false, metaVar = "<template context>", handler = StringArrayOptionHandler.class, usage = "Context values set to the job spec template")
+  private List<String> _values;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -47,9 +54,12 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   public boolean execute()
       throws Exception {
     try {
-      IngestionJobLauncher.main(new String[]{_jobSpecFile});
+      List<String> arguments = new ArrayList();
+      arguments.add(_jobSpecFile);
+      arguments.addAll(_values);
+      IngestionJobLauncher.main(arguments.toArray(new String[0]));
     } catch (Exception e) {
-      LOGGER.error("Got exception to kick off standalone data ingestion job -", e);
+      LOGGER.error("Got exception to kick off standalone data ingestion job - ", e);
       throw e;
     }
     return true;
@@ -62,7 +72,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
 
   @Override
   public String toString() {
-    return ("LaunchDataIngestionJob -jobSpecFile " + _jobSpecFile);
+    return ("LaunchDataIngestionJob -jobSpecFile " + _jobSpecFile + " -values " + Arrays.toString(_values.toArray()));
   }
 
   @Override

@@ -135,6 +135,7 @@
     <scala.binary.version>2.11</scala.binary.version>
     <scala.version>2.11.11</scala.version>
     <antlr.version>4.6</antlr.version>
+    <jinjava.version>2.5.3</jinjava.version>
     <calcite.version>1.19.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
@@ -960,6 +961,11 @@
             <artifactId>jsr305</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.hubspot.jinjava</groupId>
+        <artifactId>jinjava</artifactId>
+        <version>${jinjava.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.calcite</groupId>
