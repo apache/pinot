@@ -715,11 +715,4 @@ public final class Schema {
     }
     return outerFunction;
   }
-
-  public static void main(String[] args)
-      throws IOException {
-    Schema schema =
-        Schema.fromFile(new File("/Users/npawar/quick_start_configs/pinot-quick-start/transcript-schema.json"));
-    System.out.println(schema);
-  }
 }

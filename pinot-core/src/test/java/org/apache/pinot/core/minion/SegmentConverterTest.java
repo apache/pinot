@@ -72,7 +72,7 @@ public class SegmentConverterTest {
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT)
-        .addSingleValueDimension(D1, FieldSpec.DataType.INT).addMetric(M1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(D2, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, T), null).build();
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(T).build();
 
