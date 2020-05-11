@@ -63,8 +63,8 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
         TIME_COLUMN)}, new Object[]{"dateTimeConvert(5,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')"}, new Object[]{String.format(
         "dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')",
         INT_MV_COLUMN)}, new Object[]{String.format(
-        "dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','MINUTES')", TIME_COLUMN)}, new Object[]{String.format("dateTimeConvert(%s,%s,'1:MINUTES:EPOCH','1:MINUTES')",
-        TIME_COLUMN,
+        "dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','MINUTES')",
+        TIME_COLUMN)}, new Object[]{String.format("dateTimeConvert(%s,%s,'1:MINUTES:EPOCH','1:MINUTES')", TIME_COLUMN,
         INT_SV_COLUMN)}};
   }
 }

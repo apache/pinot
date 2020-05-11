@@ -70,6 +70,8 @@ public class FunctionRegistry {
           DateTimeFunctions.class.getDeclaredMethod("fromEpochHoursBucket", Number.class, Number.class));
       registerStaticFunction(
           DateTimeFunctions.class.getDeclaredMethod("fromEpochDaysBucket", Number.class, Number.class));
+
+      registerStaticFunction(JsonFunctions.class.getDeclaredMethod("toJsonMapStr", Map.class));
     } catch (NoSuchMethodException e) {
       LOGGER.error("Caught exception when registering function", e);
     }
