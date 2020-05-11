@@ -27,10 +27,8 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 public interface SegmentCommitter {
   /**
    * Commits a realtime segment to persistent store
-   * @param currentOffset current offset in the stream
-   * @param numRows num rows consumed in the segment being committed
    * @param segmentBuildDescriptor object that describes segment to be committed
    * @return
    */
-  SegmentCompletionProtocol.Response commit(long currentOffset, int numRows, LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor);
+  SegmentCompletionProtocol.Response commit(LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor);
 }

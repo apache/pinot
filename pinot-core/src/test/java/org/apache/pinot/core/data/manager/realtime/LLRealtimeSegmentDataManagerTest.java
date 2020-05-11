@@ -46,6 +46,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -57,8 +58,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-
-// TODO Write more tests for other parts of the class
+// TODO Re-write this test using the stream abstraction
 public class LLRealtimeSegmentDataManagerTest {
   private static final String _segmentDir = "/tmp/" + LLRealtimeSegmentDataManagerTest.class.getSimpleName();
   private static final File _segmentDirFile = new File(_segmentDir);
@@ -862,7 +862,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     public void setCurrentOffset(long offset) {
-      setLong(offset, "_currentOffset");
+      setOffset(offset, "_currentOffset");
     }
 
     public void setConsumeEndTime(long endTime) {
@@ -878,7 +878,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     public void setFinalOffset(long offset) {
-      setLong(offset, "_finalOffset");
+      setOffset(offset, "_finalOffset");
     }
 
     public boolean invokeEndCriteriaReached() {
@@ -914,7 +914,24 @@ public class LLRealtimeSegmentDataManagerTest {
       }
     }
 
-    private void setInt(int value, String fieldName) {
+    private void setOffset(long value, String fieldName) {
+      try {
+        Field field = LLRealtimeSegmentDataManager.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        StreamPartitionMsgOffset offset = (StreamPartitionMsgOffset)field.get(this);
+        if (offset == null) {
+          field.set(this, new StreamPartitionMsgOffset(value));
+        } else {
+          offset.setOffset(value);
+        }
+      } catch (NoSuchFieldException e) {
+        Assert.fail();
+      } catch (IllegalAccessException e) {
+        Assert.fail();
+      }
+  }
+
+  private void setInt(int value, String fieldName) {
       try {
         Field field = LLRealtimeSegmentDataManager.class.getDeclaredField(fieldName);
         field.setAccessible(true);
