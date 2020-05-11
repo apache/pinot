@@ -51,9 +51,9 @@ public class RangeIndexCreatorTest {
     fieldSpec.setDataType(FieldSpec.DataType.INT);
     String columnName = "latency";
     fieldSpec.setName(columnName);
-    int cardinality = 5;
-    int numDocs = 50;
-    int numValues = 50;
+    int cardinality = 20;
+    int numDocs = 1000;
+    int numValues = 1000;
     RangeIndexCreator creator =
         new RangeIndexCreator(indexDir, fieldSpec, FieldSpec.DataType.INT, -1, -1, numDocs, numValues);
     Random r = new Random();

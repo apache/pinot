@@ -188,6 +188,16 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
 
   /**
    * Generates the range Index file
+   * Sample output by running RangeIndexCreatorTest with TRACE=true and change log4.xml in core to info
+   * 15:18:47.330 RangeIndexCreator - Before sorting
+   * 15:18:47.333 RangeIndexCreator - DocIdBuffer  [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, ]
+   * 15:18:47.333 RangeIndexCreator - ValueBuffer  [ 3, 0, 0, 0, 3, 1, 3, 0, 2, 4, 4, 2, 4, 3, 2, 1, 0, 2, 0, 3, ]
+   * 15:18:47.371 RangeIndexCreator - After sorting
+   * 15:18:47.371 RangeIndexCreator - DocIdBuffer  [ 16, 3, 1, 2, 7, 18, 15, 5, 14, 8, 17, 11, 0, 4, 6, 13, 19, 10, 9, 12, ]
+   * 15:18:47.371 RangeIndexCreator - ValueBuffer  [ 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, ]
+   * 15:18:47.372 RangeIndexCreator - rangeOffsets = [ (0,5) ,(6,7) ,(8,11) ,(12,16) ,(17,19) , ]
+   * 15:18:47.372 RangeIndexCreator - rangeValues = [ (0,0) ,(1,1) ,(2,2) ,(3,3) ,(4,4) , ]
+   *
    * @throws IOException
    */
   @Override
@@ -361,8 +371,8 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     }
     rangeOffsets.append(" ]");
     rangeValues.append(" ]");
-    LOGGER.debug("rangeOffsets = " + rangeOffsets);
-    LOGGER.debug("rangeValues = " + rangeValues);
+    LOGGER.info("rangeOffsets = " + rangeOffsets);
+    LOGGER.info("rangeValues = " + rangeValues);
   }
 
   @Override
@@ -389,16 +399,20 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
   }
 
   void dump() {
-    System.out.print("DocId  [ ");
+    StringBuilder docIdAsString = new StringBuilder("DocIdBuffer  [ ");
     for (int i = 0; i < _numValues; i++) {
-      System.out.print(_docIdBuffer.get(i) + ", ");
+      docIdAsString.append(_docIdBuffer.get(i) + ", ");
     }
-    System.out.println("]");
-    System.out.print("Values [ ");
+    docIdAsString.append("]");
+    LOGGER.info(docIdAsString.toString());
+
+    StringBuilder valuesAsString = new StringBuilder("ValueBuffer  [ ");
     for (int i = 0; i < _numValues; i++) {
-      System.out.print(_numberValueBuffer.get(i) + ", ");
+      valuesAsString.append(_numberValueBuffer.get(i) + ", ");
     }
-    System.out.println("] ");
+    valuesAsString.append("] ");
+    LOGGER.info(valuesAsString.toString());
+
   }
 
   private PinotDataBuffer createTempBuffer(long size, File mmapFile)
