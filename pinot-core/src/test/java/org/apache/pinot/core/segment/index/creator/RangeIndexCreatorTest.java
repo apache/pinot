@@ -42,7 +42,6 @@ import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.BIT
  */
 public class RangeIndexCreatorTest {
 
-
   @Test
   public void testInt()
       throws Exception {
@@ -83,15 +82,15 @@ public class RangeIndexCreatorTest {
     }
   }
 
-    private void checkInt(Number[] rangeStartArray, int rangeId, Number[] values, int docId) {
+  private void checkInt(Number[] rangeStartArray, int rangeId, Number[] values, int docId) {
     if (rangeId != rangeStartArray.length - 1) {
       Assert.assertTrue(
-          rangeStartArray[rangeId].intValue() <= values[docId].intValue() && values[docId].intValue() < rangeStartArray[rangeId + 1].intValue(),
-          "rangestart:" + rangeStartArray[rangeId] + " value:" + values[docId]);
+          rangeStartArray[rangeId].intValue() <= values[docId].intValue() && values[docId].intValue() < rangeStartArray[
+              rangeId + 1].intValue(), "rangestart:" + rangeStartArray[rangeId] + " value:" + values[docId]);
     } else {
-      Assert.assertTrue(rangeStartArray[rangeId].intValue() <= values[docId].intValue(), "rangestart:" + rangeStartArray[rangeId] + " value:" + values[docId]);
+      Assert.assertTrue(rangeStartArray[rangeId].intValue() <= values[docId].intValue(),
+          "rangestart:" + rangeStartArray[rangeId] + " value:" + values[docId]);
     }
-
   }
 
   private void testRangeIndexBufferFormat(Number[] values, File rangeIndexFile)
@@ -108,27 +107,35 @@ public class RangeIndexCreatorTest {
     int numRanges = dis.readInt();
 
     Number[] rangeStart = new Number[numRanges];
-    Number[] rangeEnd = new Number[numRanges];
-    for (int i = 0; i < numRanges; i++) {
-      switch (dataType) {
-        case INT:
+    Number rangeEnd;
+
+    switch (dataType) {
+      case INT:
+        for (int i = 0; i < numRanges; i++) {
           rangeStart[i] = dis.readInt();
-          rangeEnd[i] = dis.readInt();
-          break;
-        case LONG:
+        }
+        rangeEnd = dis.readInt();
+        break;
+      case LONG:
+        for (int i = 0; i < numRanges; i++) {
           rangeStart[i] = dis.readLong();
-          rangeEnd[i] = dis.readLong();
-          break;
-        case FLOAT:
+        }
+        rangeEnd = dis.readLong();
+        break;
+      case FLOAT:
+        for (int i = 0; i < numRanges; i++) {
           rangeStart[i] = dis.readFloat();
-          rangeEnd[i] = dis.readFloat();
-          break;
-        case DOUBLE:
+        }
+        rangeEnd = dis.readFloat();
+        break;
+      case DOUBLE:
+        for (int i = 0; i < numRanges; i++) {
           rangeStart[i] = dis.readDouble();
-          rangeEnd[i] = dis.readDouble();
-          break;
-      }
+        }
+        rangeEnd = dis.readDouble();
+        break;
     }
+
     long[] rangeBitmapOffsets = new long[numRanges + 1];
     for (int i = 0; i <= numRanges; i++) {
       rangeBitmapOffsets[i] = dis.readLong();
@@ -142,8 +149,9 @@ public class RangeIndexCreatorTest {
       bitmaps[i] = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes));
       for (int docId : bitmaps[i].toArray()) {
         if (i != numRanges - 1) {
-          Assert.assertTrue(rangeStart[i].intValue() <= values[docId].intValue() && values[docId].intValue() < rangeStart[i + 1].intValue(),
-              "rangestart:" + rangeStart[i] + " value:" + values[docId]);
+          Assert.assertTrue(
+              rangeStart[i].intValue() <= values[docId].intValue() && values[docId].intValue() < rangeStart[i + 1]
+                  .intValue(), "rangestart:" + rangeStart[i] + " value:" + values[docId]);
         } else {
           Assert.assertTrue(rangeStart[i].intValue() <= values[docId].intValue());
         }

@@ -80,14 +80,21 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
   private static final String VALUE_BUFFER_SUFFIX = "val.buf";
   private static final String DOC_ID_VALUE_BUFFER_SUFFIX = ".doc.id.buf";
 
+  //output file which will hold the range index
   private final File _rangeIndexFile;
 
+  //File where the input values will be stored. This is a temp file that will be deleted at the end
   private final File _tempValueBufferFile;
+  //pinot data buffer MMapped - maps the content of _tempValueBufferFile
   private PinotDataBuffer _tempValueBuffer;
+  //a simple wrapper over _tempValueBuffer to make it easy to read/write any Number (INT,LONG, FLOAT, DOUBLE)
   private NumberValueBuffer _numberValueBuffer;
 
+  //File where the docId will be stored. Temp file that will be deleted at the end
   private final File _tempDocIdBufferFile;
+  //pinot data buffer MMapped - maps the content of _tempDocIdBufferFile
   private PinotDataBuffer _docIdValueBuffer;
+  //a simple wrapper over _docIdValueBuffer to make it easy to read/write any INT
   private IntValueBuffer _docIdBuffer;
 
   private final int _numValues;
@@ -96,6 +103,17 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
   private int _numDocsPerRange;
   private FieldSpec.DataType _valueType;
 
+  /**
+   *
+   * @param indexDir destination of the range index file
+   * @param fieldSpec fieldspec of the column to generate the range index
+   * @param valueType DataType of the column, INT if dictionary encoded, or INT, FLOAT, LONG, DOUBLE for raw encoded
+   * @param numRanges customize the number of ranges, if -1, we use DEFAULT_NUM_RANGES;
+   * @param numDocsPerRange customize the number of Docs Per Range, if -1 numDocsPerRange = totalValues/numRanges
+   * @param numDocs total number of documents
+   * @param numValues total number of values, used for Multi value columns (for single value columns numDocs== numValues)
+   * @throws IOException
+   */
   public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, FieldSpec.DataType valueType, int numRanges,
       int numDocsPerRange, int numDocs, int numValues)
       throws IOException {
@@ -115,7 +133,7 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
         _numDocsPerRange = (int) Math.ceil(_numValues / numRanges);
       }
 
-      //Value buffer to store the actual values added
+      //Value buffer to store the values added via add method
       _tempValueBuffer = createTempBuffer((long) _numValues * valueSize, _tempValueBufferFile);
 
       switch (_valueType) {
@@ -165,9 +183,13 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
 
   @Override
   public void addDoc(Object document, int docIdCounter) {
-    throw new IllegalStateException("Bitmap inverted index creator does not support Object type currently");
+    throw new IllegalStateException("Range index creator does not support Object type currently");
   }
 
+  /**
+   * Generates the range Index file
+   * @throws IOException
+   */
   @Override
   public void seal()
       throws IOException {
@@ -176,7 +198,8 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
       dump();
     }
 
-    //sort the value buffer, change the docId buffer to maintain the mapping
+    //Sorts the value buffer while maintaining the mapping with the docId.
+    //The mapping is needed  in the subsequent phase where we generate the bitmap for each range.
     IntComparator comparator = (i, j) -> {
       Number val1 = _numberValueBuffer.get(i);
       Number val2 = _numberValueBuffer.get(j);
@@ -217,16 +240,15 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     if (TRACE) {
       dumpRanges(ranges);
     }
-
-    // Create bitmaps from inverted index buffers and serialize them to file
+    // RANGE INDEX FILE LAYOUT
     //HEADER
     //   # VERSION (INT)
     //   # DATA_TYPE (String -> INT (length) (ACTUAL BYTES)
-    //   # OF RANGES (INT)
-    //   <RANGE START VALUE BUFFER> #2 * R & ValueSize
-    //   Range Start 0, Range End 0
+    //   # Number OF RANGES (INT)
+    //   <RANGE START VALUE BUFFER> # (R + 1 )* ValueSize
+    //   Range Start 0,
     //    .........
-    //   Range Start R - 1, Range End R - 1
+    //   Range Start R - 1
     //   Range MAX VALUE
     //   Bitmap for Range 0 Start Offset
     //      .....

@@ -101,7 +101,7 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
         _lastRangeEnd = _buffer.getDouble(rangeArrayStartOffset + _numRanges * Double.BYTES);
         break;
       default:
-        _lastRangeEnd = null;
+        throw new RuntimeException("Range Index Unsupported for dataType:" + _valueType);
     }
   }
 
