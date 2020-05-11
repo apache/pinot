@@ -160,20 +160,18 @@ public class SchemaTest {
     int outgoingTimeUnitSize = 1;
     TimeGranularitySpec outgoingTimeGranularitySpec =
         new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
-    int defaultNullValue = 17050;
 
     Schema schema11 = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
+        .addTime(incomingTimeGranularitySpec, null).build();
     Schema schema12 = new Schema.SchemaBuilder().setSchemaName("testSchema").build();
-    schema12.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
+    schema12.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
     Assert.assertNotNull(schema11.getTimeFieldSpec());
     Assert.assertNotNull(schema12.getTimeFieldSpec());
 
-    // Before adding default null value.
     Assert.assertNotEquals(schema12, schema11);
 
-    // After adding default null value.
-    schema11.getTimeFieldSpec().setDefaultNullValue(defaultNullValue);
+    schema11 = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     Assert.assertEquals(schema11, schema12);
   }
 

@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -43,20 +42,8 @@ public final class TimeFieldSpec extends FieldSpec {
     _incomingGranularitySpec = incomingGranularitySpec;
   }
 
-  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, Object defaultNullValue) {
-    super(incomingGranularitySpec.getName(), incomingGranularitySpec.getDataType(), true, defaultNullValue);
-    _incomingGranularitySpec = incomingGranularitySpec;
-  }
-
   public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
     super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true);
-    _incomingGranularitySpec = incomingGranularitySpec;
-    _outgoingGranularitySpec = outgoingGranularitySpec;
-  }
-
-  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, TimeGranularitySpec outgoingGranularitySpec,
-      Object defaultNullValue) {
-    super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true, defaultNullValue);
     _incomingGranularitySpec = incomingGranularitySpec;
     _outgoingGranularitySpec = outgoingGranularitySpec;
   }
