@@ -40,6 +40,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -116,9 +117,10 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
     TarGzCompressionUtils.createTarGzOfDirectory(_realtimeSegmentUntarred.getAbsolutePath());
 
     // SegmentBuildDescriptor is currently not a static class, so we will mock this object.
+    StreamPartitionMsgOffset endOffset = new StreamPartitionMsgOffset(END_OFFSET);
     when(segmentBuildDescriptor.getSegmentTarFilePath()).thenReturn(_realtimeSegmentUntarred + TARGZ_SUFFIX);
     when(segmentBuildDescriptor.getBuildTimeMillis()).thenReturn(0L);
-    when(segmentBuildDescriptor.getOffset()).thenReturn(END_OFFSET);
+    when(segmentBuildDescriptor.getOffset()).thenReturn(endOffset);
     when(segmentBuildDescriptor.getSegmentSizeBytes()).thenReturn(0L);
     when(segmentBuildDescriptor.getWaitTimeMillis()).thenReturn(0L);
 
@@ -134,7 +136,7 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
 
     SegmentCommitterFactory segmentCommitterFactory = new SegmentCommitterFactory(LOGGER, protocolHandler);
     SegmentCommitter segmentCommitter = segmentCommitterFactory.createDefaultSegmentCommitter(params);
-    segmentCommitter.commit(END_OFFSET, 3, segmentBuildDescriptor);
+    segmentCommitter.commit(segmentBuildDescriptor);
   }
 
   public void buildSegment()
