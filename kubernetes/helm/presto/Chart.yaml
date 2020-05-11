@@ -17,12 +17,18 @@
 # under the License.
 #
 
-if [[ $(nc -z  localhost 8080) != 0 ]]; then
-  kubectl port-forward service/presto-coordinator 8080:8080 -n pinot-quickstart > /dev/null &
-fi
-sleep 2
-open http://localhost:8080/
-
-# Just for blocking
-tail -f /dev/null
-pkill -f "kubectl port-forward sservice/presto-coordinator 8080:8080 -n pinot-quickstart"
+apiVersion: v1
+appVersion: 0.2.0
+name: presto
+description: Presto is an open source distributed SQL query engine for running interactive analytic queries against data sources of all sizes ranging from gigabytes to petabytes.
+version: 0.2.0
+keywords:
+  - analytics
+  - database
+  - presto
+home: https://github.com/prestodb/presto
+sources:
+  - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+maintainers:
+  - name: pinot-dev
+    email: dev@pinot.apache.org
