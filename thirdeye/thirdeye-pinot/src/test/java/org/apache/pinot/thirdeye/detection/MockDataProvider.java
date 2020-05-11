@@ -124,9 +124,13 @@ public class MockDataProvider implements DataProvider {
         result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS)));
 
       } else {
-        result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS))
-            .groupByValue(new ArrayList<>(dimensions)).aggregate(expr)
-            .dropSeries(COL_KEY).setIndex(dimensions));
+        DataFrame aggResult = this.aggregates.get(slice.withFilters(NO_FILTERS))
+            .groupByValue(new ArrayList<>(dimensions)).aggregate(expr);
+
+        if (limit > 0) {
+          aggResult = aggResult.sortedBy(COL_VALUE).reverse().head(limit);
+        }
+        result.put(slice, aggResult.dropSeries(COL_KEY).setIndex(dimensions));
       }
     }
     return result;

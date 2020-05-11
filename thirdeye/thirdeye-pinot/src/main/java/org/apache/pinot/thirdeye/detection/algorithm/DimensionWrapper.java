@@ -170,8 +170,13 @@ public class DimensionWrapper extends DetectionPipeline {
       MetricEntity metric = MetricEntity.fromURN(this.metricUrn);
       MetricSlice slice = MetricSlice.from(metric.getId(), this.start.getMillis(), this.end.getMillis(), metric.getFilters());
 
-      // Here we only pull the top k records, this is safe since the result is sorted by default in Pinot
-      DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions, this.k).get(slice);
+      // We can push down the top k filter if min contribution is not defined.
+      // Otherwise it is not accurate to calculate the contribution.
+      int limit = -1;
+      if (Double.isNaN(this.minContribution) && this.k > 0) {
+        limit = this.k;
+      }
+      DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions, limit).get(slice);
 
       if (aggregates.isEmpty()) {
         return nestedMetrics;

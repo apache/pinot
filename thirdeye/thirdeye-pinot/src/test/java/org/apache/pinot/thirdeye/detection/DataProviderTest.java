@@ -231,7 +231,7 @@ public class DataProviderTest {
   @Test
   public void testFetchAggregation() {
     MetricSlice metricSlice = MetricSlice.from(this.metricIds.get(1), 0L, 32400000L, ArrayListMultimap.create());
-    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(Collections.singletonList(metricSlice), Collections.emptyList(), -1);
+    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(Collections.singletonList(metricSlice), Collections.emptyList(), 1);
     Assert.assertEquals(aggregates.keySet().size(), 1);
   }
 
