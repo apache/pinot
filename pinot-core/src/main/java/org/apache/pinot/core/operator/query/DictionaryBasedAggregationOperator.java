@@ -21,14 +21,10 @@ package org.apache.pinot.core.operator.query;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -47,56 +43,43 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 public class DictionaryBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DictionaryBasedAggregationOperator";
 
-  private final AggregationFunctionContext[] _aggregationFunctionContexts;
+  private final AggregationFunction[] _aggregationFunctions;
   private final Map<String, Dictionary> _dictionaryMap;
-  private final long _numTotalDocs;
+  private final int _numTotalDocs;
 
-  /**
-   * Constructor for the class.
-   * @param aggregationFunctionContexts Aggregation function contexts.
-   * @param numTotalDocs total raw docs from segmet metadata
-   * @param dictionaryMap Map of column to its dictionary.
-   */
-  public DictionaryBasedAggregationOperator(AggregationFunctionContext[] aggregationFunctionContexts, long numTotalDocs,
-      Map<String, Dictionary> dictionaryMap) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
+  public DictionaryBasedAggregationOperator(AggregationFunction[] aggregationFunctions,
+      Map<String, Dictionary> dictionaryMap, int numTotalDocs) {
+    _aggregationFunctions = aggregationFunctions;
     _dictionaryMap = dictionaryMap;
     _numTotalDocs = numTotalDocs;
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numAggregationFunctions = _aggregationFunctionContexts.length;
+    int numAggregationFunctions = _aggregationFunctions.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
-
-    for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
-      AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
-      AggregationFunctionType functionType = function.getType();
-      String column = aggregationFunctionContext.getColumnName();
+    for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+      String column = ((TransformExpressionTree) aggregationFunction.getInputExpressions().get(0)).getValue();
       Dictionary dictionary = _dictionaryMap.get(column);
-      AggregationResultHolder resultHolder;
-      switch (functionType) {
+      switch (aggregationFunction.getType()) {
         case MAX:
-          resultHolder = new DoubleAggregationResultHolder(dictionary.getDoubleValue(dictionary.length() - 1));
+          aggregationResults.add(dictionary.getDoubleValue(dictionary.length() - 1));
           break;
         case MIN:
-          resultHolder = new DoubleAggregationResultHolder(dictionary.getDoubleValue(0));
+          aggregationResults.add(dictionary.getDoubleValue(0));
           break;
         case MINMAXRANGE:
-          double max = dictionary.getDoubleValue(dictionary.length() - 1);
-          double min = dictionary.getDoubleValue(0);
-          resultHolder = new ObjectAggregationResultHolder();
-          resultHolder.setValue(new MinMaxRangePair(min, max));
+          aggregationResults.add(
+              new MinMaxRangePair(dictionary.getDoubleValue(0), dictionary.getDoubleValue(dictionary.length() - 1)));
           break;
         default:
           throw new IllegalStateException(
-              "Dictionary based aggregation operator does not support function type: " + functionType);
+              "Dictionary based aggregation operator does not support function type: " + aggregationFunction.getType());
       }
-      aggregationResults.add(function.extractAggregationResult(resultHolder));
     }
 
     // Build intermediate result block based on aggregation result from the executor.
-    return new IntermediateResultsBlock(_aggregationFunctionContexts, aggregationResults, false);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, false);
   }
 
   @Override

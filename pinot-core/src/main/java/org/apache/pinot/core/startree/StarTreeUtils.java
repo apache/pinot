@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.startree;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -27,8 +26,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 
@@ -57,8 +54,8 @@ public class StarTreeUtils {
    * </ul>
    */
   public static boolean isFitForStarTree(StarTreeV2Metadata starTreeV2Metadata,
-      Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs,
-      @Nullable Set<TransformExpressionTree> groupByExpressions, @Nullable FilterQueryTree rootFilterNode) {
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs,
+      @Nullable TransformExpressionTree[] groupByExpressions, @Nullable FilterQueryTree rootFilterNode) {
     // Check aggregations
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       if (!starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)) {
@@ -101,30 +98,5 @@ public class StarTreeUtils {
     }
     String column = filterNode.getColumn();
     return starTreeDimensions.contains(column);
-  }
-
-  /**
-   * Creates a {@link AggregationFunctionContext} from the given context but replace the column with the function-column
-   * pair.
-   */
-  public static AggregationFunctionContext createStarTreeFunctionContext(AggregationFunctionContext functionContext) {
-    AggregationFunction function = functionContext.getAggregationFunction();
-    AggregationFunctionColumnPair functionColumnPair =
-        new AggregationFunctionColumnPair(function.getType(), functionContext.getColumnName());
-    return new AggregationFunctionContext(function, Arrays.asList(functionColumnPair.toColumnName()));
-  }
-
-  /**
-   * Creates an array of {@link AggregationFunctionContext}s from the given contexts but replace the column with the
-   * function-column pair.
-   */
-  public static AggregationFunctionContext[] createStarTreeFunctionContexts(
-      AggregationFunctionContext[] functionContexts) {
-    int numContexts = functionContexts.length;
-    AggregationFunctionContext[] starTreeFunctionContexts = new AggregationFunctionContext[numContexts];
-    for (int i = 0; i < numContexts; i++) {
-      starTreeFunctionContexts[i] = createStarTreeFunctionContext(functionContexts[i]);
-    }
-    return starTreeFunctionContexts;
   }
 }

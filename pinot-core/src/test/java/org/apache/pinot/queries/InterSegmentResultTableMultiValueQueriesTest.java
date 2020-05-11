@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -471,48 +472,52 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
 
   @Test
   public void testPercentile50MV() {
+    List<String> queries = Arrays
+        .asList("SELECT PERCENTILE50MV(column6) FROM testTable", "SELECT PERCENTILEMV(column6, 50) FROM testTable",
+            "SELECT PERCENTILEMV(column6, '50') FROM testTable", "SELECT PERCENTILEMV(column6, \"50\") FROM testTable");
+
     DataSchema dataSchema;
     List<Object[]> rows;
     int expectedResultsSize;
-    String query = "SELECT PERCENTILE50MV(column6) FROM testTable";
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.RESPONSE_FORMAT, CommonConstants.Broker.Request.SQL);
+    for (String query : queries) {
+      BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
+      dataSchema = new DataSchema(new String[]{"percentile50mv(column6)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
+      rows = new ArrayList<>();
+      rows.add(new Object[]{2147483647.0});
+      expectedResultsSize = 1;
+      QueriesTestUtils
+          .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 400000L, 400000L, rows, expectedResultsSize,
+              dataSchema);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
-    dataSchema = new DataSchema(new String[]{"percentile50mv(column6)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
-    rows = new ArrayList<>();
-    rows.add(new Object[]{2147483647.0});
-    expectedResultsSize = 1;
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 400000L, 400000L, rows, expectedResultsSize,
-            dataSchema);
+      brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
+      rows = new ArrayList<>();
+      rows.add(new Object[]{2147483647.0});
+      QueriesTestUtils
+          .testInterSegmentResultTable(brokerResponse, 62480L, 1101664L, 62480L, 400000L, rows, expectedResultsSize,
+              dataSchema);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
-    rows = new ArrayList<>();
-    rows.add(new Object[]{2147483647.0});
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 62480L, 1101664L, 62480L, 400000L, rows, expectedResultsSize,
-            dataSchema);
+      brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY, queryOptions);
+      dataSchema = new DataSchema(new String[]{"column8", "percentile50mv(column6)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
+      rows = new ArrayList<>();
+      rows.add(new Object[]{"169878844", 2147483647.0});
+      expectedResultsSize = 10;
+      QueriesTestUtils
+          .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
+              dataSchema);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + SV_GROUP_BY, queryOptions);
-    dataSchema = new DataSchema(new String[]{"column8", "percentile50mv(column6)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    rows = new ArrayList<>();
-    rows.add(new Object[]{"169878844", 2147483647.0});
-    expectedResultsSize = 10;
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
-            dataSchema);
-
-    brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY, queryOptions);
-    dataSchema = new DataSchema(new String[]{"column7", "percentile50mv(column6)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
-    rows = new ArrayList<>();
-    rows.add(new Object[]{"372", 2147483647.0});
-    QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
-            dataSchema);
+      brokerResponse = getBrokerResponseForPqlQuery(query + MV_GROUP_BY, queryOptions);
+      dataSchema = new DataSchema(new String[]{"column7", "percentile50mv(column6)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
+      rows = new ArrayList<>();
+      rows.add(new Object[]{"372", 2147483647.0});
+      QueriesTestUtils
+          .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
+              dataSchema);
+    }
   }
 
   @Test

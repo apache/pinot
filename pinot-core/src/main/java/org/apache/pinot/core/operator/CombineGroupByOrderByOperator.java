@@ -41,6 +41,8 @@ import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
@@ -98,7 +100,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
    */
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numAggregationFunctions = _brokerRequest.getAggregationsInfoSize();
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_brokerRequest);
+    int numAggregationFunctions = aggregationFunctions.length;
     int numGroupBy = _brokerRequest.getGroupBy().getExpressionsSize();
     int numColumns = numGroupBy + numAggregationFunctions;
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
@@ -137,8 +140,9 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
-                _indexedTable = new ConcurrentIndexedTable(_dataSchema, _brokerRequest.getAggregationsInfo(),
-                    _brokerRequest.getOrderBy(), _indexedTableCapacity);
+                _indexedTable =
+                    new ConcurrentIndexedTable(_dataSchema, aggregationFunctions, _brokerRequest.getOrderBy(),
+                        _indexedTableCapacity);
               }
             } finally {
               _initLock.unlock();

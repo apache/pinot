@@ -20,9 +20,9 @@ package org.apache.pinot.core.data.table;
 
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 
 /**
@@ -36,8 +36,9 @@ public abstract class IndexedTable extends BaseTable {
   /**
    * Initializes the variables and comparators needed for the table
    */
-  IndexedTable(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy, int capacity) {
-    super(dataSchema, aggregationInfos, orderBy, capacity);
+  IndexedTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions, List<SelectionSort> orderBy,
+      int capacity) {
+    super(dataSchema, aggregationFunctions, orderBy, capacity);
 
     _numKeyColumns = dataSchema.size() - _numAggregations;
     _keyExtractor = new KeyExtractor(_numKeyColumns);

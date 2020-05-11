@@ -37,7 +37,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -108,13 +107,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
     AtomicInteger numGroups = new AtomicInteger();
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
-    AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest);
-    int numAggregationFunctions = aggregationFunctionContexts.length;
-    AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      aggregationFunctions[i] = aggregationFunctionContexts[i].getAggregationFunction();
-    }
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_brokerRequest);
+    int numAggregationFunctions = aggregationFunctions.length;
 
     // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
     // futures (try to interrupt the execution if it already started).
@@ -205,8 +199,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
           new AggregationGroupByTrimmingService(aggregationFunctions, (int) _brokerRequest.getGroupBy().getTopN());
       List<Map<String, Object>> trimmedResults =
           aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
-      IntermediateResultsBlock mergedBlock =
-          new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
+      IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(aggregationFunctions, trimmedResults, true);
 
       // Set the processing exceptions.
       if (!mergedProcessingExceptions.isEmpty()) {

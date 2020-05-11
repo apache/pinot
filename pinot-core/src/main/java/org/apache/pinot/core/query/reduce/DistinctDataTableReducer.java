@@ -76,8 +76,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
         DataSchema finalDataSchema = getEmptyResultTableDataSchema();
         brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, Collections.emptyList()));
       } else {
-        brokerResponseNative
-            .setSelectionResults(new SelectionResults(getDistinctColumns(), Collections.emptyList()));
+        brokerResponseNative.setSelectionResults(new SelectionResults(getDistinctColumns(), Collections.emptyList()));
       }
       return;
     }
@@ -163,13 +162,15 @@ public class DistinctDataTableReducer implements DataTableReducer {
   }
 
   private List<String> getDistinctColumns() {
-    return AggregationFunctionUtils.getAggregationExpressions(_brokerRequest.getAggregationsInfo().get(0));
+    return AggregationFunctionUtils.getArguments(_brokerRequest.getAggregationsInfo().get(0));
   }
 
   private DataSchema getEmptyResultTableDataSchema() {
-    String[] columns = getDistinctColumns().toArray(new String[0]);
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columns.length];
+    List<String> distinctColumns = getDistinctColumns();
+    int numColumns = distinctColumns.size();
+    String[] columnNames = distinctColumns.toArray(new String[numColumns]);
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
     Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
-    return new DataSchema(columns, columnDataTypes);
+    return new DataSchema(columnNames, columnDataTypes);
   }
 }

@@ -29,16 +29,17 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
-
-  private final List<TransformExpressionTree> _inputExpressions;
+  private final String _column;
+  private final TransformExpressionTree _expression;
 
   /**
    * Constructor for the class.
-   * @param column Column name to aggregate on.
+   *
+   * @param column Column to aggregate on (could be column name or transform function).
    */
   public CountMVAggregationFunction(String column) {
-    super(column);
-    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(column));
+    _column = column;
+    _expression = TransformExpressionTree.compileToExpressionTree(column);
   }
 
   @Override
@@ -48,17 +49,17 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public String getColumnName() {
-    return getType().getName() + "_" + _column;
+    return AggregationFunctionType.COUNTMV.getName() + "_" + _column;
   }
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _column + ")";
+    return AggregationFunctionType.COUNTMV.getName().toLowerCase() + "(" + _column + ")";
   }
 
   @Override
   public List<TransformExpressionTree> getInputExpressions() {
-    return _inputExpressions;
+    return Collections.singletonList(_expression);
   }
 
   @Override
@@ -68,8 +69,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    int[] valueArray = blockValSetMap.get(_column).getNumMVEntries();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    int[] valueArray = blockValSetMap.get(_expression).getNumMVEntries();
     long count = 0L;
     for (int i = 0; i < length; i++) {
       count += valueArray[i];
@@ -79,8 +80,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    int[] valueArray = blockValSetMap.get(_column).getNumMVEntries();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    int[] valueArray = blockValSetMap.get(_expression).getNumMVEntries();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
@@ -89,8 +90,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    int[] valueArray = blockValSetMap.get(_column).getNumMVEntries();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    int[] valueArray = blockValSetMap.get(_expression).getNumMVEntries();
     for (int i = 0; i < length; i++) {
       int value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

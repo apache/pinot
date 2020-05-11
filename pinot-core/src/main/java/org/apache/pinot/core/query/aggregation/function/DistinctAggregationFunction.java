@@ -37,7 +37,6 @@ import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 
 
 /**
@@ -79,12 +78,13 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
 
   @Override
   public String getColumnName() {
-    return getType().getName() + "_" + AggregationFunctionUtils.concatArgs(Arrays.asList(_columns));
+    return AggregationFunctionType.DISTINCT.getName() + "_" + AggregationFunctionUtils.concatArgs(_columns);
   }
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + AggregationFunctionUtils.concatArgs(Arrays.asList(_columns)) + ")";
+    return AggregationFunctionType.DISTINCT.getName().toLowerCase() + "(" + AggregationFunctionUtils
+        .concatArgs(_columns) + ")";
   }
 
   @Override
@@ -104,23 +104,23 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    int numColumns = _columns.length;
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     int numBlockValSets = blockValSetMap.size();
-    Preconditions.checkState(numBlockValSets == numColumns, "Size mismatch: numBlockValSets = %s, numColumns = %s",
-        numBlockValSets, numColumns);
+    int numExpressions = _inputExpressions.size();
+    Preconditions
+        .checkState(numBlockValSets == numExpressions, "Size mismatch: numBlockValSets = %s, numExpressions = %s",
+            numBlockValSets, numExpressions);
 
-    DistinctTable distinctTable = aggregationResultHolder.getResult();
-    BlockValSet[] blockValSets = new BlockValSet[numColumns];
-
-    for (int i = 0; i < numColumns; i++) {
-      blockValSets[i] = blockValSetMap.get(_columns[i]);
+    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      blockValSets[i] = blockValSetMap.get(_inputExpressions.get(i));
     }
 
+    DistinctTable distinctTable = aggregationResultHolder.getResult();
     if (distinctTable == null) {
-      ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-      for (int i = 0; i < numColumns; i++) {
-        columnDataTypes[i] = ColumnDataType.fromDataTypeSV(blockValSetMap.get(_columns[i]).getValueType());
+      ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
+      for (int i = 0; i < numExpressions; i++) {
+        columnDataTypes[i] = ColumnDataType.fromDataTypeSV(blockValSetMap.get(_inputExpressions.get(i)).getValueType());
       }
       DataSchema dataSchema = new DataSchema(_columns, columnDataTypes);
       distinctTable = new DistinctTable(dataSchema, _orderBy, _capacity);
@@ -147,8 +147,7 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
     if (distinctTable != null) {
       return distinctTable;
     } else {
-      int numColumns = _columns.length;
-      ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+      ColumnDataType[] columnDataTypes = new ColumnDataType[_columns.length];
       // NOTE: Use STRING for unknown type
       Arrays.fill(columnDataTypes, ColumnDataType.STRING);
       return new DistinctTable(new DataSchema(_columns, columnDataTypes), _orderBy, _capacity);
@@ -188,13 +187,13 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 

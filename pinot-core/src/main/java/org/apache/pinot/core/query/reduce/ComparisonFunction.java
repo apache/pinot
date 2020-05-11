@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.reduce;
 
 import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 
 
 //This class will be inherited by different classes that compare (e.g., for equality) the input value by the base value
@@ -27,8 +27,7 @@ public abstract class ComparisonFunction {
   private final String _functionExpression;
 
   protected ComparisonFunction(AggregationInfo aggregationInfo) {
-    _functionExpression =
-        AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationColumnName();
+    _functionExpression = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, null).getColumnName();
   }
 
   public abstract boolean isComparisonValid(String aggResult);

@@ -226,7 +226,7 @@ public class PinotQuery2BrokerRequestConverter {
   private String getColumnExpression(Expression functionParam) {
     switch (functionParam.getType()) {
       case LITERAL:
-        return functionParam.getLiteral().getStringValue();
+        return functionParam.getLiteral().getFieldValue().toString();
       case IDENTIFIER:
         return functionParam.getIdentifier().getName();
       case FUNCTION:

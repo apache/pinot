@@ -18,18 +18,10 @@
  */
 package org.apache.pinot.core.startree.executor;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.startree.StarTreeUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
 
@@ -37,50 +29,31 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
  * The <code>StarTreeAggregationExecutor</code> class is the aggregation executor for star-tree index.
  * <ul>
  *   <li>The column in function context is function-column pair</li>
- *   <li>No UDF in aggregation</li>
+ *   <li>No transform function in aggregation</li>
  *   <li>For <code>COUNT</code> aggregation function, we need to aggregate on the pre-aggregated column</li>
  * </ul>
  */
 public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
-  // StarTree converts column names from min(col) to min__col, this is to store the original mapping.
-  private final String[][] _functionArgs;
+  private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
-  public StarTreeAggregationExecutor(AggregationFunctionContext[] functionContexts) {
-    super(StarTreeUtils.createStarTreeFunctionContexts(functionContexts));
+  public StarTreeAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+    super(aggregationFunctions);
 
-    _functionArgs = new String[functionContexts.length][];
-    for (int i = 0; i < functionContexts.length; i++) {
-      List<String> expressions = functionContexts[i].getExpressions();
-      _functionArgs[i] = new String[expressions.size()];
-
-      for (int j = 0; j < expressions.size(); j++) {
-        _functionArgs[i][j] = expressions.get(j);
-      }
+    int numAggregationFunctions = aggregationFunctions.length;
+    _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      _aggregationFunctionColumnPairs[i] =
+          AggregationFunctionUtils.getAggregationFunctionColumnPair(aggregationFunctions[i]);
     }
   }
 
   @Override
   public void aggregate(TransformBlock transformBlock) {
+    int numAggregationFunctions = _aggregationFunctions.length;
     int length = transformBlock.getNumDocs();
-    for (int i = 0; i < _numFunctions; i++) {
-      AggregationFunction function = _functions[i];
-      AggregationResultHolder resultHolder = _resultHolders[i];
-
-      AggregationFunctionType functionType = function.getType();
-      if ((functionType == AggregationFunctionType.COUNT)) {
-        BlockValSet blockValueSet =
-            transformBlock.getBlockValueSet(AggregationFunctionColumnPair.COUNT_STAR_COLUMN_NAME);
-        function.aggregate(length, resultHolder, Collections.singletonMap(_functionArgs[i][0], blockValueSet));
-      } else {
-
-        Map<String, BlockValSet> blockValSetMap = new HashMap<>();
-        for (int j = 0; j < _functionArgs[i].length; j++) {
-          blockValSetMap.put(_functionArgs[i][j], transformBlock.getBlockValueSet(
-              AggregationFunctionColumnPair.toColumnName(functionType, _expressions[i][j].getValue())));
-        }
-
-        function.aggregate(length, resultHolder, blockValSetMap);
-      }
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      _aggregationFunctions[i].aggregate(length, _aggregationResultHolders[i],
+          AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumnPairs[i], transformBlock));
     }
   }
 }

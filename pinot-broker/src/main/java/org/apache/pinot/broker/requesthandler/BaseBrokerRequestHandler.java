@@ -456,13 +456,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       for (AggregationInfo info : brokerRequest.getAggregationsInfo()) {
         if (!info.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
           // Always read from backward compatible api in AggregationFunctionUtils.
-          List<String> expressions = AggregationFunctionUtils.getAggregationExpressions(info);
-
-          List<String> newExpressions = new ArrayList<>(expressions.size());
-          for (String expression : expressions) {
-            newExpressions.add(fixColumnNameCase(actualTableName, expression));
-          }
-          info.setExpressions(newExpressions);
+          List<String> arguments = AggregationFunctionUtils.getArguments(info);
+          arguments.replaceAll(e -> fixColumnNameCase(actualTableName, e));
+          info.setExpressions(arguments);
         }
       }
       if (brokerRequest.isSetGroupBy()) {
@@ -720,11 +716,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             throw new UnsupportedOperationException("DISTINCT with GROUP BY is currently not supported");
           }
           if (brokerRequest.isSetOrderBy()) {
-            List<String> columns = AggregationFunctionUtils.getAggregationExpressions(aggregationInfo);
-            Set<String> set = new HashSet<>(columns);
+            Set<String> expressionSet = new HashSet<>(AggregationFunctionUtils.getArguments(aggregationInfo));
             List<SelectionSort> orderByColumns = brokerRequest.getOrderBy();
             for (SelectionSort selectionSort : orderByColumns) {
-              if (!set.contains(selectionSort.getColumn())) {
+              if (!expressionSet.contains(selectionSort.getColumn())) {
                 throw new UnsupportedOperationException(
                     "ORDER By should be only on some/all of the columns passed as arguments to DISTINCT");
               }

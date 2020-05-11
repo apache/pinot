@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -26,35 +25,36 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 
 
 /**
- * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
+ * The <code>AggregationGroupByOrderByOperator</code> class provides the operator for aggregation group-by query on a
+ * single segment.
  */
 public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
 
   private final DataSchema _dataSchema;
 
-  private final AggregationFunctionContext[] _functionContexts;
-  private final GroupBy _groupBy;
+  private final AggregationFunction[] _aggregationFunctions;
+  private final TransformExpressionTree[] _groupByExpressions;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
 
-  private int _numDocsScanned;
+  private int _numDocsScanned = 0;
 
-  public AggregationGroupByOrderByOperator(AggregationFunctionContext[] functionContexts, GroupBy groupBy,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, long numTotalDocs,
-      boolean useStarTree) {
-    _functionContexts = functionContexts;
-    _groupBy = groupBy;
+  public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
+      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      TransformOperator transformOperator, long numTotalDocs, boolean useStarTree) {
+    _aggregationFunctions = aggregationFunctions;
+    _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
@@ -62,29 +62,27 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     _useStarTree = useStarTree;
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
-    int numColumns = groupBy.getExpressionsSize() + _functionContexts.length;
+    int numGroupByExpressions = groupByExpressions.length;
+    int numAggregationFunctions = aggregationFunctions.length;
+    int numColumns = numGroupByExpressions + numAggregationFunctions;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
-    // extract column names and data types for group by keys
-    int index = 0;
-    for (String groupByColumn : groupBy.getExpressions()) {
-      columnNames[index] = groupByColumn;
-      TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(groupByColumn);
-      columnDataTypes[index] =
-          DataSchema.ColumnDataType.fromDataTypeSV(_transformOperator.getResultMetadata(expression).getDataType());
-      index++;
+    // Extract column names and data types for group-by columns
+    for (int i = 0; i < numGroupByExpressions; i++) {
+      TransformExpressionTree groupByExpression = groupByExpressions[i];
+      columnNames[i] = groupByExpression.toString();
+      columnDataTypes[i] = DataSchema.ColumnDataType
+          .fromDataTypeSV(_transformOperator.getResultMetadata(groupByExpression).getDataType());
     }
 
-    // extract column names and data types for aggregations
-    for (AggregationFunctionContext functionContext : functionContexts) {
-      columnNames[index] = functionContext.getResultColumnName();
-      columnDataTypes[index] = functionContext.getAggregationFunction().getIntermediateResultColumnType();
-      index++;
+    // Extract column names and data types for aggregation functions
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationFunction aggregationFunction = aggregationFunctions[i];
+      int index = numGroupByExpressions + i;
+      columnNames[index] = aggregationFunction.getResultColumnName();
+      columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
     }
-
-    // TODO: We need to support putting order by columns in the data schema.
-    //  It is possible that the order by column is not one of the group by or aggregation columns
 
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
   }
@@ -95,12 +93,12 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
       groupByExecutor =
-          new StarTreeGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity, _numGroupsLimit,
-              _transformOperator);
+          new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
+              _numGroupsLimit, _transformOperator);
     } else {
       groupByExecutor =
-          new DefaultGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity, _numGroupsLimit,
-              _transformOperator);
+          new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
+              _numGroupsLimit, _transformOperator);
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
@@ -109,7 +107,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     }
 
     // Build intermediate result block based on aggregation group-by result from the executor
-    return new IntermediateResultsBlock(_functionContexts, groupByExecutor.getResult(), _dataSchema);
+    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
   }
 
   @Override

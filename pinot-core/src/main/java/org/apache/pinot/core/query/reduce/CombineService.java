@@ -27,7 +27,7 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,19 +68,19 @@ public class CombineService {
           return;
         }
 
-        AggregationFunctionContext[] mergedAggregationFunctionContexts = mergedBlock.getAggregationFunctionContexts();
-        if (mergedAggregationFunctionContexts == null) {
+        AggregationFunction[] mergedAggregationFunctions = mergedBlock.getAggregationFunctions();
+        if (mergedAggregationFunctions == null) {
           // No data in merged block.
-          mergedBlock.setAggregationFunctionContexts(blockToMerge.getAggregationFunctionContexts());
+          mergedBlock.setAggregationFunctions(blockToMerge.getAggregationFunctions());
           mergedBlock.setAggregationResults(aggregationResultToMerge);
-        }
-
-        // Merge two block.
-        List<Object> mergedAggregationResult = mergedBlock.getAggregationResult();
-        int numAggregationFunctions = mergedAggregationFunctionContexts.length;
-        for (int i = 0; i < numAggregationFunctions; i++) {
-          mergedAggregationResult.set(i, mergedAggregationFunctionContexts[i].getAggregationFunction()
-              .merge(mergedAggregationResult.get(i), aggregationResultToMerge.get(i)));
+        } else {
+          // Merge two blocks.
+          List<Object> mergedAggregationResult = mergedBlock.getAggregationResult();
+          int numAggregationFunctions = mergedAggregationFunctions.length;
+          for (int i = 0; i < numAggregationFunctions; i++) {
+            mergedAggregationResult.set(i,
+                mergedAggregationFunctions[i].merge(mergedAggregationResult.get(i), aggregationResultToMerge.get(i)));
+          }
         }
       } else {
         // Combine aggregation group-by result, which should not come into CombineService.

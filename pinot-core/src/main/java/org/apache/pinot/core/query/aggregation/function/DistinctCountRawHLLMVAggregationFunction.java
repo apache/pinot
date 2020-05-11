@@ -23,12 +23,8 @@ import org.apache.pinot.common.function.AggregationFunctionType;
 
 public class DistinctCountRawHLLMVAggregationFunction extends DistinctCountRawHLLAggregationFunction {
 
-  /**
-   * Constructor for the class.
-   * @param column Column name to aggregate on.
-   */
   public DistinctCountRawHLLMVAggregationFunction(String column) {
-    super(new DistinctCountHLLMVAggregationFunction(column), column);
+    super(column, new DistinctCountHLLMVAggregationFunction(column));
   }
 
   @Override

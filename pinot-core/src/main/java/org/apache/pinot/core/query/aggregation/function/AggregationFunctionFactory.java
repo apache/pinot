@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
@@ -45,45 +44,79 @@ public class AggregationFunctionFactory {
   public static AggregationFunction getAggregationFunction(AggregationInfo aggregationInfo,
       @Nullable BrokerRequest brokerRequest) {
     String functionName = aggregationInfo.getAggregationType();
-    List<String> expressions = AggregationFunctionUtils.getAggregationExpressions(aggregationInfo);
+    List<String> arguments = AggregationFunctionUtils.getArguments(aggregationInfo);
 
     try {
       String upperCaseFunctionName = functionName.toUpperCase();
+      String column = arguments.get(0);
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
-        List<String> args = new ArrayList<>(expressions);
-        if (remainingFunctionName.matches("\\d+")) {
-          // Percentile
-          args.add(remainingFunctionName);
-          return new PercentileAggregationFunction(args);
-        } else if (remainingFunctionName.matches("EST\\d+")) {
-          // PercentileEst
-          args.add(remainingFunctionName.substring(3));
-          return new PercentileEstAggregationFunction(args);
-        } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
-          // PercentileTDigest
-          args.add(remainingFunctionName.substring(7));
-          return new PercentileTDigestAggregationFunction(args);
-        } else if (remainingFunctionName.matches("\\d+MV")) {
-          // PercentileMV
-          args.add(remainingFunctionName.substring(0, remainingFunctionName.length() - 2));
-          return new PercentileMVAggregationFunction(args);
-        } else if (remainingFunctionName.matches("EST\\d+MV")) {
-          // PercentileEstMV
-          args.add(remainingFunctionName.substring(3, remainingFunctionName.length() - 2));
-          return new PercentileEstMVAggregationFunction(args);
-        } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
-          // PercentileTDigestMV
-          args.add(remainingFunctionName.substring(7, remainingFunctionName.length() - 2));
-          return new PercentileTDigestMVAggregationFunction(args);
-        } else {
-          throw new IllegalArgumentException();
+        int numArguments = arguments.size();
+        if (numArguments == 1) {
+          // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
+          if (remainingFunctionName.matches("\\d+")) {
+            // Percentile
+            return new PercentileAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(remainingFunctionName));
+          } else if (remainingFunctionName.matches("EST\\d+")) {
+            // PercentileEst
+            String percentileString = remainingFunctionName.substring(3);
+            return new PercentileEstAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
+            // PercentileTDigest
+            String percentileString = remainingFunctionName.substring(7);
+            return new PercentileTDigestAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          } else if (remainingFunctionName.matches("\\d+MV")) {
+            // PercentileMV
+            String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
+            return new PercentileMVAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          } else if (remainingFunctionName.matches("EST\\d+MV")) {
+            // PercentileEstMV
+            String percentileString = remainingFunctionName.substring(3, remainingFunctionName.length() - 2);
+            return new PercentileEstMVAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
+            // PercentileTDigestMV
+            String percentileString = remainingFunctionName.substring(7, remainingFunctionName.length() - 2);
+            return new PercentileTDigestMVAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          }
+        } else if (numArguments == 2) {
+          // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.)
+          int percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
+          if (remainingFunctionName.isEmpty()) {
+            // Percentile
+            return new PercentileAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("EST")) {
+            // PercentileEst
+            return new PercentileEstAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("TDIGEST")) {
+            // PercentileTDigest
+            return new PercentileTDigestAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("MV")) {
+            // PercentileMV
+            return new PercentileMVAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("ESTMV")) {
+            // PercentileEstMV
+            return new PercentileEstMVAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("TDIGESTMV")) {
+            // PercentileTDigestMV
+            return new PercentileTDigestMVAggregationFunction(column, percentile);
+          }
         }
+        throw new IllegalArgumentException("Invalid percentile function");
       } else {
-        String column = expressions.get(0);
         switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
           case COUNT:
-            return new CountAggregationFunction(column);
+            return new CountAggregationFunction();
           case MIN:
             return new MinAggregationFunction(column);
           case MAX:
@@ -103,7 +136,7 @@ public class AggregationFunctionFactory {
           case FASTHLL:
             return new FastHLLAggregationFunction(column);
           case DISTINCTCOUNTTHETASKETCH:
-            return new DistinctCountThetaSketchAggregationFunction(expressions);
+            return new DistinctCountThetaSketchAggregationFunction(arguments);
           case COUNTMV:
             return new CountMVAggregationFunction(column);
           case MINMV:
@@ -125,14 +158,13 @@ public class AggregationFunctionFactory {
           case DISTINCT:
             Preconditions.checkState(brokerRequest != null,
                 "Broker request must be provided for 'DISTINCT' aggregation function");
-            return new DistinctAggregationFunction(expressions, brokerRequest.getOrderBy(),
-                brokerRequest.getLimit());
+            return new DistinctAggregationFunction(arguments, brokerRequest.getOrderBy(), brokerRequest.getLimit());
           default:
             throw new IllegalArgumentException();
         }
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException("Invalid aggregation function name: " + functionName);
+      throw new BadQueryRequestException("Invalid aggregation: " + aggregationInfo);
     }
   }
 }
