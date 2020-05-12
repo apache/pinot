@@ -304,6 +304,8 @@ public final class Schema {
    * If the columnName is a DATE_TIME column, returns the DateTimeFieldSpec
    * If the columnName is a TIME column, converts to DateTimeFieldSpec before returning
    */
+  @JsonIgnore
+  @Nullable
   public DateTimeFieldSpec getSpecForTimeColumn(String timeColumnName) {
     FieldSpec fieldSpec = _fieldSpecMap.get(timeColumnName);
     if (fieldSpec != null) {
