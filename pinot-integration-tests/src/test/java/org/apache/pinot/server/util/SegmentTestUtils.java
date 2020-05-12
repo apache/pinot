@@ -39,17 +39,13 @@ public class SegmentTestUtils {
 
   @Nonnull
   public static SegmentGeneratorConfig getSegmentGeneratorConfig(@Nonnull File inputAvro, @Nonnull File outputDir,
-      @Nonnull TimeUnit timeUnit, @Nonnull String tableName, @Nullable Schema pinotSchema)
+      @Nonnull String timeColumnName, @Nonnull TimeUnit timeUnit, @Nonnull String tableName, @Nullable Schema pinotSchema)
       throws IOException {
     if (pinotSchema == null) {
       pinotSchema = AvroUtils.getPinotSchemaFromAvroDataFile(inputAvro);
     }
-    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName);
-    // TODO: change to getDateTimeFieldSpecs().get(0)
-    if (pinotSchema.getTimeFieldSpec() != null) {
-      tableConfigBuilder.setTimeColumnName(pinotSchema.getTimeFieldSpec().getName());
-    }
-    TableConfig tableConfig = tableConfigBuilder.build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeColumnName).setTableName(tableName).build();
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, pinotSchema);
 
     segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());

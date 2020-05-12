@@ -198,7 +198,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, null, null, null, executor);
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, timeColumnName, null, null, null,
+            executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
     uploadSegments(getTableName(), _tarDir);

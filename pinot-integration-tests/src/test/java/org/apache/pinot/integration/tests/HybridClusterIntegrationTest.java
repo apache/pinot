@@ -81,8 +81,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     File schemaFile = getSchemaFile();
     _schema = Schema.fromFile(schemaFile);
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, 0, _segmentDir, _tarDir, getTableName(), null, getRawIndexColumns(),
-            _schema, executor);
+        .buildSegmentsFromAvro(offlineAvroFiles, 0, _segmentDir, _tarDir, getTableName(), getTimeColumnName(), null,
+            getRawIndexColumns(), _schema, executor);
 
     // Push data into the Kafka topic
     pushAvroIntoKafka(realtimeAvroFiles, getKafkaTopic(), executor);

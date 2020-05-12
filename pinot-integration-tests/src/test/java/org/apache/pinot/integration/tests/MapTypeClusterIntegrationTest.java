@@ -80,7 +80,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
         .buildSegmentsFromAvro(Collections.singletonList(avroFile), 0, _segmentDir, _tarDir, getTableName(), null, null,
-            schema, executor);
+            null, schema, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
     uploadSegments(getTableName(), _tarDir);

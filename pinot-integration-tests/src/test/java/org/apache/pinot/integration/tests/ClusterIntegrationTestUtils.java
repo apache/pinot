@@ -246,7 +246,7 @@ public class ClusterIntegrationTestUtils {
    * @param executor Executor
    */
   public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
-      String tableName, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
+      String tableName, String timeColumnName, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
       @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.spi.data.Schema pinotSchema,
       Executor executor) {
     int numSegments = avroFiles.size();
@@ -256,8 +256,8 @@ public class ClusterIntegrationTestUtils {
       executor.execute(() -> {
         try {
           File outputDir = new File(segmentDir, "segment-" + segmentIndex);
-          SegmentGeneratorConfig segmentGeneratorConfig =
-              SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
+          SegmentGeneratorConfig segmentGeneratorConfig = SegmentTestUtils
+              .getSegmentGeneratorConfig(avroFile, outputDir, timeColumnName, TimeUnit.DAYS, tableName, pinotSchema);
 
           // Test segment with space and special character in the file name
           segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
@@ -300,8 +300,9 @@ public class ClusterIntegrationTestUtils {
    * @param executor Executor
    */
   public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
-      String tableName, Executor executor) {
-    buildSegmentsFromAvro(avroFiles, baseSegmentIndex, segmentDir, tarDir, tableName, null, null, null, executor);
+      String tableName, String timeColumnName, Executor executor) {
+    buildSegmentsFromAvro(avroFiles, baseSegmentIndex, segmentDir, tarDir, tableName, timeColumnName, null, null, null,
+        executor);
   }
 
   /**

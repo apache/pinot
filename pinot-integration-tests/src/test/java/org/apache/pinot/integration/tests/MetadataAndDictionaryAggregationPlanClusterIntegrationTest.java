@@ -131,7 +131,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, null, rawIndexColumns, pinotSchema,
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, null, null, rawIndexColumns, pinotSchema,
             executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);

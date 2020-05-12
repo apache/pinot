@@ -113,8 +113,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Create segments from Avro data
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), null, getRawIndexColumns(), null,
-            executor);
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), getTimeColumnName(), null,
+            getRawIndexColumns(), null, executor);
 
     // Load data into H2
     setUpH2Connection(avroFiles, executor);

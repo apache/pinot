@@ -136,7 +136,7 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
     ExecutorService executor = MoreExecutors.newDirectExecutorService();
     ClusterIntegrationTestUtils
         .buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex, new File(_segmentDir, segmentName),
-            segmentTarDir, this._tableName, executor);
+            segmentTarDir, this._tableName, null, executor);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 
