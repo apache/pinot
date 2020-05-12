@@ -74,13 +74,6 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
 
   private static final String THETA_SKETCH_COLUMN = "colTS";
   private static final String DISTINCT_COLUMN = "distinctColumn";
-  private static final List<String> ALL_COLUMNS;
-
-  static {
-    ALL_COLUMNS = Arrays.asList("colA", "colB", "colC", DISTINCT_COLUMN, THETA_SKETCH_COLUMN);
-  }
-
-  private static final List<String> DIMENSIONS = ALL_COLUMNS.subList(0, 3);
 
   private static Random RANDOM = new Random(RANDOM_SEED);
   protected static final int MAX_CARDINALITY = 5; // 3 columns will lead to at most 125 groups
@@ -126,23 +119,23 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
   }
 
   private void testThetaSketches(boolean groupBy, boolean sql) {
-    List<String> predicates = Collections.singletonList("colA = 'colA_1'");
+    List<String> predicates = Collections.singletonList("colA = 1");
     String whereClause = Strings.join(predicates, " or ");
     testQuery(whereClause, null, predicates, whereClause, groupBy, sql);
 
     // Test Intersection (AND)
-    predicates = Arrays.asList("colA = 'colA_1'", "colB >= 'colB_1'", "colC <> 'colC_1'");
+    predicates = Arrays.asList("colA = 1", "colB >= 2.0", "colC <> 'colC_1'");
     whereClause = Strings.join(predicates, " and ");
     testQuery(whereClause, "nominalEntries=1001", predicates, whereClause, groupBy, sql);
 
     // Test Union (OR)
-    predicates = Arrays.asList("colA = 'colA_1'", "colB = 'colB_2'");
+    predicates = Arrays.asList("colA = 1", "colB = 1.9");
     whereClause = Strings.join(predicates, " or ");
     testQuery(whereClause, " nominalEntries =1001 ", predicates, whereClause, groupBy, sql);
 
     // Test complex predicates
     predicates =
-        Arrays.asList("colA in ('colA_1', 'colA_2')", "colB not in ('colB_1')", "colC between 'colC_1' and 'colC_5'");
+        Arrays.asList("colA in (1, 2)", "colB not in (3.0)", "colC between 'colC_1' and 'colC_5'");
     whereClause =
         predicates.get(0) + " and " + predicates.get(1) + " or " + predicates.get(0) + " and " + predicates.get(2);
     testQuery(whereClause, "nominalEntries =  1001", predicates, whereClause, groupBy, sql);
@@ -306,12 +299,17 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
       stringBuilder.setLength(0);
       HashMap<String, Object> valueMap = new HashMap<>();
 
-      for (String dimension : DIMENSIONS) {
-        String value = dimension + "_" + (i % (1 + RANDOM.nextInt(MAX_CARDINALITY)));
-        valueMap.put(dimension, value);
+      int value = (i % (1 + RANDOM.nextInt(MAX_CARDINALITY)));
+      valueMap.put("colA", value);
+      stringBuilder.append(value);
 
-        stringBuilder.append(value);
-      }
+      value = (i % (1 + RANDOM.nextInt(MAX_CARDINALITY)));
+      valueMap.put("colB", (i % (1 + RANDOM.nextInt(MAX_CARDINALITY))));
+      stringBuilder.append(value);
+
+      String sValue = "colC" + "_" + (i % (1 + RANDOM.nextInt(MAX_CARDINALITY)));
+      valueMap.put("colC", sValue);
+      stringBuilder.append(sValue);
 
       String distinctValue = stringBuilder.toString();
       valueMap.put(DISTINCT_COLUMN, distinctValue);
@@ -344,7 +342,10 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
 
   private Schema buildSchema() {
     Schema schema = new Schema();
-    DIMENSIONS.forEach(column -> schema.addField(new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true)));
+
+    schema.addField(new DimensionFieldSpec("colA", FieldSpec.DataType.INT, true));
+    schema.addField(new DimensionFieldSpec("colB", FieldSpec.DataType.DOUBLE, true));
+    schema.addField(new DimensionFieldSpec("colC", FieldSpec.DataType.STRING, true));
 
     schema.addField(new DimensionFieldSpec(DISTINCT_COLUMN, FieldSpec.DataType.STRING, true));
     schema.addField(new MetricFieldSpec(THETA_SKETCH_COLUMN, FieldSpec.DataType.BYTES));

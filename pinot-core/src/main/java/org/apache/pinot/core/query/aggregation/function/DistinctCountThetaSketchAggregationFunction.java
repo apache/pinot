@@ -146,6 +146,14 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       Union union = result.get(predicate);
       switch (valueType) {
         case INT:
+          int[] intValues = blockValSet.getIntValuesSV();
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(intValues[i])) {
+              union.update(sketches[i]);
+            }
+          }
+          break;
+
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
@@ -156,6 +164,14 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
           break;
 
         case FLOAT:
+          float[] floatValues = blockValSet.getFloatValuesSV();
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(floatValues[i])) {
+              union.update(sketches[i]);
+            }
+          }
+          break;
+
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
@@ -195,6 +211,16 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       Map<String, Union> result;
       switch (valueType) {
         case INT:
+          int[] intValues = blockValSet.getIntValuesSV();
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(intValues[i])) {
+              result = getDefaultResult(groupByResultHolder, groupKeyArray[i], _predicateStrings);
+              Union union = result.get(predicate);
+              union.update(sketches[i]);
+            }
+          }
+          break;
+
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
@@ -207,6 +233,16 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
           break;
 
         case FLOAT:
+          float[] floatValues = blockValSet.getFloatValuesSV();
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(floatValues[i])) {
+              result = getDefaultResult(groupByResultHolder, groupKeyArray[i], _predicateStrings);
+              Union union = result.get(predicate);
+              union.update(sketches[i]);
+            }
+          }
+          break;
+
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
@@ -251,6 +287,19 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       Map<String, Union> result;
       switch (valueType) {
         case INT:
+          int[] intValues = blockValSet.getIntValuesSV();
+
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(intValues[i])) {
+
+              for (int groupKey : groupKeysArray[i]) {
+                result = getDefaultResult(groupByResultHolder, groupKey, _predicateStrings);
+                Union union = result.get(predicate);
+                union.update(sketches[i]);
+              }
+            }
+          }
+
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
 
@@ -267,6 +316,20 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
           break;
 
         case FLOAT:
+          float[] floatValues = blockValSet.getFloatValuesSV();
+
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(floatValues[i])) {
+
+              for (int groupKey : groupKeysArray[i]) {
+                result = getDefaultResult(groupByResultHolder, groupKey, _predicateStrings);
+                Union union = result.get(predicate);
+                union.update(sketches[i]);
+              }
+            }
+          }
+          break;
+
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
 
@@ -610,13 +673,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
     public PredicateEvaluator getPredicateEvaluator(FieldSpec.DataType dataType) {
       if (_predicateEvaluator != null) {
         return _predicateEvaluator;
-      }
-
-      // Theta-sketch does not work on INT and FLOAT.
-      if (dataType == FieldSpec.DataType.INT) {
-        dataType = FieldSpec.DataType.LONG;
-      } else if (dataType == FieldSpec.DataType.FLOAT) {
-        dataType = FieldSpec.DataType.DOUBLE;
       }
 
       _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, dataType);
