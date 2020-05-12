@@ -15,7 +15,10 @@ Does this PR otherwise need attention when creating release notes? Things to con
 - New plugins added or old plugins removed
 * [ ] Yes (Please label this PR as **<code>release-notes</code>**)
 ## Release Notes
-Add text here that you would like to see appear in release notes.
+If you have tagged this as either backward-incompat or release-notes,
+add text here that you would like to see appear in release notes of the
+next release.
+
 If you have a series of commits adding or enabling a feature, then
 add this section only in final commit that marks the feature completed.
 Refer to earlier release notes to see examples of text
