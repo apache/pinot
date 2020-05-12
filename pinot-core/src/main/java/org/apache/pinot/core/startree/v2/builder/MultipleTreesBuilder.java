@@ -31,6 +31,7 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils;
 import org.slf4j.Logger;
@@ -67,13 +68,12 @@ public class MultipleTreesBuilder {
   /**
    * Constructor for the multiple star-trees builder.
    *
-   * @param builderConfigs List of builder configs
+   * @param builderConfigs List of builder configs that might contain {@code null} element for default star-tree
    * @param indexDir Index directory
    * @param buildMode Build mode (ON_HEAP or OFF_HEAP)
    */
   public MultipleTreesBuilder(List<StarTreeV2BuilderConfig> builderConfigs, File indexDir, BuildMode buildMode)
       throws Exception {
-    _builderConfigs = builderConfigs;
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     _metadataProperties =
@@ -81,6 +81,17 @@ public class MultipleTreesBuilder {
     Preconditions
         .checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree v2 already exists");
     _buildMode = buildMode;
+    _builderConfigs = new ArrayList<>(builderConfigs.size());
+    for (StarTreeV2BuilderConfig builderConfig : builderConfigs) {
+      if (builderConfig != null) {
+        _builderConfigs.add(builderConfig);
+      } else {
+        StarTreeV2BuilderConfig defaultConfig =
+            StarTreeV2BuilderConfig.generateDefaultConfig((SegmentMetadataImpl) _segment.getSegmentMetadata());
+        LOGGER.info("Generated default star-tree config: {}", defaultConfig);
+        _builderConfigs.add(defaultConfig);
+      }
+    }
   }
 
   /**

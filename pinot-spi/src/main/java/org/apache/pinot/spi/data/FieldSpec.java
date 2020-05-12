@@ -381,6 +381,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     public boolean isFixedWidth() {
       return this != STRING && this != BYTES;
     }
+
+    public boolean isNumeric() {
+      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
+    }
   }
 
   @Override

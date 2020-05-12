@@ -21,16 +21,19 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class StarTreeIndexConfig extends BaseJsonConfig {
+  // Star-tree will be split with this order (time column is treated as dimension)
   private final List<String> _dimensionsSplitOrder;
+  // Do not create star-node for these dimensions
   private final List<String> _skipStarNodeCreationForDimensions;
+  // Function column pairs with delimiter "__", e.g. SUM__col1, MAX__col2, COUNT__*
   private final List<String> _functionColumnPairs;
+  // The upper bound of records to be scanned at the leaf node
   private final int _maxLeafRecords;
 
   @JsonCreator
