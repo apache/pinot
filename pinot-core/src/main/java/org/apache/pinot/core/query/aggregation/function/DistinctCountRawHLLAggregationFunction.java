@@ -19,8 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -31,45 +29,22 @@ import org.apache.pinot.core.query.aggregation.function.customobject.SerializedH
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-public class DistinctCountRawHLLAggregationFunction implements AggregationFunction<HyperLogLog, SerializedHLL> {
+public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
   private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
-  protected final String _column;
-  private final List<TransformExpressionTree> _inputExpressions;
-
-  /**
-   * Constructor for the class.
-   * @param column Column name to aggregate on.
-   */
   public DistinctCountRawHLLAggregationFunction(String column) {
-    this(new DistinctCountHLLAggregationFunction(column), column);
+    this(column, new DistinctCountHLLAggregationFunction(column));
   }
 
-  DistinctCountRawHLLAggregationFunction(DistinctCountHLLAggregationFunction distinctCountHLLAggregationFunction,
-      String column) {
+  DistinctCountRawHLLAggregationFunction(String column,
+      DistinctCountHLLAggregationFunction distinctCountHLLAggregationFunction) {
+    super(column);
     _distinctCountHLLAggregationFunction = distinctCountHLLAggregationFunction;
-    _column = column;
-    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
   }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTRAWHLL;
-  }
-
-  @Override
-  public String getColumnName() {
-    return getType().getName() + "_" + _column;
-  }
-
-  @Override
-  public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _column + ")";
-  }
-
-  @Override
-  public List<TransformExpressionTree> getInputExpressions() {
-    return _inputExpressions;
   }
 
   @Override
@@ -89,19 +64,19 @@ public class DistinctCountRawHLLAggregationFunction implements AggregationFuncti
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     _distinctCountHLLAggregationFunction.aggregate(length, aggregationResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     _distinctCountHLLAggregationFunction.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     _distinctCountHLLAggregationFunction
         .aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
   }

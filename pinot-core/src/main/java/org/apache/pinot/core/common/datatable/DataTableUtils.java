@@ -26,7 +26,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.util.QueryOptions;
@@ -101,9 +100,8 @@ public class DataTableUtils {
     }
 
     // Aggregation query.
-    AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest);
-    int numAggregations = aggregationFunctionContexts.length;
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
+    int numAggregations = aggregationFunctions.length;
     if (brokerRequest.isSetGroupBy()) {
       // Aggregation group-by query.
 
@@ -121,9 +119,9 @@ public class DataTableUtils {
           columnDataTypes[index] = DataSchema.ColumnDataType.STRING;
           index++;
         }
-        for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
-          columnNames[index] = aggregationFunctionContext.getResultColumnName();
-          AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
+        for (AggregationFunction aggregationFunction : aggregationFunctions) {
+          // NOTE: Use AggregationFunction.getResultColumnName() for SQL format response
+          columnNames[index] = aggregationFunction.getResultColumnName();
           columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
           index++;
         }
@@ -137,9 +135,10 @@ public class DataTableUtils {
 
         // Build the data table.
         DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
-        for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
+        for (AggregationFunction aggregationFunction : aggregationFunctions) {
           dataTableBuilder.startRow();
-          dataTableBuilder.setColumn(0, aggregationFunctionContext.getAggregationColumnName());
+          // NOTE: For backward-compatibility, use AggregationFunction.getColumnName() for PQL format response
+          dataTableBuilder.setColumn(0, aggregationFunction.getColumnName());
           dataTableBuilder.setColumn(1, Collections.emptyMap());
           dataTableBuilder.finishRow();
         }
@@ -152,9 +151,9 @@ public class DataTableUtils {
       DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregations];
       Object[] aggregationResults = new Object[numAggregations];
       for (int i = 0; i < numAggregations; i++) {
-        AggregationFunctionContext aggregationFunctionContext = aggregationFunctionContexts[i];
-        aggregationColumnNames[i] = aggregationFunctionContext.getAggregationColumnName();
-        AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
+        AggregationFunction aggregationFunction = aggregationFunctions[i];
+        // NOTE: For backward-compatibility, use AggregationFunction.getColumnName() for aggregation only query
+        aggregationColumnNames[i] = aggregationFunction.getColumnName();
         columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
         aggregationResults[i] =
             aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder());

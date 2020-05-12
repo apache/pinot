@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.aggregation;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +35,7 @@ import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.BaseTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -59,7 +59,7 @@ public class DistinctTable extends BaseTable {
     // NOTE: The passed in capacity is calculated based on the LIMIT in the query as Math.max(limit * 5, 5000). When
     //       LIMIT is smaller than (64 * 1024 * 0.75 (load factor) / 5 = 9830), then it is guaranteed that no resize is
     //       required.
-    super(dataSchema, Collections.emptyList(), orderBy, capacity);
+    super(dataSchema, new AggregationFunction[0], orderBy, capacity);
     int initialCapacity = Math.min(MAX_INITIAL_CAPACITY, HashUtil.getHashMapCapacity(capacity));
     _uniqueRecordsSet = new HashSet<>(initialCapacity);
     _noMoreNewRecords = false;
@@ -162,8 +162,8 @@ public class DistinctTable extends BaseTable {
     // information to pass to super class so just pass null, empty lists
     // and the broker will set the correct information before merging the
     // data tables.
-    super(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), Collections.emptyList(), new ArrayList<>(),
-        0);
+    super(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), new AggregationFunction[0],
+        new ArrayList<>(), 0);
     DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
     _dataSchema = dataTable.getDataSchema();
     _uniqueRecordsSet = new HashSet<>();

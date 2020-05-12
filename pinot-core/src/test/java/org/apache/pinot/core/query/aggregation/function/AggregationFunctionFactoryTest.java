@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -36,7 +35,7 @@ public class AggregationFunctionFactoryTest {
     AggregationFunction aggregationFunction;
 
     BrokerRequest brokerRequest = new BrokerRequest();
-    String column = "testColumn";
+    String column;
 
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType("CoUnT");
@@ -270,9 +269,9 @@ public class AggregationFunctionFactoryTest {
     AggregationInfo aggregationInfo = new AggregationInfo();
 
     aggregationInfo.setAggregationType("distinct");
-    List<String> args = Arrays.asList("column1", "column2", "column3");
-    String expected = "distinct_" + AggregationFunctionUtils.concatArgs(args);
-    aggregationInfo.setExpressions(args);
+    String[] arguments = new String[]{"column1", "column2", "column3"};
+    String expected = "distinct_" + AggregationFunctionUtils.concatArgs(arguments);
+    aggregationInfo.setExpressions(Arrays.asList(arguments));
 
     AggregationFunction aggregationFunction =
         AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);

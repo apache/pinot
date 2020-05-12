@@ -39,7 +39,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -51,7 +51,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 public class IntermediateResultsBlock implements Block {
   private DataSchema _dataSchema;
   private Collection<Object[]> _selectionResult;
-  private AggregationFunctionContext[] _aggregationFunctionContexts;
+  private AggregationFunction[] _aggregationFunctions;
   private List<Object> _aggregationResult;
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
@@ -80,9 +80,9 @@ public class IntermediateResultsBlock implements Block {
    * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
    */
   @SuppressWarnings("unchecked")
-  public IntermediateResultsBlock(AggregationFunctionContext[] aggregationFunctionContexts, List aggregationResult,
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List aggregationResult,
       boolean isGroupBy) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
+    _aggregationFunctions = aggregationFunctions;
     if (isGroupBy) {
       _combinedAggregationGroupByResult = aggregationResult;
     } else {
@@ -93,18 +93,18 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
    */
-  public IntermediateResultsBlock(AggregationFunctionContext[] aggregationFunctionContexts,
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
       @Nullable AggregationGroupByResult aggregationGroupByResults) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
+    _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
   }
 
   /**
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
-  public IntermediateResultsBlock(AggregationFunctionContext[] aggregationFunctionContexts,
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
       @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
+    _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
   }
@@ -134,7 +134,7 @@ public class IntermediateResultsBlock implements Block {
     return _dataSchema;
   }
 
-  public void setDataSchema(@Nullable DataSchema dataSchema) {
+  public void setDataSchema(DataSchema dataSchema) {
     _dataSchema = dataSchema;
   }
 
@@ -143,17 +143,17 @@ public class IntermediateResultsBlock implements Block {
     return _selectionResult;
   }
 
-  public void setSelectionResult(@Nullable Collection<Object[]> rowEventsSet) {
+  public void setSelectionResult(Collection<Object[]> rowEventsSet) {
     _selectionResult = rowEventsSet;
   }
 
   @Nullable
-  public AggregationFunctionContext[] getAggregationFunctionContexts() {
-    return _aggregationFunctionContexts;
+  public AggregationFunction[] getAggregationFunctions() {
+    return _aggregationFunctions;
   }
 
-  public void setAggregationFunctionContexts(AggregationFunctionContext[] aggregationFunctionContexts) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
+  public void setAggregationFunctions(AggregationFunction[] aggregationFunctions) {
+    _aggregationFunctions = aggregationFunctions;
   }
 
   @Nullable
@@ -161,7 +161,7 @@ public class IntermediateResultsBlock implements Block {
     return _aggregationResult;
   }
 
-  public void setAggregationResults(@Nullable List<Object> aggregationResults) {
+  public void setAggregationResults(List<Object> aggregationResults) {
     _aggregationResult = aggregationResults;
   }
 
@@ -175,7 +175,7 @@ public class IntermediateResultsBlock implements Block {
     return _processingExceptions;
   }
 
-  public void setProcessingExceptions(@Nullable List<ProcessingException> processingExceptions) {
+  public void setProcessingExceptions(List<ProcessingException> processingExceptions) {
     _processingExceptions = processingExceptions;
   }
 
@@ -322,14 +322,14 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable getAggregationResultDataTable()
       throws Exception {
-    // Extract each aggregation column name and type from aggregation function context.
-    int numAggregationFunctions = _aggregationFunctionContexts.length;
+    // Extract result column name and type from each aggregation function
+    int numAggregationFunctions = _aggregationFunctions.length;
     String[] columnNames = new String[numAggregationFunctions];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
-      columnNames[i] = aggregationFunctionContext.getAggregationColumnName();
-      columnDataTypes[i] = aggregationFunctionContext.getAggregationFunction().getIntermediateResultColumnType();
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      columnNames[i] = aggregationFunction.getColumnName();
+      columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
     }
 
     // Build the data table.
@@ -364,11 +364,11 @@ public class IntermediateResultsBlock implements Block {
 
     // Build the data table.
     DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
-    int numAggregationFunctions = _aggregationFunctionContexts.length;
+    int numAggregationFunctions = _aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctions; i++) {
       dataTableBuilder.startRow();
-      AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
-      dataTableBuilder.setColumn(0, aggregationFunctionContext.getAggregationColumnName());
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      dataTableBuilder.setColumn(0, aggregationFunction.getColumnName());
       dataTableBuilder.setColumn(1, _combinedAggregationGroupByResult.get(i));
       dataTableBuilder.finishRow();
     }

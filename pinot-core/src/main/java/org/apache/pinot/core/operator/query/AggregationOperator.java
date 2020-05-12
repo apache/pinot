@@ -24,8 +24,8 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 
 
@@ -35,16 +35,16 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationOperator";
 
-  private final AggregationFunctionContext[] _functionContexts;
+  private final AggregationFunction[] _aggregationFunctions;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
 
   private int _numDocsScanned = 0;
 
-  public AggregationOperator(AggregationFunctionContext[] functionContexts, TransformOperator transformOperator,
+  public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
       long numTotalDocs, boolean useStarTree) {
-    _functionContexts = functionContexts;
+    _aggregationFunctions = aggregationFunctions;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
@@ -55,9 +55,9 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     // Perform aggregation on all the transform blocks
     AggregationExecutor aggregationExecutor;
     if (_useStarTree) {
-      aggregationExecutor = new StarTreeAggregationExecutor(_functionContexts);
+      aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
     } else {
-      aggregationExecutor = new DefaultAggregationExecutor(_functionContexts);
+      aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
@@ -66,7 +66,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     }
 
     // Build intermediate result block based on aggregation result from the executor
-    return new IntermediateResultsBlock(_functionContexts, aggregationExecutor.getResult(), false);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(), false);
   }
 
   @Override

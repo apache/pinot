@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -31,39 +29,16 @@ import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-public class MinAggregationFunction implements AggregationFunction<Double, Double> {
+public class MinAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
 
-  protected final String _column;
-  private final List<TransformExpressionTree> _inputExpressions;
-
-  /**
-   * Constructor for the class.
-   * @param column Column name to aggregate on.
-   */
   public MinAggregationFunction(String column) {
-    _column = column;
-    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
+    super(column);
   }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.MIN;
-  }
-
-  @Override
-  public String getColumnName() {
-    return getType().getName() + "_" + _column;
-  }
-
-  @Override
-  public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _column + ")";
-  }
-
-  @Override
-  public List<TransformExpressionTree> getInputExpressions() {
-    return _inputExpressions;
   }
 
   @Override
@@ -82,8 +57,9 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     double min = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
@@ -96,8 +72,8 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       int groupKey = groupKeyArray[i];
@@ -109,8 +85,8 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_column).getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

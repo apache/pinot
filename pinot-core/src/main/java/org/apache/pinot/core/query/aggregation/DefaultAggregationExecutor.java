@@ -19,70 +19,42 @@
 package org.apache.pinot.core.query.aggregation;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
 
 public class DefaultAggregationExecutor implements AggregationExecutor {
-  protected final int _numFunctions;
-  protected final AggregationFunction[] _functions;
-  protected final AggregationResultHolder[] _resultHolders;
-  protected final TransformExpressionTree[][] _expressions;
+  protected final AggregationFunction[] _aggregationFunctions;
+  protected final AggregationResultHolder[] _aggregationResultHolders;
 
-  public DefaultAggregationExecutor(AggregationFunctionContext[] functionContexts) {
-    _numFunctions = functionContexts.length;
-    _functions = new AggregationFunction[_numFunctions];
-    _resultHolders = new AggregationResultHolder[_numFunctions];
-
-    _expressions = new TransformExpressionTree[_numFunctions][];
-    for (int i = 0; i < _numFunctions; i++) {
-      AggregationFunction function = functionContexts[i].getAggregationFunction();
-      _functions[i] = function;
-      _resultHolders[i] = _functions[i].createAggregationResultHolder();
-
-      if (function.getType() != AggregationFunctionType.COUNT) {
-        // count(*) does not have a column so handle rest of the aggregate
-        // functions -- sum, min, max etc
-
-        List<TransformExpressionTree> inputExpressionsList = function.getInputExpressions();
-        _expressions[i] = inputExpressionsList.toArray(new TransformExpressionTree[0]);
-      }
+  public DefaultAggregationExecutor(AggregationFunction[] aggregationFunctions) {
+    _aggregationFunctions = aggregationFunctions;
+    int numAggregationFunctions = aggregationFunctions.length;
+    _aggregationResultHolders = new AggregationResultHolder[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      _aggregationResultHolders[i] = aggregationFunctions[i].createAggregationResultHolder();
     }
   }
 
   @Override
   public void aggregate(TransformBlock transformBlock) {
+    int numAggregationFunctions = _aggregationFunctions.length;
     int length = transformBlock.getNumDocs();
-    for (int i = 0; i < _numFunctions; i++) {
-      AggregationFunction function = _functions[i];
-      AggregationResultHolder resultHolder = _resultHolders[i];
-      if (function.getType() == AggregationFunctionType.COUNT) {
-        // handle count(*) function
-        function.aggregate(length, resultHolder, Collections.emptyMap());
-      } else {
-        // handle rest of the aggregate functions -- sum, min, max etc
-        Map<String, BlockValSet> blockValSetMap = new HashMap<>();
-
-        for (int j = 0; j < _expressions[i].length; j++) {
-          blockValSetMap.put(_expressions[i][j].toString(), transformBlock.getBlockValueSet(_expressions[i][j]));
-        }
-        function.aggregate(length, resultHolder, blockValSetMap);
-      }
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      aggregationFunction.aggregate(length, _aggregationResultHolders[i],
+          AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, transformBlock));
     }
   }
 
   @Override
   public List<Object> getResult() {
-    List<Object> aggregationResults = new ArrayList<>(_numFunctions);
-    for (int i = 0; i < _numFunctions; i++) {
-      aggregationResults.add(_functions[i].extractAggregationResult(_resultHolders[i]));
+    int numFunctions = _aggregationFunctions.length;
+    List<Object> aggregationResults = new ArrayList<>(numFunctions);
+    for (int i = 0; i < numFunctions; i++) {
+      aggregationResults.add(_aggregationFunctions[i].extractAggregationResult(_aggregationResultHolders[i]));
     }
     return aggregationResults;
   }

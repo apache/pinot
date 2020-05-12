@@ -31,11 +31,9 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.Function;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
 
 /**
@@ -48,13 +46,13 @@ public class TableResizer {
   private Comparator<Record> _recordComparator;
   protected int _numOrderBy;
 
-  TableResizer(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy) {
+  TableResizer(DataSchema dataSchema, AggregationFunction[] aggregationFunctions, List<SelectionSort> orderBy) {
 
     // NOTE: the assumption here is that the key columns will appear before the aggregation columns in the data schema
     // This is handled in the only in the AggregationGroupByOrderByOperator for now
 
     int numColumns = dataSchema.size();
-    int numAggregations = aggregationInfos.size();
+    int numAggregations = aggregationFunctions.length;
     int numKeyColumns = numColumns - numAggregations;
 
     Map<String, Integer> columnIndexMap = new HashMap<>();
@@ -63,10 +61,7 @@ public class TableResizer {
       String columnName = dataSchema.getColumnName(i);
       columnIndexMap.put(columnName, i);
       if (i >= numKeyColumns) {
-        AggregationInfo aggregationInfo = aggregationInfos.get(i - numKeyColumns);
-        AggregationFunction aggregationFunction =
-            AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
-        aggregationColumnToFunction.put(columnName, aggregationFunction);
+        aggregationColumnToFunction.put(columnName, aggregationFunctions[i - numKeyColumns]);
       }
     }
 
@@ -109,7 +104,8 @@ public class TableResizer {
       };
     } else {
       // For cases where the entire Record is unique and is treated as a key
-      Preconditions.checkState(numKeyColumns == numColumns, "number of key columns should be equal to total number of columns");
+      Preconditions
+          .checkState(numKeyColumns == numColumns, "number of key columns should be equal to total number of columns");
       int[] orderByIndexes = new int[_numOrderBy];
       boolean[] orderByAsc = new boolean[_numOrderBy];
       for (int i = 0; i < _numOrderBy; i++) {
@@ -194,7 +190,7 @@ public class TableResizer {
     return priorityQueue;
   }
 
-   private List<Record> sortRecordsMap(Map<Key, Record> recordsMap) {
+  private List<Record> sortRecordsMap(Map<Key, Record> recordsMap) {
     int numRecords = recordsMap.size();
     List<Record> sortedRecords = new ArrayList<>(numRecords);
     List<IntermediateRecord> intermediateRecords = new ArrayList<>(numRecords);
@@ -321,7 +317,6 @@ public class TableResizer {
     }
   }
 
-
   /********************************************************
    *                                                      *
    * Resize functions for Set based table implementation  *
@@ -342,9 +337,10 @@ public class TableResizer {
       Object[] values1 = record1.getValues();
       Object[] values2 = record2.getValues();
       for (int i = 0; i < _numOrderBy; i++) {
-        Comparable valueToCompare1 = (Comparable)values1[_orderByColumnIndexes[i]];
-        Comparable valueToCompare2 = (Comparable)values2[_orderByColumnIndexes[i]];
-        int result = _orderByAsc[i] ? valueToCompare1.compareTo(valueToCompare2) : valueToCompare2.compareTo(valueToCompare1);
+        Comparable valueToCompare1 = (Comparable) values1[_orderByColumnIndexes[i]];
+        Comparable valueToCompare2 = (Comparable) values2[_orderByColumnIndexes[i]];
+        int result =
+            _orderByAsc[i] ? valueToCompare1.compareTo(valueToCompare2) : valueToCompare2.compareTo(valueToCompare1);
         if (result != 0) {
           return result;
         }
@@ -359,14 +355,16 @@ public class TableResizer {
       if (numRecordsToEvict < trimToSize) {
         // num records to evict is smaller than num records to retain
         // make PQ of records to evict
-        PriorityQueue<Record> priorityQueue = buildPriorityQueueFromRecordSet(numRecordsToEvict, recordSet, _recordComparator);
+        PriorityQueue<Record> priorityQueue =
+            buildPriorityQueueFromRecordSet(numRecordsToEvict, recordSet, _recordComparator);
         for (Record recordToEvict : priorityQueue) {
           recordSet.remove(recordToEvict);
         }
       } else {
         // num records to retain is smaller than num records to evict
         // make PQ of records to retain
-        PriorityQueue<Record> priorityQueue = buildPriorityQueueFromRecordSet(trimToSize, recordSet, _recordComparator.reversed());
+        PriorityQueue<Record> priorityQueue =
+            buildPriorityQueueFromRecordSet(trimToSize, recordSet, _recordComparator.reversed());
         ObjectOpenHashSet<Record> recordsToRetain = new ObjectOpenHashSet<>(priorityQueue.size());
         for (Record recordToRetain : priorityQueue) {
           recordsToRetain.add(recordToRetain);
@@ -376,9 +374,7 @@ public class TableResizer {
     }
   }
 
-  private PriorityQueue<Record> buildPriorityQueueFromRecordSet(
-      int size,
-      Set<Record> recordSet,
+  private PriorityQueue<Record> buildPriorityQueueFromRecordSet(int size, Set<Record> recordSet,
       Comparator<Record> comparator) {
     PriorityQueue<Record> priorityQueue = new PriorityQueue<>(size, comparator);
     for (Record record : recordSet) {
@@ -416,7 +412,8 @@ public class TableResizer {
       // num records to evict is smaller than num records to retain
       if (numRecordsToEvict > 0) {
         // make PQ of records to evict
-        PriorityQueue<Record> priorityQueue = buildPriorityQueueFromRecordSet(numRecordsToEvict, recordSet, _recordComparator);
+        PriorityQueue<Record> priorityQueue =
+            buildPriorityQueueFromRecordSet(numRecordsToEvict, recordSet, _recordComparator);
         for (Record recordToEvict : priorityQueue) {
           recordSet.remove(recordToEvict);
         }
@@ -424,7 +421,8 @@ public class TableResizer {
       return sortRecordSet(recordSet);
     } else {
       // make PQ of records to retain
-      PriorityQueue<Record> priorityQueue = buildPriorityQueueFromRecordSet(numRecordsToRetain, recordSet, _recordComparator.reversed());
+      PriorityQueue<Record> priorityQueue =
+          buildPriorityQueueFromRecordSet(numRecordsToRetain, recordSet, _recordComparator.reversed());
       // use PQ to get sorted list
       Record[] sortedArray = new Record[numRecordsToRetain];
       while (!priorityQueue.isEmpty()) {

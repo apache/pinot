@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.base.Preconditions;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -35,29 +32,14 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class PercentileEstAggregationFunction implements AggregationFunction<QuantileDigest, Long> {
+public class PercentileEstAggregationFunction extends BaseSingleInputAggregationFunction<QuantileDigest, Long> {
   public static final double DEFAULT_MAX_ERROR = 0.05;
 
   protected final int _percentile;
-  protected final String _column;
-  private final List<TransformExpressionTree> _inputExpressions;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param arguments List of arguments.
-   *                  <ul>
-   *                  <li> Arg 0: Column name to aggregate.</li>
-   *                  <li> Arg 1: Percentile to compute. </li>
-   *                  </ul>
-   */
-  public PercentileEstAggregationFunction(List<String> arguments) {
-    int numArgs = arguments.size();
-    Preconditions.checkArgument(numArgs == 2, getType() + " expects two argument, got: " + numArgs);
-
-    _column = arguments.get(0);
-    _percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
-    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
+  public PercentileEstAggregationFunction(String column, int percentile) {
+    super(column);
+    _percentile = percentile;
   }
 
   @Override
@@ -73,11 +55,6 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   @Override
   public String getResultColumnName() {
     return AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + _percentile + "(" + _column + ")";
-  }
-
-  @Override
-  public List<TransformExpressionTree> getInputExpressions() {
-    return _inputExpressions;
   }
 
   @Override
@@ -97,8 +74,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       long[] longValues = blockValSet.getLongValuesSV();
       QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
@@ -125,8 +102,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       long[] longValues = blockValSet.getLongValuesSV();
       for (int i = 0; i < length; i++) {
@@ -150,8 +127,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       long[] longValues = blockValSet.getLongValuesSV();
       for (int i = 0; i < length; i++) {

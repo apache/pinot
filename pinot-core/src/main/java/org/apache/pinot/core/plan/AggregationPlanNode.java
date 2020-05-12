@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.AggregationInfo;
@@ -28,7 +27,7 @@ import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
@@ -47,38 +46,50 @@ public class AggregationPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfos;
-  private final AggregationFunctionContext[] _functionContexts;
+  private final AggregationFunction[] _aggregationFunctions;
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
 
   public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _functionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest);
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {
       if (!StarTreeUtils.isStarTreeDisabled(brokerRequest)) {
-        Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs = new HashSet<>();
-        for (AggregationInfo aggregationInfo : _aggregationInfos) {
-          aggregationFunctionColumnPairs.add(AggregationFunctionUtils.getFunctionColumnPair(aggregationInfo));
+        int numAggregationFunctions = _aggregationFunctions.length;
+        AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+            new AggregationFunctionColumnPair[numAggregationFunctions];
+        boolean hasUnsupportedAggregationFunction = false;
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          AggregationFunctionColumnPair aggregationFunctionColumnPair =
+              AggregationFunctionUtils.getAggregationFunctionColumnPair(_aggregationFunctions[i]);
+          if (aggregationFunctionColumnPair != null) {
+            aggregationFunctionColumnPairs[i] = aggregationFunctionColumnPair;
+          } else {
+            hasUnsupportedAggregationFunction = true;
+            break;
+          }
         }
-        FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(brokerRequest);
-        for (StarTreeV2 starTreeV2 : starTrees) {
-          if (StarTreeUtils
-              .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null, rootFilterNode)) {
-            _transformPlanNode = null;
-            _starTreeTransformPlanNode =
-                new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null, rootFilterNode,
-                    brokerRequest.getDebugOptions());
-            return;
+        if (!hasUnsupportedAggregationFunction) {
+          FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(brokerRequest);
+          for (StarTreeV2 starTreeV2 : starTrees) {
+            if (StarTreeUtils
+                .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null, rootFilterNode)) {
+              _transformPlanNode = null;
+              _starTreeTransformPlanNode =
+                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null, rootFilterNode,
+                      brokerRequest.getDebugOptions());
+              return;
+            }
           }
         }
       }
     }
 
     Set<TransformExpressionTree> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(brokerRequest, _functionContexts);
+        AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, null);
     _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest, expressionsToTransform);
     _starTreeTransformPlanNode = null;
   }
@@ -88,10 +99,10 @@ public class AggregationPlanNode implements PlanNode {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     if (_transformPlanNode != null) {
       // Do not use star-tree
-      return new AggregationOperator(_functionContexts, _transformPlanNode.run(), numTotalDocs, false);
+      return new AggregationOperator(_aggregationFunctions, _transformPlanNode.run(), numTotalDocs, false);
     } else {
       // Use star-tree
-      return new AggregationOperator(_functionContexts, _starTreeTransformPlanNode.run(), numTotalDocs, true);
+      return new AggregationOperator(_aggregationFunctions, _starTreeTransformPlanNode.run(), numTotalDocs, true);
     }
   }
 

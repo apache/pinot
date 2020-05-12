@@ -76,21 +76,22 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /**
    * Performs aggregation on the given block value sets (aggregation only).
    */
-  void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap);
+  void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap);
 
   /**
    * Performs aggregation on the given group key array and block value sets (aggregation group-by on single-value
    * columns).
    */
   void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSets);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap);
 
   /**
    * Performs aggregation on the given group keys array and block value sets (aggregation group-by on multi-value
    * columns).
    */
   void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSets);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap);
 
   /**
    * Extracts the intermediate result from the aggregation result holder (aggregation only).

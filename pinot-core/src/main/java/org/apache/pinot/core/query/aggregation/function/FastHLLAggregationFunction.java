@@ -20,8 +20,6 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -38,40 +36,17 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
  * Use {@link DistinctCountHLLAggregationFunction} on byte[] for serialized HyperLogLog.
  */
 @Deprecated
-public class FastHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
+public class FastHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
   public static final int DEFAULT_LOG2M = 8;
   private static final int BYTE_TO_CHAR_OFFSET = 129;
 
-  private final String _column;
-  private final List<TransformExpressionTree> _inputExpressions;
-
-  /**
-   * Constructor for the class.
-   * @param column Column name to aggregate on.
-   */
   public FastHLLAggregationFunction(String column) {
-    _column = column;
-    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
+    super(column);
   }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.FASTHLL;
-  }
-
-  @Override
-  public String getColumnName() {
-    return getType().getName() + "_" + _column;
-  }
-
-  @Override
-  public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _column + ")";
-  }
-
-  @Override
-  public List<TransformExpressionTree> getInputExpressions() {
-    return _inputExpressions;
   }
 
   @Override
@@ -90,8 +65,9 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
-    String[] values = blockValSetMap.get(_column).getStringValuesSV();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    String[] values = blockValSetMap.get(_expression).getStringValuesSV();
     try {
       HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
       if (hyperLogLog != null) {
@@ -112,8 +88,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    String[] values = blockValSetMap.get(_column).getStringValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    String[] values = blockValSetMap.get(_expression).getStringValuesSV();
     try {
       for (int i = 0; i < length; i++) {
         HyperLogLog value = convertStringToHLL(values[i]);
@@ -132,8 +108,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    String[] values = blockValSetMap.get(_column).getStringValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    String[] values = blockValSetMap.get(_expression).getStringValuesSV();
     try {
       for (int i = 0; i < length; i++) {
         HyperLogLog value = convertStringToHLL(values[i]);

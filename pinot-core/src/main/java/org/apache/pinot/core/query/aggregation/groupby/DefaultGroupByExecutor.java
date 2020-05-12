@@ -18,21 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
 
 /**
@@ -51,62 +45,39 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
 
-  protected final int _numFunctions;
-  protected final AggregationFunction[] _functions;
-  protected final TransformExpressionTree[][] _aggregationExpressions;
+  protected final AggregationFunction[] _aggregationFunctions;
   protected final GroupKeyGenerator _groupKeyGenerator;
-  protected final GroupByResultHolder[] _resultHolders;
+  protected final GroupByResultHolder[] _groupByResultHolders;
   protected final boolean _hasMVGroupByExpression;
-  protected final boolean _hasNoDictionaryGroupByExpression;
   protected final int[] _svGroupKeys;
   protected final int[][] _mvGroupKeys;
 
   /**
    * Constructor for the class.
    *
-   * @param functionContexts Array of aggregation functions
-   * @param groupBy Group by from broker request
+   * @param aggregationFunctions Array of aggregation functions
+   * @param groupByExpressions Array of group-by expressions
    * @param maxInitialResultHolderCapacity Maximum initial capacity for the result holder
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    * @param transformOperator Transform operator
    */
-  public DefaultGroupByExecutor(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator) {
-    // Initialize aggregation functions and expressions
-    _numFunctions = functionContexts.length;
-    _functions = new AggregationFunction[_numFunctions];
-    _aggregationExpressions = new TransformExpressionTree[_numFunctions][];
+  public DefaultGroupByExecutor(AggregationFunction[] aggregationFunctions,
+      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      TransformOperator transformOperator) {
+    _aggregationFunctions = aggregationFunctions;
 
-    for (int i = 0; i < _numFunctions; i++) {
-      AggregationFunction function = functionContexts[i].getAggregationFunction();
-      _functions[i] = function;
-
-      if (function.getType() != AggregationFunctionType.COUNT) {
-        List<String> expressions = functionContexts[i].getExpressions();
-
-        List<TransformExpressionTree> inputExpressions = function.getInputExpressions();
-        _aggregationExpressions[i] = inputExpressions.toArray(new TransformExpressionTree[0]);
-      }
-    }
-
-    // Initialize group-by expressions
-    List<String> groupByExpressionStrings = groupBy.getExpressions();
-    int numGroupByExpressions = groupByExpressionStrings.size();
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
-    TransformExpressionTree[] groupByExpressions = new TransformExpressionTree[numGroupByExpressions];
-    for (int i = 0; i < numGroupByExpressions; i++) {
-      groupByExpressions[i] = TransformExpressionTree.compileToExpressionTree(groupByExpressionStrings.get(i));
-      TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpressions[i]);
+    for (TransformExpressionTree groupByExpression : groupByExpressions) {
+      TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
       hasMVGroupByExpression |= !transformResultMetadata.isSingleValue();
       hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
-    _hasNoDictionaryGroupByExpression = hasNoDictionaryGroupByExpression;
 
     // Initialize group key generator
-    if (_hasNoDictionaryGroupByExpression) {
-      if (numGroupByExpressions == 1) {
+    if (hasNoDictionaryGroupByExpression) {
+      if (groupByExpressions.length == 1) {
         _groupKeyGenerator =
             new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit);
       } else {
@@ -121,9 +92,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize result holders
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
-    _resultHolders = new GroupByResultHolder[_numFunctions];
-    for (int i = 0; i < _numFunctions; i++) {
-      _resultHolders[i] = _functions[i].createGroupByResultHolder(initialCapacity, maxNumResults);
+    int numAggregationFunctions = aggregationFunctions.length;
+    _groupByResultHolders = new GroupByResultHolder[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      _groupByResultHolders[i] = _aggregationFunctions[i].createGroupByResultHolder(initialCapacity, maxNumResults);
     }
 
     // Initialize map from document Id to group key
@@ -137,7 +109,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   @Override
-  public void process(@Nonnull TransformBlock transformBlock) {
+  public void process(TransformBlock transformBlock) {
     // Generate group keys
     // NOTE: groupKeyGenerator will limit the number of groups. Once reaching limit, no new group will be generated
     if (_hasMVGroupByExpression) {
@@ -146,41 +118,31 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       _groupKeyGenerator.generateKeysForBlock(transformBlock, _svGroupKeys);
     }
 
-    int length = transformBlock.getNumDocs();
     int capacityNeeded = _groupKeyGenerator.getCurrentGroupKeyUpperBound();
-    for (int i = 0; i < _numFunctions; i++) {
-      GroupByResultHolder resultHolder = _resultHolders[i];
-      resultHolder.ensureCapacity(capacityNeeded);
+    int length = transformBlock.getNumDocs();
+    int numAggregationFunctions = _aggregationFunctions.length;
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
+      groupByResultHolder.ensureCapacity(capacityNeeded);
       aggregate(transformBlock, length, i);
     }
   }
 
-  protected void aggregate(@Nonnull TransformBlock transformBlock, int length, int functionIndex) {
-    AggregationFunction function = _functions[functionIndex];
-    GroupByResultHolder resultHolder = _resultHolders[functionIndex];
+  protected void aggregate(TransformBlock transformBlock, int length, int functionIndex) {
+    AggregationFunction aggregationFunction = _aggregationFunctions[functionIndex];
+    Map<TransformExpressionTree, BlockValSet> blockValSetMap =
+        AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, transformBlock);
 
-    if (function.getType() == AggregationFunctionType.COUNT) {
-      if (_hasMVGroupByExpression) {
-        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, Collections.emptyMap());
-      } else {
-        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, Collections.emptyMap());
-      }
+    GroupByResultHolder groupByResultHolder = _groupByResultHolders[functionIndex];
+    if (_hasMVGroupByExpression) {
+      aggregationFunction.aggregateGroupByMV(length, _mvGroupKeys, groupByResultHolder, blockValSetMap);
     } else {
-      Map<String, BlockValSet> blockValSetMap = new HashMap<>();
-      for (int i = 0; i < _aggregationExpressions[functionIndex].length; i++) {
-        TransformExpressionTree aggregationExpression = _aggregationExpressions[functionIndex][i];
-        blockValSetMap.put(aggregationExpression.toString(), transformBlock.getBlockValueSet(aggregationExpression));
-      }
-      if (_hasMVGroupByExpression) {
-        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValSetMap);
-      } else {
-        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValSetMap);
-      }
+      aggregationFunction.aggregateGroupBySV(length, _svGroupKeys, groupByResultHolder, blockValSetMap);
     }
   }
 
   @Override
   public AggregationGroupByResult getResult() {
-    return new AggregationGroupByResult(_groupKeyGenerator, _functions, _resultHolders);
+    return new AggregationGroupByResult(_groupKeyGenerator, _aggregationFunctions, _groupByResultHolders);
   }
 }

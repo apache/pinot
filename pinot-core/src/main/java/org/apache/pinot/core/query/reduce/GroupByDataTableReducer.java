@@ -31,7 +31,6 @@ import java.util.function.BiFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.GroupBy;
@@ -48,7 +47,6 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
@@ -63,8 +61,6 @@ import org.apache.pinot.core.util.QueryOptions;
 public class GroupByDataTableReducer implements DataTableReducer {
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction[] _aggregationFunctions;
-  private final List<AggregationInfo> _aggregationInfos;
-  private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final List<SelectionSort> _orderBy;
   private final GroupBy _groupBy;
   private final int _numAggregationFunctions;
@@ -80,8 +76,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
       QueryOptions queryOptions) {
     _brokerRequest = brokerRequest;
     _aggregationFunctions = aggregationFunctions;
-    _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _aggregationFunctionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest);
     _numAggregationFunctions = aggregationFunctions.length;
     _groupBy = brokerRequest.getGroupBy();
     _numGroupBy = _groupBy.getExpressionsSize();
@@ -154,7 +148,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       // This is the primary PQL compliant group by
 
       boolean[] aggregationFunctionSelectStatus =
-          AggregationFunctionUtils.getAggregationFunctionsSelectStatus(_aggregationInfos);
+          AggregationFunctionUtils.getAggregationFunctionsSelectStatus(_brokerRequest.getAggregationsInfo());
       setGroupByHavingResults(brokerResponseNative, aggregationFunctionSelectStatus, dataTables,
           _brokerRequest.getHavingFilterQuery(), _brokerRequest.getHavingFilterSubQueryMap());
 
@@ -303,10 +297,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
   }
 
   private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTables) {
-
     int indexedTableCapacity = GroupByUtils.getTableCapacity(_groupBy, _orderBy);
     IndexedTable indexedTable =
-        new ConcurrentIndexedTable(dataSchema, _aggregationInfos, _orderBy, indexedTableCapacity);
+        new ConcurrentIndexedTable(dataSchema, _aggregationFunctions, _orderBy, indexedTableCapacity);
 
     for (DataTable dataTable : dataTables) {
       BiFunction[] functions = new BiFunction[_numColumns];
@@ -552,8 +545,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
         if (aggregationFunctionsSelectStatus[i]) {
           finalColumnNames[count] = columnNames[i];
           finalOutResultMaps[count] = finalResultMaps[i];
-          finalResultTableAggNames[count] = _aggregationFunctionContexts[i].getResultColumnName();
-          finalAggregationFunctions[count] = _aggregationFunctions[i];
+          AggregationFunction aggregationFunction = _aggregationFunctions[i];
+          finalResultTableAggNames[count] = aggregationFunction.getResultColumnName();
+          finalAggregationFunctions[count] = aggregationFunction;
           count++;
         }
       }

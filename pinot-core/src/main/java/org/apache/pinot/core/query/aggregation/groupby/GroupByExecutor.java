@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
@@ -32,7 +31,7 @@ public interface GroupByExecutor {
    *
    * @param transformBlock Transform block
    */
-  void process(@Nonnull TransformBlock transformBlock);
+  void process(TransformBlock transformBlock);
 
   /**
    * Returns the result of group-by aggregation.
