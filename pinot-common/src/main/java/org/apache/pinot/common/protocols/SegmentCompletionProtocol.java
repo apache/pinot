@@ -385,6 +385,7 @@ public class SegmentCompletionProtocol {
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class Response {
     private ControllerResponseStatus _status;
     private long _offset = -1;
@@ -396,7 +397,6 @@ public class SegmentCompletionProtocol {
     public Response() {
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public Response(Params params) {
       _status = params.getStatus();
       _offset = params.getOffset();
