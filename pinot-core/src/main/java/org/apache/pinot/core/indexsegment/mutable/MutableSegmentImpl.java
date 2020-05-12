@@ -98,6 +98,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private final String _segmentName;
   private final Schema _schema;
+  private final String _timeColumnName;
   private final int _capacity;
   private final SegmentMetadata _segmentMetadata;
   private final boolean _offHeap;
@@ -143,6 +144,7 @@ public class MutableSegmentImpl implements MutableSegment {
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
+    _timeColumnName = config.getTimeColumnName();
     _capacity = config.getCapacity();
     _segmentMetadata = new SegmentMetadataImpl(config.getRealtimeSegmentZKMetadata(), _schema) {
       @Override
@@ -419,8 +421,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Update min/max value for time column
-      FieldSpec.FieldType fieldType = fieldSpec.getFieldType();
-      if (fieldType.equals(FieldSpec.FieldType.TIME) || fieldType.equals(FieldSpec.FieldType.DATE_TIME)) {
+      if (column.equals(_timeColumnName)) {
         long timeValue;
         if (value instanceof Number) {
           timeValue = ((Number) value).longValue();

@@ -30,6 +30,7 @@ public class RealtimeSegmentConfig {
   private final String _segmentName;
   private final String _streamName;
   private final Schema _schema;
+  private final String _timeColumnName;
   private final int _capacity;
   private final int _avgNumMultiValues;
   private final Set<String> _noDictionaryColumns;
@@ -47,8 +48,8 @@ public class RealtimeSegmentConfig {
   private final boolean _nullHandlingEnabled;
   private final String _consumerDir;
 
-  private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
-      int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
+  private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, String timeColumnName,
+      int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
       Set<String> invertedIndexColumns, Set<String> textIndexColumns,
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
@@ -56,6 +57,7 @@ public class RealtimeSegmentConfig {
     _segmentName = segmentName;
     _streamName = streamName;
     _schema = schema;
+    _timeColumnName = timeColumnName;
     _capacity = capacity;
     _avgNumMultiValues = avgNumMultiValues;
     _noDictionaryColumns = noDictionaryColumns;
@@ -84,6 +86,10 @@ public class RealtimeSegmentConfig {
 
   public Schema getSchema() {
     return _schema;
+  }
+
+  public String getTimeColumnName() {
+    return _timeColumnName;
   }
 
   public int getCapacity() {
@@ -159,6 +165,7 @@ public class RealtimeSegmentConfig {
     private String _segmentName;
     private String _streamName;
     private Schema _schema;
+    private String _timeColumnName;
     private int _capacity;
     private int _avgNumMultiValues;
     private Set<String> _noDictionaryColumns;
@@ -191,6 +198,11 @@ public class RealtimeSegmentConfig {
 
     public Builder setSchema(Schema schema) {
       _schema = schema;
+      return this;
+    }
+
+    public Builder setTimeColumnName(String timeColumnName) {
+      _timeColumnName = timeColumnName;
       return this;
     }
 
@@ -283,10 +295,10 @@ public class RealtimeSegmentConfig {
     }
 
     public RealtimeSegmentConfig build() {
-      return new RealtimeSegmentConfig(_segmentName, _streamName, _schema, _capacity, _avgNumMultiValues,
-          _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns, _textIndexColumns,
-          _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _partitionColumn, _partitionFunction,
-          _partitionId, _aggregateMetrics, _nullHandlingEnabled, _consumerDir);
+      return new RealtimeSegmentConfig(_segmentName, _streamName, _schema, _timeColumnName, _capacity,
+          _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
+          _textIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _partitionColumn,
+          _partitionFunction, _partitionId, _aggregateMetrics, _nullHandlingEnabled, _consumerDir);
     }
   }
 }
