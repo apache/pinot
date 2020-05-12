@@ -257,7 +257,7 @@ public class ClusterIntegrationTestUtils {
         try {
           File outputDir = new File(segmentDir, "segment-" + segmentIndex);
           SegmentGeneratorConfig segmentGeneratorConfig = SegmentTestUtils
-              .getSegmentGeneratorConfig(avroFile, outputDir, timeColumnName, TimeUnit.DAYS, tableName, pinotSchema);
+              .getSegmentGeneratorConfig(avroFile, outputDir, timeColumnName, tableName, pinotSchema);
 
           // Test segment with space and special character in the file name
           segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");

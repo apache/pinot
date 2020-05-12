@@ -39,7 +39,7 @@ public class SegmentTestUtils {
 
   @Nonnull
   public static SegmentGeneratorConfig getSegmentGeneratorConfig(@Nonnull File inputAvro, @Nonnull File outputDir,
-      @Nonnull String timeColumnName, @Nonnull TimeUnit timeUnit, @Nonnull String tableName, @Nullable Schema pinotSchema)
+      @Nonnull String timeColumnName, @Nonnull String tableName, @Nullable Schema pinotSchema)
       throws IOException {
     if (pinotSchema == null) {
       pinotSchema = AvroUtils.getPinotSchemaFromAvroDataFile(inputAvro);
