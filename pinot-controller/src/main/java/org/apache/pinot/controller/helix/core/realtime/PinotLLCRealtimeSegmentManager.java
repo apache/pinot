@@ -78,6 +78,7 @@ import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PartitionOffsetFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.zookeeper.data.Stat;
@@ -480,7 +481,7 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(segmentMetadata != null, "Failed to find segment metadata from descriptor for segment: %s",
         segmentName);
 
-    committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
+    committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset().getOffset());
     committingSegmentZKMetadata.setStatus(Status.DONE);
     committingSegmentZKMetadata.setDownloadUrl(URIUtils
         .constructDownloadUrl(_controllerConf.generateVipUrl(), TableNameBuilder.extractRawTableName(realtimeTableName),
@@ -505,7 +506,7 @@ public class PinotLLCRealtimeSegmentManager {
       int numPartitions, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
-    long startOffset = committingSegmentDescriptor.getNextOffset();
+    long startOffset = committingSegmentDescriptor.getNextOffset().getOffset();
     LOGGER
         .info("Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
             segmentName, startOffset, creationTimeMs);
@@ -868,7 +869,8 @@ public class PinotLLCRealtimeSegmentManager {
             LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
             String newSegmentName = newLLCSegmentName.getSegmentName();
             CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(latestSegmentName, latestSegmentZKMetadata.getEndOffset(), 0);
+                new CommittingSegmentDescriptor(latestSegmentName,
+                    new StreamPartitionMsgOffset(latestSegmentZKMetadata.getEndOffset()), 0);
             createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
                 committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
             updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, newSegmentName,
@@ -898,7 +900,7 @@ public class PinotLLCRealtimeSegmentManager {
             }
 
             CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(latestSegmentName, startOffset, 0);
+                new CommittingSegmentDescriptor(latestSegmentName, new StreamPartitionMsgOffset(startOffset), 0);
             createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
                 committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
             String newSegmentName = newLLCSegmentName.getSegmentName();
@@ -983,7 +985,8 @@ public class PinotLLCRealtimeSegmentManager {
         new LLCSegmentName(rawTableName, partitionId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
     long startOffset = getPartitionOffset(streamConfig, streamConfig.getOffsetCriteria(), partitionId);
-    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null,
+        new StreamPartitionMsgOffset(startOffset), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas);
 

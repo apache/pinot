@@ -806,7 +806,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
-    params.withSegmentName(_segmentNameStr).withOffset(_currentOffset.getOffset()).withNumRows(_numRowsConsumed)
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset).withNumRows(_numRowsConsumed)
         .withInstanceId(_instanceId).withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
@@ -882,7 +882,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected void postStopConsumedMsg(String reason) {
     do {
       SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-      params.withOffset(_currentOffset.getOffset()).withReason(reason).withSegmentName(_segmentNameStr).withInstanceId(_instanceId);
+      params.withStreamPartitionMsgOffset(_currentOffset).withReason(reason).withSegmentName(_segmentNameStr).withInstanceId(_instanceId);
 
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
@@ -898,7 +898,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withOffset(_currentOffset.getOffset()).withSegmentName(_segmentNameStr).withReason(_stopReason)
+    params.withStreamPartitionMsgOffset(_currentOffset).withSegmentName(_segmentNameStr).withReason(_stopReason)
         .withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());

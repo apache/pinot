@@ -23,6 +23,7 @@ import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
 
@@ -161,7 +162,7 @@ public class FlushThresholdUpdaterTest {
   }
 
   private CommittingSegmentDescriptor getCommittingSegmentDescriptor(long segmentSizeBytes) {
-    return new CommittingSegmentDescriptor(null, 0L, segmentSizeBytes);
+    return new CommittingSegmentDescriptor(null, new StreamPartitionMsgOffset(0), segmentSizeBytes);
   }
 
   private LLCRealtimeSegmentZKMetadata getCommittingSegmentZKMetadata(long creationTime,
