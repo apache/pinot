@@ -36,6 +36,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -169,7 +170,7 @@ public class SegmentCompletionManager {
     }
     final String instanceId = reqParams.getInstanceId();
     final String stopReason = reqParams.getReason();
-    final long offset = reqParams.getOffset();
+    final StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
 
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
@@ -206,7 +207,7 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final long offset = reqParams.getOffset();
+    final StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
@@ -230,7 +231,7 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final long offset = reqParams.getOffset();
+    final StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
     final int extTimeSec = reqParams.getExtraTimeSec();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionFSM fsm = null;
@@ -261,7 +262,7 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final long offset = reqParams.getOffset();
+    final StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
     final String reason = reqParams.getReason();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionFSM fsm = null;
@@ -355,8 +356,8 @@ public class SegmentCompletionManager {
     private final String _realtimeTableName;
     private final int _numReplicas;
     private final Set<String> _excludedServerStateMap;
-    private final Map<String, Long> _commitStateMap;
-    private long _winningOffset = -1L;
+    private final Map<String, StreamPartitionMsgOffset> _commitStateMap;
+    private StreamPartitionMsgOffset _winningOffset = new StreamPartitionMsgOffset(-1);
     private String _winner;
     private final PinotLLCRealtimeSegmentManager _segmentManager;
     private final SegmentCompletionManager _segmentCompletionManager;
@@ -431,7 +432,7 @@ public class SegmentCompletionManager {
       // Constructor used when we get an event after a segment is committed.
       this(segmentManager, segmentCompletionManager, segmentName, numReplicas);
       _state = State.COMMITTED;
-      _winningOffset = winningOffset;
+      _winningOffset.setOffset(winningOffset);
       _winner = "UNKNOWN";
     }
 
@@ -452,7 +453,8 @@ public class SegmentCompletionManager {
      * we need to synchronize on the FSM to handle the messages. The processing time itself is small,
      * so we should be OK with this synchronization.
      */
-    public SegmentCompletionProtocol.Response segmentConsumed(String instanceId, long offset, final String stopReason) {
+    public SegmentCompletionProtocol.Response segmentConsumed(String instanceId, StreamPartitionMsgOffset offset,
+        final String stopReason) {
       final long now = _segmentCompletionManager.getCurrentTimeMs();
       // We can synchronize the entire block for the SegmentConsumed message.
       synchronized (this) {
@@ -506,7 +508,7 @@ public class SegmentCompletionManager {
      * from the map, and things start over. In this case, we respond to the server with a 'hold' so
      * that they re-transmit their segmentConsumed() message and start over.
      */
-    public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, long offset) {
+    public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, StreamPartitionMsgOffset offset) {
       long now = _segmentCompletionManager.getCurrentTimeMs();
       if (_excludedServerStateMap.contains(instanceId)) {
         LOGGER.warn("Not accepting commit from {} since it had stoppd consuming", instanceId);
@@ -545,7 +547,7 @@ public class SegmentCompletionManager {
       }
     }
 
-    public SegmentCompletionProtocol.Response stoppedConsuming(String instanceId, long offset, String reason) {
+    public SegmentCompletionProtocol.Response stoppedConsuming(String instanceId, StreamPartitionMsgOffset offset, String reason) {
       synchronized (this) {
         LOGGER.info("Processing stoppedConsuming({}, {})", instanceId, offset);
         _excludedServerStateMap.add(instanceId);
@@ -581,8 +583,8 @@ public class SegmentCompletionManager {
       }
     }
 
-    public SegmentCompletionProtocol.Response extendBuildTime(final String instanceId, final long offset,
-        final int extTimeSec) {
+    public SegmentCompletionProtocol.Response extendBuildTime(final String instanceId,
+        final StreamPartitionMsgOffset offset, final int extTimeSec) {
       final long now = _segmentCompletionManager.getCurrentTimeMs();
       synchronized (this) {
         LOGGER.info("Processing extendBuildTime({}, {}, {})", instanceId, offset, extTimeSec);
@@ -610,14 +612,15 @@ public class SegmentCompletionManager {
     public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
         boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
-      long offset = reqParams.getOffset();
+      StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
           return abortAndReturnFailed();
         }
         LOGGER.info("Processing segmentCommitEnd({}, {})", instanceId, offset);
-        if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner) || offset != _winningOffset) {
+        if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner) ||
+            offset.compareTo(_winningOffset) != 0) {
           // State changed while we were out of sync. return a failed commit.
           LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
               _segmentName.getSegmentName(), _winner, _winningOffset);
@@ -638,17 +641,18 @@ public class SegmentCompletionManager {
     }
 
     // Helper methods that log the current state and the response sent
-    private SegmentCompletionProtocol.Response fail(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response fail(String instanceId, StreamPartitionMsgOffset offset) {
       LOGGER.info("{}:FAIL for instance={} offset={}", _state, instanceId, offset);
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    private SegmentCompletionProtocol.Response commit(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response commit(String instanceId, StreamPartitionMsgOffset offset) {
       long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs) / 1000;
       LOGGER
           .info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
       SegmentCompletionProtocol.Response.Params params =
-          new SegmentCompletionProtocol.Response.Params().withOffset(offset).withBuildTimeSeconds(allowedBuildTimeSec)
+          new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(offset)
+              .withBuildTimeSeconds(allowedBuildTimeSec)
               .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
               .withSplitCommit(_isSplitCommitEnabled);
       if (_isSplitCommitEnabled) {
@@ -657,31 +661,34 @@ public class SegmentCompletionManager {
       return new SegmentCompletionProtocol.Response(params);
     }
 
-    private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response discard(String instanceId, StreamPartitionMsgOffset offset) {
       LOGGER.warn("{}:DISCARD for instance={} offset={}", _state, instanceId, offset);
       return SegmentCompletionProtocol.RESP_DISCARD;
     }
 
-    private SegmentCompletionProtocol.Response keep(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response keep(String instanceId, StreamPartitionMsgOffset offset) {
       LOGGER.info("{}:KEEP for instance={} offset={}", _state, instanceId, offset);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
+      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
+          .withStreamPartitionMsgOffset(offset)
           .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP));
     }
 
-    private SegmentCompletionProtocol.Response catchup(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response catchup(String instanceId, StreamPartitionMsgOffset offset) {
       LOGGER.info("{}:CATCHUP for instance={} offset={}", _state, instanceId, offset);
       return new SegmentCompletionProtocol.Response(
-          new SegmentCompletionProtocol.Response.Params().withOffset(_winningOffset)
+          new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(_winningOffset)
               .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP));
     }
 
-    private SegmentCompletionProtocol.Response hold(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response hold(String instanceId, StreamPartitionMsgOffset offset) {
       LOGGER.info("{}:HOLD for instance={} offset={}", _state, instanceId, offset);
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
-          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(offset));
+          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
+          .withStreamPartitionMsgOffset(offset));
     }
 
-    private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId,
+        StreamPartitionMsgOffset offset) {
       _state = State.ABORTED;
       _segmentCompletionManager._controllerMetrics
           .addMeteredTableValue(_rawTableName, ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
@@ -695,7 +702,8 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    private SegmentCompletionProtocol.Response abortIfTooLateAndReturnHold(long now, String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response abortIfTooLateAndReturnHold(long now, String instanceId,
+        StreamPartitionMsgOffset offset) {
       if (now > _maxTimeAllowedToCommitMs) {
         LOGGER.warn("{}:Aborting FSM (too late) instance={} offset={} now={} start={}", _state, instanceId, offset, now,
             _startTimeMs);
@@ -708,7 +716,7 @@ public class SegmentCompletionManager {
       return _numReplicas - _excludedServerStateMap.size();
     }
 
-    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__consumed(String instanceId, long offset, long now,
+    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__consumed(String instanceId, StreamPartitionMsgOffset offset, long now,
         final String stopReason) {
       // This is the first time we are getting segmentConsumed() for this segment.
       // Some instance thinks we can close this segment, so go to HOLDING state, and process as normal.
@@ -723,13 +731,14 @@ public class SegmentCompletionManager {
      * message. As long as the committer is not the one who stopped consuming (which we have already checked before
      * coming here), we will trust the server that this is a valid commit.
      */
-    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__commit(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__commit(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
       // Do the same as HOLDING__commit
       return processCommitWhileHoldingOrPartialConsuming(instanceId, offset, now);
     }
 
-    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__stoppedConsuming(String instanceId, long offset,
-        String reason) {
+    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__stoppedConsuming(String instanceId,
+        StreamPartitionMsgOffset offset, String reason) {
       return processStoppedConsuming(instanceId, offset, reason, true);
     }
 
@@ -743,8 +752,8 @@ public class SegmentCompletionManager {
      *
      * If we can go to COMMITTER_NOTIFIED then we respond with a COMMIT message, otherwise with a HOLD message.
      */
-    private SegmentCompletionProtocol.Response HOLDING__consumed(String instanceId, long offset, long now,
-        final String stopReason) {
+    private SegmentCompletionProtocol.Response HOLDING__consumed(String instanceId, StreamPartitionMsgOffset offset,
+        long now, final String stopReason) {
       SegmentCompletionProtocol.Response response;
       // If we are past the max time to pick a winner, or we have heard from all replicas,
       // we are ready to pick a winner.
@@ -768,11 +777,13 @@ public class SegmentCompletionManager {
      * This not a good state to receive a commit message, but then it may be that the controller
      * failed over while in the COMMITTER_NOTIFIED state...
      */
-    private SegmentCompletionProtocol.Response HOLDING__commit(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response HOLDING__commit(String instanceId, StreamPartitionMsgOffset offset,
+        long now) {
       return processCommitWhileHoldingOrPartialConsuming(instanceId, offset, now);
     }
 
-    private SegmentCompletionProtocol.Response HOLDING_stoppedConsuming(String instanceId, long offset, String reason) {
+    private SegmentCompletionProtocol.Response HOLDING_stoppedConsuming(String instanceId,
+        StreamPartitionMsgOffset offset, String reason) {
       return processStoppedConsuming(instanceId, offset, reason, true);
     }
 
@@ -782,15 +793,16 @@ public class SegmentCompletionManager {
      * Otherwise, just have the server HOLD. Since the segment is not committed yet, we cannot ask them to KEEP or
      * DISCARD etc. If the committer fails for any reason, we will need a new committer.
      */
-    private SegmentCompletionProtocol.Response COMMITTER_DECIDED__consumed(String instanceId, long offset, long now) {
-      if (offset > _winningOffset) {
+    private SegmentCompletionProtocol.Response COMMITTER_DECIDED__consumed(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
+      if (offset.compareTo(_winningOffset) > 0) {
         LOGGER.warn("{}:Aborting FSM (offset larger than winning) instance={} offset={} now={} winning={}", _state,
             instanceId, offset, now, _winningOffset);
         return abortAndReturnHold(now, instanceId, offset);
       }
       SegmentCompletionProtocol.Response response;
       if (_winner.equals(instanceId)) {
-        if (_winningOffset == offset) {
+        if (_winningOffset.compareTo(offset) == 0) {
           LOGGER.info("{}:Notifying winner instance={} offset={}", _state, instanceId, offset);
           response = commit(instanceId, offset);
           _state = State.COMMITTER_NOTIFIED;
@@ -800,7 +812,7 @@ public class SegmentCompletionManager {
               instanceId, offset, _winningOffset);
           response = abortAndReturnHold(now, instanceId, offset);
         }
-      } else if (offset == _winningOffset) {
+      } else if (offset.compareTo(_winningOffset) == 0) {
         // Wait until winner has posted the segment.
         response = hold(instanceId, offset);
       } else {
@@ -819,12 +831,13 @@ public class SegmentCompletionManager {
      * We have already decided who the committer is, but have not let them know yet. So, we don't expect
      * a commit() call here.
      */
-    private SegmentCompletionProtocol.Response COMMITTER_DECIDED__commit(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response COMMITTER_DECIDED__commit(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
       return processCommitWhileHoldingOrPartialConsuming(instanceId, offset, now);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTER_DECIDED__stoppedConsuming(String instanceId, long offset,
-        String reason) {
+    private SegmentCompletionProtocol.Response COMMITTER_DECIDED__stoppedConsuming(String instanceId,
+        StreamPartitionMsgOffset offset, String reason) {
       return processStoppedConsuming(instanceId, offset, reason, false);
     }
 
@@ -832,7 +845,8 @@ public class SegmentCompletionManager {
      * We have notified the committer. If we get a consumed message from another server, we can ask them to
      * catchup (if the offset is lower). If anything else, then we pretty much ask them to hold.
      */
-    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__consumed(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__consumed(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
       SegmentCompletionProtocol.Response response;
       // We have already picked a winner and notified them but we have not heard from them yet.
       // Common case here is that another server is coming back to us with its offset. We either respond back with HOLD or CATCHUP.
@@ -844,7 +858,7 @@ public class SegmentCompletionManager {
       if (instanceId.equals(_winner)) {
         // Winner is coming back to after holding. Somehow they never heard us return COMMIT.
         // Allow them to be winner again, since we are still within time to pick a winner.
-        if (offset == _winningOffset) {
+        if (offset.compareTo(_winningOffset) == 0) {
           response = commit(instanceId, offset);
         } else {
           // Something seriously wrong. Abort the FSM
@@ -854,10 +868,10 @@ public class SegmentCompletionManager {
         }
       } else {
         // Common case: A different instance is reporting.
-        if (offset == _winningOffset) {
+        if (offset.compareTo(_winningOffset) == 0) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
           response = hold(instanceId, offset);
-        } else if (offset < _winningOffset) {
+        } else if (offset.compareTo(_winningOffset) < 0) {
           response = catchup(instanceId, offset);
         } else {
           // We have not yet committed, so ask the new responder to hold. They may be the new leader in case the
@@ -872,7 +886,8 @@ public class SegmentCompletionManager {
      * We have notified the committer. If we get a consumed message from another server, we can ask them to
      * catchup (if the offset is lower). If anything else, then we pretty much ask them to hold.
      */
-    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__commit(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__commit(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
       SegmentCompletionProtocol.Response response = null;
       response = checkBadCommitRequest(instanceId, offset, now);
       if (response != null) {
@@ -890,13 +905,13 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_COMMIT_CONTINUE;
     }
 
-    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__stoppedConsuming(String instanceId, long offset,
-        String reason) {
+    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__stoppedConsuming(String instanceId,
+        StreamPartitionMsgOffset offset, String reason) {
       return processStoppedConsuming(instanceId, offset, reason, false);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__extendBuildlTime(String instanceId, long offset,
-        int extTimeSec, long now) {
+    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__extendBuildlTime(String instanceId,
+        StreamPartitionMsgOffset offset, int extTimeSec, long now) {
       SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response == null) {
         long maxTimeAllowedToCommitMs = now + extTimeSec * 1000;
@@ -911,36 +926,40 @@ public class SegmentCompletionManager {
       return response;
     }
 
-    private SegmentCompletionProtocol.Response COMMITTER_UPLOADING__consumed(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response COMMITTER_UPLOADING__consumed(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
       return processConsumedAfterCommitStart(instanceId, offset, now);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTER_UPLOADING__commit(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response COMMITTER_UPLOADING__commit(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
       return processCommitWhileUploading(instanceId, offset, now);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTER_UPLOADING__stoppedConsuming(String instanceId, long offset,
-        String reason) {
+    private SegmentCompletionProtocol.Response COMMITTER_UPLOADING__stoppedConsuming(String instanceId,
+        StreamPartitionMsgOffset offset, String reason) {
       return processStoppedConsuming(instanceId, offset, reason, false);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTING__consumed(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response COMMITTING__consumed(String instanceId, StreamPartitionMsgOffset offset,
+        long now) {
       return processConsumedAfterCommitStart(instanceId, offset, now);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTING__commit(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response COMMITTING__commit(String instanceId, StreamPartitionMsgOffset offset,
+        long now) {
       return processCommitWhileUploading(instanceId, offset, now);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTING__stoppedConsuming(String instanceId, long offset,
-        String reason) {
+    private SegmentCompletionProtocol.Response COMMITTING__stoppedConsuming(String instanceId,
+        StreamPartitionMsgOffset offset, String reason) {
       return processStoppedConsuming(instanceId, offset, reason, false);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTED__consumed(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response COMMITTED__consumed(String instanceId, StreamPartitionMsgOffset offset) {
       SegmentCompletionProtocol.Response
           response;// Server reporting an offset on an already completed segment. Depending on the offset, either KEEP or DISCARD.
-      if (offset == _winningOffset) {
+      if (offset.compareTo(_winningOffset) == 0) {
         response = keep(instanceId, offset);
       } else {
         // Return DISCARD. It is hard to say how long the server will take to complete things.
@@ -949,20 +968,20 @@ public class SegmentCompletionManager {
       return response;
     }
 
-    private SegmentCompletionProtocol.Response COMMITTED__commit(String instanceId, long offset) {
-      if (offset == _winningOffset) {
+    private SegmentCompletionProtocol.Response COMMITTED__commit(String instanceId, StreamPartitionMsgOffset offset) {
+      if (offset.compareTo(_winningOffset) == 0) {
         return keep(instanceId, offset);
       }
       return discard(instanceId, offset);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTED__stoppedConsuming(String instanceId, long offset,
-        String reason) {
+    private SegmentCompletionProtocol.Response COMMITTED__stoppedConsuming(String instanceId,
+        StreamPartitionMsgOffset offset, String reason) {
       return processStoppedConsuming(instanceId, offset, reason, false);
     }
 
-    private SegmentCompletionProtocol.Response processStoppedConsuming(String instanceId, long offset, String reason,
-        boolean createNew) {
+    private SegmentCompletionProtocol.Response processStoppedConsuming(String instanceId,
+        StreamPartitionMsgOffset offset, String reason, boolean createNew) {
       LOGGER
           .info("Instance {} stopped consuming segment {} at offset {}, state {}, createNew: {}, reason:{}", instanceId,
               _segmentName, offset, _state, createNew, reason);
@@ -977,8 +996,8 @@ public class SegmentCompletionManager {
     }
 
     // A common method when the state is > COMMITTER_NOTIFIED.
-    private SegmentCompletionProtocol.Response processConsumedAfterCommitStart(String instanceId, long offset,
-        long now) {
+    private SegmentCompletionProtocol.Response processConsumedAfterCommitStart(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
       SegmentCompletionProtocol.Response response;
       // We have already picked a winner, and may or many not have heard from them.
       // Common case here is that another server is coming back to us with its offset. We either respond back with HOLD or CATCHUP.
@@ -1000,10 +1019,10 @@ public class SegmentCompletionManager {
         return abortAndReturnHold(now, instanceId, offset);
       } else {
         // Common case: A different instance is reporting.
-        if (offset == _winningOffset) {
+        if (offset.compareTo(_winningOffset) == 0) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
           response = hold(instanceId, offset);
-        } else if (offset < _winningOffset) {
+        } else if (offset.compareTo(_winningOffset) < 0) {
           response = catchup(instanceId, offset);
         } else {
           // We have not yet committed, so ask the new responder to hold. They may be the new leader in case the
@@ -1017,7 +1036,7 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
         boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
-      long offset = reqParams.getOffset();
+      StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
         // State changed while we were out of sync. return a failed commit.
         LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
@@ -1051,22 +1070,23 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
     }
 
-    private SegmentCompletionProtocol.Response processCommitWhileUploading(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response processCommitWhileUploading(String instanceId,
+        StreamPartitionMsgOffset offset, long now) {
       LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
       SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response != null) {
         return response;
       }
       // Another committer (or same) came in while one was uploading. Ask them to hold in case this one fails.
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
-          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
+      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
+          .withStreamPartitionMsgOffset(offset).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
     }
 
-    private SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, StreamPartitionMsgOffset offset, long now) {
       SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response != null) {
         return response;
-      } else if (instanceId.equals(_winner) && offset != _winningOffset) {
+      } else if (instanceId.equals(_winner) && offset.compareTo(_winningOffset) != 0) {
         // Hmm. Committer has been notified, but either a different one is committing, or offset is different
         LOGGER.warn("{}:Aborting FSM (bad commit req) instance={} offset={} now={} winning={}", _state, instanceId,
             offset, now, _winningOffset);
@@ -1076,7 +1096,7 @@ public class SegmentCompletionManager {
     }
 
     private SegmentCompletionProtocol.Response processCommitWhileHoldingOrPartialConsuming(String instanceId,
-        long offset, long now) {
+        StreamPartitionMsgOffset offset, long now) {
       LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
       SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response != null) {
@@ -1113,16 +1133,16 @@ public class SegmentCompletionManager {
         return true;
       } else if (now > _maxTimeToPickWinnerMs || _commitStateMap.size() == numReplicasToLookFor()) {
         LOGGER.info("{}:Picking winner time={} size={}", _state, now - _startTimeMs, _commitStateMap.size());
-        long maxOffsetSoFar = -1;
+        StreamPartitionMsgOffset maxOffsetSoFar = new StreamPartitionMsgOffset(-1);
         String winnerSoFar = null;
-        for (Map.Entry<String, Long> entry : _commitStateMap.entrySet()) {
-          if (entry.getValue() > maxOffsetSoFar) {
+        for (Map.Entry<String, StreamPartitionMsgOffset> entry : _commitStateMap.entrySet()) {
+          if (entry.getValue().compareTo(maxOffsetSoFar) > 0) {
             maxOffsetSoFar = entry.getValue();
             winnerSoFar = entry.getKey();
           }
         }
         _winningOffset = maxOffsetSoFar;
-        if (_commitStateMap.get(preferredInstance) == maxOffsetSoFar) {
+        if (_commitStateMap.get(preferredInstance).compareTo(maxOffsetSoFar) == 0) {
           winnerSoFar = preferredInstance;
         }
         _winner = winnerSoFar;

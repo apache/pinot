@@ -325,7 +325,8 @@ public class LLCSegmentCompletionHandlers {
               URIUtils.encode(SegmentCompletionUtils.generateSegmentFileName(segmentName)));
       PinotFSFactory.create(segmentFileURI.getScheme()).copyFromLocalFile(localTempFile, segmentFileURI);
       SegmentCompletionProtocol.Response.Params responseParams =
-          new SegmentCompletionProtocol.Response.Params().withOffset(requestParams.getOffset())
+          new SegmentCompletionProtocol.Response.Params()
+              .withStreamPartitionMsgOffset(requestParams.getStreamPartitionMsgOffset())
               .withSegmentLocation(segmentFileURI.toString())
               .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
 
