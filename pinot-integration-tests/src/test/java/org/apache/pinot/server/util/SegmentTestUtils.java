@@ -49,7 +49,6 @@ public class SegmentTestUtils {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, pinotSchema);
 
     segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());
-    segmentGeneratorConfig.setSegmentTimeUnit(timeUnit);
     if (inputAvro.getName().endsWith("gz")) {
       segmentGeneratorConfig.setFormat(FileFormat.GZIPPED_AVRO);
     } else {

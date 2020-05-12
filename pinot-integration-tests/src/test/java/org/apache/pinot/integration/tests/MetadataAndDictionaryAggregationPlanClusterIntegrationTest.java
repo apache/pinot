@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -93,18 +94,24 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     startBrokers(getNumBrokers());
     startServers(getNumServers());
 
+    File schemaFile = getSchemaFile();
+    Schema schema = Schema.fromFile(schemaFile);
+    String timeColumnName = getTimeColumnName();
+
     // Create the tables
-    addOfflineTable(DEFAULT_TABLE_NAME);
-    addOfflineTable(STAR_TREE_TABLE_NAME);
+    addOfflineTable(DEFAULT_TABLE_NAME, timeColumnName, null, null, null, null, SegmentVersion.v1, null, null, null,
+        null, null);
+    addOfflineTable(STAR_TREE_TABLE_NAME, timeColumnName, null, null, null, null, SegmentVersion.v1, null, null, null,
+        null, null);
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload segments without star tree indexes from Avro data
-    createAndUploadSegments(avroFiles, DEFAULT_TABLE_NAME, false, getRawIndexColumns(), null);
+    createAndUploadSegments(avroFiles, DEFAULT_TABLE_NAME, false, getRawIndexColumns(), schema);
 
     // Create and upload segments with star tree indexes from Avro data
-    createAndUploadSegments(avroFiles, STAR_TREE_TABLE_NAME, true, null, Schema.fromFile(getSchemaFile()));
+    createAndUploadSegments(avroFiles, STAR_TREE_TABLE_NAME, true, null, schema);
 
     // Load data into H2
     _currentTable = DEFAULT_TABLE_NAME;

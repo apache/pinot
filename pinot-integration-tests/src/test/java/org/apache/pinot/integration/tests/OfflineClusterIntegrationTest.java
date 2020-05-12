@@ -42,6 +42,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -111,10 +112,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     ExecutorService executor = Executors.newCachedThreadPool();
 
+    File schemaFile = getSchemaFile();
+    Schema schema = Schema.fromFile(schemaFile);
+    String tableName = getTableName();
+    String timeColumnName = getTimeColumnName();
     // Create segments from Avro data
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), getTimeColumnName(), null,
-            getRawIndexColumns(), null, executor);
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, timeColumnName, null,
+            getRawIndexColumns(), schema, executor);
 
     // Load data into H2
     setUpH2Connection(avroFiles, executor);
@@ -126,11 +131,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     // Create the table
-    addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
+    addOfflineTable(tableName, timeColumnName, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
         getBloomFilterIndexColumns(), getTaskConfig(), null, null);
 
     // Upload all segments
-    uploadSegments(getTableName(), _tarDir);
+    uploadSegments(tableName, _tarDir);
 
     // Set up service status callbacks
     // NOTE: put this step after creating the table and uploading all segments so that brokers and servers can find the

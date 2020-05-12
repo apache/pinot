@@ -169,7 +169,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    */
   private void setupOfflineTable(String table)
       throws Exception {
-    addOfflineTable(table, null, null, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null);
+    addOfflineTable(table, getTimeColumnName(), null, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null);
   }
 
   /**
@@ -198,7 +198,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, timeColumnName, null, null, null,
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, timeColumnName, null, null, schema,
             executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);

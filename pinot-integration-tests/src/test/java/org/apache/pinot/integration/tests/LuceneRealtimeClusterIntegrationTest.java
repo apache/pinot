@@ -100,7 +100,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     textIndexColumns.add(fieldConfig);
 
     addRealtimeTable(TABLE_NAME, true, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, null, null, TABLE_NAME,
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, TIME_COL_NAME, null, TABLE_NAME,
         getBrokerTenant(), getServerTenant(), getLoadMode(), null, null,
         null, null, getTaskConfig(), getStreamConsumerFactoryClassName(),
         1, textIndexColumns);
