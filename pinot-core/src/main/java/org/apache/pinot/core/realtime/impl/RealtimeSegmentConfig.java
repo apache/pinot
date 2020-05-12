@@ -48,6 +48,7 @@ public class RealtimeSegmentConfig {
   private final boolean _nullHandlingEnabled;
   private final String _consumerDir;
 
+  // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
   private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, String timeColumnName,
       int capacity, int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
       Set<String> invertedIndexColumns, Set<String> textIndexColumns,
