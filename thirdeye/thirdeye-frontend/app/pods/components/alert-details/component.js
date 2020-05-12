@@ -609,8 +609,9 @@ export default Component.extend({
           set(a, 'startDateStr', this._formatAnomaly(a));
           set(a, 'current', a.avgCurrentVal);
           set(a, 'baseline', a.avgBaselineVal);
-          set(a, 'rule', this.get('_formattedRule')(a.properties));
+          set(a, 'rule', this.get('_formattedRule')(a));
           set(a, 'modifiedBy', this.get('_formattedModifiedBy')(a.feedback));
+          set(a, 'updateTime', a.feedback ? a.feedback.updateTime : '');
           set(a, 'start', a.startTime);
           set(a, 'end', a.endTime);
           set(a, 'feedback', a.feedback ? a.feedback.feedbackType : a.statusClassification);
@@ -636,8 +637,9 @@ export default Component.extend({
           set(a, 'startDateStr', this._formatAnomaly(a));
           set(a, 'current', a.avgCurrentVal);
           set(a, 'baseline', a.avgBaselineVal);
-          set(a, 'rule', this.get('_formattedRule')(a.properties));
+          set(a, 'rule', this.get('_formattedRule')(a));
           set(a, 'modifiedBy', this.get('_formattedModifiedBy')(a.feedback));
+          set(a, 'updateTime', a.feedback ? a.feedback.updateTime : '');
           set(a, 'start', a.startTime);
           set(a, 'end', a.endTime);
           set(a, 'feedback', a.feedback ? a.feedback.feedbackType : a.statusClassification);
@@ -709,6 +711,7 @@ export default Component.extend({
         title: 'Current / Predicted',
         propertyName: 'change'
       }, {
+        component: 'custom/anomalies-table/rule',
         propertyName: 'rule',
         title: 'Rule'
       }];
@@ -718,7 +721,11 @@ export default Component.extend({
         propertyName: 'anomalyFeedback'
       }, {
         propertyName: 'modifiedBy',
-        title: 'Modified'
+        title: 'Modifier'
+      }, {
+        component: 'custom/anomalies-table/modify-time',
+        propertyName: 'updateTime',
+        title: 'Modify Time'
       }, {
         component: 'custom/anomalies-table/investigation-link',
         title: 'RCA',
@@ -1059,18 +1066,21 @@ export default Component.extend({
     return isMetricNew;
   },
 
-  _formattedRule(properties) {
+  _formattedRule(anomaly) {
     let result;
-    if (properties && typeof properties === 'object') {
-      if (properties.detectorComponentName) {
+    if (anomaly.properties && typeof anomaly.properties === 'object') {
+      if (anomaly.properties.detectorComponentName) {
         // The format is rule1_name:rule1_type,rule2_name:rule2_type ...
         // For example: wow_10_percent_change:PERCENTAGE_RULE,algorithm:ALGORITHM
         let rules = [];
-        properties.detectorComponentName.split(',').forEach(x => {
+        anomaly.properties.detectorComponentName.split(',').forEach(x => {
           rules.push(x.split(':')[0]);
         });
         result = rules.sort().join();
-      } else {
+      } else if (anomaly.anomalyResultSource) {
+        result = (anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY') ? 'User Reported' : '--';
+      }
+      else {
         result = '--';
       }
     }
@@ -1162,7 +1172,7 @@ export default Component.extend({
             timeseries: seriesSet.predictedTimeSeries,
             baseline: seriesSet.predictedTimeSeries,
             isLoadingTimeSeries: false,
-            displayRange: [seriesSet.predictedTimeSeries.timestamp[0] || analysisRange[0], analysisRange[1]]
+            displayRange: [Math.min(seriesSet.predictedTimeSeries.timestamp[0] || analysisRange[0], analysisRange[0]), analysisRange[1]]
           });
         } else {
           const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
@@ -1173,7 +1183,7 @@ export default Component.extend({
                 timeseries: seriesSet.predictedTimeSeries,
                 baseline: res,
                 isLoadingTimeSeries: false,
-                displayRange: [seriesSet.predictedTimeSeries.timestamp[0] || analysisRange[0], analysisRange[1]]
+                displayRange: [Math.min(seriesSet.predictedTimeSeries.timestamp[0] || analysisRange[0], analysisRange[0]), analysisRange[1]]
               });
             });
         }

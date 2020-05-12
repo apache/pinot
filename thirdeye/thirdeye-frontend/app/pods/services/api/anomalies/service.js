@@ -31,7 +31,11 @@ const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDispla
   baseline: computed('anomaly.baseline', function() {
     return humanizeFloat(get(this, 'anomaly.baseline'));
   }),
+  isUserReported: computed('anomaly.rule', function() {
+    return (get(this, 'anomaly.rule') === 'User Reported');
+  }),
   modifiedBy: computed.alias('anomaly.modifiedBy'),
+  updateTime: computed.alias('anomaly.updateTime'),
   rule: computed.alias('anomaly.rule'),
   dimensionStr: computed.alias('anomaly.dimensionStr'),
   severity: computed('anomaly.severity', function() {

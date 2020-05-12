@@ -19,7 +19,7 @@ export function checkStatus(response, mode = 'get', recoverBlank = false, isYaml
     throw new Error('401');
   } else if (response.status >= 200 && response.status < 300) {
     // Prevent parsing of null response
-    if (response.status === 204) {
+    if (mode === 'delete' || response.status === 204) {
       return '';
     } else {
       return (mode === 'get' || isYamlPreview) ? response.json() : JSON.parse(JSON.stringify(response));
@@ -177,6 +177,17 @@ export function putProps() {
 }
 
 /**
+ * Preps delete object
+ * @returns {Object}
+ */
+export function deleteProps() {
+  return {
+    method: 'delete',
+    headers: { 'content-type': 'Application/Json' }
+  };
+}
+
+/**
  * Format conversion helper
  * @param {String} dateStr - date to convert
  */
@@ -277,6 +288,7 @@ export default {
   makeFilterString,
   parseProps,
   postProps,
+  deleteProps,
   putProps,
   toIso,
   replaceNonFiniteWithCurrent,
