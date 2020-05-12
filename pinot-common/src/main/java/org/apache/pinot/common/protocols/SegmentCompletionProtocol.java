@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.protocols;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -395,6 +396,7 @@ public class SegmentCompletionProtocol {
     public Response() {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public Response(Params params) {
       _status = params.getStatus();
       _offset = params.getOffset();
