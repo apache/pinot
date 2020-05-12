@@ -19,9 +19,9 @@
 
 package org.apache.pinot.thirdeye.rootcause.impl;
 
-import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.rootcause.Entity;
+
 import java.util.ArrayList;
 import java.util.List;
 

@@ -19,11 +19,9 @@
 
 package org.apache.pinot.thirdeye.datalayer.entity;
 
-import org.apache.pinot.thirdeye.anomaly.events.EventType;
-
 public class EventIndex extends AbstractIndexEntity {
   String name;
-  EventType eventType;
+  String eventType;
   long startTime;
   long endTime;
   String metricName;
@@ -45,11 +43,11 @@ public class EventIndex extends AbstractIndexEntity {
     this.endTime = endTime;
   }
 
-  public EventType getEventType() {
+  public String getEventType() {
     return eventType;
   }
 
-  public void setEventType(EventType eventType) {
+  public void setEventType(String eventType) {
     this.eventType = eventType;
   }
 
