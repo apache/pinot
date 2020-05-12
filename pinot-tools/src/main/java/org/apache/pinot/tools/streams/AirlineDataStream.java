@@ -30,6 +30,8 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -48,6 +50,7 @@ public class AirlineDataStream {
   private static final Logger logger = LoggerFactory.getLogger(AirlineDataStream.class);
 
   Schema pinotSchema;
+  String timeColumnName;
   File avroFile;
   DataFileStream<GenericRecord> avroDataStream;
   Integer currentTimeValue = 16102;
@@ -56,9 +59,10 @@ public class AirlineDataStream {
   int counter = 0;
   private StreamDataProducer producer;
 
-  public AirlineDataStream(Schema pinotSchema, File avroFile)
+  public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile)
       throws Exception {
     this.pinotSchema = pinotSchema;
+    this.timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     this.avroFile = avroFile;
     createStream();
     Properties properties = new Properties();
@@ -120,13 +124,11 @@ public class AirlineDataStream {
               message.put(spec.getName(), record.get(spec.getName()));
             }
 
-            for (FieldSpec spec : pinotSchema.getDimensionFieldSpecs()) {
+            for (FieldSpec spec : pinotSchema.getMetricFieldSpecs()) {
               message.put(spec.getName(), record.get(spec.getName()));
             }
 
-            TimeFieldSpec spec = pinotSchema.getTimeFieldSpec();
-            String timeColumn = spec.getIncomingGranularitySpec().getName();
-            message.put(timeColumn, currentTimeValue);
+            message.put(timeColumnName, currentTimeValue);
 
             try {
               publish(message);

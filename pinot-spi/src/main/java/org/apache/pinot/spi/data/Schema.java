@@ -582,10 +582,6 @@ public final class Schema {
    */
 
   public boolean isBackwardCompatibleWith(Schema oldSchema) {
-    if (!EqualityUtils.isEqual(_timeFieldSpec, oldSchema.getTimeFieldSpec()) || !EqualityUtils
-        .isEqual(_dateTimeFieldSpecs, oldSchema.getDateTimeFieldSpecs())) {
-      return false;
-    }
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
       if (!getColumnNames().contains(entry.getKey())) {
         return false;

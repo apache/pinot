@@ -46,28 +46,11 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "segment1";
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
     Assert.assertEquals(schema.getColumnNames().size(), 5);
-    Assert.assertEquals(schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType(), TimeUnit.MILLISECONDS);
 
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(null, "", schema, "testTable", tableConfig, segmentName, "col1");
 
     Schema newSchema = converter.getUpdatedSchema(schema);
     Assert.assertEquals(newSchema.getColumnNames().size(), 2);
-    Assert.assertEquals(newSchema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType(), TimeUnit.DAYS);
-  }
-
-  @Test
-  public void testNoTimeColumnsInSchema() {
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec("col1", FieldSpec.DataType.STRING, true));
-    schema.addField(new DimensionFieldSpec("col2", FieldSpec.DataType.STRING, true));
-    schema.addField(new DimensionFieldSpec("col3", FieldSpec.DataType.STRING, true));
-    schema.addField(new MetricFieldSpec("met1", FieldSpec.DataType.DOUBLE, 0));
-    schema.addField(new MetricFieldSpec("met2", FieldSpec.DataType.LONG, 0));
-    Assert.assertEquals(schema.getColumnNames().size(), 5);
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(null, "", schema, "testTable", null, "segment1", "col1");
-    Schema newSchema = converter.getUpdatedSchema(schema);
-    Assert.assertEquals(newSchema.getColumnNames().size(), 5);
   }
 }

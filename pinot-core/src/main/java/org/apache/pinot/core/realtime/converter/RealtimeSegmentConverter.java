@@ -156,20 +156,8 @@ public class RealtimeSegmentConverter {
   @VisibleForTesting
   public Schema getUpdatedSchema(Schema original) {
     Schema newSchema = new Schema();
-    TimeFieldSpec tfs = original.getTimeFieldSpec();
-    if (tfs != null) {
-      // Use outgoing granularity for creating segment
-      TimeGranularitySpec outgoing = tfs.getOutgoingGranularitySpec();
-      if (outgoing != null) {
-        TimeFieldSpec newTimeSpec = new TimeFieldSpec(outgoing);
-        newSchema.addField(newTimeSpec);
-      }
-    }
-
     for (String col : original.getPhysicalColumnNames()) {
-      if ((tfs == null) || (!col.equals(tfs.getName()))) {
-        newSchema.addField(original.getFieldSpecFor(col));
-      }
+      newSchema.addField(original.getFieldSpecFor(col));
     }
     return newSchema;
   }
