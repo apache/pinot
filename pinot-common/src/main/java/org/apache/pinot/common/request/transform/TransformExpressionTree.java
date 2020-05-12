@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
@@ -37,7 +36,7 @@ import org.apache.pinot.spi.utils.EqualityUtils;
  * <ul>
  *   <li>A TransformExpressionTree node has either transform function or a column name, or a literal.</li>
  *   <li>Leaf nodes either have column name or literal, whereas non-leaf nodes have transform function.</li>
- *   <li>Transform function in non-leaf nodes is applied to its children nodes.</li>
+ *   <li>Transform function is applied to its children.</li>
  * </ul>
  */
 public class TransformExpressionTree {
