@@ -184,7 +184,7 @@ public class SegmentGeneratorConfig {
    */
   public void setTime(String timeColumnName, Schema schema) {
     if (timeColumnName != null) {
-      DateTimeFieldSpec dateTimeFieldSpec = schema.getDateTimeSpec(timeColumnName);
+      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
       if (dateTimeFieldSpec != null) {
         setTimeColumnName(dateTimeFieldSpec.getName());
         DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
