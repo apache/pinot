@@ -299,6 +299,26 @@ public final class Schema {
     return null;
   }
 
+  /**
+   * Fetches the DateTimeFieldSpec for the given time column name.
+   * If the columnName is a DATE_TIME column, returns the DateTimeFieldSpec
+   * If the columnName is a TIME column, converts to DateTimeFieldSpec before returning
+   */
+  @JsonIgnore
+  @Nullable
+  public DateTimeFieldSpec getSpecForTimeColumn(String timeColumnName) {
+    FieldSpec fieldSpec = _fieldSpecMap.get(timeColumnName);
+    if (fieldSpec != null) {
+      if (fieldSpec.getFieldType() == FieldType.DATE_TIME) {
+        return (DateTimeFieldSpec) fieldSpec;
+      }
+      if (fieldSpec.getFieldType() == FieldType.TIME) {
+        return convertToDateTimeFieldSpec((TimeFieldSpec) fieldSpec);
+      }
+    }
+    return null;
+  }
+
   @JsonIgnore
   public List<String> getDimensionNames() {
     return _dimensionNames;
