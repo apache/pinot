@@ -1467,4 +1467,21 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(),
         "distinct_bar");
   }
+
+  @Test
+  public void testNoArgFunction() {
+    String query = "SELECT now() FROM foo ";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "now");
+
+    query = "SELECT a FROM foo where time_col > now()";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Function greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
+    Function minus = greaterThan.getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(minus.getOperands().get(1).getFunctionCall().getOperator(), "now");
+
+    query = "SELECT sum(a), now() FROM foo group by now()";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "now");
+  }
 }
