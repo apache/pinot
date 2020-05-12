@@ -20,11 +20,9 @@ public class TestRecordReader implements RecordReader {
 
   List<GenericRow> _rows = new ArrayList<>();
   Iterator<GenericRow> _iterator;
-  Schema _schema;
 
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig, Set<String> fields)
+  public void init(File dataFile, Set<String> fields, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    _schema = schema;
     int numRows = 10;
     for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
@@ -53,10 +51,7 @@ public class TestRecordReader implements RecordReader {
     _iterator = _rows.iterator();
   }
 
-  public Schema getSchema() {
-    return _schema;
-  }
-  public void close () {
+  public void close() {
 
   }
 }

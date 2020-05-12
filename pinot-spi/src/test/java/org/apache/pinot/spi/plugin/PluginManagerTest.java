@@ -36,6 +36,8 @@ import org.testng.annotations.Test;
 
 public class PluginManagerTest {
 
+  private final String TEST_RECORD_READER_FILE = "TestRecordReader.java";
+
   private File tempDir;
   private String jarFile;
   private File jarDirFile;
@@ -57,9 +59,10 @@ public class PluginManagerTest {
   public void testSimple()
       throws Exception {
     JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-    URL javaFile = Thread.currentThread().getContextClassLoader().getResource("TestRecordReader.java");
+    URL javaFile = Thread.currentThread().getContextClassLoader().getResource(TEST_RECORD_READER_FILE);
     if (javaFile != null) {
-      compiler.run(null, null, null, javaFile.getFile(), "-d", tempDir.getAbsolutePath());
+      int compileStatus = compiler.run(null, null, null, javaFile.getFile(), "-d", tempDir.getAbsolutePath());
+      Assert.assertTrue(compileStatus == 0, "Error when compiling resource: " + TEST_RECORD_READER_FILE);
 
       URL classFile = Thread.currentThread().getContextClassLoader().getResource("TestRecordReader.class");
 
