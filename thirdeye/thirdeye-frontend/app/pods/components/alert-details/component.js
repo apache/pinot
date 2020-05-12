@@ -33,6 +33,7 @@ import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 import moment from 'moment';
 import _ from 'lodash';
+import config from 'thirdeye-frontend/config/environment';
 
 const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
@@ -693,7 +694,7 @@ export default Component.extend({
         }] : [];
       const startColumn = [{
         template: 'custom/anomalies-table/start-duration',
-        title: 'Start / Duration (PDT)',
+        title: `Start / Duration (${moment().tz(config.timeZone).format('z')})`,
         propertyName: 'startDateStr',
         sortedBy: 'start',
         sortDirection: 'desc',
@@ -1144,7 +1145,7 @@ export default Component.extend({
       selectedRule,
       uniqueTimeSeries
     } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline', 'showRules', 'selectedRule', 'uniqueTimeSeries');
-    const timeZone = 'America/Los_Angeles';
+    const timeZone = config.timeZone;
 
     this.setProperties({
       errorTimeseries: null,

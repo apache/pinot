@@ -39,7 +39,7 @@ export default Route.extend(ApplicationRouteMixin, {
         });
     }
 
-    this.get('moment').setTimeZone('America/Los_Angeles');
+    this.get('moment').setTimeZone(config.timeZone);
   },
 
   model(params, transition) {

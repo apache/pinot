@@ -5,6 +5,7 @@ import {
   toAbsoluteUrn
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import config from 'thirdeye-frontend/config/environment';
 import _ from 'lodash';
 
 const ROOTCAUSE_TIMESERIES_ENDPOINT = '/rootcause/metric/timeseries';
@@ -96,7 +97,7 @@ export default Service.extend({
     const range = context.analysisRange;
     const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
     const granularity = context.granularity;
-    const timezone = 'America/Los_Angeles';
+    const timezone = config.timeZone;
 
     const url = `${ROOTCAUSE_TIMESERIES_ENDPOINT}?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}&timezone=${timezone}`;
     return fetcher.fetch(url, ROOTCAUSE_TIMESERIES_PRIORITY)

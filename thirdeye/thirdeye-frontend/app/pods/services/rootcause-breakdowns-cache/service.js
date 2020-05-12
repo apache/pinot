@@ -5,6 +5,8 @@ import {
   toAbsoluteUrn
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import config from 'thirdeye-frontend/config/environment';
+
 import _ from 'lodash';
 
 const ROOTCAUSE_BREAKDOWNS_ENDPOINT = '/rootcause/metric/breakdown';
@@ -93,7 +95,7 @@ export default Service.extend({
     const metricUrn = toMetricUrn(urn);
     const range = context.anomalyRange;
     const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
-    const timezone = 'America/Los_Angeles';
+    const timezone = config.timeZone;
     const limit = offset === 'current' ? 100 : 200; // heuristically over-fetch baseline for heat map
 
     const url = `${ROOTCAUSE_BREAKDOWNS_ENDPOINT}?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}&limit=${limit}`;

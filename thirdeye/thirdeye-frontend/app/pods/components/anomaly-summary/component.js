@@ -24,6 +24,7 @@ import { checkStatus, humanizeFloat, buildBounds } from 'thirdeye-frontend/utils
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import moment from 'moment';
 import _ from 'lodash';
+import config from 'thirdeye-frontend/config/environment';
 
 const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table and legend
 
@@ -52,6 +53,12 @@ export default Component.extend({
    * predicted time series
    */
   predicted: null,
+
+  /**
+   * timezone id
+   */
+  timezoneId: moment().tz(config.timeZone).format('z'),
+
   /**
    * imported color mapping for graph
    */
