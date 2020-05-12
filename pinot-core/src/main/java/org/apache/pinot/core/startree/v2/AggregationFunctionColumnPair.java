@@ -53,7 +53,12 @@ public class AggregationFunctionColumnPair {
 
   @Nonnull
   public String toColumnName() {
-    return _functionType.getName() + DELIMITER + _column;
+    return toColumnName(_functionType, _column);
+  }
+
+  @Nonnull
+  public static String toColumnName(AggregationFunctionType functionType, String column) {
+    return functionType.getName() + DELIMITER + column;
   }
 
   @Nonnull

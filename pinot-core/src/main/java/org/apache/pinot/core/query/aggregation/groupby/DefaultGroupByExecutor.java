@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -52,7 +53,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   protected final int _numFunctions;
   protected final AggregationFunction[] _functions;
-  protected final TransformExpressionTree[] _aggregationExpressions;
+  protected final TransformExpressionTree[][] _aggregationExpressions;
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _resultHolders;
   protected final boolean _hasMVGroupByExpression;
@@ -74,12 +75,17 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize aggregation functions and expressions
     _numFunctions = functionContexts.length;
     _functions = new AggregationFunction[_numFunctions];
-    _aggregationExpressions = new TransformExpressionTree[_numFunctions];
+    _aggregationExpressions = new TransformExpressionTree[_numFunctions][];
+
     for (int i = 0; i < _numFunctions; i++) {
       AggregationFunction function = functionContexts[i].getAggregationFunction();
       _functions[i] = function;
+
       if (function.getType() != AggregationFunctionType.COUNT) {
-        _aggregationExpressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumnName());
+        List<String> expressions = functionContexts[i].getExpressions();
+
+        List<TransformExpressionTree> inputExpressions = function.getInputExpressions();
+        _aggregationExpressions[i] = inputExpressions.toArray(new TransformExpressionTree[0]);
       }
     }
 
@@ -160,9 +166,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, Collections.emptyMap());
       }
     } else {
-      TransformExpressionTree aggregationExpression = _aggregationExpressions[functionIndex];
-      Map<String, BlockValSet> blockValSetMap = Collections
-          .singletonMap(aggregationExpression.toString(), transformBlock.getBlockValueSet(aggregationExpression));
+      Map<String, BlockValSet> blockValSetMap = new HashMap<>();
+      for (int i = 0; i < _aggregationExpressions[functionIndex].length; i++) {
+        TransformExpressionTree aggregationExpression = _aggregationExpressions[functionIndex][i];
+        blockValSetMap.put(aggregationExpression.toString(), transformBlock.getBlockValueSet(aggregationExpression));
+      }
       if (_hasMVGroupByExpression) {
         function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValSetMap);
       } else {

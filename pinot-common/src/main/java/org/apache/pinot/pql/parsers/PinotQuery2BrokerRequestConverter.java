@@ -20,9 +20,7 @@ package org.apache.pinot.pql.parsers;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.calcite.sql.SqlKind;
@@ -37,19 +35,17 @@ import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.parsers.CompilerConstants;
+import org.apache.pinot.parsers.utils.ParserUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 
 
 public class PinotQuery2BrokerRequestConverter {
-
-  static Map<FilterKind, FilterOperator> filterOperatorMapping;
 
   public BrokerRequest convert(PinotQuery pinotQuery) {
     BrokerRequest brokerRequest = new BrokerRequest();
@@ -93,7 +89,7 @@ public class PinotQuery2BrokerRequestConverter {
       //order by is always a function (ASC or DESC)
       Function functionCall = orderByExpr.getFunctionCall();
       selectionSort.setIsAsc(functionCall.getOperator().equalsIgnoreCase(OrderByAstNode.ASCENDING_ORDER));
-      selectionSort.setColumn(standardizeExpression(functionCall.getOperands().get(0), true));
+      selectionSort.setColumn(ParserUtils.standardizeExpression(functionCall.getOperands().get(0), true));
       sortSequenceList.add(selectionSort);
     }
     if (!sortSequenceList.isEmpty()) {
@@ -109,7 +105,7 @@ public class PinotQuery2BrokerRequestConverter {
     if (groupByList != null && groupByList.size() > 0) {
       GroupBy groupBy = new GroupBy();
       for (Expression expression : groupByList) {
-        String expressionStr = standardizeExpression(expression, true);
+        String expressionStr = ParserUtils.standardizeExpression(expression, true);
         groupBy.addToExpressions(expressionStr);
       }
       groupBy.setTopN(pinotQuery.getLimit());
@@ -153,7 +149,7 @@ public class PinotQuery2BrokerRequestConverter {
             if (selection == null) {
               selection = new Selection();
             }
-            selection.addToSelectionColumns(standardizeExpression(expression, false));
+            selection.addToSelectionColumns(ParserUtils.standardizeExpression(expression, false));
           }
           break;
       }
@@ -183,48 +179,6 @@ public class PinotQuery2BrokerRequestConverter {
       brokerRequest.setFilterQuery(filterQuery);
       brokerRequest.setFilterSubQueryMap(filterSubQueryMap);
     }
-  }
-
-  private String standardizeExpression(Expression expression, boolean treatLiteralAsIdentifier) {
-    return standardizeExpression(expression, treatLiteralAsIdentifier, false);
-  }
-
-  private String standardizeExpression(Expression expression, boolean treatLiteralAsIdentifier,
-      boolean forceSingleQuoteOnNonStringLiteral) {
-    switch (expression.getType()) {
-      case LITERAL:
-        Literal literal = expression.getLiteral();
-        // Force single quote on non-string literal inside a function.
-        if (forceSingleQuoteOnNonStringLiteral && !literal.isSetStringValue()) {
-          return "'" + literal.getFieldValue() + "'";
-        }
-        if (treatLiteralAsIdentifier || !literal.isSetStringValue()) {
-          return literal.getFieldValue().toString();
-        } else {
-          return "'" + literal.getFieldValue() + "'";
-        }
-      case IDENTIFIER:
-        return expression.getIdentifier().getName();
-      case FUNCTION:
-        Function functionCall = expression.getFunctionCall();
-        return standardizeFunction(functionCall);
-      default:
-        throw new UnsupportedOperationException("Unknown Expression type: " + expression.getType());
-    }
-  }
-
-  private String standardizeFunction(Function functionCall) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(functionCall.getOperator().toLowerCase());
-    sb.append("(");
-    String delim = "";
-    for (Expression operand : functionCall.getOperands()) {
-      sb.append(delim);
-      sb.append(standardizeExpression(operand, false, true));
-      delim = ",";
-    }
-    sb.append(")");
-    return sb.toString();
   }
 
   private AggregationInfo buildAggregationInfo(Function function) {
@@ -276,7 +230,7 @@ public class PinotQuery2BrokerRequestConverter {
       case IDENTIFIER:
         return functionParam.getIdentifier().getName();
       case FUNCTION:
-        return standardizeExpression(functionParam, false, true);
+        return ParserUtils.standardizeExpression(functionParam, false, true);
       default:
         throw new UnsupportedOperationException("Unrecognized functionParamType:" + functionParam.getType());
     }
@@ -296,7 +250,7 @@ public class PinotQuery2BrokerRequestConverter {
         Function functionCall = filterExpression.getFunctionCall();
         String operator = functionCall.getOperator();
         FilterKind filterKind = FilterKind.valueOf(operator);
-        FilterOperator filterOperator = filterOperatorMapping.get(filterKind);
+        FilterOperator filterOperator = ParserUtils.filterKindToOperator(filterKind);
         filterQuery.setOperator(filterOperator);
         List<Expression> operands = functionCall.getOperands();
         switch (filterOperator) {
@@ -313,84 +267,19 @@ public class PinotQuery2BrokerRequestConverter {
           case NOT_IN:
           case IN:
           case TEXT_MATCH:
-            //first operand is the always the column
-            String column = null;
-            //remaining operands are arguments to the function
-            List<String> valueList = new ArrayList<>();
-            for (int i = 0; i < operands.size(); i++) {
-              Expression operand = operands.get(i);
-              if (i == 0) {
-                column = standardizeExpression(operand, false);
-              } else {
-                valueList.add(standardizeExpression(operand, true));
-              }
-            }
-            filterQuery.setColumn(column);
-            filterQuery.setValue(valueList);
-            break;
           case RANGE:
-            handleRange(filterQuery, filterKind, operands);
+            //first operand is the always the column
+            filterQuery.setColumn(ParserUtils.standardizeExpression(operands.get(0), false));
+            filterQuery.setValue(ParserUtils.getFilterValues(filterKind, operands));
             break;
+
           default:
             throw new UnsupportedOperationException("Filter UDF not supported");
         }
         break;
     }
+
     filterQuery.setNestedFilterQueryIds(childFilterIds);
     return filterQuery;
-  }
-
-  private void handleRange(FilterQuery filterQuery, FilterKind filterKind, List<Expression> operands) {
-
-    filterQuery.setColumn(standardizeExpression(operands.get(0), false));
-
-    String rangeExpression;
-    //PQL does not quote the string literals when we create expression
-    boolean treatLiteralAsIdentifier = true;
-
-    if (FilterKind.LESS_THAN == filterKind) {
-
-      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(*\t\t" + value + ")";
-    } else if (FilterKind.LESS_THAN_OR_EQUAL == filterKind) {
-
-      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(*\t\t" + value + "]";
-    } else if (FilterKind.GREATER_THAN == filterKind) {
-
-      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "(" + value + "\t\t*)";
-    } else if (FilterKind.GREATER_THAN_OR_EQUAL == filterKind) {
-
-      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      rangeExpression = "[" + value + "\t\t*)";
-    } else if (FilterKind.BETWEEN == filterKind) {
-
-      String left = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
-      String right = standardizeExpression(operands.get(2), treatLiteralAsIdentifier);
-      rangeExpression = "[" + left + "\t\t" + right + "]";
-    } else {
-      throw new UnsupportedOperationException("Unknown Filter Kind:" + filterKind);
-    }
-    List<String> valueList = new ArrayList<>();
-    valueList.add(rangeExpression);
-    filterQuery.setValue(valueList);
-  }
-
-  static {
-    filterOperatorMapping = new HashMap<>();
-    filterOperatorMapping.put(FilterKind.AND, FilterOperator.AND);
-    filterOperatorMapping.put(FilterKind.OR, FilterOperator.OR);
-    filterOperatorMapping.put(FilterKind.EQUALS, FilterOperator.EQUALITY);
-    filterOperatorMapping.put(FilterKind.NOT_EQUALS, FilterOperator.NOT);
-    filterOperatorMapping.put(FilterKind.GREATER_THAN, FilterOperator.RANGE);
-    filterOperatorMapping.put(FilterKind.LESS_THAN, FilterOperator.RANGE);
-    filterOperatorMapping.put(FilterKind.GREATER_THAN_OR_EQUAL, FilterOperator.RANGE);
-    filterOperatorMapping.put(FilterKind.LESS_THAN_OR_EQUAL, FilterOperator.RANGE);
-    filterOperatorMapping.put(FilterKind.BETWEEN, FilterOperator.RANGE);
-    filterOperatorMapping.put(FilterKind.IN, FilterOperator.IN);
-    filterOperatorMapping.put(FilterKind.NOT_IN, FilterOperator.NOT_IN);
-    filterOperatorMapping.put(FilterKind.REGEXP_LIKE, FilterOperator.REGEXP_LIKE);
-    filterOperatorMapping.put(FilterKind.TEXT_MATCH, FilterOperator.TEXT_MATCH);
   }
 }

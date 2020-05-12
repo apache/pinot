@@ -75,6 +75,11 @@ public abstract class Predicate {
     final String column = filterQueryTree.getColumn();
     final List<String> value = filterQueryTree.getValue();
 
+    Predicate predicate = newPredicate(filterType, column, value);
+    return predicate;
+  }
+
+  public static Predicate newPredicate(FilterOperator filterType, String column, List<String> value) {
     Predicate predicate = null;
     switch (filterType) {
       case EQUALITY:
