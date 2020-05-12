@@ -89,8 +89,10 @@ public class TransformExpressionTree {
       _expressionType = ExpressionType.FUNCTION;
       _value = ((FunctionCallAstNode) root).getName().toLowerCase();
       _children = new ArrayList<>();
-      for (AstNode child : root.getChildren()) {
-        _children.add(new TransformExpressionTree(child));
+      if(root.hasChildren()) {
+        for (AstNode child : root.getChildren()) {
+          _children.add(new TransformExpressionTree(child));
+        }
       }
     } else if (root instanceof IdentifierAstNode) {
       _expressionType = ExpressionType.IDENTIFIER;

@@ -55,6 +55,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class CalciteSqlParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
@@ -291,7 +292,7 @@ public class CalciteSqlParser {
         throw new RuntimeException(
             "Unable to convert SqlNode: " + sqlNode + " to PinotQuery. Unknown node type: " + sqlNode.getKind());
     }
-    queryReWrite(pinotQuery);
+    queryRewrite(pinotQuery);
     return pinotQuery;
   }
 
@@ -307,7 +308,7 @@ public class CalciteSqlParser {
     return SqlParser.create(sql, parserBuilder.build());
   }
 
-  private static void queryReWrite(PinotQuery pinotQuery) {
+  private static void queryRewrite(PinotQuery pinotQuery) {
     // Update Predicate Comparison
     if (pinotQuery.isSetFilterExpression()) {
       Expression filterExpression = pinotQuery.getFilterExpression();
@@ -361,8 +362,10 @@ public class CalciteSqlParser {
         default:
           List<Expression> operands = functionCall.getOperands();
           List<Expression> newOperands = new ArrayList<>();
-          for (int i = 0; i < operands.size(); i++) {
-            newOperands.add(updateComparisonPredicate(operands.get(i)));
+          if (operands != null) {
+            for (int i = 0; i < operands.size(); i++) {
+              newOperands.add(updateComparisonPredicate(operands.get(i)));
+            }
           }
           functionCall.setOperands(newOperands);
       }
@@ -590,8 +593,9 @@ public class CalciteSqlParser {
         if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
           funcName = funcSqlNode.getOperator().getName();
         }
-        if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null) && funcSqlNode
-            .getFunctionQuantifier().toValue().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+        if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null)
+            && funcSqlNode.getFunctionQuantifier().toValue()
+            .equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
           funcName = AggregationFunctionType.DISTINCTCOUNT.getName();
         }
         final Expression funcExpr = RequestUtils.getFunctionExpression(funcName);
