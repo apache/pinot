@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import java.util.List;
+import java.util.Objects;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.predicate.EqPredicate;
@@ -113,5 +114,22 @@ public abstract class Predicate {
         throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
     }
     return predicate;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof Predicate)) {
+      return false;
+    }
+    Predicate predicate = (Predicate) o;
+    return Objects.equals(lhs, predicate.lhs) && Objects.equals(rhs, predicate.rhs) && type == predicate.type;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(lhs, rhs, type);
   }
 }
