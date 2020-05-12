@@ -19,11 +19,13 @@
 package org.apache.pinot.common.protocols;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -284,6 +286,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withStreamPartitionMsgOffset(StreamPartitionMsgOffset offset) {
+        _offset = offset.getOffset();
+        return this;
+      }
+
       public String getSegmentName() {
         return _segmentName;
       }
@@ -326,6 +333,10 @@ public class SegmentCompletionProtocol {
 
       public long getSegmentSizeBytes() {
         return _segmentSizeBytes;
+      }
+
+      public StreamPartitionMsgOffset getStreamPartitionMsgOffset() {
+        return new StreamPartitionMsgOffset(_offset);
       }
 
       public String toString() {
@@ -419,6 +430,12 @@ public class SegmentCompletionProtocol {
     @JsonProperty(OFFSET_KEY)
     public long getOffset() {
       return _offset;
+    }
+
+    // TODO Make it a JsonProperty when we are ready to move the protocol
+    @JsonIgnore
+    public StreamPartitionMsgOffset getStreamPartitionMsgOffset() {
+      return new StreamPartitionMsgOffset(_offset);
     }
 
     @JsonProperty(OFFSET_KEY)
@@ -531,6 +548,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withStreamPartitionMsgOffset(StreamPartitionMsgOffset offset) {
+        _offset = offset.getOffset();
+        return this;
+      }
+
       public ControllerResponseStatus getStatus() {
         return _status;
       }
@@ -553,6 +575,10 @@ public class SegmentCompletionProtocol {
 
       public String getControllerVipUrl() {
         return _controllerVipUrl;
+      }
+
+      public StreamPartitionMsgOffset getStreamPartitionMsgOffset() {
+        return new StreamPartitionMsgOffset(_offset);
       }
     }
   }

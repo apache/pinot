@@ -20,7 +20,6 @@ package org.apache.pinot.query.aggregation;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,7 +27,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
@@ -43,10 +42,11 @@ import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -88,8 +88,8 @@ public class DefaultAggregationExecutorTest {
 
   public static IndexSegment _indexSegment;
   private Random _random;
-  private List<AggregationInfo> _aggregationInfoList;
   private String[] _columns;
+  private BrokerRequest _brokerRequest;
   private double[][] _inputData;
 
   /**
@@ -110,15 +110,15 @@ public class DefaultAggregationExecutorTest {
     _columns = new String[numColumns];
     setupSegment();
 
-    _aggregationInfoList = new ArrayList<>();
-
-    for (int i = 0; i < _columns.length; i++) {
-      AggregationInfo aggregationInfo = new AggregationInfo();
-      aggregationInfo.setAggregationType(AGGREGATION_FUNCTIONS[i]);
-
-      aggregationInfo.setExpressions(Collections.singletonList(_columns[i]));
-      _aggregationInfoList.add(aggregationInfo);
+    StringBuilder queryBuilder = new StringBuilder("SELECT");
+    for (int i = 0; i < numColumns; i++) {
+      queryBuilder.append(String.format(" %s(%s)", AGGREGATION_FUNCTIONS[i], _columns[i]));
+      if (i != numColumns - 1) {
+        queryBuilder.append(',');
+      }
     }
+    queryBuilder.append(" FROM testTable");
+    _brokerRequest = new Pql2Compiler().compileToBrokerRequest(queryBuilder.toString());
   }
 
   /**
@@ -139,13 +139,8 @@ public class DefaultAggregationExecutorTest {
     ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
     TransformOperator transformOperator = new TransformOperator(projectionOperator, expressionTrees);
     TransformBlock transformBlock = transformOperator.nextBlock();
-    int numAggFuncs = _aggregationInfoList.size();
-    AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFuncs];
-    for (int i = 0; i < numAggFuncs; i++) {
-      AggregationInfo aggregationInfo = _aggregationInfoList.get(i);
-      aggrFuncContextArray[i] = AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo);
-    }
-    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggrFuncContextArray);
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_brokerRequest);
+    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
     aggregationExecutor.aggregate(transformBlock);
     List<Object> result = aggregationExecutor.getResult();
     for (int i = 0; i < result.size(); i++) {

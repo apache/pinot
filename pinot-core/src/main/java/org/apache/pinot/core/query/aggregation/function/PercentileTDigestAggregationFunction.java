@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.base.Preconditions;
 import com.tdunning.math.stats.TDigest;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -38,28 +35,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * TDigest based Percentile aggregation function.
  */
-public class PercentileTDigestAggregationFunction implements AggregationFunction<TDigest, Double> {
+public class PercentileTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   protected final int _percentile;
-  protected final String _column;
-  private final List<TransformExpressionTree> _inputExpressions;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param arguments List of arguments.
-   *                  <ul>
-   *                  <li> Arg 0: Column name to aggregate.</li>
-   *                  <li> Arg 1: Percentile to compute. </li>
-   *                  </ul>
-   */
-  public PercentileTDigestAggregationFunction(List<String> arguments) {
-    int numArgs = arguments.size();
-    Preconditions.checkArgument(numArgs == 2, getType() + " expects two argument, got: " + numArgs);
-    _column = arguments.get(0);
-    _percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
-    _inputExpressions = Collections.singletonList(TransformExpressionTree.compileToExpressionTree(_column));
+  public PercentileTDigestAggregationFunction(String column, int percentile) {
+    super(column);
+    _percentile = percentile;
   }
 
   @Override
@@ -78,11 +61,6 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
-  public List<TransformExpressionTree> getInputExpressions() {
-    return _inputExpressions;
-  }
-
-  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
@@ -98,8 +76,9 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       TDigest tDigest = getDefaultTDigest(aggregationResultHolder);
@@ -126,8 +105,8 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {
@@ -151,8 +130,8 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {

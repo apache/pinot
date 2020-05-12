@@ -64,6 +64,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 public class DistinctCountThetaSketchAggregationFunction implements AggregationFunction<Map<String, Sketch>, Integer> {
 
   private String _thetaSketchColumn;
+  private TransformExpressionTree _thetaSketchIdentifier;
   private Set<String> _predicateStrings;
   private Expression _postAggregationExpression;
   private Set<PredicateInfo> _predicateInfoSet;
@@ -130,15 +131,15 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
 
     Map<String, Union> result = getDefaultResult(aggregationResultHolder, _predicateStrings);
-    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchColumn).getBytesValuesSV(), length);
+    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchIdentifier).getBytesValuesSV(), length);
 
     for (PredicateInfo predicateInfo : _predicateInfoSet) {
       String predicate = predicateInfo.getStringVal();
 
-      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getColumn());
+      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getExpression());
       FieldSpec.DataType valueType = blockValSet.getValueType();
       PredicateEvaluator predicateEvaluator = predicateInfo.getPredicateEvaluator(valueType);
 
@@ -181,13 +182,13 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchColumn).getBytesValuesSV(), length);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchIdentifier).getBytesValuesSV(), length);
 
     for (PredicateInfo predicateInfo : _predicateInfoSet) {
       String predicate = predicateInfo.getStringVal();
 
-      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getColumn());
+      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getExpression());
       FieldSpec.DataType valueType = blockValSet.getValueType();
       PredicateEvaluator predicateEvaluator = predicateInfo.getPredicateEvaluator(valueType);
 
@@ -237,13 +238,13 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchColumn).getBytesValuesSV(), length);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchIdentifier).getBytesValuesSV(), length);
 
     for (PredicateInfo predicateInfo : _predicateInfoSet) {
       String predicate = predicateInfo.getStringVal();
 
-      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getColumn());
+      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getExpression());
       FieldSpec.DataType valueType = blockValSet.getValueType();
       PredicateEvaluator predicateEvaluator = predicateInfo.getPredicateEvaluator(valueType);
 
@@ -425,10 +426,12 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
     // Initialize the Theta-Sketch Column.
     _thetaSketchColumn = arguments.get(0);
+    _thetaSketchIdentifier =
+        new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER, _thetaSketchColumn, null);
 
     // Initialize input expressions. It is expected they are covered between the theta-sketch column and the predicates.
     _inputExpressions = new ArrayList<>();
-    _inputExpressions.add(TransformExpressionTree.compileToExpressionTree(_thetaSketchColumn));
+    _inputExpressions.add(_thetaSketchIdentifier);
 
     // Initialize thetaSketchParams
     String paramsString = arguments.get(1);
@@ -443,14 +446,18 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
     if (predicatesSpecified) {
       for (String predicateString : _predicateStrings) {
+        // FIXME: Standardize predicate string?
+
         Expression expression = CalciteSqlParser.compileToExpression(predicateString);
 
         // TODO: Add support for complex predicates with AND/OR.
         String filterColumn = ParserUtils.getFilterColumn(expression);
         Predicate predicate = Predicate
             .newPredicate(ParserUtils.getFilterType(expression), filterColumn, ParserUtils.getFilterValues(expression));
+        TransformExpressionTree filterExpression =
+            new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER, filterColumn, null);
 
-        _predicateInfoSet.add(new PredicateInfo(predicateString, filterColumn, predicate));
+        _predicateInfoSet.add(new PredicateInfo(predicateString, filterExpression, predicate));
         _expressionMap.put(expression, predicateString);
         _inputExpressions.add(new TransformExpressionTree(new IdentifierAstNode(filterColumn)));
       }
@@ -461,12 +468,14 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
         String filterColumn = ParserUtils.getFilterColumn(predicateExpression);
         Predicate predicate = Predicate.newPredicate(ParserUtils.getFilterType(predicateExpression), filterColumn,
             ParserUtils.getFilterValues(predicateExpression));
+        TransformExpressionTree filterExpression =
+            new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER, filterColumn, null);
 
         String predicateString = ParserUtils.standardizeExpression(predicateExpression, false);
         _predicateStrings.add(predicateString);
-        _predicateInfoSet.add(new PredicateInfo(predicateString, filterColumn, predicate));
+        _predicateInfoSet.add(new PredicateInfo(predicateString, filterExpression, predicate));
         _expressionMap.put(predicateExpression, predicateString);
-        _inputExpressions.add(new TransformExpressionTree(new IdentifierAstNode(filterColumn)));
+        _inputExpressions.add(filterExpression);
       }
     }
   }
@@ -567,15 +576,15 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
    *
    */
   private static class PredicateInfo {
-
     private final String _stringVal;
-    private final String _column; // LHS
+    private final TransformExpressionTree _expression; // LHS
+    // FIXME: Predicate does not have equals() and hashCode() implemented
     private final Predicate _predicate;
     private PredicateEvaluator _predicateEvaluator;
 
-    private PredicateInfo(String stringVal, String column, Predicate predicate) {
+    private PredicateInfo(String stringVal, TransformExpressionTree expression, Predicate predicate) {
       _stringVal = stringVal;
-      _column = column;
+      _expression = expression;
       _predicate = predicate;
       _predicateEvaluator = null; // Initialized lazily
     }
@@ -584,8 +593,8 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       return _stringVal;
     }
 
-    public String getColumn() {
-      return _column;
+    public TransformExpressionTree getExpression() {
+      return _expression;
     }
 
     public Predicate getPredicate() {
@@ -625,13 +634,13 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       }
 
       PredicateInfo that = (PredicateInfo) o;
-      return Objects.equals(_stringVal, that._stringVal) && Objects.equals(_column, that._column) && Objects
+      return Objects.equals(_stringVal, that._stringVal) && Objects.equals(_expression, that._expression) && Objects
           .equals(_predicate, that._predicate);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_stringVal, _column, _predicate);
+      return Objects.hash(_stringVal, _expression, _predicate);
     }
   }
 }

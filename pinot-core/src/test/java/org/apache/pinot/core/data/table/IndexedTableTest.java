@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -29,10 +30,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -44,31 +47,18 @@ import org.testng.annotations.Test;
 public class IndexedTableTest {
 
   @Test
-  public void testConcurrentIndexedTable() throws InterruptedException, TimeoutException, ExecutionException {
-
+  public void testConcurrentIndexedTable()
+      throws InterruptedException, TimeoutException, ExecutionException {
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
-            ColumnDataType.DOUBLE});
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    AggregationFunction[] aggregationFunctions =
+        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
+    SelectionSort selectionSort = new SelectionSort();
+    selectionSort.setColumn("sum(m1)");
+    selectionSort.setIsAsc(true);
+    List<SelectionSort> orderBy = Collections.singletonList(selectionSort);
 
-    AggregationInfo agg1 = new AggregationInfo();
-    List<String> args1 = new ArrayList<>(1);
-    args1.add("m1");
-    agg1.setExpressions(args1);
-    agg1.setAggregationType("sum");
-
-    AggregationInfo agg2 = new AggregationInfo();
-    List<String> args2 = new ArrayList<>(1);
-    args2.add("m2");
-    agg2.setExpressions(args2);
-    agg2.setAggregationType("max");
-    List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
-
-    SelectionSort sel = new SelectionSort();
-    sel.setColumn("sum(m1)");
-    sel.setIsAsc(true);
-    List<SelectionSort> orderBy = Lists.newArrayList(sel);
-
-    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, orderBy, 5);
+    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationFunctions, orderBy, 5);
 
     // 3 threads upsert together
     // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
@@ -81,7 +71,8 @@ public class IndexedTableTest {
       Callable<Void> c1 = () -> {
         indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
         indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
-        indexedTable.upsert(getKey(new Object[]{"c", 3, 30d}), getRecord(new Object[]{"c", 3, 30d, 10000d, 300d})); // eviction candidate
+        indexedTable.upsert(getKey(new Object[]{"c", 3, 30d}),
+            getRecord(new Object[]{"c", 3, 30d, 10000d, 300d})); // eviction candidate
         indexedTable.upsert(getKey(new Object[]{"d", 4, 40d}), getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
         indexedTable.upsert(getKey(new Object[]{"d", 4, 40d}), getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
         indexedTable.upsert(getKey(new Object[]{"e", 5, 50d}), getRecord(new Object[]{"e", 5, 50d, 10d, 500d}));
@@ -90,27 +81,29 @@ public class IndexedTableTest {
 
       Callable<Void> c2 = () -> {
         indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
-        indexedTable.upsert(getKey(new Object[]{"f", 6, 60d}), getRecord(new Object[]{"f", 6, 60d,20000d, 600d})); // eviction candidate
-        indexedTable.upsert(getKey(new Object[]{"g", 7, 70d}), getRecord(new Object[]{"g", 7, 70d,10d, 700d}));
-        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d,10d, 200d}));
-        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d,10d, 200d}));
-        indexedTable.upsert(getKey(new Object[]{"h", 8, 80d}), getRecord(new Object[]{"h", 8, 80d,10d, 800d}));
-        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d,10d, 100d}));
-        indexedTable.upsert(getKey(new Object[]{"i", 9, 90d}), getRecord(new Object[]{"i", 9, 90d,500d, 900d}));
+        indexedTable.upsert(getKey(new Object[]{"f", 6, 60d}),
+            getRecord(new Object[]{"f", 6, 60d, 20000d, 600d})); // eviction candidate
+        indexedTable.upsert(getKey(new Object[]{"g", 7, 70d}), getRecord(new Object[]{"g", 7, 70d, 10d, 700d}));
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"h", 8, 80d}), getRecord(new Object[]{"h", 8, 80d, 10d, 800d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+        indexedTable.upsert(getKey(new Object[]{"i", 9, 90d}), getRecord(new Object[]{"i", 9, 90d, 500d, 900d}));
         return null;
       };
 
       Callable<Void> c3 = () -> {
-        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d,10d, 100d}));
-        indexedTable.upsert(getKey(new Object[]{"j", 10, 100d}), getRecord(new Object[]{"j", 10, 100d,10d, 1000d}));
-        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d,10d, 200d}));
-        indexedTable.upsert(getKey(new Object[]{"k", 11, 110d}), getRecord(new Object[]{"k", 11, 110d,10d, 1100d}));
-        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d,10d, 100d}));
-        indexedTable.upsert(getKey(new Object[]{"l", 12, 120d}), getRecord(new Object[]{"l", 12, 120d,10d, 1200d}));
-        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d,10d, 100d})); // trimming candidate
-        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d,10d, 200d}));
-        indexedTable.upsert(getKey(new Object[]{"m", 13, 130d}), getRecord(new Object[]{"m", 13, 130d,10d, 1300d}));
-        indexedTable.upsert(getKey(new Object[]{"n", 14, 140d}), getRecord(new Object[]{"n", 14, 140d,10d, 1400d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+        indexedTable.upsert(getKey(new Object[]{"j", 10, 100d}), getRecord(new Object[]{"j", 10, 100d, 10d, 1000d}));
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"k", 11, 110d}), getRecord(new Object[]{"k", 11, 110d, 10d, 1100d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+        indexedTable.upsert(getKey(new Object[]{"l", 12, 120d}), getRecord(new Object[]{"l", 12, 120d, 10d, 1200d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}),
+            getRecord(new Object[]{"a", 1, 10d, 10d, 100d})); // trimming candidate
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"m", 13, 130d}), getRecord(new Object[]{"m", 13, 130d, 10d, 1300d}));
+        indexedTable.upsert(getKey(new Object[]{"n", 14, 140d}), getRecord(new Object[]{"n", 14, 140d, 10d, 1400d}));
         return null;
       };
 
@@ -122,7 +115,6 @@ public class IndexedTableTest {
       indexedTable.finish(false);
       Assert.assertEquals(indexedTable.size(), 5);
       checkEvicted(indexedTable, "c", "f");
-
     } finally {
       executorService.shutdown();
     }
@@ -130,27 +122,15 @@ public class IndexedTableTest {
 
   @Test(dataProvider = "initDataProvider")
   public void testNonConcurrentIndexedTable(List<SelectionSort> orderBy, List<String> survivors) {
-
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "d4", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-
-    AggregationInfo agg1 = new AggregationInfo();
-    List<String> args1 = new ArrayList<>(1);
-    args1.add("m1");
-    agg1.setExpressions(args1);
-    agg1.setAggregationType("sum");
-
-    AggregationInfo agg2 = new AggregationInfo();
-    List<String> args2 = new ArrayList<>(1);
-    args2.add("m2");
-    agg2.setExpressions(args2);
-    agg2.setAggregationType("max");
-    List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
+    AggregationFunction[] aggregationFunctions =
+        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
 
     // Test SimpleIndexedTable
-    IndexedTable simpleIndexedTable = new SimpleIndexedTable(dataSchema, aggregationInfos, orderBy, 5);
+    IndexedTable simpleIndexedTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderBy, 5);
     // merge table
-    IndexedTable mergeTable = new SimpleIndexedTable(dataSchema, aggregationInfos, orderBy, 10);
+    IndexedTable mergeTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderBy, 10);
     testNonConcurrent(simpleIndexedTable, mergeTable);
 
     // finish
@@ -158,8 +138,8 @@ public class IndexedTableTest {
     checkSurvivors(simpleIndexedTable, survivors);
 
     // Test ConcurrentIndexedTable
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, orderBy, 5);
-    mergeTable = new SimpleIndexedTable(dataSchema, aggregationInfos, orderBy, 10);
+    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(dataSchema, aggregationFunctions, orderBy, 5);
+    mergeTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderBy, 10);
     testNonConcurrent(concurrentIndexedTable, mergeTable);
 
     // finish
@@ -300,6 +280,7 @@ public class IndexedTableTest {
   private Key getKey(Object[] keys) {
     return new Key(keys);
   }
+
   private Record getRecord(Object[] columns) {
     return new Record(columns);
   }
@@ -307,26 +288,14 @@ public class IndexedTableTest {
   @Test
   public void testNoMoreNewRecords() {
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
-        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
-            ColumnDataType.DOUBLE});
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    AggregationFunction[] aggregationFunctions =
+        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
 
-    AggregationInfo agg1 = new AggregationInfo();
-    List<String> args1 = new ArrayList<>(1);
-    args1.add("m1");
-    agg1.setExpressions(args1);
-    agg1.setAggregationType("sum");
-
-    AggregationInfo agg2 = new AggregationInfo();
-    List<String> args2 = new ArrayList<>(1);
-    args2.add("m2");
-    agg2.setExpressions(args2);
-    agg2.setAggregationType("max");
-    List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
-
-    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, aggregationInfos, null, 5);
+    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, null, 5);
     testNoMoreNewRecordsInTable(indexedTable);
 
-    indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, null, 5);
+    indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationFunctions, null, 5);
     testNoMoreNewRecordsInTable(indexedTable);
   }
 
@@ -355,6 +324,5 @@ public class IndexedTableTest {
     indexedTable.finish(false);
 
     checkEvicted(indexedTable, "f", "g");
-
   }
 }

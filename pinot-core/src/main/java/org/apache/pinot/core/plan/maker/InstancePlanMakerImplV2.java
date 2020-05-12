@@ -26,7 +26,6 @@ import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
@@ -205,9 +204,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
     if (functionType
         .isOfType(AggregationFunctionType.MIN, AggregationFunctionType.MAX, AggregationFunctionType.MINMAXRANGE)) {
-      String expression = AggregationFunctionUtils.getAggregationExpressions(aggregationInfo).get(0);
-      if (TransformExpressionTree.compileToExpressionTree(expression).isColumn()) {
-        Dictionary dictionary = indexSegment.getDataSource(expression).getDictionary();
+      String column = AggregationFunctionUtils.getArguments(aggregationInfo).get(0);
+      if (indexSegment.getColumnNames().contains(column)) {
+        Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
         return dictionary != null && dictionary.isSorted();
       }
     }

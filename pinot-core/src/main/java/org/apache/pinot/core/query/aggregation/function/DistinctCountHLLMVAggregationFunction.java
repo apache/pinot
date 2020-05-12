@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -29,10 +30,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggregationFunction {
 
-  /**
-   * Constructor for the class.
-   * @param column Column name to aggregate on.
-   */
   public DistinctCountHLLMVAggregationFunction(String column) {
     super(column);
   }
@@ -48,10 +45,11 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, Map<String, BlockValSet> blockValSetMap) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
 
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
     switch (valueType) {
       case INT:
@@ -102,8 +100,8 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
 
     switch (valueType) {
@@ -160,8 +158,8 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<String, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_column);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
 
     switch (valueType) {

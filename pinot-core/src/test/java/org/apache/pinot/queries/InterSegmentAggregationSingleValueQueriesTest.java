@@ -19,6 +19,8 @@
 package org.apache.pinot.queries;
 
 import java.io.Serializable;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.SelectionResults;
@@ -238,23 +240,28 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testPercentile50() {
-    String query = "SELECT PERCENTILE50(column1), PERCENTILE50(column3) FROM testTable";
+    List<String> queries = Arrays.asList("SELECT PERCENTILE50(column1), PERCENTILE50(column3) FROM testTable",
+        "SELECT PERCENTILE(column1, 50), PERCENTILE(column3, 50) FROM testTable",
+        "SELECT PERCENTILE(column1, '50'), PERCENTILE(column3, '50') FROM testTable",
+        "SELECT PERCENTILE(column1, \"50\"), PERCENTILE(column3, \"50\") FROM testTable");
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"1107310944.00000", "1080136306.00000"});
+    for (String query : queries) {
+      BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
+          new String[]{"1107310944.00000", "1080136306.00000"});
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"1139674505.00000", "505053732.00000"});
+      brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
+      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
+          new String[]{"1139674505.00000", "505053732.00000"});
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"2146791843.00000", "2141451242.00000"});
+      brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY);
+      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
+          new String[]{"2146791843.00000", "2141451242.00000"});
 
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"2142595699.00000", "999309554.00000"});
+      brokerResponse = getBrokerResponseForPqlQueryWithFilter(query + GROUP_BY);
+      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
+          new String[]{"2142595699.00000", "999309554.00000"});
+    }
   }
 
   @Test

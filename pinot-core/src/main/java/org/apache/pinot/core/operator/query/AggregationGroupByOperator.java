@@ -18,26 +18,27 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 
 
 /**
- * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
+ * The <code>AggregationGroupByOperator</code> class provides the operator for aggregation group-by query on a single
+ * segment.
  */
 public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOperator";
 
-  private final AggregationFunctionContext[] _functionContexts;
-  private final GroupBy _groupBy;
+  private final AggregationFunction[] _aggregationFunctions;
+  private final TransformExpressionTree[] _groupByExpressions;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
@@ -46,11 +47,11 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
 
   private int _numDocsScanned = 0;
 
-  public AggregationGroupByOperator(AggregationFunctionContext[] functionContexts, GroupBy groupBy,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, long numTotalDocs,
-      boolean useStarTree) {
-    _functionContexts = functionContexts;
-    _groupBy = groupBy;
+  public AggregationGroupByOperator(AggregationFunction[] aggregationFunctions,
+      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      TransformOperator transformOperator, long numTotalDocs, boolean useStarTree) {
+    _aggregationFunctions = aggregationFunctions;
+    _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
@@ -64,12 +65,12 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
       groupByExecutor =
-          new StarTreeGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity, _numGroupsLimit,
-              _transformOperator);
+          new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
+              _numGroupsLimit, _transformOperator);
     } else {
       groupByExecutor =
-          new DefaultGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity, _numGroupsLimit,
-              _transformOperator);
+          new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
+              _numGroupsLimit, _transformOperator);
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
@@ -78,7 +79,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     }
 
     // Build intermediate result block based on aggregation group-by result from the executor
-    return new IntermediateResultsBlock(_functionContexts, groupByExecutor.getResult());
+    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult());
   }
 
   @Override

@@ -30,12 +30,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -46,7 +41,6 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -54,6 +48,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -62,6 +57,11 @@ import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder.BuildMode;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -69,6 +69,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -118,14 +119,12 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     List<GenericRow> segmentRecords = new ArrayList<>(NUM_SEGMENT_RECORDS);
     for (int i = 0; i < NUM_SEGMENT_RECORDS; i++) {
-      Map<String, Object> fieldMap = new HashMap<>();
-      fieldMap.put(DIMENSION_D1, RANDOM.nextInt(DIMENSION_CARDINALITY));
-      fieldMap.put(DIMENSION_D2, RANDOM.nextInt(DIMENSION_CARDINALITY));
-      if (rawValueType != null) {
-        fieldMap.put(METRIC, getRandomRawValue(RANDOM));
-      }
       GenericRow segmentRecord = new GenericRow();
-      segmentRecord.init(fieldMap);
+      segmentRecord.putValue(DIMENSION_D1, RANDOM.nextInt(DIMENSION_CARDINALITY));
+      segmentRecord.putValue(DIMENSION_D2, RANDOM.nextInt(DIMENSION_CARDINALITY));
+      if (rawValueType != null) {
+        segmentRecord.putValue(METRIC, getRandomRawValue(RANDOM));
+      }
       segmentRecords.add(segmentRecord);
     }
 
@@ -184,11 +183,14 @@ abstract class BaseStarTreeV2Test<R, A> {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
 
     // Aggregations
-    List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
-    int numAggregations = aggregationInfos.size();
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
+    int numAggregations = aggregationFunctions.length;
     List<AggregationFunctionColumnPair> functionColumnPairs = new ArrayList<>(numAggregations);
-    for (AggregationInfo aggregationInfo : aggregationInfos) {
-      functionColumnPairs.add(AggregationFunctionUtils.getFunctionColumnPair(aggregationInfo));
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      AggregationFunctionColumnPair aggregationFunctionColumnPair =
+          AggregationFunctionUtils.getAggregationFunctionColumnPair(aggregationFunction);
+      assertNotNull(aggregationFunctionColumnPair);
+      functionColumnPairs.add(aggregationFunctionColumnPair);
     }
 
     // Group-by columns

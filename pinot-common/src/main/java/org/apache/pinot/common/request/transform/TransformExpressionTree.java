@@ -22,14 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import javax.annotation.Nonnull;
-import org.apache.pinot.spi.utils.EqualityUtils;
+import javax.annotation.Nullable;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
+import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 /**
@@ -37,7 +36,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
  * <ul>
  *   <li>A TransformExpressionTree node has either transform function or a column name, or a literal.</li>
  *   <li>Leaf nodes either have column name or literal, whereas non-leaf nodes have transform function.</li>
- *   <li>Transform function in non-leaf nodes is applied to its children nodes.</li>
+ *   <li>Transform function is applied to its children.</li>
  * </ul>
  */
 public class TransformExpressionTree {
@@ -66,10 +65,9 @@ public class TransformExpressionTree {
     } else if (astNode instanceof FunctionCallAstNode) {
       // UDF expression
       return standardizeExpression(((FunctionCallAstNode) astNode).getExpression());
-    } else if (astNode instanceof StringLiteralAstNode) {
-      // Treat string as column name
-      // NOTE: this is for backward-compatibility
-      return ((StringLiteralAstNode) astNode).getText();
+    } else if (astNode instanceof LiteralAstNode) {
+      // Literal
+      return ((LiteralAstNode) astNode).getValueAsString();
     } else {
       throw new IllegalStateException("Cannot get standard expression from " + astNode.getClass().getSimpleName());
     }
@@ -104,6 +102,13 @@ public class TransformExpressionTree {
       throw new IllegalArgumentException(
           "Illegal AstNode type for TransformExpressionTree: " + root.getClass().getName());
     }
+  }
+
+  public TransformExpressionTree(ExpressionType expressionType, String value,
+      @Nullable List<TransformExpressionTree> children) {
+    _expressionType = expressionType;
+    _value = value;
+    _children = children;
   }
 
   /**
@@ -168,7 +173,7 @@ public class TransformExpressionTree {
    *
    * @param columns Output columns
    */
-  public void getColumns(@Nonnull Set<String> columns) {
+  public void getColumns(Set<String> columns) {
     if (_expressionType == ExpressionType.IDENTIFIER) {
       columns.add(_value);
     } else if (_children != null) {
