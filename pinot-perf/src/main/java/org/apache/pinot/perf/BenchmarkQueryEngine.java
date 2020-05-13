@@ -104,7 +104,7 @@ public class BenchmarkQueryEngine {
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
       _perfBenchmarkDriver.configureTable(TABLE_NAME);
       System.out.println("Adding segment " + segmentDir.getAbsolutePath());
-      _perfBenchmarkDriver.addSegment(TABLE_NAME, segmentMetadata);
+      _perfBenchmarkDriver.addSegment(TABLE_NAME, segmentDir, segmentMetadata);
     }
 
     ZkClient client = new ZkClient("localhost:2191", 10000, 10000, new ZNRecordSerializer());
