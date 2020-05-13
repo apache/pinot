@@ -166,7 +166,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
         driver.configureTable(tableName, invertedIndexColumns, bloomFilterColumns);
         tableConfigured = true;
       }
-      driver.addSegment(tableName, segmentMetadata);
+      driver.addSegment(tableName, segment, segmentMetadata);
     }
   }
 

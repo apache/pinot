@@ -28,6 +28,7 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
@@ -45,9 +46,12 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
+import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
@@ -322,10 +326,15 @@ public class PerfBenchmarkDriver {
    *
    * @param segmentMetadata segment metadata.
    */
-  public void addSegment(String tableName, SegmentMetadata segmentMetadata) {
+  public void addSegment(String tableName, File segmentFile, SegmentMetadata segmentMetadata) throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    _helixResourceManager
-        .addNewSegment(rawTableName, segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+    URI finalSegmentLocationURI = URIUtils
+        .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
+            URIUtils.encode(segmentMetadata.getName()));
+    String zkDownloadURI = "http://" + _controllerAddress + "/segments/" + rawTableName + "/" + segmentMetadata.getName();
+    ZKOperator zkOperator = new ZKOperator(_helixResourceManager, getControllerConf(), null);
+    zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, segmentFile,
+        false, null, zkDownloadURI, true);
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
