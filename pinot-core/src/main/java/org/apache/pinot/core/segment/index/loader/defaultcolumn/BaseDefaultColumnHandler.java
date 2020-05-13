@@ -62,19 +62,23 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Present in schema but not in segment.
     ADD_DIMENSION,
     ADD_METRIC,
+    ADD_DATE_TIME,
     // Present in segment but not in schema
     REMOVE_DIMENSION,
     REMOVE_METRIC,
+    REMOVE_DATE_TIME,
     // Present in both segment and schema but one of the following updates is needed
     UPDATE_DIMENSION_DATA_TYPE,
     UPDATE_DIMENSION_DEFAULT_VALUE,
     UPDATE_DIMENSION_NUMBER_OF_VALUES,
     UPDATE_METRIC_DATA_TYPE,
     UPDATE_METRIC_DEFAULT_VALUE,
-    UPDATE_METRIC_NUMBER_OF_VALUES;
+    UPDATE_METRIC_NUMBER_OF_VALUES,
+    UPDATE_DATE_TIME_DATA_TYPE,
+    UPDATE_DATE_TIME_DEFAULT_VALUE;
 
     boolean isAddAction() {
-      return this == ADD_DIMENSION || this == ADD_METRIC;
+      return this == ADD_DIMENSION || this == ADD_METRIC || this == ADD_DATE_TIME;
     }
 
     boolean isUpdateAction() {
@@ -82,7 +86,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
 
     boolean isRemoveAction() {
-      return this == REMOVE_DIMENSION || this == REMOVE_METRIC;
+      return this == REMOVE_DIMENSION || this == REMOVE_METRIC || this == REMOVE_DATE_TIME;
     }
   }
 
@@ -125,6 +129,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.DIMENSIONS, _segmentProperties);
     List<String> metricColumns =
         LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.METRICS, _segmentProperties);
+    List<String> dateTimeColumns =
+        LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, _segmentProperties);
     for (Map.Entry<String, DefaultColumnAction> entry : defaultColumnActionMap.entrySet()) {
       String column = entry.getKey();
       DefaultColumnAction action = entry.getValue();
@@ -135,18 +141,24 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         case ADD_METRIC:
           metricColumns.add(column);
           break;
+        case ADD_DATE_TIME:
+          dateTimeColumns.add(column);
+          break;
         case REMOVE_DIMENSION:
           dimensionColumns.remove(column);
           break;
         case REMOVE_METRIC:
           metricColumns.remove(column);
           break;
+        case REMOVE_DATE_TIME:
+          dateTimeColumns.remove(column);
         default:
           break;
       }
     }
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DIMENSIONS, dimensionColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.METRICS, metricColumns);
+    _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, dateTimeColumns);
 
     // Create a back up for origin metadata.
     File metadataFile = _segmentProperties.getFile();
@@ -215,14 +227,19 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           } else if (isSingleValueInMetadata != isSingleValueInSchema) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DIMENSION_NUMBER_OF_VALUES);
           }
-        } else {
-          Preconditions.checkState(fieldTypeInMetadata == FieldSpec.FieldType.METRIC);
+        } else if (fieldTypeInMetadata == FieldSpec.FieldType.METRIC){
           if (dataTypeInMetadata != dataTypeInSchema) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_DATA_TYPE);
           } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_DEFAULT_VALUE);
           } else if (isSingleValueInMetadata != isSingleValueInSchema) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_NUMBER_OF_VALUES);
+          }
+        } else if (fieldTypeInMetadata == FieldSpec.FieldType.DATE_TIME){
+          if (dataTypeInMetadata != dataTypeInSchema) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DATE_TIME_DATA_TYPE);
+          } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DATE_TIME_DEFAULT_VALUE);
           }
         }
       } else {
@@ -235,6 +252,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           case METRIC:
             defaultColumnActionMap.put(column, DefaultColumnAction.ADD_METRIC);
             break;
+          case DATE_TIME:
+            defaultColumnActionMap.put(column, DefaultColumnAction.ADD_DATE_TIME);
           default:
             LOGGER.warn("Skip adding default column for column: {} with field type: {}", column, fieldTypeInSchema);
             break;
@@ -253,9 +272,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           FieldSpec.FieldType fieldTypeInMetadata = columnMetadata.getFieldType();
           if (fieldTypeInMetadata == FieldSpec.FieldType.DIMENSION) {
             defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DIMENSION);
-          } else {
-            Preconditions.checkState(fieldTypeInMetadata == FieldSpec.FieldType.METRIC);
+          } else if (fieldTypeInMetadata == FieldSpec.FieldType.METRIC){
             defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_METRIC);
+          } else if (fieldTypeInMetadata == FieldSpec.FieldType.DATE_TIME) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DATE_TIME);
           }
         }
       }
