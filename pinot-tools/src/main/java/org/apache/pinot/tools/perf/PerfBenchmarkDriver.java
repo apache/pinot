@@ -45,6 +45,7 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -180,13 +181,12 @@ public class PerfBenchmarkDriver {
 
   private void startZookeeper()
       throws Exception {
-    int zkPort = _conf.getZkPort();
     if (!_conf.isStartZookeeper()) {
       LOGGER.info("Skipping start zookeeper step. Assumes zookeeper is already started.");
       return;
     }
-    ZookeeperLauncher launcher = new ZookeeperLauncher(_tempDir);
-    launcher.start(zkPort);
+    int zkPort = _conf.getZkPort();
+    ZkStarter.startLocalZkServer(zkPort);
   }
 
   private void startController() {
