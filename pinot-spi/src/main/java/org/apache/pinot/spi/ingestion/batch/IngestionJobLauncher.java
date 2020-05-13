@@ -19,14 +19,20 @@
 package org.apache.pinot.spi.ingestion.batch;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
-import java.io.Reader;
+import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.Properties;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
 import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -36,28 +42,39 @@ public class IngestionJobLauncher {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(IngestionJobLauncher.class);
 
-  private static final String USAGE = "usage: [jobSpec.yaml]";
-
-  private static void usage() {
-    System.err.println(USAGE);
+  public static SegmentGenerationJobSpec getSegmentGenerationJobSpec(String jobSpecFilePath, String propertyFilePath,
+      Map<String, Object> context) {
+    Properties properties = new Properties();
+    if (propertyFilePath != null) {
+      try {
+        properties.load(FileUtils.openInputStream(new File(propertyFilePath)));
+      } catch (IOException e) {
+        throw new RuntimeException(
+            String.format("Unable to read property file [%s] into properties.", propertyFilePath), e);
+      }
+    }
+    Map<String, Object> propertiesMap = (Map) properties;
+    if (context != null) {
+      propertiesMap.putAll(context);
+    }
+    String yamlTemplate;
+    try {
+      yamlTemplate = IOUtils.toString(new BufferedReader(new FileReader(jobSpecFilePath)));
+    } catch (IOException e) {
+      throw new RuntimeException(String.format("Unable to read ingestion job spec file [%s].", jobSpecFilePath), e);
+    }
+    String yamlStr;
+    try {
+      yamlStr = GroovyTemplateUtils.renderTemplate(yamlTemplate, propertiesMap);
+    } catch (Exception e) {
+      throw new RuntimeException(String
+          .format("Unable to render templates on ingestion job spec template file - [%s] with propertiesMap - [%s].",
+              jobSpecFilePath, Arrays.toString(propertiesMap.entrySet().toArray())), e);
+    }
+    return new Yaml().loadAs(yamlStr, SegmentGenerationJobSpec.class);
   }
 
-  public static void main(String[] args)
-      throws Exception {
-    if (args.length != 1) {
-      usage();
-      System.exit(1);
-    }
-    String jobSpecFilePath = args[0];
-
-    try (Reader reader = new BufferedReader(new FileReader(jobSpecFilePath))) {
-      SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
-      runIngestionJob(spec);
-    }
-  }
-
-  public static void runIngestionJob(SegmentGenerationJobSpec spec)
-      throws Exception {
+  public static void runIngestionJob(SegmentGenerationJobSpec spec) {
     StringWriter sw = new StringWriter();
     new Yaml().dump(spec, sw);
     LOGGER.info("SegmentGenerationJobSpec: \n{}", sw.toString());
@@ -88,12 +105,21 @@ public class IngestionJobLauncher {
     }
   }
 
-  private static void kickoffIngestionJob(SegmentGenerationJobSpec spec, String ingestionJobRunnerClassName)
-      throws Exception {
+  private static void kickoffIngestionJob(SegmentGenerationJobSpec spec, String ingestionJobRunnerClassName) {
     LOGGER.info("Trying to create instance for class {}", ingestionJobRunnerClassName);
-    IngestionJobRunner ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
+    IngestionJobRunner ingestionJobRunner;
+    try {
+      ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to create IngestionJobRunner instance for class - " + ingestionJobRunnerClassName, e);
+    }
     ingestionJobRunner.init(spec);
-    ingestionJobRunner.run();
+    try {
+      ingestionJobRunner.run();
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception during running - " + ingestionJobRunnerClassName, e);
+    }
   }
 
   enum PinotIngestionJobType {
