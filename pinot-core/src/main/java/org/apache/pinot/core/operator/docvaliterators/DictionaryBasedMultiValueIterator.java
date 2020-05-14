@@ -19,52 +19,76 @@
 package org.apache.pinot.core.operator.docvaliterators;
 
 import org.apache.pinot.core.common.BlockMultiValIterator;
+import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
+import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 @SuppressWarnings("unchecked")
-public final class MultiValueIterator extends BlockMultiValIterator {
+public final class DictionaryBasedMultiValueIterator extends BlockMultiValIterator {
+
   private final SingleColumnMultiValueReader _reader;
   private final int _numDocs;
   private final ReaderContext _context;
+  private final Dictionary _dictionary;
+  private final int[] _dictIds;
 
   private int _nextDocId;
 
-  public MultiValueIterator(SingleColumnMultiValueReader reader, int numDocs) {
+  public DictionaryBasedMultiValueIterator(SingleColumnMultiValueReader reader, Dictionary dictionary, int numDocs,
+      int maxLength) {
     _reader = reader;
     _numDocs = numDocs;
     _context = _reader.createContext();
+    _dictionary = dictionary;
+    _dictIds = new int[maxLength];
   }
 
   @Override
   public int nextIntVal(int[] intArray) {
-    return _reader.getIntArray(_nextDocId++, intArray, _context);
-  }
-
-  @Override
-  public int nextCharVal(char[] charArray) {
-    return _reader.getCharArray(_nextDocId++, charArray);
+    int length = _reader.getIntArray(_nextDocId++, _dictIds, _context);
+    for (int i = 0; i < length; i++) {
+      intArray[i] = _dictionary.getIntValue(_dictIds[i]);
+    }
+    return length;
   }
 
   @Override
   public int nextDoubleVal(double[] doubleArray) {
-    return _reader.getDoubleArray(_nextDocId++, doubleArray);
+    int length = _reader.getIntArray(_nextDocId++, _dictIds, _context);
+    for (int i = 0; i < length; i++) {
+      doubleArray[i] = _dictionary.getDoubleValue(_dictIds[i]);
+    }
+    return length;
   }
 
   @Override
   public int nextFloatVal(float[] floatArray) {
-    return _reader.getFloatArray(_nextDocId++, floatArray);
+    int length = _reader.getIntArray(_nextDocId++, _dictIds, _context);
+    for (int i = 0; i < length; i++) {
+      floatArray[i] = _dictionary.getFloatValue(_dictIds[i]);
+    }
+    return length;
   }
 
   @Override
   public int nextLongVal(long[] longArray) {
-    return _reader.getLongArray(_nextDocId++, longArray);
+    int length = _reader.getIntArray(_nextDocId++, _dictIds, _context);
+    for (int i = 0; i < length; i++) {
+      longArray[i] = _dictionary.getLongValue(_dictIds[i]);
+    }
+    return length;
   }
 
   @Override
   public int nextBytesArrayVal(byte[][] bytesArrays) {
-     return _reader.getBytesArray(_nextDocId++, bytesArrays);
+    int length = _reader.getIntArray(_nextDocId++, _dictIds, _context);
+    for (int i = 0; i < length; i++) {
+      bytesArrays[i] = _dictionary.getBytesValue(_dictIds[i]);
+    }
+    return length;
   }
 
   @Override

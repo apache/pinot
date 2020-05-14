@@ -123,6 +123,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       case INVERTED_INDEX:
         filename = metadata.getBitmapInvertedIndexFileName(column);
         break;
+      case RANGE_INDEX:
+        filename = metadata.getBitmapRangeIndexFileName(column);
+        break;
       case BLOOM_FILTER:
         filename = metadata.getBloomFilterFileName(column);
         break;

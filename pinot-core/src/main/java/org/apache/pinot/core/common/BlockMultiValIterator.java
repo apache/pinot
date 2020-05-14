@@ -24,7 +24,7 @@ package org.apache.pinot.core.common;
  */
 public abstract class BlockMultiValIterator implements BlockValIterator {
 
-  public int nextCharVal(int[] charArray) {
+  public int nextCharVal(char[] charArray) {
     throw new UnsupportedOperationException();
   }
 
@@ -44,7 +44,7 @@ public abstract class BlockMultiValIterator implements BlockValIterator {
     throw new UnsupportedOperationException();
   }
 
-  public byte[][] nextBytesArrayVal(byte[][] bytesArrays) {
+  public int nextBytesArrayVal(byte[][] bytesArrays) {
     throw new UnsupportedOperationException();
   }
 }

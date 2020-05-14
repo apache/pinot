@@ -39,17 +39,20 @@ public abstract class BaseDataSource extends DataSource {
   private final DataFileReader _forwardIndex;
   private final Dictionary _dictionary;
   private final InvertedIndexReader _invertedIndex;
+  private final InvertedIndexReader _rangeIndex;
   private final BloomFilterReader _bloomFilter;
   private final NullValueVectorReader _nullValueVector;
   private final String _operatorName;
 
   public BaseDataSource(DataSourceMetadata dataSourceMetadata, DataFileReader forwardIndex,
       @Nullable Dictionary dictionary, @Nullable InvertedIndexReader invertedIndex,
-      @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector, String operatorName) {
+      @Nullable InvertedIndexReader rangeIndex, @Nullable BloomFilterReader bloomFilter,
+      @Nullable NullValueVectorReader nullValueVector, String operatorName) {
     _dataSourceMetadata = dataSourceMetadata;
     _forwardIndex = forwardIndex;
     _dictionary = dictionary;
     _invertedIndex = invertedIndex;
+    _rangeIndex = rangeIndex;
     _bloomFilter = bloomFilter;
     _nullValueVector = nullValueVector;
     _operatorName = operatorName;
@@ -75,6 +78,12 @@ public abstract class BaseDataSource extends DataSource {
   @Override
   public InvertedIndexReader getInvertedIndex() {
     return _invertedIndex;
+  }
+
+  @Nullable
+  @Override
+  public InvertedIndexReader getRangeIndex() {
+    return _rangeIndex;
   }
 
   @Nullable

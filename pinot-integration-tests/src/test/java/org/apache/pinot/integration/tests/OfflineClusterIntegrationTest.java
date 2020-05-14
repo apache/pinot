@@ -72,6 +72,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
 
+  // For inverted index triggering test
+  private static final List<String> UPDATED_RANGE_INDEX_COLUMNS = Arrays.asList("DivActualElapsedTime");
+  private static final String TEST_UPDATED_RANGE_INDEX_QUERY =
+      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime > 305";
+
   private static final List<String> UPDATED_BLOOM_FILTER_COLUMNS = Collections.singletonList("Carrier");
   private static final String TEST_UPDATED_BLOOM_FILTER_QUERY = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'CA'";
 
@@ -127,7 +132,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Create the table
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
-        getBloomFilterIndexColumns(), getTaskConfig(), null, null);
+        getBloomFilterIndexColumns(), getRangeIndexColumns(), getTaskConfig(), null, null);
 
     // Upload all segments
     uploadSegments(getTableName(), _tarDir);
@@ -282,7 +287,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
-        UPDATED_INVERTED_INDEX_COLUMNS, null, getTaskConfig(), null, null);
+        UPDATED_INVERTED_INDEX_COLUMNS, null, null, getTaskConfig(), null, null);
 
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
@@ -307,7 +312,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, null,
-        UPDATED_BLOOM_FILTER_COLUMNS, getTaskConfig(), null, null);
+        UPDATED_BLOOM_FILTER_COLUMNS, null, getTaskConfig(), null, null);
 
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
@@ -317,6 +322,36 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         // Total docs should not change during reload
         assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
         return queryResponse1.get("numSegmentsProcessed").asLong() == 0L;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to generate bloom index");
+  }
+
+  @Test
+  public void testRangeIndexTriggering()
+      throws Exception {
+    final long numTotalDocs = getCountStarResult();
+    JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
+    System.out.println("Before queryResponse = " + queryResponse);
+    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    long beforeCount = queryResponse.get("aggregationResults").get(0).get("value").asLong();
+
+    // Update table config and trigger reload
+    updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, null, null,
+        UPDATED_RANGE_INDEX_COLUMNS, getTaskConfig(), null, null);
+
+    sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse1 = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
+        System.out.println("After queryResponse = " + queryResponse);
+        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
+        long afterCount = queryResponse.get("aggregationResults").get(0).get("value").asLong();
+        //we should be scanning less than numTotalDocs with index enabled.
+        //In the current implementation its 8785, but it
+        return beforeCount == afterCount  && queryResponse1.get("numEntriesScannedInFilter").asLong() < numTotalDocs;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

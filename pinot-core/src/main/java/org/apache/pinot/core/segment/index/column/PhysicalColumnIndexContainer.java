@@ -33,6 +33,7 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.BytesDictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
@@ -61,6 +62,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
+  private final InvertedIndexReader _rangeIndex;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
@@ -70,11 +72,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       throws IOException {
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = false;
+    boolean loadRangeIndex = false;
     boolean loadTextIndex = false;
     boolean loadOnHeapDictionary = false;
     boolean loadBloomFilter = false;
     if (indexLoadingConfig != null) {
       loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
+      loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
       loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
       loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
@@ -108,6 +112,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
               new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
+          _rangeIndex = null;
           return;
         } else {
           // Unsorted
@@ -124,14 +129,21 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         _invertedIndex =
             new BitmapInvertedIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.INVERTED_INDEX),
                 metadata.getCardinality());
+        _rangeIndex = null;
+      } else if (loadRangeIndex) {
+        _invertedIndex = null;
+        _rangeIndex =
+            new RangeIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX));
       } else {
         _invertedIndex = null;
+        _rangeIndex = null;
       }
     } else {
       // Raw index
       _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
       _dictionary = null;
       _bloomFilterReader = null;
+      _rangeIndex = null;
       if (loadTextIndex) {
         Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
         _invertedIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs(),
@@ -153,6 +165,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
+  public InvertedIndexReader getRangeIndex() {
+    return _rangeIndex;
+  }
+
+  @Override
   public BaseImmutableDictionary getDictionary() {
     return _dictionary;
   }
@@ -167,7 +184,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     return _nullValueVectorReader;
   }
 
-  private static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
+  //TODO: move this to a DictionaryLoader class
+  public static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
       boolean loadOnHeap) {
     FieldSpec.DataType dataType = metadata.getDataType();
     if (loadOnHeap) {

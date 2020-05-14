@@ -71,6 +71,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final List<String> DEFAULT_RAW_INDEX_COLUMNS =
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
   private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Arrays.asList("FlightNum", "Origin");
+  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = Arrays.asList("", "Origin");
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected final File _avroDir = new File(_tempDir, "avroDir");
@@ -169,6 +170,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   @Nullable
   protected List<String> getBloomFilterIndexColumns() {
     return DEFAULT_BLOOM_FILTER_COLUMNS;
+  }
+
+  @Nullable
+  protected List<String> getRangeIndexColumns() {
+    return DEFAULT_RANGE_INDEX_COLUMNS;
   }
 
   @Nullable
@@ -420,7 +426,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     addRealtimeTable(tableName, useLLC, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
         getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(), getInvertedIndexColumns(),
-        getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(),
+        getBloomFilterIndexColumns(), getRangeIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(),
         numReplicas);
   }
 

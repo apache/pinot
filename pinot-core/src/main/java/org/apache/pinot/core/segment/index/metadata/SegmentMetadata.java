@@ -96,6 +96,8 @@ public interface SegmentMetadata {
 
   String getBitmapInvertedIndexFileName(String column);
 
+  String getBitmapRangeIndexFileName(String column);
+
   String getBloomFilterFileName(String column);
 
   String getNullValueVectorFileName(String column);

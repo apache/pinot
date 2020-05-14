@@ -55,6 +55,12 @@ public abstract class DataSource extends BaseOperator {
   public abstract InvertedIndexReader getInvertedIndex();
 
   /**
+   * Returns the inverted index for the column if exists, or {@code null} if not.
+   */
+  @Nullable
+  public abstract InvertedIndexReader getRangeIndex();
+
+  /**
    * Returns the bloom filter for the column if exists, or {@code null} if not.
    */
   @Nullable

@@ -452,6 +452,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
+  public String getBitmapRangeIndexFileName(String column) {
+    return column + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
+  }
+
+  @Override
   public String getBloomFilterFileName(String column) {
     return column + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
   }

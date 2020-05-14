@@ -80,4 +80,12 @@ public class RangePredicateFilter implements PredicateFilter {
     }
     return false;
   }
+
+  public int getStartIndex() {
+    return _startIndex;
+  }
+
+  public int getEndIndex() {
+    return _endIndex;
+  }
 }

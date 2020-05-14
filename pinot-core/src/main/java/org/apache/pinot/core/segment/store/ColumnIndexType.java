@@ -24,7 +24,8 @@ public enum ColumnIndexType {
   INVERTED_INDEX("inverted_index"),
   BLOOM_FILTER("bloom_filter"),
   NULLVALUE_VECTOR("nullvalue_vector"),
-  TEXT_INDEX("text_index");
+  TEXT_INDEX("text_index"),
+  RANGE_INDEX("range_index");
 
   private final String indexName;
 

@@ -22,6 +22,8 @@ import org.apache.pinot.core.common.Predicate;
 
 
 public interface PredicateEvaluator {
+
+
   /**
    * APIs for both dictionary based and raw value based predicate evaluator
    */
@@ -180,4 +182,5 @@ public interface PredicateEvaluator {
    * @return Whether the entry matches the predicate
    */
   boolean applyMV(byte[][] values, int length);
+
 }
