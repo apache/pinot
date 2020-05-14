@@ -73,7 +73,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
 
   // For inverted index triggering test
-  private static final List<String> UPDATED_RANGE_INDEX_COLUMNS = Arrays.asList("DivActualElapsedTime");
+  private static final List<String> UPDATED_RANGE_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
   private static final String TEST_UPDATED_RANGE_INDEX_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime > 305";
 
@@ -351,7 +351,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         long afterCount = queryResponse.get("aggregationResults").get(0).get("value").asLong();
         //we should be scanning less than numTotalDocs with index enabled.
         //In the current implementation its 8785, but it
-        return beforeCount == afterCount  && queryResponse1.get("numEntriesScannedInFilter").asLong() < numTotalDocs;
+        return beforeCount == afterCount && queryResponse1.get("numEntriesScannedInFilter").asLong() < numTotalDocs;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
