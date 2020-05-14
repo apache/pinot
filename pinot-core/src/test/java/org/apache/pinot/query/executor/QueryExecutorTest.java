@@ -36,6 +36,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.callback.impl.DefaultDataManagerCallbackImpl;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -103,7 +104,7 @@ public class QueryExecutorTest {
             mock(ServerMetrics.class));
     tableDataManager.start();
     for (ImmutableSegment indexSegment : _indexSegments) {
-      tableDataManager.addSegment(indexSegment);
+      tableDataManager.addSegment(indexSegment, DefaultDataManagerCallbackImpl.INSTANCE);
     }
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     when(instanceDataManager.getTableDataManager(TABLE_NAME)).thenReturn(tableDataManager);

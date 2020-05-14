@@ -28,10 +28,22 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class VirtualColumnContext {
   private FieldSpec _fieldSpec;
   private int _totalDocCount;
+  private boolean _isMutableSegment;
 
   public VirtualColumnContext(FieldSpec fieldSpec, int totalDocCount) {
+    this(fieldSpec, totalDocCount, false);
+  }
+
+  /**
+   * create context for a virtual column
+   * @param fieldSpec spec for the current virtual column
+   * @param totalDocCount total doc count for the current segment, maybe estimation for mutable segment
+   * @param isMutableSegment indicate whether the current segment is a mutable segment or not
+   */
+  public VirtualColumnContext(FieldSpec fieldSpec, int totalDocCount, boolean isMutableSegment) {
     _fieldSpec = fieldSpec;
     _totalDocCount = totalDocCount;
+    _isMutableSegment = isMutableSegment;
   }
 
   public FieldSpec getFieldSpec() {
@@ -40,5 +52,9 @@ public class VirtualColumnContext {
 
   public int getTotalDocCount() {
     return _totalDocCount;
+  }
+
+  public boolean isMutableSegment() {
+    return _isMutableSegment;
   }
 }

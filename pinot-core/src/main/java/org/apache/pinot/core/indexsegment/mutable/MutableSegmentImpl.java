@@ -36,6 +36,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.data.manager.callback.IndexSegmentCallback;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
@@ -54,6 +55,7 @@ import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefr
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.core.realtime.impl.nullvalue.RealtimeNullValueVectorReaderWriter;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
@@ -142,7 +144,10 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
-  public MutableSegmentImpl(RealtimeSegmentConfig config) {
+  // upsert/append related components
+  private final IndexSegmentCallback _indexSegmentCallback;
+
+  public MutableSegmentImpl(RealtimeSegmentConfig config, IndexSegmentCallback indexSegmentCallback) {
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
     _timeColumnName = config.getTimeColumnName();
@@ -172,12 +177,14 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionId = config.getPartitionId();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
     _aggregateMetrics = config.aggregateMetrics();
+    _indexSegmentCallback = indexSegmentCallback;
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
     List<DimensionFieldSpec> physicalDimensionFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
     List<MetricFieldSpec> physicalMetricFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
     List<String> physicalTimeColumnNames = new ArrayList<>();
+    List<FieldSpec> virtualFieldSpecs = new ArrayList<>(allFieldSpecs.size());
 
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -191,6 +198,8 @@ public class MutableSegmentImpl implements MutableSegment {
         } else if (fieldType == FieldSpec.FieldType.DATE_TIME || fieldType == FieldSpec.FieldType.TIME) {
           physicalTimeColumnNames.add(fieldSpec.getName());
         }
+      } else {
+        virtualFieldSpecs.add(fieldSpec);
       }
     }
     _physicalFieldSpecs = Collections.unmodifiableCollection(physicalFieldSpecs);
@@ -310,6 +319,20 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
 
+    // create virtual columns and send to
+    Map<String, ColumnIndexContainer> virtualColumnIndexContainer = new HashMap<>();
+    for (FieldSpec fieldSpec : virtualFieldSpecs) {
+      String column = fieldSpec.getName();
+      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _capacity, true);
+      final VirtualColumnProvider provider =
+              VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
+      if (provider == null) {
+        throw new RuntimeException(String.format("failed to create virtual segment provider for field %s", fieldSpec.getName()));
+      }
+      virtualColumnIndexContainer.put(column, provider.buildColumnIndexContainer(virtualColumnContext));
+    }
+    _indexSegmentCallback.init(_segmentMetadata, virtualColumnIndexContainer);
+
     if (_realtimeLuceneReaders != null) {
       // add the realtime lucene index readers to the global queue for refresh task to pick up
       RealtimeLuceneIndexRefreshState realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
@@ -410,6 +433,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Update number of document indexed at last to make the latest record queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
+      _indexSegmentCallback.postProcessRecords(row, docId);
     } else {
       Preconditions
           .checkState(_aggregateMetrics, "Invalid document-id during indexing: " + docId + " expected: " + numDocs);
@@ -630,7 +654,7 @@ public class MutableSegmentImpl implements MutableSegment {
         Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + column + " should not be null");
       }
       // TODO: Refactor virtual column provider to directly generate data source
-      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
+      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed, true);
       VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
       return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
           virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));

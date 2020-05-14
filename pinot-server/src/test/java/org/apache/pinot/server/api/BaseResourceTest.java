@@ -35,6 +35,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.callback.impl.DefaultDataManagerCallbackImpl;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -132,7 +133,7 @@ public abstract class BaseResourceTest {
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap);
     segments.add(immutableSegment);
-    _tableDataManagerMap.get(tableNameWithType).addSegment(immutableSegment);
+    _tableDataManagerMap.get(tableNameWithType).addSegment(immutableSegment, DefaultDataManagerCallbackImpl.INSTANCE);
     return immutableSegment;
   }
 

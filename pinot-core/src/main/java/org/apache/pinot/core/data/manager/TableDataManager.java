@@ -26,6 +26,8 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.data.manager.callback.DataManagerCallback;
+import org.apache.pinot.core.data.manager.callback.TableDataManagerCallback;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -58,7 +60,7 @@ public interface TableDataManager {
   /**
    * Adds a loaded immutable segment into the table.
    */
-  void addSegment(ImmutableSegment immutableSegment);
+  void addSegment(ImmutableSegment immutableSegment, DataManagerCallback dataManagerCallback);
 
   /**
    * Adds a segment from local disk into the OFFLINE table.
@@ -122,4 +124,10 @@ public interface TableDataManager {
    * @return
    */
   File getTableDataDir();
+
+  /**
+   * get the callback object for this table, either no-op object for the regular table or upsert callback for
+   * upsert-enabled table
+   */
+  TableDataManagerCallback getTableDataManagerCallback();
 }

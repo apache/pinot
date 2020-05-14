@@ -20,6 +20,9 @@ package org.apache.pinot.core.data.manager.offline;
 
 import java.io.File;
 import javax.annotation.concurrent.ThreadSafe;
+
+import org.apache.pinot.core.data.manager.callback.DataManagerCallback;
+import org.apache.pinot.core.data.manager.callback.TableDataManagerCallback;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
@@ -32,6 +35,12 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
  */
 @ThreadSafe
 public class OfflineTableDataManager extends BaseTableDataManager {
+
+  private TableDataManagerCallback _tableDataManagerCallback;
+
+  public OfflineTableDataManager(TableDataManagerCallback tableDataManagerCallback) {
+    _tableDataManagerCallback = tableDataManagerCallback;
+  }
 
   @Override
   protected void doInit() {
@@ -49,6 +58,13 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+    DataManagerCallback callback = _tableDataManagerCallback.getDefaultDataManagerCallback();
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
+        callback, schema), callback);
+  }
+
+  @Override
+  public TableDataManagerCallback getTableDataManagerCallback() {
+    return _tableDataManagerCallback;
   }
 }

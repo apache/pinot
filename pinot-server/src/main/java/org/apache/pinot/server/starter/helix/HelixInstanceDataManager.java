@@ -42,6 +42,7 @@ import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.callback.DataManagerCallback;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -242,12 +243,17 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       // Copy from segment backup directory back to index directory
       FileUtils.copyDirectory(segmentBackupDir, indexDir);
 
+      final DataManagerCallback dataManagerCallback = tableDataManager.getTableDataManagerCallback()
+          .getImmutableDataManagerCallback(tableNameWithType, segmentName, schema, tableConfig, _serverMetrics);
+
       // Load from index directory
-      ImmutableSegment immutableSegment = ImmutableSegmentLoader
-          .load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
+      ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir,
+          new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
+          dataManagerCallback,
+          schema);
 
       // Replace the old segment in memory
-      tableDataManager.addSegment(immutableSegment);
+      tableDataManager.addSegment(immutableSegment, dataManagerCallback);
 
       // Rename segment backup directory to segment temporary directory (atomic)
       // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we

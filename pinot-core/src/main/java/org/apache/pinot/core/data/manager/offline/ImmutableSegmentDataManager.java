@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.callback.DataManagerCallback;
+import org.apache.pinot.core.data.manager.callback.impl.DefaultDataManagerCallbackImpl;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+
+import java.io.IOException;
 
 
 /**
@@ -28,9 +33,20 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 public class ImmutableSegmentDataManager extends SegmentDataManager {
 
   private final ImmutableSegment _immutableSegment;
+  private final DataManagerCallback _dataManagerCallback;
 
   public ImmutableSegmentDataManager(ImmutableSegment immutableSegment) {
+    this(immutableSegment, DefaultDataManagerCallbackImpl.INSTANCE);
+  }
+
+  public ImmutableSegmentDataManager(ImmutableSegment immutableSegment, DataManagerCallback dataManagerCallback) {
     _immutableSegment = immutableSegment;
+    _dataManagerCallback = dataManagerCallback;
+    try {
+      _dataManagerCallback.init();
+    } catch (IOException ex) {
+      ExceptionUtils.rethrow(ex);
+    }
   }
 
   @Override
@@ -45,6 +61,7 @@ public class ImmutableSegmentDataManager extends SegmentDataManager {
 
   @Override
   public void destroy() {
+    _dataManagerCallback.destroy();
     _immutableSegment.destroy();
   }
 

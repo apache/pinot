@@ -39,6 +39,7 @@ import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.server.upsert.SegmentDeletionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,12 +54,19 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   private final String _instanceId;
   private final InstanceDataManager _instanceDataManager;
   private final SegmentFetcherAndLoader _fetcherAndLoader;
+  private final SegmentDeletionHandler _segmentDeletionHandler;
 
   public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
       SegmentFetcherAndLoader fetcherAndLoader) {
+    this(instanceId, instanceDataManager, fetcherAndLoader, new SegmentDeletionHandler());
+  }
+
+  public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
+      SegmentFetcherAndLoader fetcherAndLoader, SegmentDeletionHandler segmentDeletionHandler) {
     _instanceId = instanceId;
     _instanceDataManager = instanceDataManager;
     _fetcherAndLoader = fetcherAndLoader;
+    _segmentDeletionHandler = segmentDeletionHandler;
   }
 
   public static String getStateModelName() {
@@ -203,6 +211,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           FileUtils.deleteQuietly(segmentDir);
           _logger.info("Deleted segment directory {}", segmentDir);
         }
+        _segmentDeletionHandler.deleteSegmentFromLocalStorage(tableNameWithType, segmentName);
       } catch (final Exception e) {
         _logger.error("Cannot delete the segment : " + segmentName + " from local directory!\n" + e.getMessage(), e);
         Utils.rethrowException(e);

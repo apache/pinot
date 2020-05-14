@@ -48,6 +48,7 @@ import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Completion
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.core.data.manager.callback.DataManagerCallback;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -276,6 +277,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
 
+  // upsert/append related components
+  private final DataManagerCallback _dataManagerCallback;
+
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
     Preconditions.checkState(_state.shouldConsume(), "Incorrect state %s", _state);
@@ -420,6 +424,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
     }
+    _dataManagerCallback.postConsumeLoop();
     return true;
   }
 
@@ -476,6 +481,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                     .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
                 indexedMessageCount++;
                 canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
+                _dataManagerCallback.postIndexProcessing(transformedRow, _currentOffset);
               } else {
                 realtimeRowsDroppedMeter = _serverMetrics
                     .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
@@ -824,7 +830,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       return false;
     }
 
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _tableConfig, _indexLoadingConfig);
     removeSegmentFile();
     return true;
   }
@@ -869,7 +875,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       return false;
     }
 
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _tableConfig, _indexLoadingConfig);
     return true;
   }
 
@@ -1019,7 +1025,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
     closeKafkaConsumers();
-    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
+    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _tableConfig, _indexLoadingConfig);
   }
 
   protected long now() {
@@ -1050,6 +1056,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   public void destroy() {
+    _dataManagerCallback.destroy();
     try {
       stop();
     } catch (InterruptedException e) {
@@ -1087,7 +1094,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
-      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionConsumerSemaphore, ServerMetrics serverMetrics) {
+      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionConsumerSemaphore, ServerMetrics serverMetrics,
+      DataManagerCallback dataManagerCallback) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1097,6 +1105,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _serverMetrics = serverMetrics;
+    _dataManagerCallback = dataManagerCallback;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
@@ -1236,7 +1245,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
 
-    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
+    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(),
+      _dataManagerCallback.getIndexSegmentCallback());
     _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
     _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
     _resourceTmpDir = new File(resourceDataDir, "_tmp");

@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.manager.callback.impl.DefaultDataManagerCallbackImpl;
+import org.apache.pinot.core.data.manager.callback.DataManagerCallback;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
@@ -58,7 +60,7 @@ public class ImmutableSegmentLoader {
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
-    return load(indexDir, defaultIndexLoadingConfig, null);
+    return load(indexDir, defaultIndexLoadingConfig, DefaultDataManagerCallbackImpl.INSTANCE, null);
   }
 
   /**
@@ -66,11 +68,17 @@ public class ImmutableSegmentLoader {
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, null);
+    return load(indexDir, indexLoadingConfig, DefaultDataManagerCallbackImpl.INSTANCE, null);
   }
 
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
+    return load(indexDir, indexLoadingConfig, DefaultDataManagerCallbackImpl.INSTANCE, schema);
+  }
+
+
+  public static ImmutableSegmentImpl load(File indexDir, IndexLoadingConfig indexLoadingConfig,
+                                                 DataManagerCallback dataManagerCallback, @Nullable Schema schema) throws Exception {
     Preconditions
         .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
 
@@ -123,7 +131,7 @@ public class ImmutableSegmentLoader {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (fieldSpec.isVirtualColumn()) {
         String columnName = fieldSpec.getName();
-        VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
+        VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs(), true);
         VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
         indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
         segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
@@ -139,7 +147,8 @@ public class ImmutableSegmentLoader {
     }
 
     ImmutableSegmentImpl segment =
-        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer,
+            dataManagerCallback.getIndexSegmentCallback());
     LOGGER.info("Successfully loaded segment {} with readMode: {}", segmentName, readMode);
     return segment;
   }

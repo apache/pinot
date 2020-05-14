@@ -20,6 +20,9 @@ package org.apache.pinot.core.data.manager.offline;
 
 import java.util.concurrent.Semaphore;
 import javax.annotation.Nonnull;
+
+import com.google.common.base.Preconditions;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -28,6 +31,7 @@ import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.core.data.manager.callback.impl.TableDataManagerCallbackProvider;
 
 
 /**
@@ -35,11 +39,18 @@ import org.apache.pinot.spi.config.table.TableType;
  */
 public class TableDataManagerProvider {
   private static Semaphore _segmentBuildSemaphore;
+  private static TableDataManagerCallbackProvider _tableDataManagerCallbackProvider;
 
   private TableDataManagerProvider() {
   }
 
   public static void init(InstanceDataManagerConfig instanceDataManagerConfig) {
+    init(instanceDataManagerConfig, new TableDataManagerCallbackProvider(new PropertiesConfiguration()));
+  }
+
+  public static void init(InstanceDataManagerConfig instanceDataManagerConfig,
+                          TableDataManagerCallbackProvider callbackProvider) {
+    _tableDataManagerCallbackProvider = callbackProvider;
     int maxParallelBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
     if (maxParallelBuilds > 0) {
       _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);
@@ -49,13 +60,16 @@ public class TableDataManagerProvider {
   public static TableDataManager getTableDataManager(@Nonnull TableDataManagerConfig tableDataManagerConfig,
       @Nonnull String instanceId, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
       @Nonnull ServerMetrics serverMetrics) {
+    Preconditions.checkNotNull(_tableDataManagerCallbackProvider, "callback provider is not init");
     TableDataManager tableDataManager;
     switch (TableType.valueOf(tableDataManagerConfig.getTableDataManagerType())) {
       case OFFLINE:
-        tableDataManager = new OfflineTableDataManager();
+        tableDataManager = new OfflineTableDataManager(
+            _tableDataManagerCallbackProvider.getDefaultTableDataManagerCallback());
         break;
       case REALTIME:
-        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore);
+        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore,
+            _tableDataManagerCallbackProvider.getTableDataManagerCallback(tableDataManagerConfig));
         break;
       default:
         throw new IllegalStateException();

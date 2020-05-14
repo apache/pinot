@@ -35,6 +35,7 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
   private static final String TABLE_DATA_MANAGER_CONSUMER_DIRECTORY = "consumerDirectory";
   private static final String TABLE_DATA_MANAGER_NAME = "name";
+  private static final String IS_TABLE_FOR_UPSERT = "isTableForUpsert";
 
   private final Configuration _tableDataManagerConfig;
 
@@ -62,6 +63,10 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
   }
 
+  public boolean isTableForUpsert() {
+    return _tableDataManagerConfig.getBoolean(IS_TABLE_FOR_UPSERT);
+  }
+
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
@@ -83,5 +88,9 @@ public class TableDataManagerConfig {
     // If we wish to override some table level configs using table config, override them here
     // Note: the configs in TableDataManagerConfig is immutable once the table is created, which mean it will not pick
     // up the latest table config
+
+    // provide information on whether this particular table support upsert or not
+    // set isTableForUpsert to true if the table config indicate this table is an upsert table
+    _tableDataManagerConfig.setProperty(IS_TABLE_FOR_UPSERT, tableConfig.getUpsertConfig() != null);
   }
 }
