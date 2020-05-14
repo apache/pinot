@@ -39,7 +39,7 @@ public class YamlResourceTest {
   public void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
     this.user = new ThirdEyePrincipal("test", "test");
-    this.yamlResource = new YamlResource(new DetectionPreviewConfiguration());
+    this.yamlResource = new YamlResource(null, new DetectionPreviewConfiguration());
     this.daoRegistry = DAORegistry.getInstance();
     DetectionConfigManager detectionDAO = this.daoRegistry.getDetectionConfigManager();
     DetectionConfigDTO config1 = new DetectionConfigDTO();

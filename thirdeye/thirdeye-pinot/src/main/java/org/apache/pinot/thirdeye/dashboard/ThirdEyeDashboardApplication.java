@@ -191,7 +191,8 @@ public class ThirdEyeDashboardApplication
         DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
     env.jersey().register(new DetectionResource());
     env.jersey().register(new DetectionAlertResource(DAO_REGISTRY.getDetectionAlertConfigManager()));
-    env.jersey().register(new YamlResource(config.getDetectionPreviewConfig(), config.getAlertOnboardingPermitPerSecond()));
+    env.jersey().register(new YamlResource(config.getAlerterConfiguration(), config.getDetectionPreviewConfig(),
+        config.getAlertOnboardingPermitPerSecond()));
     env.jersey().register(new SqlDataSourceResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(

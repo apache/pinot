@@ -28,7 +28,7 @@ import com.atlassian.jira.rest.client.api.domain.CimProject;
 import com.atlassian.jira.rest.client.api.domain.Comment;
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.atlassian.jira.rest.client.api.domain.Transition;
-import com.atlassian.jira.rest.client.api.domain.input.FieldInput;
+import com.atlassian.jira.rest.client.api.domain.input.ComplexIssueInputFieldValue;
 import com.atlassian.jira.rest.client.api.domain.input.IssueInput;
 import com.atlassian.jira.rest.client.api.domain.input.IssueInputBuilder;
 import com.atlassian.jira.rest.client.api.domain.input.TransitionInput;
@@ -62,6 +62,7 @@ public class ThirdEyeJiraClient {
   public static final String PROP_ISSUE_TYPE = "issuetype";
   public static final String PROP_PROJECT = "project";
   public static final String PROP_ASSIGNEE = "assignee";
+  public static final String PROP_CUSTOM = "custom";
   public static final String PROP_MERGE_GAP = "mergeGap";
   public static final String PROP_LABELS = "labels";
   public static final String PROP_COMPONENTS = "components";
@@ -160,14 +161,11 @@ public class ThirdEyeJiraClient {
    * Updates existing issue with assignee and labels
    */
   public void updateIssue(Issue issue, JiraEntity jiraEntity) {
-    IssueInput issueInput = new IssueInputBuilder()
-        .setAssigneeName(jiraEntity.getAssignee())
-        .setFieldInput(new FieldInput(PROP_LABELS, jiraEntity.getLabels()))
-        .build();
+    IssueInputBuilder issueBuilder = new IssueInputBuilder();
+    setJiraAlertUpdatableFields(issueBuilder, jiraEntity);
+    IssueInput issueInput = issueBuilder.build();
 
-    String prevAssignee = issue.getAssignee() == null ? "unassigned" : issue.getAssignee().getName();
-    LOG.info("Updating Jira {} with [assignee={}, labels={}]. Previous state [assignee={}, labels={}]", issue.getKey(),
-        jiraEntity.getAssignee(), jiraEntity.getLabels(), prevAssignee, issue.getLabels());
+    LOG.info("Updating Jira {} with {}", issue.getKey(), issueInput.toString());
     restClient.getIssueClient().updateIssue(issue.getKey(), issueInput).claim();
     if (jiraEntity.getSnapshot() != null && jiraEntity.getSnapshot().exists()) {
       restClient.getIssueClient().addAttachments(issue.getAttachmentsUri(), jiraEntity.getSnapshot()).claim();
@@ -219,6 +217,26 @@ public class ThirdEyeJiraClient {
     return basicIssue.getKey();
   }
 
+  /**
+   * Set jira fields which should be updated when a new alert is fired
+   */
+  private void setJiraAlertUpdatableFields(IssueInputBuilder issueBuilder, JiraEntity jiraEntity) {
+    issueBuilder.setAssigneeName(jiraEntity.getAssignee());
+    issueBuilder.setFieldValue(PROP_LABELS, jiraEntity.getLabels());
+
+    if (jiraEntity.getComponents() != null && !jiraEntity.getComponents().isEmpty()) {
+      issueBuilder.setComponentsNames(jiraEntity.getComponents());
+    }
+
+    if (jiraEntity.getCustomFieldsMap() != null) {
+      for (Map.Entry<String, Object> customFieldEntry : jiraEntity.getCustomFieldsMap().entrySet()) {
+        issueBuilder.setFieldValue(
+            customFieldEntry.getKey(),
+            ComplexIssueInputFieldValue.with("name", customFieldEntry.getValue().toString()));
+      }
+    }
+  }
+
   IssueInput buildIssue(JiraEntity jiraEntity) {
     IssueInputBuilder issueBuilder = new IssueInputBuilder();
 
@@ -239,13 +257,9 @@ public class ThirdEyeJiraClient {
     issueBuilder.setProjectKey(jiraEntity.getJiraProject());
     issueBuilder.setSummary(jiraEntity.getSummary());
     issueBuilder.setIssueTypeId(jiraEntity.getJiraIssueTypeId());
-    issueBuilder.setAssigneeName(jiraEntity.getAssignee());
     issueBuilder.setDescription(jiraEntity.getDescription());
-    issueBuilder.setFieldInput(new FieldInput(PROP_LABELS, jiraEntity.getLabels()));
 
-    if (jiraEntity.getComponents() != null && !jiraEntity.getComponents().isEmpty()) {
-      issueBuilder.setComponentsNames(jiraEntity.getComponents());
-    }
+    setJiraAlertUpdatableFields(issueBuilder, jiraEntity);
 
     return issueBuilder.build();
   }

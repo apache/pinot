@@ -48,13 +48,11 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
   public static final String PROP_BCC = "bcc";
   public static final String PROP_RECIPIENTS = "recipients";
 
-  private static final String PROP_SEND_ONCE = "sendOnce";
-
   // Time beyond which we do not want to notify anomalies
   private static final long ANOMALY_NOTIFICATION_LOOKBACK_TIME = TimeUnit.DAYS.toMillis(14);
 
   public StatefulDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
-    super(provider, config, endTime);//prepareStatement.setObject(parameterIndex++, pair.getValue(), info.sqlType);
+    super(provider, config, endTime);
   }
 
   protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks) {

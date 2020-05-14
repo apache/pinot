@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.notification.commons;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 
@@ -37,6 +38,9 @@ public class JiraEntity {
   private String assignee;
   private List<String> labels;
   private List<String> components;
+
+  // Ability to configure non-standard customized jira fields
+  private Map<String, Object> customFieldsMap;
 
   // Report new anomalies by reopening jira tickets created within
   // the last mergeGap milliseconds
@@ -120,6 +124,14 @@ public class JiraEntity {
     this.components = components;
   }
 
+  public Map<String, Object> getCustomFieldsMap() {
+    return customFieldsMap;
+  }
+
+  public void setCustomFieldsMap(Map<String, Object> customFieldsMap) {
+    this.customFieldsMap = customFieldsMap;
+  }
+
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder("Jira{");
@@ -129,6 +141,7 @@ public class JiraEntity {
     sb.append(", summary='").append(summary).append('\'');
     sb.append(", labels='").append(labels).append('\'');
     sb.append(", components='").append(components).append('\'');
+    sb.append(", custom='").append(customFieldsMap).append('\'');
     sb.append(", mergeGap='").append(mergeGap).append('\'');
     sb.append(", snapshot='").append(snapshot == null ? "" : snapshot.getName()).append('\'');
     sb.append('}');
@@ -137,6 +150,6 @@ public class JiraEntity {
 
   @Override
   public int hashCode() {
-    return Objects.hash(jiraProject, jiraIssueTypeId, assignee, summary, labels, mergeGap, snapshot, components);
+    return Objects.hash(jiraProject, jiraIssueTypeId, assignee, summary, labels, customFieldsMap, mergeGap, snapshot, components);
   }
 }
