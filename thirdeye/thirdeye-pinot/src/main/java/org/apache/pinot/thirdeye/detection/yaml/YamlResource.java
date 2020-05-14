@@ -1124,24 +1124,32 @@ public class YamlResource {
   @PUT
   @Path("/notify/{id}")
   @ApiOperation("Send notification email for detection alert config")
-  public void test(
-      @ApiParam("Subscription configuration id for the alert") @NotNull @PathParam("id") long detectionAlertConfigId) {
-    LOG.info("Triggering subscription task with id " + detectionAlertConfigId);
-
-    // Build the task context
-    ThirdEyeAnomalyConfiguration config = new ThirdEyeAnomalyConfiguration();
-    config.setAlerterConfiguration(alerterConfig);
-    TaskContext taskContext = new TaskContext();
-    taskContext.setThirdEyeAnomalyConfiguration(config);
-
-    // Run the notification task. This will update the subscription watermark as well.
-    DetectionAlertTaskInfo taskInfo = new DetectionAlertTaskInfo(detectionAlertConfigId);
-    TaskRunner taskRunner = new DetectionAlertTaskRunner();
+  public Response triggerNotification(
+      @ApiParam("Subscription configuration id for the alert") @NotNull @PathParam("id") long subscriptionId) {
+    LOG.info("Triggering subscription task with id " + subscriptionId);
+    Map<String, String> responseMessage = new HashMap<>();
     try {
+      // Build the task context
+      ThirdEyeAnomalyConfiguration config = new ThirdEyeAnomalyConfiguration();
+      config.setAlerterConfiguration(alerterConfig);
+      TaskContext taskContext = new TaskContext();
+      taskContext.setThirdEyeAnomalyConfiguration(config);
+
+      // Run the notification task. This will update the subscription watermark as well.
+      DetectionAlertTaskInfo taskInfo = new DetectionAlertTaskInfo(subscriptionId);
+      TaskRunner taskRunner = new DetectionAlertTaskRunner();
       taskRunner.execute(taskInfo, taskContext);
     } catch (Exception e) {
-      LOG.error("Exception while triggering the notification task with id " + detectionAlertConfigId, e);
+      LOG.error("Exception while triggering the notification task with id " + subscriptionId, e);
+      responseMessage.put("message", "Failed to trigger the notification");
+      responseMessage.put("more-info", "Triggered subscription id " + subscriptionId + ". Error = " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
     }
-    LOG.info("Notification api triggered successfully");
+
+    LOG.info("Subscription with id " + subscriptionId + " triggered successfully");
+    responseMessage.put("message", "Subscription was triggered successfully.");
+    responseMessage.put("more-info", "Triggered subscription id " + subscriptionId);
+    responseMessage.put("detectionAlertConfigId", String.valueOf(subscriptionId));
+    return Response.ok().entity(responseMessage).build();
   }
 }
