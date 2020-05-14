@@ -11,6 +11,7 @@ import {
 } from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
+import config from 'thirdeye-frontend/config/environment';
 
 /**
  * Massages the hovered urns
@@ -118,11 +119,12 @@ export default Helper.extend({
     const lookup = getTimeseriesLookup(timeseries, hoverUrns);
     const values = getValues(hoverUrns, hoverTimestamp, lookup, entities);
     const colors = getColors(entities, hoverUrns);
+    const timeZoneId = moment(hoverTimestamp).tz(config.timeZone).format('z')
 
     /** TODO: abstract the js out of the template */
     return htmlSafe(`
       <div class="te-tooltip">
-        <h5 class="te-tooltip__header">${humanTimeStamp} (PDT)</h5>
+        <h5 class="te-tooltip__header">${humanTimeStamp} (${timeZoneId})</h5>
         <div class="te-tooltip__body">
           ${metricUrns.map((urn) => {
             return `

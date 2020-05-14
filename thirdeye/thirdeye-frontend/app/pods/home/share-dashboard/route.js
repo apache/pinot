@@ -14,6 +14,7 @@ import {
 import { appendFilters } from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeFloat, humanizeChange, checkStatus } from 'thirdeye-frontend/utils/utils';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
+import config from 'thirdeye-frontend/config/environment';
 
 const queryParamsConfig = {
   refreshModel: true
@@ -169,6 +170,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           const dimensions = get(anomaly, 'dimensions');
           const start = get(anomaly, 'start');
           const end = get(anomaly, 'end');
+          const timeZone = config.timeZone
 
           if (!map[metricName]) {
             map[metricName] = { 'metricId': metricId, items: {}, count: index };
@@ -183,7 +185,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           //build new urn
           const metricUrn = appendFilters(`thirdeye:metric:${metricId}`, filteredDimensions);
           //Get all in the following order - current,wo2w,median4w
-          const offsets = await fetch(`/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=wo1w,wo2w,median4w&timezone=America/Los_Angeles`).then(checkStatus).then(res => res);
+          const offsets = await fetch(`/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=wo1w,wo2w,median4w&timezone=${timeZone}`).then(checkStatus).then(res => res);
 
           const current = get(anomaly, 'current');
           const wow = humanizeFloat(offsets[0]);
