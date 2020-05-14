@@ -23,20 +23,15 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -53,14 +48,27 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
 
-  private Schema _schema;
-
   protected int getNumOfflineSegments() {
     return NUM_OFFLINE_SEGMENTS;
   }
 
   protected int getNumRealtimeSegments() {
     return NUM_REALTIME_SEGMENTS;
+  }
+
+  @Override
+  protected String getBrokerTenant() {
+    return TENANT_NAME;
+  }
+
+  @Override
+  protected String getServerTenant() {
+    return TENANT_NAME;
+  }
+
+  @Override
+  protected void overrideServerConf(Configuration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
   @BeforeClass
@@ -75,32 +83,26 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
     List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles);
 
-    ExecutorService executor = Executors.newCachedThreadPool();
+    // Create and upload the schema and table config
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    addTableConfig(offlineTableConfig);
+    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
-    // Create segments from Avro data
-    File schemaFile = getSchemaFile();
-    _schema = Schema.fromFile(schemaFile);
+    // Create and upload segments
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, 0, _segmentDir, _tarDir, getTableName(), null, getRawIndexColumns(),
-            _schema, executor);
-
-    // Push data into the Kafka topic
-    pushAvroIntoKafka(realtimeAvroFiles, getKafkaTopic(), executor);
-
-    // Load data into H2
-    setUpH2Connection(avroFiles, executor);
-
-    // Initialize query generator
-    setUpQueryGenerator(avroFiles, executor);
-
-    executor.shutdown();
-    executor.awaitTermination(10, TimeUnit.MINUTES);
-
-    // Create Pinot table
-    setUpTable(avroFiles.get(0));
-
-    // Upload all segments
+        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), _tarDir);
+
+    // Push data into Kafka
+    pushAvroIntoKafka(realtimeAvroFiles);
+
+    // Set up the H2 connection
+    setUpH2Connection(avroFiles);
+
+    // Initialize the query generator
+    setUpQueryGenerator(avroFiles);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
@@ -122,30 +124,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     // Create tenants
     createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
-  }
-
-  protected void setUpTable(File avroFile)
-      throws Exception {
-    String schemaName = _schema.getSchemaName();
-    addSchema(getSchemaFile(), schemaName);
-
-    String timeColumnName = getTimeColumnName();
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(timeColumnName);
-    Assert.assertNotNull(fieldSpec);
-    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-    TimeUnit outgoingTimeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
-    Assert.assertNotNull(outgoingTimeUnit);
-    String timeType = outgoingTimeUnit.toString();
-
-    addHybridTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME,
-        TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRangeIndexColumns(),
-        getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(), getSegmentPartitionConfig());
-  }
-
-  @Override
-  protected void overrideServerConf(Configuration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
   }
 
   protected List<File> getAllAvroFiles()
@@ -308,7 +286,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void tearDown()
       throws Exception {
     // Try deleting the tables and check that they have no routing table
-    final String tableName = getTableName();
+    String tableName = getTableName();
     dropOfflineTable(tableName);
     dropRealtimeTable(tableName);
 

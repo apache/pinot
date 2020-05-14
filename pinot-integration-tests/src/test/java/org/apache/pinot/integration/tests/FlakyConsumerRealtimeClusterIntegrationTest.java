@@ -28,20 +28,12 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
-import org.testng.annotations.BeforeClass;
 
 
 /**
  * Integration test that simulates a flaky Kafka consumer.
  */
 public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
-
-  @BeforeClass
-  @Override
-  public void setUp()
-      throws Exception {
-    super.setUp();
-  }
 
   @Override
   protected String getStreamConsumerFactoryClassName() {

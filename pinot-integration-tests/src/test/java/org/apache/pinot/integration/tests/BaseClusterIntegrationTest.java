@@ -20,28 +20,31 @@ package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -53,29 +56,30 @@ import org.testng.Assert;
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   // Default settings
-  private static final String DEFAULT_TABLE_NAME = "mytable";
-  private static final String DEFAULT_SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
-  private static final String DEFAULT_TIME_COLUMN_NAME = "DaysSinceEpoch";
-  private static final String DEFAULT_AVRO_TAR_FILE_NAME =
+  protected static final String DEFAULT_TABLE_NAME = "mytable";
+  protected static final String DEFAULT_SCHEMA_NAME = "mytable";
+  protected static final String DEFAULT_SCHEMA_FILE_NAME =
+      "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
+  protected static final String DEFAULT_TIME_COLUMN_NAME = "DaysSinceEpoch";
+  protected static final String DEFAULT_AVRO_TAR_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz";
-  private static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
-  private static final int DEFAULT_LLC_SEGMENT_FLUSH_SIZE = 5000;
-  private static final int DEFAULT_HLC_SEGMENT_FLUSH_SIZE = 20000;
-  private static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
-  private static final int DEFAULT_HLC_NUM_KAFKA_BROKERS = 1;
-  private static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
-  private static final int DEFAULT_HLC_NUM_KAFKA_PARTITIONS = 10;
-  private static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
-  private static final String DEFAULT_SORTED_COLUMN = "Carrier";
-  private static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
-  private static final List<String> DEFAULT_RAW_INDEX_COLUMNS =
+  protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
+  protected static final int DEFAULT_LLC_SEGMENT_FLUSH_SIZE = 5000;
+  protected static final int DEFAULT_HLC_SEGMENT_FLUSH_SIZE = 20000;
+  protected static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
+  protected static final int DEFAULT_HLC_NUM_KAFKA_BROKERS = 1;
+  protected static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
+  protected static final int DEFAULT_HLC_NUM_KAFKA_PARTITIONS = 10;
+  protected static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
+  protected static final List<String> DEFAULT_NO_DICTIONARY_COLUMNS =
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
+  protected static final String DEFAULT_SORTED_COLUMN = "Carrier";
+  protected static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
   private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Arrays.asList("FlightNum", "Origin");
-  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = Arrays.asList("", "Origin");
+  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = Collections.singletonList("Origin");
+  protected static final int DEFAULT_NUM_REPLICAS = 1;
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
-  protected final File _avroDir = new File(_tempDir, "avroDir");
-  protected final File _preprocessingDir = new File(_tempDir, "preprocessingDir");
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
   protected List<StreamDataServerStartable> _kafkaStarters;
@@ -87,14 +91,20 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * The following getters can be overridden to change default settings.
    */
+
   protected String getTableName() {
     return DEFAULT_TABLE_NAME;
+  }
+
+  protected String getSchemaName() {
+    return DEFAULT_SCHEMA_NAME;
   }
 
   protected String getSchemaFileName() {
     return DEFAULT_SCHEMA_FILE_NAME;
   }
 
+  @Nullable
   protected String getTimeColumnName() {
     return DEFAULT_TIME_COLUMN_NAME;
   }
@@ -105,10 +115,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected long getCountStarResult() {
     return DEFAULT_COUNT_STAR_RESULT;
-  }
-
-  protected String getKafkaTopic() {
-    return getClass().getSimpleName();
   }
 
   protected boolean useLlc() {
@@ -135,12 +141,24 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
+  protected int getBaseKafkaPort() {
+    return KafkaStarterUtils.DEFAULT_KAFKA_PORT;
+  }
+
+  protected String getKafkaZKAddress() {
+    return KafkaStarterUtils.DEFAULT_ZK_STR;
+  }
+
   protected int getNumKafkaPartitions() {
     if (useLlc()) {
       return DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
     } else {
       return DEFAULT_HLC_NUM_KAFKA_PARTITIONS;
     }
+  }
+
+  protected String getKafkaTopic() {
+    return getClass().getSimpleName();
   }
 
   protected int getMaxNumKafkaMessagesPerBatch() {
@@ -168,18 +186,34 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
-  protected List<String> getBloomFilterIndexColumns() {
-    return DEFAULT_BLOOM_FILTER_COLUMNS;
+  protected List<String> getNoDictionaryColumns() {
+    return DEFAULT_NO_DICTIONARY_COLUMNS;
   }
 
   @Nullable
   protected List<String> getRangeIndexColumns() {
-    return DEFAULT_RANGE_INDEX_COLUMNS;
+    return null;
+    // TODO: Fix the JVM crash then uncomment this line
+//    return DEFAULT_RANGE_INDEX_COLUMNS;
   }
 
   @Nullable
-  protected List<String> getRawIndexColumns() {
-    return DEFAULT_RAW_INDEX_COLUMNS;
+  protected List<String> getBloomFilterColumns() {
+    return DEFAULT_BLOOM_FILTER_COLUMNS;
+  }
+
+  @Nullable
+  protected List<FieldConfig> getFieldConfigs() {
+    return null;
+  }
+
+  protected int getNumReplicas() {
+    return DEFAULT_NUM_REPLICAS;
+  }
+
+  @Nullable
+  protected String getSegmentVersion() {
+    return null;
   }
 
   @Nullable
@@ -193,23 +227,114 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
-  protected String getServerTenant() {
-    return TagNameUtils.DEFAULT_TENANT_NAME;
-  }
-
-  @Nullable
   protected String getBrokerTenant() {
     return TagNameUtils.DEFAULT_TENANT_NAME;
   }
 
-  protected SegmentPartitionConfig getSegmentPartitionConfig() {
+  @Nullable
+  protected String getServerTenant() {
+    return TagNameUtils.DEFAULT_TENANT_NAME;
+  }
 
-    ColumnPartitionConfig columnPartitionConfig = new ColumnPartitionConfig("murmur", 2);
-    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
-    columnPartitionConfigMap.put("AirlineID", columnPartitionConfig);
+  /**
+   * The following methods are based on the getters. Override the getters for non-default settings before calling these
+   * methods.
+   */
 
-    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(columnPartitionConfigMap);
-    return segmentPartitionConfig;
+  /**
+   * Creates a new schema.
+   */
+  protected Schema createSchema()
+      throws IOException {
+    URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getSchemaFileName());
+    Assert.assertNotNull(resourceUrl);
+    return Schema.fromFile(new File(resourceUrl.getFile()));
+  }
+
+  /**
+   * Returns the schema in the cluster.
+   */
+  protected Schema getSchema() {
+    return getSchema(getSchemaName());
+  }
+
+  /**
+   * Creates a new OFFLINE table config.
+   */
+  protected TableConfig createOfflineTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setSchemaName(getSchemaName())
+        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant()).build();
+  }
+
+  /**
+   * Returns the OFFLINE table config in the cluster.
+   */
+  protected TableConfig getOfflineTableConfig() {
+    return getOfflineTableConfig(getTableName());
+  }
+
+  /**
+   * Creates a new REALTIME table config.
+   */
+  protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
+    Map<String, String> streamConfigs = new HashMap<>();
+    String streamType = "kafka";
+    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
+    boolean useLlc = useLlc();
+    if (useLlc) {
+      // LLC
+      streamConfigs
+          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+              StreamConfig.ConsumerType.LOWLEVEL.toString());
+      streamConfigs.put(KafkaStreamConfigProperties
+              .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
+          KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+    } else {
+      // HLC
+      streamConfigs
+          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+              StreamConfig.ConsumerType.HIGHLEVEL.toString());
+      streamConfigs.put(KafkaStreamConfigProperties
+              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
+          KafkaStarterUtils.DEFAULT_ZK_STR);
+      streamConfigs.put(KafkaStreamConfigProperties
+              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
+          KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+    }
+    streamConfigs.put(StreamConfigProperties
+            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
+        getStreamConsumerFactoryClassName());
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+            getKafkaTopic());
+    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = sampleAvroFile;
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+            AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    streamConfigs
+        .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(getRealtimeSegmentFlushSize()));
+    streamConfigs.put(StreamConfigProperties
+        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
+        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant()).setLLC(useLlc).setStreamConfigs(streamConfigs).build();
+  }
+
+  /**
+   * Returns the REALTIME table config in the cluster.
+   */
+  protected TableConfig getRealtimeTableConfig() {
+    return getRealtimeTableConfig(getTableName());
   }
 
   /**
@@ -245,55 +370,23 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * Set up H2 connection to a table with pre-loaded data.
-   *
-   * @param avroFiles List of Avro files to be loaded.
-   * @param executor Executor
-   * @throws Exception
+   * Sets up the H2 connection to a table with pre-loaded data.
    */
-  protected void setUpH2Connection(final List<File> avroFiles, Executor executor)
+  protected void setUpH2Connection(List<File> avroFiles)
       throws Exception {
     Assert.assertNull(_h2Connection);
     Class.forName("org.h2.Driver");
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getTableName(), _h2Connection);
-        } catch (Exception e) {
-          // Ignored
-        }
-      }
-    });
+    ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getTableName(), _h2Connection);
   }
 
   /**
-   * Set up query generator using the given Avro files.
-   *
-   * @param avroFiles List of Avro files
-   * @param executor Executor
+   * Sets up the query generator using the given Avro files.
    */
-  protected void setUpQueryGenerator(final List<File> avroFiles, Executor executor) {
+  protected void setUpQueryGenerator(List<File> avroFiles) {
     Assert.assertNull(_queryGenerator);
-    final String tableName = getTableName();
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, tableName, tableName);
-      }
-    });
-  }
-
-  /**
-   * Get the schema file.
-   *
-   * @return Schema file
-   */
-  protected File getSchemaFile() {
-    URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getSchemaFileName());
-    Assert.assertNotNull(resourceUrl);
-    return new File(resourceUrl.getFile());
+    String tableName = getTableName();
+    _queryGenerator = new QueryGenerator(avroFiles, tableName, tableName);
   }
 
   /**
@@ -311,30 +404,19 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * Push the data in the given Avro files into a Kafka stream.
+   * Pushes the data in the given Avro files into a Kafka stream.
    *
    * @param avroFiles List of Avro files
-   * @param kafkaTopic Kafka topic
-   * @param executor Executor
    */
-  protected void pushAvroIntoKafka(final List<File> avroFiles, final String kafkaTopic, Executor executor) {
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic,
-              getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
-        } catch (Exception e) {
-          // Ignored
-        }
-      }
-    });
+  protected void pushAvroIntoKafka(List<File> avroFiles)
+      throws Exception {
+    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
+        getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
   }
 
   protected void startKafka() {
-    _kafkaStarters = KafkaStarterUtils
-        .startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
-            KafkaStarterUtils.getDefaultKafkaConfiguration());
+    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), getBaseKafkaPort(), getKafkaZKAddress(),
+        KafkaStarterUtils.getDefaultKafkaConfiguration());
     _kafkaStarters.get(0)
         .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
   }
@@ -406,32 +488,5 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     ClusterIntegrationTestUtils
         .testSqlQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
-  }
-
-  protected void setUpRealtimeTable(File avroFile, int numReplicas, boolean useLLC, String tableName)
-      throws Exception {
-    File schemaFile = getSchemaFile();
-    Schema schema = Schema.fromFile(schemaFile);
-    String schemaName = schema.getSchemaName();
-    addSchema(schemaFile, schemaName);
-
-    String timeColumnName = getTimeColumnName();
-    FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
-    Assert.assertNotNull(fieldSpec);
-    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-    TimeUnit outgoingTimeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
-    Assert.assertNotNull(outgoingTimeUnit);
-    String timeType = outgoingTimeUnit.toString();
-
-    addRealtimeTable(tableName, useLLC, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
-        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(), getInvertedIndexColumns(),
-        getBloomFilterIndexColumns(), getRangeIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(),
-        numReplicas);
-  }
-
-  protected void setUpRealtimeTable(File avroFile)
-      throws Exception {
-    setUpRealtimeTable(avroFile, 1, useLlc(), getTableName());
   }
 }

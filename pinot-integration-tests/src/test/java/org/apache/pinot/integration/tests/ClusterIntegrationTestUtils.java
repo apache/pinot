@@ -40,9 +40,9 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileStream;
@@ -65,12 +65,12 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
-import org.apache.pinot.server.util.SegmentTestUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.testng.Assert;
@@ -92,8 +92,7 @@ public class ClusterIntegrationTestUtils {
    * @throws Exception
    */
   @SuppressWarnings("SqlNoDataSourceInspection")
-  public static void setUpH2TableWithAvro(@Nonnull List<File> avroFiles, @Nonnull String tableName,
-      @Nonnull Connection h2Connection)
+  public static void setUpH2TableWithAvro(List<File> avroFiles, String tableName, Connection h2Connection)
       throws Exception {
     int numFields;
 
@@ -196,7 +195,7 @@ public class ClusterIntegrationTestUtils {
    * @param avroFieldType Avro field type
    * @return Whether the given Avro field type is a single value type (non-NULL)
    */
-  private static boolean isSingleValueAvroFieldType(@Nonnull Schema.Type avroFieldType) {
+  private static boolean isSingleValueAvroFieldType(Schema.Type avroFieldType) {
     return (avroFieldType == Schema.Type.BOOLEAN) || (avroFieldType == Schema.Type.INT) || (avroFieldType
         == Schema.Type.LONG) || (avroFieldType == Schema.Type.FLOAT) || (avroFieldType == Schema.Type.DOUBLE) || (
         avroFieldType == Schema.Type.STRING);
@@ -210,9 +209,7 @@ public class ClusterIntegrationTestUtils {
    * @param nullable Whether the column is nullable
    * @return H2 field name and type
    */
-  @Nonnull
-  private static String buildH2FieldNameAndType(@Nonnull String fieldName, @Nonnull Schema.Type avroFieldType,
-      boolean nullable) {
+  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable) {
     String avroFieldTypeName = avroFieldType.getName();
     String h2FieldType;
     switch (avroFieldTypeName) {
@@ -234,74 +231,68 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
-   * Builds segments from the given Avro files. Each segment will be built using a separate thread.
-   *  @param avroFiles List of Avro files
+   * Builds Pinot segments from the given Avro files. Each segment will be built using a separate thread.
+   *
+   * @param avroFiles List of Avro files
+   * @param tableConfig Pinot table config
+   * @param schema Pinot schema
    * @param baseSegmentIndex Base segment index number
    * @param segmentDir Output directory for the un-tarred segments
    * @param tarDir Output directory for the tarred segments
-   * @param tableName Table name
-   * @param starTreeV2BuilderConfigs List of star-tree V2 builder configs
-   * @param rawIndexColumns Columns to create raw index with
-   * @param pinotSchema Pinot schema
-   * @param executor Executor
    */
-  public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
-      String tableName, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
-      @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.spi.data.Schema pinotSchema,
-      Executor executor) {
-    int numSegments = avroFiles.size();
-    for (int i = 0; i < numSegments; i++) {
-      final File avroFile = avroFiles.get(i);
-      final int segmentIndex = i + baseSegmentIndex;
-      executor.execute(() -> {
-        try {
-          File outputDir = new File(segmentDir, "segment-" + segmentIndex);
-          SegmentGeneratorConfig segmentGeneratorConfig =
-              SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
-
-          // Test segment with space and special character in the file name
-          segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
-
-          if (starTreeV2BuilderConfigs != null) {
-            segmentGeneratorConfig.setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
-          }
-
-          if (rawIndexColumns != null) {
-            segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexColumns);
-          }
-
-          // Build the segment
-          SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-          driver.init(segmentGeneratorConfig);
-          driver.build();
-
-          // Tar the segment
-          File[] files = outputDir.listFiles();
-          Assert.assertNotNull(files);
-          File segmentFile = files[0];
-          String segmentName = segmentFile.getName();
-          TarGzCompressionUtils
-              .createTarGzOfDirectory(segmentFile.getAbsolutePath(), new File(tarDir, segmentName).getAbsolutePath());
-        } catch (Exception e) {
-          // Ignored
-        }
-      });
+  public static void buildSegmentsFromAvro(List<File> avroFiles, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir)
+      throws Exception {
+    int numAvroFiles = avroFiles.size();
+    if (numAvroFiles == 1) {
+      buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
+    } else {
+      ExecutorService executorService = Executors.newFixedThreadPool(numAvroFiles);
+      List<Future<Void>> futures = new ArrayList<>(numAvroFiles);
+      for (int i = 0; i < numAvroFiles; i++) {
+        File avroFile = avroFiles.get(i);
+        int segmentIndex = i + baseSegmentIndex;
+        futures.add(executorService.submit(() -> {
+          buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex, segmentDir, tarDir);
+          return null;
+        }));
+      }
+      executorService.shutdown();
+      for (Future<Void> future : futures) {
+        future.get();
+      }
     }
   }
 
   /**
-   * Builds segments from the given Avro files. Each segment will be built using a separate thread.
+   * Builds one Pinot segment from the given Avro file.
    *
-   * @param avroFiles List of Avro files
-   * @param baseSegmentIndex Base segment index number
+   * @param avroFile Avro file
+   * @param tableConfig Pinot table config
+   * @param schema Pinot schema
+   * @param segmentIndex Segment index number
    * @param segmentDir Output directory for the un-tarred segments
    * @param tarDir Output directory for the tarred segments
-   * @param tableName Table name
-   * @param executor Executor
    */
-  public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
-      String tableName, Executor executor) {
-    buildSegmentsFromAvro(avroFiles, baseSegmentIndex, segmentDir, tarDir, tableName, null, null, null, executor);
+  public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
+      throws Exception {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
+    segmentGeneratorConfig.setOutDir(segmentDir.getPath());
+    segmentGeneratorConfig.setTableName(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
+    // Test segment with space and special character in the file name
+    segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
+
+    // Build the segment
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig);
+    driver.build();
+
+    // Tar the segment
+    String segmentName = driver.getSegmentName();
+    File indexDir = new File(segmentDir, driver.getSegmentName());
+    TarGzCompressionUtils.createTarGzOfDirectory(indexDir.getPath(), new File(tarDir, segmentName).getPath());
   }
 
   /**
@@ -315,9 +306,8 @@ public class ClusterIntegrationTestUtils {
    * @param partitionColumn Optional partition column
    * @throws Exception
    */
-  public static void pushAvroIntoKafka(@Nonnull List<File> avroFiles, @Nonnull String kafkaBroker,
-      @Nonnull String kafkaTopic, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
-      @Nullable String partitionColumn)
+  public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
+      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn)
       throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
@@ -364,8 +354,8 @@ public class ClusterIntegrationTestUtils {
    * @throws Exception
    */
   @SuppressWarnings("unused")
-  public static void pushRandomAvroIntoKafka(@Nonnull File avroFile, @Nonnull String kafkaBroker,
-      @Nonnull String kafkaTopic, int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
+  public static void pushRandomAvroIntoKafka(File avroFile, String kafkaBroker, String kafkaTopic,
+      int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
       @Nullable String partitionColumn)
       throws Exception {
     Properties properties = new Properties();
@@ -444,8 +434,7 @@ public class ClusterIntegrationTestUtils {
    * @param fieldType Field type
    * @return Random value for the given field type
    */
-  @Nonnull
-  private static Object generateRandomValue(@Nonnull Schema.Type fieldType) {
+  private static Object generateRandomValue(Schema.Type fieldType) {
     switch (fieldType) {
       case BOOLEAN:
         return RANDOM.nextBoolean();
@@ -480,8 +469,8 @@ public class ClusterIntegrationTestUtils {
    * @param h2Connection H2 connection
    * @throws Exception
    */
-  public static void testQuery(@Nonnull String pinotQuery, @Nonnull String queryFormat, @Nonnull String brokerUrl,
-      @Nonnull org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
+  public static void testQuery(String pinotQuery, String queryFormat, String brokerUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
     // Use broker response for metadata check, connection response for value check
@@ -1000,8 +989,8 @@ public class ClusterIntegrationTestUtils {
    * @param failureMessage Failure message
    * @param e Exception
    */
-  private static void failure(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries,
-      @Nonnull String failureMessage, @Nullable Exception e) {
+  private static void failure(String pqlQuery, @Nullable List<String> sqlQueries, String failureMessage,
+      @Nullable Exception e) {
     failureMessage += "\nPQL: " + pqlQuery;
     if (sqlQueries != null) {
       failureMessage += "\nSQL: " + sqlQueries;
@@ -1020,8 +1009,7 @@ public class ClusterIntegrationTestUtils {
    * @param sqlQueries H2 SQL queries
    * @param failureMessage Failure message
    */
-  private static void failure(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries,
-      @Nonnull String failureMessage) {
+  private static void failure(String pqlQuery, @Nullable List<String> sqlQueries, String failureMessage) {
     failure(pqlQuery, sqlQueries, failureMessage, null);
   }
 
@@ -1034,8 +1022,7 @@ public class ClusterIntegrationTestUtils {
    * @param value raw value.
    * @return converted value.
    */
-  @Nonnull
-  private static String convertBooleanToLowerCase(@Nonnull String value) {
+  private static String convertBooleanToLowerCase(String value) {
     if (value.equals("TRUE")) {
       return "true";
     }

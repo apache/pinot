@@ -18,60 +18,98 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
  * Cluster integration test for near realtime text search
  */
-@Test(enabled=false)
-public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
+  private static final String TEXT_COLUMN_NAME = "skills";
+  private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
+  private static final int NUM_SKILLS = 24;
+  private static final int NUM_MATCHING_SKILLS = 4;
+  private static final int NUM_RECORDS = NUM_SKILLS * 1000;
+  private static final int NUM_MATCHING_RECORDS = NUM_MATCHING_SKILLS * 1000;
 
-  private static final String TABLE_NAME = "mytable";
-  private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
-  private static final String TIME_COL_NAME = "TIME_COL";
-  private static final String INT_COL_NAME = "INT_COL";
-  private static final int INT_BASE_VALUE = 10000;
-  Schema _schema;
+  private static final String TEST_TEXT_COLUMN_QUERY =
+      "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(skills, '\"machine learning\" AND spark')";
+
+  @Override
+  public String getTimeColumnName() {
+    return TIME_COLUMN_NAME;
+  }
+
+  // TODO: Support Lucene index on HLC consuming segments
+  @Override
+  protected boolean useLlc() {
+    return true;
+  }
+
+  @Nullable
+  @Override
+  protected String getSortedColumn() {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  protected List<String> getInvertedIndexColumns() {
+    return null;
+  }
+
+  @Override
+  protected List<String> getNoDictionaryColumns() {
+    return Collections.singletonList(TEXT_COLUMN_NAME);
+  }
+
+  @Nullable
+  @Override
+  protected List<String> getRangeIndexColumns() {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  protected List<String> getBloomFilterColumns() {
+    return null;
+  }
+
+  @Override
+  protected List<FieldConfig> getFieldConfigs() {
+    return Collections.singletonList(
+        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null));
+  }
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
-
-    _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
-        .addMetric(INT_COL_NAME, FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COL_NAME), null)
-        .build();
 
     // Start the Pinot cluster
     startZk();
@@ -82,37 +120,34 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     // Start Kafka
     startKafka();
 
-    // Unpack the Avro files
+    // Create the Avro file
     File avroFile = createAvroFile();
 
-    ExecutorService executor = Executors.newCachedThreadPool();
+    // Create and upload the schema and table config
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
+        .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN_NAME), null)
+        .build();
+    addSchema(schema);
+    addTableConfig(createRealtimeTableConfig(avroFile));
 
-    // Push data into the Kafka topic
-    pushAvroIntoKafka(Lists.newArrayList(avroFile), getKafkaTopic(), executor);
+    // Push data into Kafka
+    pushAvroIntoKafka(Collections.singletonList(avroFile));
 
-    executor.shutdown();
-    executor.awaitTermination(10, TimeUnit.MINUTES);
-
-    // Create Pinot table
-    addSchema(_schema);
-    List<FieldConfig> textIndexColumns = new ArrayList<>();
-    FieldConfig fieldConfig = new FieldConfig(SKILLS_TEXT_COL_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null);
-    textIndexColumns.add(fieldConfig);
-
-    addRealtimeTable(TABLE_NAME, true, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, null, null, TABLE_NAME,
-        getBrokerTenant(), getServerTenant(), getLoadMode(), null, null,
-        null, null, getTaskConfig(), getStreamConsumerFactoryClassName(),
-        1, textIndexColumns);
-
-    // just wait for 2sec for few docs to be loaded
-    waitForDocsLoaded(2000L, false );
+    // Wait until the table is queryable
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return getCurrentCountStarResult() >= 0;
+      } catch (Exception e) {
+        return null;
+      }
+    }, 10_000L, "Failed to get COUNT(*) result");
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(TABLE_NAME);
+    dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
     stopController();
@@ -123,66 +158,61 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
 
   private File createAvroFile()
       throws Exception {
-    // read the skills file
-    String[] skills = new String[100];
-    int skillCount = 0;
-    try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/text_search_data/skills.txt");
-        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+    // Read all skills from the skill file
+    InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/text_search_data/skills.txt");
+    assertNotNull(inputStream);
+    List<String> skills = new ArrayList<>(NUM_SKILLS);
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
       String line;
       while ((line = reader.readLine()) != null) {
-        skills[skillCount++] = line;
+        skills.add(line);
       }
     }
+    assertEquals(skills.size(), NUM_SKILLS);
 
-    org.apache.avro.Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(_schema);
-    DataFileWriter avroRecordWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema));
-    String pathToAvroFile = _tempDir.getAbsolutePath() + "/" + "skills.avro";
-    File outputAvroFile = new File(pathToAvroFile);
-    avroRecordWriter.create(avroSchema, outputAvroFile);
-
-    int counter = 0;
-    Random random = new Random();
-    // create Avro file with 100k documents
-    // it will be later pushed to Kafka
-    while (counter < 100000) {
-      GenericData.Record record = new GenericData.Record(avroSchema);
-      record.put(INT_COL_NAME, INT_BASE_VALUE + counter);
-      if (counter >= skillCount) {
-        int index = random.nextInt(skillCount);
-        record.put(SKILLS_TEXT_COL_NAME, skills[index]);
-      } else {
-        record.put(SKILLS_TEXT_COL_NAME, skills[counter]);
+    File avroFile = new File(_tempDir, "data.avro");
+    org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
+    avroSchema.setFields(Arrays.asList(new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
+        new org.apache.avro.Schema.Field(TIME_COLUMN_NAME,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG), null, null)));
+    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
+      fileWriter.create(avroSchema, avroFile);
+      for (int i = 0; i < NUM_RECORDS; i++) {
+        GenericData.Record record = new GenericData.Record(avroSchema);
+        record.put(TEXT_COLUMN_NAME, skills.get(i % NUM_SKILLS));
+        record.put(TIME_COLUMN_NAME, System.currentTimeMillis());
+        fileWriter.append(record);
       }
-      record.put(TIME_COL_NAME, TimeUtils.getValidMinTimeMillis());
-      avroRecordWriter.append(record);
-      counter++;
     }
-
-    avroRecordWriter.close();
-    return outputAvroFile;
+    return avroFile;
   }
 
-
-  // we need to make this more deterministic. internal release builds
-  // are failing intermittently. disable until we make it reasonably deterministic
-  @Test(enabled=false)
-  public void testTextSearchCountQuery() throws Exception {
-    String pqlQuery =
-        "SELECT count(*) FROM " + TABLE_NAME + " WHERE text_match(SKILLS_TEXT_COL, '\"machine learning\" AND spark') LIMIT 1000000";
-    int prevResult = 0;
-    // run the same query 2000 times and see an increasing number of hits in the index and count(*) result
-    for (int i = 0; i < 2000; i++) {
-      JsonNode pinotResponse = postQuery(pqlQuery);
-      Assert.assertTrue(pinotResponse.has("aggregationResults"));
-      TextNode textNode = (TextNode)pinotResponse.get("aggregationResults").get(0).get("value");
-      int result = Integer.valueOf(textNode.textValue());
-      // TODO: see if this can be made more deterministic
-      if (i >= 300) {
-        Assert.assertTrue(result > 0);
-        Assert.assertTrue(result >= prevResult);
-      }
-      prevResult = result;
-      Thread.sleep(10);
+  @Test
+  public void testTextSearchCountQuery()
+      throws Exception {
+    // Keep posting queries until all records are consumed
+    long previousResult = 0;
+    while (getCurrentCountStarResult() < NUM_RECORDS) {
+      long result = getTextColumnQueryResult();
+      assertTrue(result >= previousResult);
+      previousResult = result;
+      Thread.sleep(100);
     }
+
+    // TODO: Fix Lucene index on consuming segments to update the latest records, then uncomment the following part
+//    TestUtils.waitForCondition(aVoid -> {
+//      try {
+//        return getTextColumnQueryResult() == NUM_MATCHING_RECORDS;
+//      } catch (Exception e) {
+//        fail("Caught exception while getting text column query result");
+//        return false;
+//      }
+//    }, 10_000L, "Failed to reach expected number of matching records");
+  }
+
+  private long getTextColumnQueryResult()
+      throws Exception {
+    return postQuery(TEST_TEXT_COLUMN_QUERY).get("aggregationResults").get(0).get("value").asLong();
   }
 }

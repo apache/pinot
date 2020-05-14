@@ -23,11 +23,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -52,35 +50,23 @@ import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.minion.events.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
-import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
-import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableTaskConfig;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -96,17 +82,14 @@ public abstract class ClusterTest extends ControllerTest {
   private List<HelixServerStarter> _serverStarters;
   private MinionStarter _minionStarter;
 
-  // TODO: clean this up
-  private TableConfig _realtimeTableConfig;
-
   protected void startBroker()
       throws Exception {
     startBrokers(1);
   }
 
-  protected void startBroker(int basePort, String zkStr)
+  protected void startBroker(int port, String zkStr)
       throws Exception {
-    startBrokers(1, basePort, zkStr);
+    startBrokers(1, port, zkStr);
   }
 
   protected void startBrokers(int numBrokers)
@@ -245,100 +228,40 @@ public abstract class ClusterTest extends ControllerTest {
     _minionStarter = null;
   }
 
-  protected void addSchema(File schemaFile, String schemaName)
-      throws Exception {
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient
-          .addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort), schemaName,
-              schemaFile);
-    }
-  }
-
   /**
    * Upload all segments inside the given directory to the cluster.
    *
-   * @param segmentDir Segment directory
+   * @param tarDir Segment directory
    */
-  protected void uploadSegments(String tableName, File segmentDir)
+  protected void uploadSegments(String tableName, File tarDir)
       throws Exception {
-    String[] segmentNames = segmentDir.list();
-    assertNotNull(segmentNames);
+    File[] segmentTarFiles = tarDir.listFiles();
+    assertNotNull(segmentTarFiles);
+    int numSegments = segmentTarFiles.length;
+    assertTrue(numSegments > 0);
+
+    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      final URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
-
-      // Upload all segments in parallel
-      int numSegments = segmentNames.length;
-      ExecutorService executor = Executors.newFixedThreadPool(numSegments);
-      List<Future<Integer>> tasks = new ArrayList<>(numSegments);
-      for (final String segmentName : segmentNames) {
-        final File segmentFile = new File(segmentDir, segmentName);
-        tasks.add(executor.submit(new Callable<Integer>() {
-          @Override
-          public Integer call()
-              throws Exception {
-            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile, tableName)
-                .getStatusCode();
-          }
-        }));
+      if (numSegments == 1) {
+        File segmentTarFile = segmentTarFiles[0];
+        assertEquals(fileUploadDownloadClient
+                .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName).getStatusCode(),
+            HttpStatus.SC_OK);
+      } else {
+        // Upload all segments in parallel
+        ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
+        List<Future<Integer>> futures = new ArrayList<>(numSegments);
+        for (File segmentTarFile : segmentTarFiles) {
+          futures.add(executorService.submit(() -> fileUploadDownloadClient
+              .uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, tableName)
+              .getStatusCode()));
+        }
+        executorService.shutdown();
+        for (Future<Integer> future : futures) {
+          assertEquals((int) future.get(), HttpStatus.SC_OK);
+        }
       }
-      for (Future<Integer> task : tasks) {
-        assertEquals((int) task.get(), HttpStatus.SC_OK);
-      }
-      executor.shutdown();
     }
-  }
-
-  protected void addOfflineTable(String tableName)
-      throws Exception {
-    addOfflineTable(tableName, SegmentVersion.v1);
-  }
-
-  protected void addOfflineTable(String tableName, SegmentVersion segmentVersion)
-      throws Exception {
-    addOfflineTable(tableName, null, null, null, null, null, segmentVersion, null, null, null, null, null, null);
-  }
-
-  protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
-      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, List<String> rangeIndexColumns, TableTaskConfig taskConfig,
-      SegmentPartitionConfig segmentPartitionConfig, String sortedColumn)
-      throws Exception {
-    TableConfig tableConfig =
-        getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, bloomFilterColumns, rangeIndexColumns, taskConfig, segmentPartitionConfig,
-            sortedColumn, "daily");
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
-  }
-
-  protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
-      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, List<String> rangeIndexColumns, TableTaskConfig taskConfig,
-      SegmentPartitionConfig segmentPartitionConfig, String sortedColumn)
-      throws Exception {
-    TableConfig tableConfig =
-        getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, bloomFilterColumns, rangeIndexColumns, taskConfig, segmentPartitionConfig,
-            sortedColumn, "daily");
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonString());
-  }
-
-  private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
-      String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> rangeIndexColumns,
-      TableTaskConfig taskConfig, SegmentPartitionConfig segmentPartitionConfig, String sortedColumn,
-      String segmentPushFrequency) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
-        .setTimeType(timeType).setSegmentPushFrequency(segmentPushFrequency).setNumReplicas(1)
-        .setBrokerTenant(brokerTenant).setServerTenant(serverTenant).setLoadMode(loadMode)
-        .setSegmentVersion(segmentVersion.toString()).setInvertedIndexColumns(invertedIndexColumns)
-        .setBloomFilterColumns(bloomFilterColumns).setRangeIndexColumns(rangeIndexColumns).setTaskConfig(taskConfig)
-        .setSegmentPartitionConfig(segmentPartitionConfig).setSortedColumn(sortedColumn).build();
-  }
-
-  protected void dropOfflineTable(String tableName)
-      throws Exception {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
@@ -377,123 +300,6 @@ public abstract class ClusterTest extends ControllerTest {
         throw new RuntimeException(e);
       }
     }
-  }
-
-  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
-      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
-      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> rangeIndexColumns,
-      List<String> noDictionaryColumns, TableTaskConfig taskConfig, String streamConsumerFactoryName)
-      throws Exception {
-    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows, avroFile,
-        timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
-        bloomFilterColumns, rangeIndexColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName, 1);
-  }
-
-  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
-      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
-      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> rangeIndexColumns,
-      List<String> noDictionaryColumns, TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas)
-      throws Exception {
-    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows, avroFile,
-        timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
-        bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName, numReplicas, null);
-  }
-
-  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
-      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
-      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas,
-      List<FieldConfig> fieldConfigListForTextColumns)
-      throws Exception {
-    Map<String, String> streamConfigs = new HashMap<>();
-    String streamType = "kafka";
-    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    if (useLlc) {
-      // LLC
-      streamConfigs
-          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-              StreamConfig.ConsumerType.LOWLEVEL.toString());
-      streamConfigs.put(KafkaStreamConfigProperties
-          .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST), kafkaBrokerList);
-    } else {
-      // HLC
-      streamConfigs
-          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-              StreamConfig.ConsumerType.HIGHLEVEL.toString());
-      streamConfigs.put(KafkaStreamConfigProperties
-              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
-          kafkaZkUrl);
-      streamConfigs.put(KafkaStreamConfigProperties
-              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
-          kafkaBrokerList);
-    }
-    streamConfigs.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        streamConsumerFactoryName);
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            kafkaTopic);
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(realtimeSegmentFlushRows));
-    streamConfigs.put(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setLLC(useLlc)
-        .setTimeColumnName(timeColumnName).setTimeType(timeType).setSchemaName(schemaName).setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
-        .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
-        .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig)
-        .setNumReplicas(numReplicas).setFieldConfigList(fieldConfigListForTextColumns).build();
-
-    // save the realtime table config
-    _realtimeTableConfig = tableConfig;
-
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
-  }
-
-  protected void updateRealtimeTableConfig(String tablename, List<String> invertedIndexCols,
-      List<String> bloomFilterCols)
-      throws Exception {
-
-    IndexingConfig config = _realtimeTableConfig.getIndexingConfig();
-    config.setInvertedIndexColumns(invertedIndexCols);
-    config.setBloomFilterColumns(bloomFilterCols);
-
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename), _realtimeTableConfig.toJsonString());
-  }
-
-  protected void updateRealtimeTableTenant(String tableName, TenantConfig tenantConfig)
-      throws Exception {
-
-    _realtimeTableConfig.setTenantConfig(tenantConfig);
-
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), _realtimeTableConfig.toJsonString());
-  }
-
-  protected void dropRealtimeTable(String tableName)
-      throws Exception {
-    sendDeleteRequest(
-        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
-  }
-
-  protected void addHybridTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
-      String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
-      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> rangeIndexColumns,
-      List<String> noDictionaryColumns, TableTaskConfig taskConfig, String streamConsumerFactoryName,
-      SegmentPartitionConfig segmentPartitionConfig)
-      throws Exception {
-    addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, SegmentVersion.v1,
-        invertedIndexColumns, bloomFilterColumns, rangeIndexColumns, taskConfig, segmentPartitionConfig, sortedColumn);
-    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
-        timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
-        bloomFilterColumns, rangeIndexColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName);
   }
 
   protected JsonNode getDebugInfo(final String uri)
