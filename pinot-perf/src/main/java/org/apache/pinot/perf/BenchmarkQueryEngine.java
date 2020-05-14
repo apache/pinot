@@ -27,6 +27,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.pinot.broker.requesthandler.OptimizationFlags;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriverConf;
@@ -98,6 +99,7 @@ public class BenchmarkQueryEngine {
     conf.setConfigureResources(false);
     _perfBenchmarkDriver = new PerfBenchmarkDriver(conf);
     _perfBenchmarkDriver.run();
+    ControllerFilePathProvider.init(_perfBenchmarkDriver.getControllerConf());
 
     File[] segments = new File(DATA_DIRECTORY, TABLE_NAME).listFiles();
     for (File segmentDir : segments) {
