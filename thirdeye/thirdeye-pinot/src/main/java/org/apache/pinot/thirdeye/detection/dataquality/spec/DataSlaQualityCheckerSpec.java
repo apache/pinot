@@ -17,31 +17,22 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.anomaly.task;
+package org.apache.pinot.thirdeye.detection.dataquality.spec;
 
-public class TaskConstants {
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 
-  public enum TaskType {
-    DATA_QUALITY,
-    DETECTION,
-    DETECTION_ALERT,
-    YAML_DETECTION_ONBOARD,
-    ANOMALY_DETECTION,
-    MERGE,
-    // TODO: deprecate ALERT task type
-    ALERT,
-    ALERT2,
-    MONITOR,
-    DATA_COMPLETENESS,
-    CLASSIFICATION,
-    REPLAY
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class DataSlaQualityCheckerSpec extends AbstractSpec {
+  private String sla = "1_DAYS";
+
+  public String getSla() {
+    return sla;
   }
 
-  public enum TaskStatus {
-    WAITING,
-    RUNNING,
-    COMPLETED,
-    FAILED,
-    TIMEOUT
+  public void setSla(String sla) {
+    this.sla = sla;
   }
 }

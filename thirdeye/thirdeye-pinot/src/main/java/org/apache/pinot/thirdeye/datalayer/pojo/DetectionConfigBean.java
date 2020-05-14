@@ -47,7 +47,7 @@ public class DetectionConfigBean extends AbstractBean {
   List<String> owners;
 
   // Stores properties related to data SLA rules for every metric
-  Map<String, Object> dataSLAProperties;
+  Map<String, Object> dataQualityProperties;
 
   boolean isDataAvailabilitySchedule;
   long taskTriggerFallBackTimeInSec;
@@ -133,12 +133,12 @@ public class DetectionConfigBean extends AbstractBean {
     this.active = active;
   }
 
-  public Map<String, Object> getDataSLAProperties() {
-    return dataSLAProperties;
+  public Map<String, Object> getDataQualityProperties() {
+    return dataQualityProperties;
   }
 
-  public void setDataSLAProperties(Map<String, Object> dataSLAProperties) {
-    this.dataSLAProperties = dataSLAProperties;
+  public void setDataQualityProperties(Map<String, Object> dataQualityProperties) {
+    this.dataQualityProperties = dataQualityProperties;
   }
 
   public boolean isDataAvailabilitySchedule() {
@@ -176,7 +176,7 @@ public class DetectionConfigBean extends AbstractBean {
     DetectionConfigBean that = (DetectionConfigBean) o;
     return lastTimestamp == that.lastTimestamp && active == that.active && Objects.equals(cron, that.cron)
         && Objects.equals(name, that.name) && Objects.equals(properties, that.properties) && Objects.equals(yaml,
-        that.yaml) && Objects.equals(dataSLAProperties, that.dataSLAProperties)
+        that.yaml) && Objects.equals(dataQualityProperties, that.dataQualityProperties)
         && Objects.equals(isDataAvailabilitySchedule, that.isDataAvailabilitySchedule) && Objects
         .equals(taskTriggerFallBackTimeInSec, that.taskTriggerFallBackTimeInSec);
   }

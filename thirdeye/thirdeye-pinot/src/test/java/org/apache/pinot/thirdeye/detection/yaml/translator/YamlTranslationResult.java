@@ -24,6 +24,7 @@ import java.util.Map;
 
 public class YamlTranslationResult {
   private Map<String, Object> properties;
+  private Map<String, Object> dataQualityProperties;
   private Map<String, Object> components;
   private String cron;
 
@@ -33,6 +34,14 @@ public class YamlTranslationResult {
 
   public Map<String, Object> getProperties() {
     return properties;
+  }
+
+  public void setDataQualityProperties(Map<String, Object> dataQualityProperties) {
+    this.dataQualityProperties = dataQualityProperties;
+  }
+
+  public Map<String, Object> getDataQualityProperties() {
+    return dataQualityProperties;
   }
 
   public void setComponents(Map<String, Object> components) {

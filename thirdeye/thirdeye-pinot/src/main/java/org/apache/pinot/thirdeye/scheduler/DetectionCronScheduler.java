@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
-import org.apache.pinot.thirdeye.detection.DetectionDataSLAJob;
+import org.apache.pinot.thirdeye.detection.dataquality.DataQualityPipelineJob;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineJob;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.TaskUtils;
@@ -84,7 +84,7 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
           LOG.debug("Detection config " + key + " is inactive. Skipping.");
           continue;
         }
-        if (DetectionUtils.isDataAvailabilityCheckEnabled(config)) {
+        if (DetectionUtils.isDataQualityCheckEnabled(config)) {
           LOG.debug("Detection config " + key + " is enabled for data availability scheduling. Skipping.");
           continue;
         }
@@ -152,10 +152,10 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
     LOG.info(String.format("scheduled detection pipeline job %s", detectionJob.getKey().getName()));
 
     // Data SLA alerts will be scheduled only when enabled by the user.
-    if (DetectionUtils.isDataAvailabilityCheckEnabled((DetectionConfigDTO) config)) {
-      JobDetail dataSLAJob = JobBuilder.newJob(DetectionDataSLAJob.class).withIdentity(key).build();
-      this.scheduler.scheduleJob(dataSLAJob, trigger);
-      LOG.info(String.format("scheduled data sla jobs %s", dataSLAJob.getKey().getName()));
+    if (DetectionUtils.isDataQualityCheckEnabled((DetectionConfigDTO) config)) {
+      JobDetail dataQualityJob = JobBuilder.newJob(DataQualityPipelineJob.class).withIdentity(key).build();
+      this.scheduler.scheduleJob(dataQualityJob, trigger);
+      LOG.info(String.format("scheduled data sla jobs %s", dataQualityJob.getKey().getName()));
     }
   }
 

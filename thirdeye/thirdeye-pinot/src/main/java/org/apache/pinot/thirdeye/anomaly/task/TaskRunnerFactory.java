@@ -27,7 +27,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
 import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskRunner;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskRunner;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskRunner;
-import org.apache.pinot.thirdeye.detection.datasla.DatasetSlaTaskRunner;
+import org.apache.pinot.thirdeye.detection.dataquality.DataQualityPipelineTaskRunner;
 import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskRunner;
 
 
@@ -39,8 +39,8 @@ public class TaskRunnerFactory {
   public static TaskRunner getTaskRunnerFromTaskType(TaskType taskType) {
     TaskRunner taskRunner = null;
     switch (taskType) {
-      case DATA_SLA:
-        taskRunner = new DatasetSlaTaskRunner();
+      case DATA_QUALITY:
+        taskRunner = new DataQualityPipelineTaskRunner();
         break;
       case DETECTION:
         taskRunner = new DetectionPipelineTaskRunner();

@@ -46,11 +46,8 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import org.joda.time.DateTime;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator.*;
@@ -84,9 +81,6 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   private static final String PROP_NESTED_PROPERTIES_KEY = "nested";
   private static final String PROP_MONITORING_GRANULARITY = "monitoringGranularity";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
-  private static final String PROP_VARIABLES_BUCKET_PERIOD = "variables.bucketPeriod";
-
-  private static final Logger LOG = LoggerFactory.getLogger(DetectionConfigFormatter.class);
 
   private static final long DEFAULT_PRESENTING_WINDOW_SIZE_MINUTELY = TimeUnit.HOURS.toMillis(48);
   private static final long DEFAULT_PRESENTING_WINDOW_SIZE_DAILY = TimeUnit.DAYS.toMillis(30);
