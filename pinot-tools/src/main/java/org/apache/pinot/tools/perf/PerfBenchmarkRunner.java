@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
@@ -160,6 +161,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
     boolean tableConfigured = false;
     File[] segments = new File(dataDir, tableName).listFiles();
     Preconditions.checkNotNull(segments);
+    ControllerFilePathProvider.init(driver.getControllerConf());
     for (File segment : segments) {
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segment);
       if (!tableConfigured) {

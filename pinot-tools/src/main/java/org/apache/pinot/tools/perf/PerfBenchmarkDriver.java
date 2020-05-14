@@ -204,7 +204,7 @@ public class PerfBenchmarkDriver {
     _controllerStarter.start();
   }
 
-  private ControllerConf getControllerConf() {
+  public ControllerConf getControllerConf() {
     ControllerConf conf = new ControllerConf();
     conf.setHelixClusterName(_clusterName);
     conf.setZkStr(_zkAddress);
