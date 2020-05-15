@@ -110,8 +110,13 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     }
   }
 
-  private static final int NUM_REPLICAS = 3;
+  private static final int NUM_REPLICAS = 2;
   private static final String TENANT_NAME = "TestTenant";
+  private static final int NUM_BROKERS = 1;
+  private static final int NUM_OFFLINE_SERVERS = 2;
+  private static final int NUM_REALTIME_SERVERS = 2;
+  private static final int NUM_OFFLINE_AVRO_FILES = 8;
+  private static final int NUM_REALTIME_AVRO_FILES = 6;
 
   private String _currentTable = DEFAULT_TABLE_NAME;
 
@@ -151,31 +156,29 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     TestControllerConf controllerConf = new TestControllerConf(getDefaultControllerConfiguration());
     controllerConf.setTenantIsolationEnabled(false);
     startController(controllerConf);
-    startBroker();
-    startServers(6);
+    startBrokers(NUM_BROKERS);
+    startServers(NUM_OFFLINE_SERVERS + NUM_REALTIME_SERVERS);
 
     // Create tenants
-    createBrokerTenant(TENANT_NAME, 1);
-    createServerTenant(TENANT_NAME, 3, 3);
+    createBrokerTenant(TENANT_NAME, NUM_BROKERS);
+    createServerTenant(TENANT_NAME, NUM_OFFLINE_SERVERS, NUM_REALTIME_SERVERS);
 
     // Unpack the Avro files
     int numAvroFiles = unpackAvroData(_tempDir).size();
-    int numOfflineAvroFiles = 8;
-    int numRealtimeAvroFiles = 6;
     // Avro files has to be ordered as time series data
     List<File> avroFiles = new ArrayList<>(numAvroFiles);
     for (int i = 1; i <= numAvroFiles; i++) {
       avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
     }
-    List<File> offlineAvroFiles = avroFiles.subList(0, numOfflineAvroFiles);
-    List<File> realtimeAvroFiles = avroFiles.subList(numAvroFiles - numRealtimeAvroFiles, numAvroFiles);
+    List<File> offlineAvroFiles = avroFiles.subList(0, NUM_OFFLINE_AVRO_FILES);
+    List<File> realtimeAvroFiles = avroFiles.subList(numAvroFiles - NUM_REALTIME_AVRO_FILES, numAvroFiles);
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
+    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
     ClusterIntegrationTestUtils
@@ -241,7 +244,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         return false;
       }
       if (!checkSegmentStatusCheckerMetrics(controllerMetrics, TableNameBuilder.OFFLINE.tableNameWithType(emptyTable),
-          null, 3, 100, 0, 100)) {
+          null, NUM_REPLICAS, 100, 0, 100)) {
         return false;
       }
       if (!checkSegmentStatusCheckerMetrics(controllerMetrics,
@@ -251,17 +254,21 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       }
       String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
       IdealState idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-      if (!checkSegmentStatusCheckerMetrics(controllerMetrics, tableNameWithType, idealState, 3, 100, 0, 100)) {
+      if (!checkSegmentStatusCheckerMetrics(controllerMetrics, tableNameWithType, idealState, NUM_REPLICAS, 100, 0,
+          100)) {
         return false;
       }
       tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableWithOfflineSegment);
       idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-      if (!checkSegmentStatusCheckerMetrics(controllerMetrics, tableNameWithType, idealState, 2, 66, 0, 100)) {
+      //noinspection PointlessArithmeticExpression
+      if (!checkSegmentStatusCheckerMetrics(controllerMetrics, tableNameWithType, idealState, NUM_REPLICAS - 1,
+          100 * (NUM_REPLICAS - 1) / NUM_REPLICAS, 0, 100)) {
         return false;
       }
       tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
       idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-      if (!checkSegmentStatusCheckerMetrics(controllerMetrics, tableNameWithType, idealState, 3, 100, 0, 100)) {
+      if (!checkSegmentStatusCheckerMetrics(controllerMetrics, tableNameWithType, idealState, NUM_REPLICAS, 100, 0,
+          100)) {
         return false;
       }
       return controllerMetrics.getValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT) == 4
@@ -303,7 +310,8 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     // Add relocation tenant config
     TableConfig realtimeTableConfig = getRealtimeTableConfig();
     realtimeTableConfig.setTenantConfig(new TenantConfig(TENANT_NAME, TENANT_NAME,
-        new TagOverrideConfig(TENANT_NAME + "_REALTIME", TENANT_NAME + "_OFFLINE")));
+        new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME),
+            TagNameUtils.getOfflineTagForTenant(TENANT_NAME))));
     updateTableConfig(realtimeTableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -371,7 +379,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           validationMetrics.getValueOfGauge(ValidationMetrics.makeGaugeName(tableNameWithType, "missingSegmentCount"));
       long numTotalDocs =
           validationMetrics.getValueOfGauge(ValidationMetrics.makeGaugeName(tableNameWithType, "TotalDocumentCount"));
-      return numSegments == 8 && numMissingSegments == 0 && numTotalDocs == 79003;
+      return numSegments == NUM_OFFLINE_AVRO_FILES && numMissingSegments == 0 && numTotalDocs == 79003;
     }, 60_000, "Timed out waiting for OfflineSegmentIntervalChecker");
   }
 
