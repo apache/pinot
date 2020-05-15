@@ -150,8 +150,7 @@ public class RealtimeSegmentConverter {
   }
 
   /**
-   * Returns a new schema based on the original one. The new schema removes columns as needed (for ex, virtual cols)
-   * and adds the new timespec to the schema.
+   * Returns a new schema containing only physical columns
    */
   @VisibleForTesting
   public Schema getUpdatedSchema(Schema original) {

@@ -40,14 +40,12 @@ public class SegmentGeneratorConfigTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
-    // table config provided
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertEquals(segmentGeneratorConfig.getTimeColumnName(), "daysSinceEpoch");
     assertEquals(segmentGeneratorConfig.getTimeColumnType(), SegmentGeneratorConfig.TimeColumnType.EPOCH);
     assertEquals(segmentGeneratorConfig.getSegmentTimeUnit(), TimeUnit.DAYS);
     assertNull(segmentGeneratorConfig.getSimpleDateFormat());
 
-    // table config not provided
     // MUST provide valid tableConfig with time column if time details are wanted
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
@@ -64,14 +62,12 @@ public class SegmentGeneratorConfigTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("Date").build();
 
-    // Table config provided
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertEquals(segmentGeneratorConfig.getTimeColumnName(), "Date");
     assertEquals(segmentGeneratorConfig.getTimeColumnType(), SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE);
     assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
     assertEquals(segmentGeneratorConfig.getSimpleDateFormat(), "yyyyMMdd");
 
-    // Table config not provided
     // MUST provide valid tableConfig with time column if time details are wanted
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();

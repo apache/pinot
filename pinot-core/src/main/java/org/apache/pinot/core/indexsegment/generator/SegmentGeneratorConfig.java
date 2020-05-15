@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
@@ -182,7 +183,7 @@ public class SegmentGeneratorConfig {
   /**
    * Set time column details using the given time column
    */
-  public void setTime(String timeColumnName, Schema schema) {
+  public void setTime(@Nullable String timeColumnName, Schema schema) {
     if (timeColumnName != null) {
       DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
       if (dateTimeFieldSpec != null) {
