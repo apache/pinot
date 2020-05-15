@@ -158,6 +158,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServers(int numServers, Configuration configuration, int baseAdminApiPort, int baseNettyPort,
       String zkStr) {
+    FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
     _serverStarters = new ArrayList<>(numServers);
     overrideServerConf(configuration);
     try {
@@ -178,6 +179,7 @@ public abstract class ClusterTest extends ControllerTest {
   //       to manage the instance level configs
   protected void startMinion(@Nullable Map<String, PinotTaskExecutorFactory> taskExecutorFactoryRegistry,
       @Nullable Map<String, MinionEventObserverFactory> eventObserverFactoryRegistry) {
+    FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     try {
       _minionStarter =
           new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), new PropertiesConfiguration());

@@ -110,7 +110,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Create the tables
     ArrayList<String> invertedIndexColumns = Lists.newArrayList();
     addOfflineTable(DEFAULT_TABLE_NAME, null, null, null, null, null, SegmentVersion.v1, invertedIndexColumns, null,
-        null, null, null);
+        null, null, null, null);
 
     setUpSegmentsAndQueryGenerator();
 
@@ -269,7 +269,8 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(selectionResults.size() == 1);
     for (int i = 0; i < selectionResults.size(); i++) {
       String value = selectionResults.get(i).get(0).textValue();
-      Assert.assertEquals(value, "{\"k4-k1\":\"value-k4-k1-0\",\"k4-k2\":\"value-k4-k2-0\",\"k4-k3\":\"value-k4-k3-0\",\"met\":0}");
+      Assert.assertEquals(value,
+          "{\"k4-k1\":\"value-k4-k1-0\",\"k4-k2\":\"value-k4-k2-0\",\"k4-k3\":\"value-k4-k3-0\",\"met\":0}");
     }
 
     //selection order by
