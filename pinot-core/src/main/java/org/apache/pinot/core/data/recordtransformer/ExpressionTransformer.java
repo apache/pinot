@@ -37,9 +37,11 @@ public class ExpressionTransformer implements RecordTransformer {
   private final Map<String, FunctionEvaluator> _expressionEvaluators = new HashMap<>();
 
   public ExpressionTransformer(Schema schema) {
+    FunctionEvaluatorFactory functionEvaluatorFactory = new FunctionEvaluatorFactory();
+
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        FunctionEvaluator functionEvaluator = functionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
         if (functionEvaluator != null) {
           _expressionEvaluators.put(fieldSpec.getName(), functionEvaluator);
         }
