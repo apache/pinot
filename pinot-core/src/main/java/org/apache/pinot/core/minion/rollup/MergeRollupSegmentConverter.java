@@ -112,7 +112,6 @@ public class MergeRollupSegmentConverter {
     for (DateTimeFieldSpec dateTimeFieldSpec : schema.getDateTimeFieldSpecs()) {
       groupByColumns.add(dateTimeFieldSpec.getName());
     }
-    // TODO: once time column starts showing up as dateTimeFieldSpec (https://github.com/apache/incubator-pinot/issues/2756) below lines becomes redundant
     String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
     if (timeColumnName != null && !groupByColumns.contains(timeColumnName)) {
       groupByColumns.add(timeColumnName);

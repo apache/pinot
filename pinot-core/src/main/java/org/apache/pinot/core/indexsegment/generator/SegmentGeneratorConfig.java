@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
@@ -42,6 +43,8 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
@@ -118,10 +121,6 @@ public class SegmentGeneratorConfig {
     setSchema(schema);
 
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
-    //  If time column name is not set in table config, read time from schema.
-    // WARN: Once we move to DateTimeFieldSpec - table config has to be provided with valid time - if time needs to be set.
-    //  We cannot deduce whether 1) one of the provided DateTimes should be used as time column 2) if yes, which one
-    //  Even if only 1 DateTime exists, we cannot determine whether it should be primary time column (there could be no time column for table (REFRESH), but still multiple DateTimeFieldSpec)
     String timeColumnName = null;
     if (tableConfig.getValidationConfig() != null) {
       timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -182,41 +181,20 @@ public class SegmentGeneratorConfig {
   }
 
   /**
-   * Set time column details using the given time column. If not found, use schema
+   * Set time column details using the given time column
    */
-  public void setTime(String timeColumnName, Schema schema) {
+  public void setTime(@Nullable String timeColumnName, Schema schema) {
     if (timeColumnName != null) {
-      FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
-      if (fieldSpec != null) {
-        setTime(fieldSpec);
-        return;
+      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+      if (dateTimeFieldSpec != null) {
+        setTimeColumnName(dateTimeFieldSpec.getName());
+        DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+        if (formatSpec.getTimeFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH)) {
+          setSegmentTimeUnit(formatSpec.getColumnUnit());
+        } else {
+          setSimpleDateFormat(formatSpec.getSDFPattern());
+        }
       }
-    }
-    setTime(schema.getTimeFieldSpec());
-  }
-
-  /**
-   * Set time column details using the given field spec
-   */
-  private void setTime(FieldSpec timeSpec) {
-    if (timeSpec == null) {
-      return;
-    }
-    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) timeSpec;
-    setTimeColumnName(timeFieldSpec.getName());
-
-    TimeGranularitySpec timeGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
-
-    String timeFormat = timeGranularitySpec.getTimeFormat();
-    if (timeFormat.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-      // Time format: 'EPOCH'
-      setSegmentTimeUnit(timeGranularitySpec.getTimeType());
-    } else {
-      // Time format: 'SIMPLE_DATE_FORMAT:<pattern>'
-      Preconditions.checkArgument(timeFormat.startsWith(TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-          "Invalid time format: %s, must be one of '%s' or '%s:<pattern>'", timeFormat,
-          TimeGranularitySpec.TimeFormat.EPOCH, TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT);
-      setSimpleDateFormat(timeFormat.substring(timeFormat.indexOf(':') + 1));
     }
   }
 

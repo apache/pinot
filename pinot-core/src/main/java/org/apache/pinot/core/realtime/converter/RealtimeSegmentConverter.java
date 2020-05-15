@@ -150,26 +150,13 @@ public class RealtimeSegmentConverter {
   }
 
   /**
-   * Returns a new schema based on the original one. The new schema removes columns as needed (for ex, virtual cols)
-   * and adds the new timespec to the schema.
+   * Returns a new schema containing only physical columns
    */
   @VisibleForTesting
   public Schema getUpdatedSchema(Schema original) {
     Schema newSchema = new Schema();
-    TimeFieldSpec tfs = original.getTimeFieldSpec();
-    if (tfs != null) {
-      // Use outgoing granularity for creating segment
-      TimeGranularitySpec outgoing = tfs.getOutgoingGranularitySpec();
-      if (outgoing != null) {
-        TimeFieldSpec newTimeSpec = new TimeFieldSpec(outgoing);
-        newSchema.addField(newTimeSpec);
-      }
-    }
-
     for (String col : original.getPhysicalColumnNames()) {
-      if ((tfs == null) || (!col.equals(tfs.getName()))) {
-        newSchema.addField(original.getFieldSpecFor(col));
-      }
+      newSchema.addField(original.getFieldSpecFor(col));
     }
     return newSchema;
   }

@@ -25,11 +25,13 @@ import java.io.IOException;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
@@ -45,6 +47,7 @@ public class HybridQuickstart {
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private File _schemaFile;
+  private File _realtimeTableConfigFile;
   private File _dataFile;
   private File _ingestionJobSpecFile;
 
@@ -92,18 +95,18 @@ public class HybridQuickstart {
     }
 
     _dataFile = new File(_realtimeQuickStartDataDir, "airlineStats_data.avro");
-    File tableConfigFile = new File(_realtimeQuickStartDataDir, "airlineStats_realtime_table_config.json");
+    _realtimeTableConfigFile = new File(_realtimeQuickStartDataDir, "airlineStats_realtime_table_config.json");
 
     URL resource = Quickstart.class.getClassLoader().getResource(
         "examples/stream/airlineStats/airlineStats_realtime_table_config.json");
     Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, tableConfigFile);
+    FileUtils.copyURLToFile(resource, _realtimeTableConfigFile);
     resource = Quickstart.class.getClassLoader().getResource(
         "examples/stream/airlineStats/sample_data/airlineStats_data.avro");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, _dataFile);
 
-    return new QuickstartTableRequest("airlineStats", _schemaFile, tableConfigFile);
+    return new QuickstartTableRequest("airlineStats", _schemaFile, _realtimeTableConfigFile);
   }
 
   private void startKafka() {
@@ -136,8 +139,9 @@ public class HybridQuickstart {
     runner.launchDataIngestionJob();
 
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");
-
-    final AirlineDataStream stream = new AirlineDataStream(Schema.fromFile(_schemaFile), _dataFile);
+    Schema schema = Schema.fromFile(_schemaFile);
+    TableConfig tableConfig = JsonUtils.fileToObject(_realtimeTableConfigFile, TableConfig.class);
+    final AirlineDataStream stream = new AirlineDataStream(schema, tableConfig, _dataFile);
     stream.run();
 
     printStatus(Color.YELLOW, "***** Pinot Hybrid with hybrid table setup is complete *****");
