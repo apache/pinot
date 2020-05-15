@@ -55,13 +55,18 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Generates Data SLA anomalies. DATA_MISSING anomalies are created if
- * the data is not available for the sla detection window within the configured SLA.
+ * Performs data sla checks for the window and generates DATA_MISSING anomalies.
  */
-@Components(title = "DataSla", type = "DATA_SLA", tags = {
-    DetectionTag.RULE_DETECTION}, description = "", presentation = {
-    @PresentationOption(name = "absolute value", template = "is lower than ${min} or higher than ${max}")}, params = {
-    @Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")})
+@Components(title = "Data Sla Quality Checker",
+    type = "DATA_SLA",
+    tags = {DetectionTag.RULE_DETECTION},
+    description = "Checks if data is missing or not based on the configured sla",
+    presentation = {
+        @PresentationOption(name = "data sla", template = "is ${sla}")
+    },
+    params = {
+        @Param(name = "sla", placeholder = "value")
+    })
 public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityCheckerSpec>, BaselineProvider<DataSlaQualityCheckerSpec> {
   private static final Logger LOG = LoggerFactory.getLogger(DataSlaQualityChecker.class);
 
@@ -91,7 +96,7 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
   private List<MergedAnomalyResultDTO> runSLACheck(MetricEntity me, Interval window) {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
 
-    // We want to measure the overall dataset availability (filters are ignored)
+    // We want to measure the overall dataset availability (filters can be ignored)
     long startTime = window.getStart().getMillis();
     long endTime = window.getEnd().getMillis();
     MetricSlice metricSlice = MetricSlice.from(me.getId(), startTime, endTime, ArrayListMultimap.<String, String>create());
@@ -205,59 +210,6 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
     properties.put("sla", sla);
     anomaly.setProperties(properties);
 
-/*    List<MergedAnomalyResultDTO> existingAnomalies = anomalyDAO.findAnomaliesWithinBoundary(start, end, detectionId);
-    if (!existingAnomalies.isEmpty()) {
-      mergeSLAAnomalies(anomaly, existingAnomalies);
-    } else {
-      // no merging required
-      this.anomalyDAO.save(anomaly);
-      if (anomaly.getId() == null) {
-        LOG.warn("Could not store data sla check failed anomaly:\n{}", anomaly);
-      }
-    }*/
-
     return anomaly;
-  }
-
-  /**
-   * Merges one DATA_MISSING anomaly with remaining existing anomalies.
-   */
-/*  private void mergeSLAAnomalies(MergedAnomalyResultDTO anomaly, List<MergedAnomalyResultDTO> existingAnomalies) {
-    // Extract the parent SLA anomaly. We can have only 1 parent DATA_MISSING anomaly in a window.
-    existingAnomalies.removeIf(MergedAnomalyResultBean::isChild);
-    MergedAnomalyResultDTO existingParentSLAAnomaly = existingAnomalies.get(0);
-
-    if (isDuplicateSLAAnomaly(existingParentSLAAnomaly, anomaly)) {
-      // Ensure anomalies are not duplicated. Ignore and return.
-      // Example: daily data with hourly cron should generate only 1 sla alert if data is missing
-      return;
-    }
-    existingParentSLAAnomaly.setChild(true);
-    anomaly.setChild(false);
-    anomaly.setChildren(Collections.singleton(existingParentSLAAnomaly));
-    this.anomalyDAO.save(anomaly);
-    if (anomaly.getId() == null) {
-      LOG.warn("Could not store data sla check failed anomaly:\n{}", anomaly);
-    }
-  }*/
-
-  /**
-   * We say one DATA_MISSING anomaly is a duplicate of another if they belong to the same detection with the same type
-   * and span the exact same duration.
-   */
-  private boolean isDuplicateSLAAnomaly(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2) {
-    if (anomaly1 == null && anomaly2 == null) {
-      return true;
-    }
-
-    if (anomaly1 == null || anomaly2 == null) {
-      return false;
-    }
-
-    // anomalies belong to the same detection, same type & span over the same duration
-    return anomaly1.getDetectionConfigId().equals(anomaly2.getDetectionConfigId())
-        && anomaly1.getType() == anomaly2.getType()
-        && anomaly1.getStartTime() == anomaly2.getStartTime()
-        && anomaly1.getEndTime() == anomaly2.getEndTime();
   }
 }

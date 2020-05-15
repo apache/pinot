@@ -72,7 +72,6 @@ public class DataSlaWrapper extends DetectionPipeline {
     Preconditions.checkArgument(this.config.getComponents().containsKey(this.qualityCheckerKey));
     this.qualityChecker = (AnomalyDetector) this.config.getComponents().get(this.qualityCheckerKey);
 
-    // TODO Check
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     this.metricEntity = MetricEntity.fromURN(this.metricUrn);
     this.metric = provider.fetchMetrics(Collections.singleton(this.metricEntity.getId())).get(this.metricEntity.getId());
@@ -84,24 +83,10 @@ public class DataSlaWrapper extends DetectionPipeline {
 
   @Override
   public DetectionPipelineResult run() throws Exception {
-    //dataSlaTaskCounter.inc();
-
     LOG.info("Check data sla for config {} between {} and {}", config.getId(), startTime, endTime);
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    List<Interval> monitoringWindows = Collections.singletonList(new Interval(startTime, endTime, DateTimeZone.forID(dataset.getTimezone())));
-    int totalWindows = monitoringWindows.size();
-    int successWindows = 0;
-    // The last exception of the detection windows. It will be thrown out to upper level.
-    Exception lastException = null;
-    for (int i = 0; i < totalWindows; i++) {
-      // run detection
-      Interval window = monitoringWindows.get(i);
-      DetectionResult detectionResult = DetectionResult.empty();
-
-      // TODO log
-      detectionResult = qualityChecker.runDetection(window, this.metricUrn);
-      anomalies.addAll(detectionResult.getAnomalies());
-    }
+    Interval window =  new Interval(startTime, endTime, DateTimeZone.forID(dataset.getTimezone()));
+    DetectionResult detectionResult = qualityChecker.runDetection(window, this.metricUrn);
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>(detectionResult.getAnomalies());
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());

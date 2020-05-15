@@ -52,6 +52,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator.*;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.builder.DetectionConfigTranslatorBuilder.*;
 
 
 /**
