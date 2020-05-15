@@ -136,6 +136,12 @@
           <td class="{{this.fieldType}}">{{this.dataType}}</td>
         </tr>
       {{/each}}
+      {{#each dateTimeFieldSpecs}}
+      <tr>
+        <td class="{{this.fieldType}}">{{this.name}}</td>
+        <td class="{{this.fieldType}}">{{this.dataType}}</td>
+      </tr>
+      {{/each}}
 
       {{#if timeFieldSpec}}
          {{#if outgoingGranularitySpec}}
