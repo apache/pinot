@@ -23,7 +23,6 @@ import org.apache.pinot.core.data.manager.callback.IndexSegmentCallback;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
-
 /**
  * class that used for regular append-only ingestion mode or data processing that don't support upsert
  * all method are no-op to ensure that regular append-only ingestion mode has the same performance as before
