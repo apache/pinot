@@ -41,7 +41,8 @@ import static org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner.*;
 
 
 /**
- * Translate a raw yaml config and map it to a config object
+ * This is the root of the detection config translator builder. Other translators
+ * extend from this class.
  */
 public abstract class DetectionConfigTranslatorBuilder {
 

@@ -51,7 +51,6 @@ public class DetectionMetricAttributeHolder {
     this.dataProvider = provider;
   }
 
-  // TODO: Synchronize
   private String loadMetricCache(Map<String, Object> metricAlertConfigMap) {
     String metricName = MapUtils.getString(metricAlertConfigMap, PROP_METRIC);
     String datasetName = MapUtils.getString(metricAlertConfigMap, PROP_DATASET);

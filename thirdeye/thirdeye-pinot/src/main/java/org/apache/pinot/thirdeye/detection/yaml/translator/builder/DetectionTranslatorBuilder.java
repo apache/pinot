@@ -47,7 +47,7 @@ import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
 
 
 /**
- * A data holder to store the processed information per metric
+ * This class is responsible for translating the detection properties
  */
 public class DetectionTranslatorBuilder extends DetectionConfigTranslatorBuilder {
 
