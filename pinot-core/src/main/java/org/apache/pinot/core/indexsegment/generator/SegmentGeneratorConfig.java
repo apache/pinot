@@ -130,6 +130,11 @@ public class SegmentGeneratorConfig {
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig != null) {
+      String segmentVersion = indexingConfig.getSegmentFormatVersion();
+      if (segmentVersion != null) {
+        _segmentVersion = SegmentVersion.valueOf(segmentVersion);
+      }
+
       List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
       Map<String, String> noDictionaryColumnMap = indexingConfig.getNoDictionaryConfig();
 

@@ -94,7 +94,6 @@
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
@@ -172,10 +171,6 @@
             <program>
               <mainClass>org.apache.pinot.perf.RawIndexBenchmark</mainClass>
               <name>pinot-RawIndexBenchmark</name>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.perf.RealtimeStressTest</mainClass>
-              <name>pinot-RealtimeStressTest</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>

@@ -24,10 +24,10 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -56,44 +56,27 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   private final boolean _isDirectAlloc = RANDOM.nextBoolean();
   private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
+  private final boolean _enableSplitCommit = RANDOM.nextBoolean();
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private final long _startTime = System.currentTimeMillis();
-
-  @BeforeClass
-  @Override
-  public void setUp()
-      throws Exception {
-    System.out.println(String.format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
-        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
-
-    // Remove the consumer directory
-    File consumerDirectory = new File(CONSUMER_DIRECTORY);
-    if (consumerDirectory.exists()) {
-      FileUtils.deleteDirectory(consumerDirectory);
-    }
-
-    super.setUp();
-  }
-
-  @Override
-  public void startController() {
-    ControllerConf controllerConfig = getDefaultControllerConfiguration();
-    controllerConfig.setHLCTablesAllowed(false);
-    controllerConfig.setSplitCommit(true);
-    startController(controllerConfig);
-    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
-  }
 
   @Override
   protected boolean useLlc() {
     return true;
   }
 
-  @Nullable
   @Override
   protected String getLoadMode() {
-    return "MMAP";
+    return ReadMode.mmap.name();
+  }
+
+  @Override
+  public void startController() {
+    ControllerConf controllerConfig = getDefaultControllerConfiguration();
+    controllerConfig.setHLCTablesAllowed(false);
+    controllerConfig.setSplitCommit(_enableSplitCommit);
+    startController(controllerConfig);
+    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
 
   @Override
@@ -103,9 +86,25 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
     }
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
+    if (_enableSplitCommit) {
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
+    }
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT, true);
+  }
+
+  @BeforeClass
+  @Override
+  public void setUp()
+      throws Exception {
+    System.out.println(String.format(
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, enableLeadControllerResource: %s",
+        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableSplitCommit, _enableLeadControllerResource));
+
+    // Remove the consumer directory
+    FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
+
+    super.setUp();
   }
 
   @Test
@@ -136,8 +135,10 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0L);
 
-    updateRealtimeTableConfig(getTableName(), UPDATED_INVERTED_INDEX_COLUMNS, null);
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(getTableName(), "realtime"), null);
+    TableConfig tableConfig = getRealtimeTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
+    updateTableConfig(tableConfig);
+    reloadRealtimeTable(getTableName());
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -165,6 +166,6 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Test
   public void testReload()
       throws Exception {
-    super.testReload(false);
+    testReload(false);
   }
 }

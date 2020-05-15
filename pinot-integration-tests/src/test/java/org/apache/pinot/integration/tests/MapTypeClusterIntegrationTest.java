@@ -21,24 +21,23 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -71,37 +70,28 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    // Create the tables
-    addOfflineTable(getTableName());
-
-    // Create and upload segments
-    File avroFile = createAvroFile();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(getTableName())
+    // Create and upload the schema and table config
+    String rawTableName = getTableName();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(rawTableName)
         .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, DataType.STRING)
         .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
         .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, DataType.INT)
         .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT).build();
-    FieldSpec intKeyMapJsonStrFieldSpec = new DimensionFieldSpec();
-    intKeyMapJsonStrFieldSpec.setDataType(DataType.STRING);
-    intKeyMapJsonStrFieldSpec.setDefaultNullValue("");
-    intKeyMapJsonStrFieldSpec.setName(INT_KEY_MAP_STR_FIELD_NAME);
-    intKeyMapJsonStrFieldSpec.setTransformFunction("toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")");
-    intKeyMapJsonStrFieldSpec.setSingleValueField(true);
-    schema.addField(intKeyMapJsonStrFieldSpec);
-    FieldSpec stringKeyMapJsonStrFieldSpec = new DimensionFieldSpec();
-    stringKeyMapJsonStrFieldSpec.setDataType(DataType.STRING);
-    stringKeyMapJsonStrFieldSpec.setDefaultNullValue("");
-    stringKeyMapJsonStrFieldSpec.setName(STRING_KEY_MAP_STR_FIELD_NAME );
+    FieldSpec stringKeyMapJsonStrFieldSpec =
+        new DimensionFieldSpec(STRING_KEY_MAP_STR_FIELD_NAME, DataType.STRING, true);
     stringKeyMapJsonStrFieldSpec.setTransformFunction("toJsonMapStr(" + STRING_KEY_MAP_FIELD_NAME + ")");
-    stringKeyMapJsonStrFieldSpec.setSingleValueField(true);
     schema.addField(stringKeyMapJsonStrFieldSpec);
-    ExecutorService executor = Executors.newCachedThreadPool();
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(Collections.singletonList(avroFile), 0, _segmentDir, _tarDir, getTableName(), null, null,
-            schema, executor);
-    executor.shutdown();
-    executor.awaitTermination(10, TimeUnit.MINUTES);
-    uploadSegments(getTableName(), _tarDir);
+    FieldSpec intKeyMapJsonStrFieldSpec = new DimensionFieldSpec(INT_KEY_MAP_STR_FIELD_NAME, DataType.STRING, true);
+    intKeyMapJsonStrFieldSpec.setTransformFunction("toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")");
+    schema.addField(intKeyMapJsonStrFieldSpec);
+    addSchema(schema);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
+    addTableConfig(tableConfig);
+
+    // Create and upload segments
+    File avroFile = createAvroFile();
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
+    uploadSegments(rawTableName, _tarDir);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(60_000);
@@ -148,12 +138,12 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     JsonNode selectionResults = pinotResponse.get("selectionResults").get("results");
     assertEquals(selectionResults.size(), 10);
     for (int i = 0; i < 10; i++) {
-      assertEquals(selectionResults.get(i).get(0).textValue(), String.format("{\"k1\":%d,\"k2\":100%d}",i,i));
+      assertEquals(selectionResults.get(i).get(0).textValue(), String.format("{\"k1\":%d,\"k2\":100%d}", i, i));
     }
     query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k1', 'INT') FROM " + getTableName();
-     pinotResponse = postQuery(query);
+    pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
-     selectionResults = pinotResponse.get("selectionResults").get("results");
+    selectionResults = pinotResponse.get("selectionResults").get("results");
     assertEquals(selectionResults.size(), 10);
     for (int i = 0; i < 10; i++) {
       assertEquals(Integer.parseInt(selectionResults.get(i).get(0).textValue()), i);

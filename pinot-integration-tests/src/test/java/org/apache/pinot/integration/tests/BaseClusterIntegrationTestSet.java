@@ -526,7 +526,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testReload(boolean includeOfflineTable)
       throws Exception {
     String rawTableName = getTableName();
-    Schema schema = Schema.fromFile(getSchemaFile());
+    Schema schema = getSchema();
 
     String selectStarQuery = "SELECT * FROM " + rawTableName;
     JsonNode queryResponse = postQuery(selectStarQuery);
@@ -554,9 +554,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Reload the table
     if (includeOfflineTable) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableReload(rawTableName, "OFFLINE"), null);
+      reloadOfflineTable(rawTableName);
     }
-    sendPostRequest(_controllerRequestURLBuilder.forTableReload(rawTableName, "REALTIME"), null);
+    reloadRealtimeTable(rawTableName);
 
     // Wait for all segments to finish reloading, and test querying the new columns
     // NOTE: Use count query to prevent schema inconsistency error
