@@ -51,6 +51,11 @@ public class QuickstartRunner {
   private static final int DEFAULT_BROKER_PORT = 8000;
   private static final int DEFAULT_CONTROLLER_PORT = 9000;
 
+  private static final String DEFAULT_ZK_DIR = "PinotZkDir";
+  private static final String DEFAULT_CONTROLLER_DIR = "PinotControllerDir";
+  private static final String DEFAULT_SERVER_DATA_DIR = "PinotServerDataDir";
+  private static final String DEFAULT_SERVER_SEGMENT_DIR = "PinotServerSegmentDir";
+
   private final List<QuickstartTableRequest> _tableRequests;
   private final int _numServers;
   private final int _numBrokers;
@@ -85,6 +90,7 @@ public class QuickstartRunner {
       throws IOException {
     StartZookeeperCommand zkStarter = new StartZookeeperCommand();
     zkStarter.setPort(ZK_PORT);
+    zkStarter.setDataDir(new File(_tempDir, DEFAULT_ZK_DIR).getAbsolutePath());
     zkStarter.execute();
   }
 
@@ -93,7 +99,8 @@ public class QuickstartRunner {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i)).setZkAddress(ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation);
+          .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
+          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath());
       controllerStarter.execute();
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
     }
@@ -115,8 +122,8 @@ public class QuickstartRunner {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
-          .setDataDir(new File(_tempDir, "PinotServerData" + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, "PinotServerSegment" + i).getAbsolutePath());
+          .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
       serverStarter.execute();
     }
   }
