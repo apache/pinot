@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.manager.callback.TableDataManagerCallback;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.slf4j.Logger;
@@ -58,8 +57,6 @@ public class TableDataManagerCallbackProvider {
       LOGGER.error("failed to load table data manager class {}", appendClassName, e);
       ExceptionUtils.rethrow(e);
     }
-    Preconditions.checkState(defaultTableDataManagerCallBackClass.isAssignableFrom(TableDataManagerCallback.class),
-        "configured class not assignable from Callback class", defaultTableDataManagerCallBackClass);
     if (StringUtils.isNotEmpty(upsertClassName)) {
       try {
         upsertTableDataManagerCallBackClass = (Class<TableDataManagerCallback>) Class.forName(upsertClassName);
