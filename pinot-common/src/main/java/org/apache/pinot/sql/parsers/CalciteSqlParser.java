@@ -55,6 +55,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class CalciteSqlParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
@@ -115,12 +116,15 @@ public class CalciteSqlParser {
 
   private static void matchIdentifierInAliasMap(Expression selectExpr, Set<String> aliasKeys)
       throws SqlCompilationException {
-    if (selectExpr.getFunctionCall() != null) {
-      if (selectExpr.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
-        matchIdentifierInAliasMap(selectExpr.getFunctionCall().getOperands().get(0), aliasKeys);
+    Function functionCall = selectExpr.getFunctionCall();
+    if (functionCall != null) {
+      if (functionCall.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+        matchIdentifierInAliasMap(functionCall.getOperands().get(0), aliasKeys);
       } else {
-        for (Expression operand : selectExpr.getFunctionCall().getOperands()) {
-          matchIdentifierInAliasMap(operand, aliasKeys);
+        if (functionCall.getOperandsSize() > 0) {
+          for (Expression operand : functionCall.getOperands()) {
+            matchIdentifierInAliasMap(operand, aliasKeys);
+          }
         }
       }
     }
@@ -169,16 +173,19 @@ public class CalciteSqlParser {
   }
 
   private static boolean isAggregateExpression(Expression expression) {
-    if (expression.getFunctionCall() != null) {
-      String operator = expression.getFunctionCall().getOperator();
+    Function functionCall = expression.getFunctionCall();
+    if (functionCall != null) {
+      String operator = functionCall.getOperator();
       try {
         AggregationFunctionType.getAggregationFunctionType(operator);
         return true;
       } catch (IllegalArgumentException e) {
       }
-      for (Expression operand : expression.getFunctionCall().getOperands()) {
-        if (isAggregateExpression(operand)) {
-          return true;
+      if (functionCall.getOperandsSize() > 0) {
+        for (Expression operand : functionCall.getOperands()) {
+          if (isAggregateExpression(operand)) {
+            return true;
+          }
         }
       }
     }
@@ -291,7 +298,7 @@ public class CalciteSqlParser {
         throw new RuntimeException(
             "Unable to convert SqlNode: " + sqlNode + " to PinotQuery. Unknown node type: " + sqlNode.getKind());
     }
-    queryReWrite(pinotQuery);
+    queryRewrite(pinotQuery);
     return pinotQuery;
   }
 
@@ -307,7 +314,7 @@ public class CalciteSqlParser {
     return SqlParser.create(sql, parserBuilder.build());
   }
 
-  private static void queryReWrite(PinotQuery pinotQuery) {
+  private static void queryRewrite(PinotQuery pinotQuery) {
     // Update Predicate Comparison
     if (pinotQuery.isSetFilterExpression()) {
       Expression filterExpression = pinotQuery.getFilterExpression();
@@ -359,10 +366,11 @@ public class CalciteSqlParser {
           comparisonFunction.getFunctionCall().setOperands(exprList);
           return comparisonFunction;
         default:
-          List<Expression> operands = functionCall.getOperands();
           List<Expression> newOperands = new ArrayList<>();
-          for (int i = 0; i < operands.size(); i++) {
-            newOperands.add(updateComparisonPredicate(operands.get(i)));
+          int operandsSize = functionCall.getOperandsSize();
+          for (int i = 0; i < operandsSize; i++) {
+            Expression operand = functionCall.getOperands().get(i);
+            newOperands.add(updateComparisonPredicate(operand));
           }
           functionCall.setOperands(newOperands);
       }
@@ -433,7 +441,7 @@ public class CalciteSqlParser {
       expression.setType(aliasExpression.getType()).setIdentifier(aliasExpression.getIdentifier())
           .setFunctionCall(aliasExpression.getFunctionCall()).setLiteral(aliasExpression.getLiteral());
     }
-    if (expression.getFunctionCall() != null) {
+    if (expression.getFunctionCall() != null && expression.getFunctionCall().getOperandsSize() > 0) {
       for (Expression operand : expression.getFunctionCall().getOperands()) {
         applyAlias(aliasMap, operand);
       }
@@ -590,8 +598,9 @@ public class CalciteSqlParser {
         if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
           funcName = funcSqlNode.getOperator().getName();
         }
-        if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null) && funcSqlNode
-            .getFunctionQuantifier().toValue().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+        if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null)
+            && funcSqlNode.getFunctionQuantifier().toValue()
+            .equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
           funcName = AggregationFunctionType.DISTINCTCOUNT.getName();
         }
         final Expression funcExpr = RequestUtils.getFunctionExpression(funcName);
