@@ -68,10 +68,10 @@ public class MutableSegmentImplAggregateMetricsTest {
         .build();
     // Add virtual columns, which should not be aggregated
     DimensionFieldSpec virtualDimensionFieldSpec =
-        new DimensionFieldSpec("$virtualDimension", FieldSpec.DataType.INT, true, Object.class);
+        new DimensionFieldSpec("$virtualDimension", FieldSpec.DataType.INT, true, MockVCProvider.class);
     schema.addField(virtualDimensionFieldSpec);
     MetricFieldSpec virtualMetricFieldSpec = new MetricFieldSpec("$virtualMetric", FieldSpec.DataType.INT);
-    virtualMetricFieldSpec.setVirtualColumnProvider(mockVCProvider.class.getName());
+    virtualMetricFieldSpec.setVirtualColumnProvider(MockVCProvider.class.getName());
     schema.addField(virtualMetricFieldSpec);
     MutableSegmentImpl mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
@@ -153,9 +153,9 @@ public class MutableSegmentImplAggregateMetricsTest {
         .getValue(TIME_COLUMN1) + KEY_SEPARATOR + row.getValue(TIME_COLUMN2);
   }
 
-  public static class mockVCProvider implements VirtualColumnProvider {
+  public static class MockVCProvider implements VirtualColumnProvider {
 
-    public mockVCProvider() {}
+    public MockVCProvider() {}
 
     @Override
     public DataFileReader buildReader(VirtualColumnContext context) {
