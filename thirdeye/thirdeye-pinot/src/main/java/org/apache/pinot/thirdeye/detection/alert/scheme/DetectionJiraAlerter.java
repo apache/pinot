@@ -63,6 +63,9 @@ import static org.apache.pinot.thirdeye.notification.commons.JiraConfiguration.*
  *     labels:              # optional, default - thirdeye label is always appended
  *       - test-label-1
  *       - test-label-2
+ *     custom:
+ *       test1: value1
+ *       test2: value2
  */
 @AlertScheme(type = "JIRA")
 public class DetectionJiraAlerter extends DetectionAlertScheme {
@@ -92,7 +95,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
   }
 
   private void updateJiraAlert(Issue issue, JiraEntity jiraEntity) {
-    // Append labels
+    // Append labels - do not remove existing labels
     jiraEntity.getLabels().addAll(issue.getLabels());
     jiraEntity.setLabels(jiraEntity.getLabels().stream().distinct().collect(Collectors.toList()));
 
@@ -152,7 +155,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
       try {
         JiraEntity jiraEntity = buildJiraEntity(result.getKey(), result.getValue());
 
-        // Fetch the most recent reported issue
+        // Fetch the most recent reported issues within mergeGap by jira service account under the project
         List<Issue> issues = jiraClient.getIssues(jiraEntity.getJiraProject(), jiraEntity.getLabels(),
             this.jiraAdminConfig.getJiraUser(), jiraEntity.getMergeGap());
         Optional<Issue> latestJiraIssue = issues.stream().max(

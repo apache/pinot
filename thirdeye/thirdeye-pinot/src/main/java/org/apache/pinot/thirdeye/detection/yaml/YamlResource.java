@@ -56,7 +56,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.dashboard.DetectionPreviewConfiguration;
@@ -88,6 +91,8 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.TaskUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskInfo;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskRunner;
 import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskInfo;
@@ -148,8 +153,10 @@ public class YamlResource {
   private final long previewTimeout;
   private final DetectionConfigFormatter detectionConfigFormatter;
   private final RateLimiter onboardingRateLimiter;
+  private final Map<String, Map<String, Object>> alerterConfig;
 
-  public YamlResource(DetectionPreviewConfiguration previewConfig, double alertOnboardingPermitPerSecond) {
+  public YamlResource(Map<String, Map<String, Object>> alerterConfig, DetectionPreviewConfiguration previewConfig,
+      double alertOnboardingPermitPerSecond) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.subscriptionConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -162,6 +169,7 @@ public class YamlResource {
     this.yaml = new Yaml();
     this.executor = Executors.newFixedThreadPool(previewConfig.getParallelism());
     this.previewTimeout = previewConfig.getTimeout();
+    this.alerterConfig = alerterConfig;
     this.onboardingRateLimiter = RateLimiter.create(alertOnboardingPermitPerSecond);
 
     TimeSeriesLoader timeseriesLoader =
@@ -182,8 +190,8 @@ public class YamlResource {
     this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
   }
 
-  public YamlResource(DetectionPreviewConfiguration previewConfig) {
-    this(previewConfig, Double.MAX_VALUE);
+  public YamlResource(Map<String, Map<String, Object>> alerterConfig, DetectionPreviewConfiguration previewConfig) {
+    this(alerterConfig, previewConfig, Double.MAX_VALUE);
   }
 
   /*
@@ -1106,5 +1114,42 @@ public class YamlResource {
 
     LOG.info("Successfully returned " + yamls.size() + " detection configs.");
     return Response.ok(yamls).build();
+  }
+
+  /**
+   * Api to trigger a notification alert. Mostly used for ad-hoc testing.
+   * Alert will be sent only if there are new anomalies since the last watermark.
+   * Watermarks will be updated after notifying anomalies if any.
+   */
+  @PUT
+  @Path("/notify/{id}")
+  @ApiOperation("Send notification email for detection alert config")
+  public Response triggerNotification(
+      @ApiParam("Subscription configuration id for the alert") @NotNull @PathParam("id") long subscriptionId) {
+    LOG.info("Triggering subscription task with id " + subscriptionId);
+    Map<String, String> responseMessage = new HashMap<>();
+    try {
+      // Build the task context
+      ThirdEyeAnomalyConfiguration config = new ThirdEyeAnomalyConfiguration();
+      config.setAlerterConfiguration(alerterConfig);
+      TaskContext taskContext = new TaskContext();
+      taskContext.setThirdEyeAnomalyConfiguration(config);
+
+      // Run the notification task. This will update the subscription watermark as well.
+      DetectionAlertTaskInfo taskInfo = new DetectionAlertTaskInfo(subscriptionId);
+      TaskRunner taskRunner = new DetectionAlertTaskRunner();
+      taskRunner.execute(taskInfo, taskContext);
+    } catch (Exception e) {
+      LOG.error("Exception while triggering the notification task with id " + subscriptionId, e);
+      responseMessage.put("message", "Failed to trigger the notification");
+      responseMessage.put("more-info", "Triggered subscription id " + subscriptionId + ". Error = " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    }
+
+    LOG.info("Subscription with id " + subscriptionId + " triggered successfully");
+    responseMessage.put("message", "Subscription was triggered successfully.");
+    responseMessage.put("more-info", "Triggered subscription id " + subscriptionId);
+    responseMessage.put("detectionAlertConfigId", String.valueOf(subscriptionId));
+    return Response.ok().entity(responseMessage).build();
   }
 }

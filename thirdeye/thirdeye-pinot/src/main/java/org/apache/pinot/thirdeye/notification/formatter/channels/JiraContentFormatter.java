@@ -171,6 +171,8 @@ public class JiraContentFormatter extends AlertContentFormatter {
     jiraEntity.setDescription(buildDescription(jiraTemplate, templateValues));
     jiraEntity.setComponents(ConfigUtils.getList(alertClientConfig.get(PROP_COMPONENTS)));
     jiraEntity.setSnapshot(buildSnapshot());
+    Map<String, Object> customFieldsMap = ConfigUtils.getMap(alertClientConfig.get(PROP_CUSTOM));
+    jiraEntity.setCustomFieldsMap(customFieldsMap);
 
     return jiraEntity;
   }
