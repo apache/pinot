@@ -33,6 +33,7 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
+import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.callback.impl.DefaultDataManagerCallbackImpl;
@@ -79,6 +80,7 @@ public abstract class BaseResourceTest {
 
     // Mock the instance data manager
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+
     when(instanceDataManager.getTableDataManager(anyString()))
         .thenAnswer(invocation -> _tableDataManagerMap.get(invocation.getArguments()[0]));
     when(instanceDataManager.getAllTables()).thenReturn(_tableDataManagerMap.keySet());
@@ -144,6 +146,7 @@ public abstract class BaseResourceTest {
         .thenReturn(TableNameBuilder.getTableTypeFromTableName(tableNameWithType).name());
     when(tableDataManagerConfig.getTableName()).thenReturn(tableNameWithType);
     when(tableDataManagerConfig.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
+    TableDataManagerProvider.init(mock(InstanceDataManagerConfig.class));
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
             mock(ServerMetrics.class));
