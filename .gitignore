@@ -24,7 +24,7 @@ docs/_build
 **/.env
 **/.factorypath
 kubernetes/examples/helm/charts/
-**/node_modules
+
 # Site Dependencies
 /node_modules
 package-lock.json
