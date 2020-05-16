@@ -39,7 +39,6 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
 import org.apache.pinot.util.TestUtils;
@@ -89,14 +88,14 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
   public static void printUsage() {
     System.err.println(
-        "Usage: pinot-hybrid-cluster.sh [--llc] tableName schemaFile dataDir invertedIndexColumns sortedColumn");
+        "Usage: pinot-hybrid-cluster.sh [--llc] tableName schemaFile timeColumnName dataDir invertedIndexColumns sortedColumn");
     System.exit(1);
   }
 
   public static void main(String[] args)
       throws Exception {
     int numArgs = args.length;
-    if (!((numArgs == 5) || (numArgs == 6 && args[0].equals("--llc")))) {
+    if (!((numArgs == 6) || (numArgs == 7 && args[0].equals("--llc")))) {
       printUsage();
     }
 
@@ -111,6 +110,9 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     CustomHybridClusterIntegrationTest._tableName = args[argIdx++];
     File schemaFile = new File(args[argIdx++]);
     CustomHybridClusterIntegrationTest._schema = Schema.fromFile(schemaFile);
+    String timeColumnName = args[argIdx++];
+    CustomHybridClusterIntegrationTest._timeColumnName =
+        (CustomHybridClusterIntegrationTest._schema.getFieldSpecFor(timeColumnName) != null) ? timeColumnName : null;
     File dataDir = new File(args[argIdx++]);
     Preconditions.checkState(dataDir.isDirectory());
     CustomHybridClusterIntegrationTest._dataDir = dataDir;
@@ -179,6 +181,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     private static boolean _useLlc = false;
     private static String _tableName;
     private static Schema _schema;
+    private static String _timeColumnName;
     private static File _dataDir;
     private static List<String> _invertedIndexColumns;
     private static String _sortedColumn;
@@ -231,8 +234,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     @Nullable
     @Override
     protected String getTimeColumnName() {
-      TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
-      return timeFieldSpec != null ? timeFieldSpec.getName() : null;
+      return _timeColumnName;
     }
 
     @Override
