@@ -39,12 +39,13 @@
       "name": "group_name"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
-      "timeType": "MILLISECONDS",
+  "dateTimeFieldSpecs": [
+    {
+      "name": "mtime",
       "dataType": "LONG",
-      "name": "mtime"
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
     }
-  },
+  ],
   "schemaName": "meetupRsvp"
 }

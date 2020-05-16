@@ -324,12 +324,13 @@
       "name": "TotalAddGTime"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
+  "dateTimeFieldSpecs": [
+    {
+      "name": "DaysSinceEpoch",
       "dataType": "INT",
-      "timeType": "DAYS",
-      "name": "DaysSinceEpoch"
+      "format": "1:DAYS:EPOCH",
+      "granularity": "1:DAYS"
     }
-  },
+  ],
   "schemaName": "airlineStats"
 }
