@@ -28,16 +28,14 @@ public class QuickstartTableRequest {
   File schemaFile;
   File tableRequestFile;
   File ingestionJobFile;
-  File dataDir;
   TableType tableType;
   String tableName;
   FileFormat segmentFileFormat = FileFormat.CSV;
 
-  public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest, File ingestionJobFile, File dataDir,
+  public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest, File ingestionJobFile,
       FileFormat segmentFileFormat) {
     this.tableName = tableName;
     this.schemaFile = schemaFile;
-    this.dataDir = dataDir;
     this.tableRequestFile = tableRequest;
     tableType = TableType.OFFLINE;
     this.segmentFileFormat = segmentFileFormat;
@@ -81,14 +79,6 @@ public class QuickstartTableRequest {
 
   public void setIngestionJobFile(File ingestionJobFile) {
     this.ingestionJobFile = ingestionJobFile;
-  }
-
-  public File getDataDir() {
-    return dataDir;
-  }
-
-  public void setDataDir(File dataDir) {
-    this.dataDir = dataDir;
   }
 
   public TableType getTableType() {

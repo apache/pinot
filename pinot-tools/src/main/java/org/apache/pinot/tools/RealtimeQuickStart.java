@@ -47,14 +47,14 @@ public class RealtimeQuickStart {
 
   public void execute()
       throws Exception {
-    final File quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
+    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File configDir = new File(quickstartTmpDir, "configs");
+    File dataDir = new File(quickstartTmpDir, "data");
+    Preconditions.checkState(configDir.mkdirs());
+    Preconditions.checkState(dataDir.mkdirs());
 
-    if (!quickStartDataDir.exists()) {
-      Preconditions.checkState(quickStartDataDir.mkdirs());
-    }
-
-    File schemaFile = new File(quickStartDataDir, "meetupRsvp_schema.json");
-    File tableConfigFile = new File(quickStartDataDir, "meetupRsvp_realtime_table_config.json");
+    File schemaFile = new File(configDir, "meetupRsvp_schema.json");
+    File tableConfigFile = new File(configDir, "meetupRsvp_realtime_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
     URL resource = classLoader.getResource("examples/stream/meetupRsvp/meetupRsvp_schema.json");
@@ -64,10 +64,8 @@ public class RealtimeQuickStart {
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
-    Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schemaFile, tableConfigFile);
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
@@ -98,7 +96,7 @@ public class RealtimeQuickStart {
           runner.stop();
           _kafkaStarter.stop();
           ZkStarter.stopLocalZkServer(zookeeperInstance);
-          FileUtils.deleteDirectory(quickStartDataDir);
+          FileUtils.deleteDirectory(quickstartTmpDir);
         } catch (Exception e) {
           e.printStackTrace();
         }

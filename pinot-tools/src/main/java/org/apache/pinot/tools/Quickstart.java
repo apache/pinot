@@ -115,16 +115,16 @@ public class Quickstart {
 
   public void execute()
       throws Exception {
-    final File quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
+    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File configDir = new File(quickstartTmpDir, "configs");
+    File dataDir = new File(quickstartTmpDir, "data");
+    Preconditions.checkState(configDir.mkdirs());
+    Preconditions.checkState(dataDir.mkdirs());
 
-    if (!quickStartDataDir.exists()) {
-      Preconditions.checkState(quickStartDataDir.mkdirs());
-    }
-
-    File schemaFile = new File(quickStartDataDir, "baseballStats_schema.json");
-    File dataFile = new File(quickStartDataDir, "baseballStats_data.csv");
-    File tableConfigFile = new File(quickStartDataDir, "baseballStats_offline_table_config.json");
-    File ingestionJobSpecFile = new File(quickStartDataDir, "ingestionJobSpec.yaml");
+    File schemaFile = new File(configDir, "baseballStats_schema.json");
+    File dataFile = new File(configDir, "baseballStats_data.csv");
+    File tableConfigFile = new File(configDir, "baseballStats_offline_table_config.json");
+    File ingestionJobSpecFile = new File(configDir, "ingestionJobSpec.yaml");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
     URL resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_schema.json");
@@ -140,11 +140,9 @@ public class Quickstart {
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
-    Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request =
-        new QuickstartTableRequest("baseballStats", schemaFile, tableConfigFile, ingestionJobSpecFile, quickStartDataDir, FileFormat.CSV);
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
+        new QuickstartTableRequest("baseballStats", schemaFile, tableConfigFile, ingestionJobSpecFile, FileFormat.CSV);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
@@ -161,7 +159,7 @@ public class Quickstart {
         try {
           printStatus(Color.GREEN, "***** Shutting down offline quick start *****");
           runner.stop();
-          FileUtils.deleteDirectory(quickStartDataDir);
+          FileUtils.deleteDirectory(quickstartTmpDir);
         } catch (Exception e) {
           e.printStackTrace();
         }
