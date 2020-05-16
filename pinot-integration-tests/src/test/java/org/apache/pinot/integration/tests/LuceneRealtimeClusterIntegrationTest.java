@@ -126,8 +126,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     // Create and upload the schema and table config
     Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
         .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN_NAME), null)
-        .build();
+        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     addSchema(schema);
     addTableConfig(createRealtimeTableConfig(avroFile));
 

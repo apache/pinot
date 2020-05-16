@@ -47,8 +47,16 @@ public class SegmentGeneratorConfigTest {
     assertNull(segmentGeneratorConfig.getSimpleDateFormat());
 
     // MUST provide valid tableConfig with time column if time details are wanted
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    assertNull(segmentGeneratorConfig.getTimeColumnName());
+    assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
+    assertNull(segmentGeneratorConfig.getSimpleDateFormat());
+
+    schema = new Schema.SchemaBuilder().addDateTime("daysSinceEpoch", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
+        .build();
     tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("daysSinceEpoch").build();
     segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertNull(segmentGeneratorConfig.getTimeColumnName());
     assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
@@ -69,8 +77,15 @@ public class SegmentGeneratorConfigTest {
     assertEquals(segmentGeneratorConfig.getSimpleDateFormat(), "yyyyMMdd");
 
     // MUST provide valid tableConfig with time column if time details are wanted
-    tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    assertNull(segmentGeneratorConfig.getTimeColumnName());
+    assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
+    assertNull(segmentGeneratorConfig.getSimpleDateFormat());
+
+    schema = new Schema.SchemaBuilder()
+        .addDateTime("Date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS").build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("Date").build();
     segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     assertNull(segmentGeneratorConfig.getTimeColumnName());
     assertNull(segmentGeneratorConfig.getSegmentTimeUnit());

@@ -55,7 +55,8 @@ public class FunctionEvaluatorFactory {
       }
     } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
 
-      // for backward compatible handling of TIME field conversion
+      // Time conversions should be done using DateTimeFieldSpec and treansformFunctions
+      // But we need below lines for converting TimeFieldSpec's incoming to outgoing
       TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
       TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
       TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();

@@ -34,6 +34,8 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -71,11 +73,12 @@ public class TimeBoundaryManager {
     _timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
     Preconditions
         .checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s", _offlineTableName);
-    FieldSpec fieldSpec = schema.getFieldSpecFor(_timeColumn);
+    DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(_timeColumn);
     Preconditions
-        .checkNotNull(fieldSpec, "Field spec must be specified in schema for time column: %s of table: %s", _timeColumn,
+        .checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s", _timeColumn,
             _offlineTableName);
-    _timeUnit = ((TimeFieldSpec) fieldSpec).getOutgoingGranularitySpec().getTimeType();
+    DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
+    _timeUnit = formatSpec.getColumnUnit();
     Preconditions
         .checkNotNull(_timeUnit, "Time unit must be configured in the field spec for time column: %s of table: %s",
             _timeColumn, _offlineTableName);

@@ -36,6 +36,9 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -87,6 +90,12 @@ public class AvroUtils {
             Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
             pinotSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(dataType, timeUnit, field.name())));
             break;
+          case DATE_TIME:
+            Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", fieldName);
+            Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
+            pinotSchema.addField(new DateTimeFieldSpec(field.name(), dataType,
+                new DateTimeFormatSpec(1, timeUnit.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString())
+                    .getFormat(), new DateTimeGranularitySpec(1, timeUnit).getGranularity()));
           default:
             throw new UnsupportedOperationException(
                 "Unsupported field type: " + fieldType + " for field: " + fieldName);

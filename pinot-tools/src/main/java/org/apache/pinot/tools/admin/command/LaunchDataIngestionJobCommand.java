@@ -114,7 +114,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
     SegmentGenerationJobSpec spec;
     try {
       spec = IngestionJobLauncher.getSegmentGenerationJobSpec(jobSpecFilePath, propertyFilePath,
-          GroovyTemplateUtils.getTemplateContext(_values));
+          null);
     } catch (Exception e) {
       LOGGER.error("Got exception to generate IngestionJobSpec for data ingestion job - ", e);
       throw e;

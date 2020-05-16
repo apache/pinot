@@ -91,9 +91,8 @@ public class SegmentDumpTool {
       System.out.print(i);
       System.out.print("\t");
       for (String columnName : columnNames) {
-        FieldSpec.DataType columnType = metadata.getSchema().getFieldSpecFor(columnName).getDataType();
         BlockSingleValIterator itr = iterators.get(columnName);
-        Integer encodedValue = itr.nextIntVal();
+        int encodedValue = itr.nextIntVal();
         Object value = dictionaries.get(columnName).get(encodedValue);
         System.out.print(value);
         System.out.print("\t");

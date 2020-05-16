@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Sep 12, 2014
  */
-
+// TODO: add DATE_TIME to the data generator
 public class DataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataGenerator.class);
   private File outDir;

@@ -28,6 +28,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Deprecated
+/**
+ * TimeFieldSpec is deprecated. Use {@link DateTimeFieldSpec} instead.
+ * This should only be used in 1) tests 2) wherever required for backward compatible handling of schemas with TimeFieldSpec
+ * https://github.com/apache/incubator-pinot/issues/2756
+ */
 public final class TimeFieldSpec extends FieldSpec {
   private TimeGranularitySpec _incomingGranularitySpec;
   private TimeGranularitySpec _outgoingGranularitySpec;

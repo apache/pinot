@@ -37,6 +37,8 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -251,11 +253,11 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     TimeUnit timeType = null;
     String timeFormat = null;
     if (timeColumnName != null) {
-      FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
-      if (fieldSpec != null) {
-        TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-        timeType = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
-        timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
+      DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumnName);
+      if (dateTimeSpec != null) {
+        DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
+        timeType = formatSpec.getColumnUnit();
+        timeFormat = formatSpec.getTimeFormat().toString();
       }
     }
 

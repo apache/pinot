@@ -80,10 +80,8 @@ public class PinotInstanceAssignmentRestletResourceTest extends ControllerTest {
   @Test
   public void testInstanceAssignment()
       throws Exception {
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-            .addTime(new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, TIME_COLUMN_NAME), null)
-            .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addDateTime(TIME_COLUMN_NAME, DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
     _helixResourceManager.addSchema(schema, true);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(TENANT_NAME)

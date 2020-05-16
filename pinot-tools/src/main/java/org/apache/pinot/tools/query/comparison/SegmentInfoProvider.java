@@ -120,6 +120,7 @@ public class SegmentInfoProvider {
           // Treat TIME column as single-value dimension column
           case DIMENSION:
           case TIME:
+          case DATE_TIME:
             uniqueSingleValueDimensions.add(columnName);
             loadValuesForSingleValueDimension(indexSegment, singleValueDimensionValuesMap, columnName);
             break;

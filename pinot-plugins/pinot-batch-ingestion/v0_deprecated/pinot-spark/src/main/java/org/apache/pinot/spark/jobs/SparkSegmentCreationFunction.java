@@ -44,6 +44,8 @@ import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -124,11 +126,11 @@ public class SparkSegmentCreationFunction implements Serializable {
         String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
 
         if (timeColumnName != null) {
-          FieldSpec fieldSpec = _schema.getFieldSpecFor(timeColumnName);
-          if (fieldSpec != null) {
-            TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-            timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
-            timeType = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
+          DateTimeFieldSpec dateTimeFieldSpec = _schema.getSpecForTimeColumn(timeColumnName);
+          if (dateTimeFieldSpec != null) {
+            DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+            timeFormat = formatSpec.getTimeFormat().toString();
+            timeType = formatSpec.getColumnUnit();
           }
         }
         _segmentNameGenerator =

@@ -92,7 +92,7 @@ public class SegmentPurger {
       // The time column type info is not stored in the segment metadata.
       // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
       if (segmentMetadata.getTimeInterval() != null) {
-        config.setTimeColumnName(segmentMetadata.getTimeColumn());
+        config.setTimeColumnName(_tableConfig.getValidationConfig().getTimeColumnName());
         config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
         config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
         config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());

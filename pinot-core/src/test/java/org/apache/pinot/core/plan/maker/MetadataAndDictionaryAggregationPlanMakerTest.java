@@ -84,7 +84,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
         .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
         .addMetric("column18", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(DataType.INT, 1, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
+        .addTime(new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
 

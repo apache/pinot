@@ -30,6 +30,7 @@ import org.joda.time.format.DateTimeFormat;
 
 
 /**
+ * This has been deprecated. Use DateTimeFieldSpec instead.
  * The <code>TimeGranularitySpec</code> class contains all specs related to time field.
  * <p>- <code>DataType</code>: data type of the time column (e.g. INT, LONG).
  * <p>- <code>TimeType</code>: time unit of the time column (e.g. MINUTES, HOURS).
@@ -46,6 +47,7 @@ import org.joda.time.format.DateTimeFormat;
  */
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Deprecated
 public class TimeGranularitySpec {
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;
   private static final String DEFAULT_TIME_FORMAT = TimeFormat.EPOCH.toString();
@@ -58,8 +60,10 @@ public class TimeGranularitySpec {
   private String _timeFormat = DEFAULT_TIME_FORMAT;
 
   /*
+  Deprecated. Use {@link DateTimeFieldSpec.TimeFormat} instead
    * Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd
    */
+  @Deprecated
   public enum TimeFormat {
     EPOCH, //default
     SIMPLE_DATE_FORMAT
@@ -167,68 +171,6 @@ public class TimeGranularitySpec {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setTimeFormat(String timeFormat) {
     _timeFormat = timeFormat;
-  }
-
-  /**
-   * Convert the units of time since epoch to {@link DateTime} format using current <code>TimeGranularitySpec</code>.
-   */
-  public DateTime toDateTime(long timeSinceEpoch) {
-    return new DateTime(_timeType.toMillis(timeSinceEpoch * _timeUnitSize));
-  }
-
-  /**
-   * Convert the timeColumnValue to millis
-   *
-   * eg:
-   * 1) given timeColumnValue = 416359 and timeGranularitySpec:{timeUnitSize=1,timetype=HOURS,timeFormat=EPOCH},
-   * timeGranularitySpec.toMillis(416359) = 1498892400000 (i.e. timeColumnValue*60*60*1000)
-   *
-   * 2) given timeColumnValue = 4996308 and timeGranularitySpec:{timeUnitSize=5,timetype=MINUTES,timeFormat=EPOCH},
-   * timeGranularitySpec.toMillis(4996308) = 1498892400000 (i.e. timeColumnValue*5*60*1000)
-   *
-   * 3) given timeColumnValue = 20170701 and timeGranularitySpec:{timeUnitSize=1,timetype=DAYS,timeFormat=SIMPLE_DATE_FORMAT:yyyyMMdd},
-   * timeGranularitySpec.toMillis(20170701) = 1498892400000
-   *
-   * @param timeColumnValue - time column value to convert
-   * @return time column value in millis
-   */
-  public Long toMillis(Object timeColumnValue) {
-    Preconditions.checkNotNull(timeColumnValue);
-    Long timeColumnValueMs;
-    if (_timeFormat.equals(TimeFormat.EPOCH.toString())) {
-      timeColumnValueMs = TimeUnit.MILLISECONDS.convert((Long) timeColumnValue * _timeUnitSize, _timeType);
-    } else {
-      String pattern = _timeFormat.split(COLON_SEPARATOR)[1];
-      timeColumnValueMs = DateTimeFormat.forPattern(pattern).parseMillis(String.valueOf(timeColumnValue));
-    }
-    return timeColumnValueMs;
-  }
-
-  /**
-   * Convert the time value in millis to the format from timeGranularitySpec
-   * eg:
-   * 1) given timeColumnValueMS = 1498892400000 and timeGranularitySpec:{timeUnitSize=1,timetype=HOURS,timeFormat=EPOCH},
-   * timeGranularitySpec.fromMillis(1498892400000) = 416359 (i.e. timeColumnValueMS/(1000*60*60))
-   *
-   * 2) given timeColumnValueMS = 1498892400000 and timeGranularitySpec:{timeUnitSize=5,timetype=MINUTES,timeFormat=EPOCH},
-   * timeGranularitySpec.fromMillis(1498892400000) = 4996308 (i.e. timeColumnValueMS/(1000*60*5))
-   *
-   * 3) given timeColumnValueMS = 1498892400000 and timeGranularitySpec:{timeUnitSize=1,timetype=DAYS,timeFormat=SIMPLE_DATE_FORMAT:yyyyMMdd},
-   * timeGranularitySpec.fromMillis(1498892400000) = 20170701
-   *
-   * @param timeColumnValueMS - millis value to convert
-   * @return time value in timeGranularitySpec format
-   */
-  public Object fromMillis(Long timeColumnValueMS) {
-    Preconditions.checkNotNull(timeColumnValueMS);
-    Object timeColumnValue;
-    if (_timeFormat.equals(TimeFormat.EPOCH.toString())) {
-      timeColumnValue = _timeType.convert(timeColumnValueMS, TimeUnit.MILLISECONDS) / _timeUnitSize;
-    } else {
-      String pattern = _timeFormat.split(COLON_SEPARATOR)[1];
-      timeColumnValue = DateTimeFormat.forPattern(pattern).print(timeColumnValueMS);
-    }
-    return timeColumnValue;
   }
 
   /**

@@ -63,6 +63,8 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -373,14 +375,13 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
       String timeColumnName = validationConfig.getTimeColumnName();
       job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_CONFIG, timeColumnName);
       if (timeColumnName != null) {
-        FieldSpec fieldSpec = _pinotTableSchema.getFieldSpecFor(timeColumnName);
-        if (fieldSpec != null) {
-          TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-          TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+        DateTimeFieldSpec dateTimeFieldSpec = _pinotTableSchema.getSpecForTimeColumn(timeColumnName);
+        if (dateTimeFieldSpec != null) {
+          DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           job.getConfiguration()
-              .set(InternalConfigConstants.SEGMENT_TIME_TYPE, outgoingGranularitySpec.getTimeType().toString());
+              .set(InternalConfigConstants.SEGMENT_TIME_TYPE, formatSpec.getColumnUnit().toString());
           job.getConfiguration()
-              .set(InternalConfigConstants.SEGMENT_TIME_FORMAT, outgoingGranularitySpec.getTimeFormat());
+              .set(InternalConfigConstants.SEGMENT_TIME_FORMAT, formatSpec.getTimeFormat().toString());
         }
       }
       job.getConfiguration()

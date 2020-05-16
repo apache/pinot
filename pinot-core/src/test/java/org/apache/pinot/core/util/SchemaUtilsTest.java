@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -110,6 +111,16 @@ public class SchemaUtilsTest {
     extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestamp")));
+
+    // inbuilt functions on DateTimeFieldSpec
+    schema = new Schema();
+    DateTimeFieldSpec dateTimeFieldSpec =
+        new DateTimeFieldSpec("date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS");
+    dateTimeFieldSpec.setTransformFunction("toDateTime(timestamp, 'yyyy-MM-dd')");
+    schema.addField(dateTimeFieldSpec);
+    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
+    Assert.assertEquals(extract.size(), 2);
+    Assert.assertTrue(extract.containsAll(Lists.newArrayList("date", "timestamp")));
   }
 
   @Test
@@ -126,6 +137,12 @@ public class SchemaUtilsTest {
     MetricFieldSpec metricFieldSpec = new MetricFieldSpec("m1", FieldSpec.DataType.LONG);
     metricFieldSpec.setTransformFunction("Groovy({function}, m1, m1)");
     pinotSchema.addField(metricFieldSpec);
+    Assert.assertFalse(SchemaUtils.validate(pinotSchema));
+
+    pinotSchema = new Schema();
+    DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec("dt1", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
+    dateTimeFieldSpec.setTransformFunction("Groovy({function}, m1, dt1)");
+    pinotSchema.addField(dateTimeFieldSpec);
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
 
     pinotSchema = new Schema.SchemaBuilder()
