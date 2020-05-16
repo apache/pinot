@@ -250,20 +250,17 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     String pushFrequency = validationConfig.getSegmentPushFrequency();
     String pushType = validationConfig.getSegmentPushType();
     String timeColumnName = validationConfig.getTimeColumnName();
-    TimeUnit timeType = null;
-    String timeFormat = null;
+    DateTimeFormatSpec dateTimeFormatSpec = null;
     if (timeColumnName != null) {
       DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumnName);
       if (dateTimeSpec != null) {
-        DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
-        timeType = formatSpec.getColumnUnit();
-        timeFormat = formatSpec.getTimeFormat().toString();
+        dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
       }
     }
 
     // Generate the final segment name using segment name generator
     NormalizedDateSegmentNameGenerator segmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, timeType, timeFormat);
+        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, dateTimeFormatSpec);
 
     return segmentNameGenerator.generateSegmentName(DEFAULT_SEQUENCE_ID, minStartTime, maxEndTime);
   }

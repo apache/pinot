@@ -126,22 +126,18 @@ public class SegmentGenerationTaskRunner implements Serializable {
         return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
       case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
         SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-        String timeFormat = null;
-        TimeUnit timeType = null;
+        DateTimeFormatSpec dateTimeFormatSpec = null;
         String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
 
         if (timeColumnName != null) {
           DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
           if (dateTimeFieldSpec != null) {
-            DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
-            timeFormat = formatSpec.getTimeFormat().toString();
-            timeType = formatSpec.getColumnUnit();
+            dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           }
         }
         return new NormalizedDateSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
             Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
-            validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(),
-            timeType, timeFormat);
+            validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(), dateTimeFormatSpec);
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }

@@ -138,23 +138,19 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
         Preconditions.checkState(_tableConfig != null,
             "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
         SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
-        String timeFormat = null;
-        TimeUnit timeType = null;
+        DateTimeFormatSpec dateTimeFormatSpec = null;
         String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
 
         if (timeColumnName != null) {
           DateTimeFieldSpec dateTimeFieldSpec = _schema.getSpecForTimeColumn(timeColumnName);
           if (dateTimeFieldSpec != null) {
-            DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
-            timeFormat = formatSpec.getTimeFormat().toString();
-            timeType = formatSpec.getColumnUnit();
+            dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           }
         }
         _segmentNameGenerator =
             new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
                 _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
-                validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(),
-                timeType, timeFormat);
+                validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(), dateTimeFormatSpec);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
