@@ -107,8 +107,14 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
 
   @Override
   public String toString() {
-    return ("LaunchDataIngestionJob -jobSpecFile " + _jobSpecFile + " -propertyFile " + _propertyFile + " -values "
-        + Arrays.toString(_values.toArray()));
+    String results = "LaunchDataIngestionJob -jobSpecFile " + _jobSpecFile;
+    if (_propertyFile != null) {
+      results += " -propertyFile " + _propertyFile;
+    }
+    if (_values != null) {
+      results += " -values " + Arrays.toString(_values.toArray());
+    }
+    return results;
   }
 
   @Override
