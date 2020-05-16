@@ -175,6 +175,9 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
       Map<String, Object> ruleYaml = ruleYamls.get(ruleIndex - 1);
 
       // Validate detection rules
+      Preconditions.checkArgument(ruleYaml.containsKey(PROP_DETECTION),
+          "Detection rule missing for sub-alert " + alertName + " rule no. " + ruleIndex);
+      // Validate detection rules
       List<Map<String, Object>> detectionRuleYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
       for (Map<String, Object> detectionRuleYaml : detectionRuleYamls) {
         validateRule(alertName, detectionRuleYaml, ruleIndex, "detection", names);

@@ -54,6 +54,7 @@ public class DataQualityTranslatorBuilder extends DetectionConfigTranslatorBuild
    */
   @Override
   public Map<String, Object> buildMetricAlertProperties(Map<String, Object> metricAlertConfigMap) {
+    Map<String, Object> properties = new HashMap<>();
     MetricConfigDTO metricConfigDTO = metricAttributesMap.fetchMetric(metricAlertConfigMap);
 
     String subEntityName = MapUtils.getString(metricAlertConfigMap, PROP_NAME);
@@ -67,16 +68,26 @@ public class DataQualityTranslatorBuilder extends DetectionConfigTranslatorBuild
     List<Map<String, Object>> nestedPipelines = new ArrayList<>();
     for (Map<String, Object> ruleYaml : ruleYamls) {
       List<Map<String, Object>> qualityYamls = ConfigUtils.getList(ruleYaml.get(PROP_QUALITY));
+      if (qualityYamls.isEmpty()) {
+        continue;
+      }
       List<Map<String, Object>> qualityProperties = buildListOfDataQualityProperties(
           subEntityName, metricUrn, qualityYamls, mergerProperties);
       nestedPipelines.addAll(qualityProperties);
     }
+    if (nestedPipelines.isEmpty()) {
+      // No data quality rules
+      return properties;
+    }
 
-    return buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(), nestedPipelines, mergerProperties);
+    properties.putAll(buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(), nestedPipelines, mergerProperties));
+    return properties;
   }
 
   @Override
   public Map<String, Object> buildCompositeAlertProperties(Map<String, Object> compositeAlertConfigMap) {
+    Map<String, Object> properties = new HashMap<>();
+
     // Recursively translate all the sub-alerts
     List<Map<String, Object>> subDetectionYamls = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_ALERTS));
     List<Map<String, Object>> nestedPropertiesList = new ArrayList<>();
@@ -90,8 +101,12 @@ public class DataQualityTranslatorBuilder extends DetectionConfigTranslatorBuild
 
       nestedPropertiesList.add(subProps);
     }
+    if (nestedPropertiesList.isEmpty()) {
+      return properties;
+    }
 
-    return compositePropertyBuilderHelper(nestedPropertiesList, compositeAlertConfigMap);
+    properties.putAll(compositePropertyBuilderHelper(nestedPropertiesList, compositeAlertConfigMap));
+    return properties;
   }
 
   private List<Map<String, Object>> buildListOfDataQualityProperties(String subEntityName, String metricUrn,

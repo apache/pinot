@@ -145,6 +145,15 @@ public class DetectionConfigValidatorTest {
     detectionConfigValidator.validateYaml(this.yamlConfig1);
   }
 
+  // Every rule must have at least 1 detection
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testNoDetectionUnderRuleValidation() {
+    ((Map<String, Object>) ConfigUtils.getList(this.yamlConfig1.get("rules")).get(0)).remove("detection");
+
+    DetectionConfigValidator detectionConfigValidator = new DetectionConfigValidator(provider);
+    detectionConfigValidator.validateYaml(this.yamlConfig1);
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testNoDetectionTypeUnderRuleValidation() {
     ((Map<String, Object>) ConfigUtils.getList(((Map<String, Object>) ConfigUtils.getList(this.yamlConfig1.get("rules")).get(0))

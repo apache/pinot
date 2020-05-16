@@ -13,6 +13,11 @@
       "sla": "2_DAYS",
       "className": "org.apache.pinot.thirdeye.detection.dataquality.components.DataSlaQualityChecker",
       "metricUrn": "thirdeye:metric:1"
+    },
+    "maxThreshold_1:THRESHOLD": {
+      "max": 100,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector",
+      "metricUrn": "thirdeye:metric:1"
     }
   }
 }

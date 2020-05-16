@@ -32,7 +32,12 @@ rules:
     params:
       min: 50
 
-- quality:
+- detection:
+  - type: THRESHOLD
+    name: maxThreshold_3
+    params:
+      max: 100
+  quality:
   - type: DATA_SLA
     name: slaRule1
     params:

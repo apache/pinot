@@ -5,7 +5,12 @@ metric: test_metric
 dataset: test_dataset
 
 rules:
-- quality:
+- detection:
+  - type: THRESHOLD
+    name: maxThreshold_1
+    params:
+      max: 100
+  quality:
   - type: DATA_SLA
     name: slaRule1
     params:

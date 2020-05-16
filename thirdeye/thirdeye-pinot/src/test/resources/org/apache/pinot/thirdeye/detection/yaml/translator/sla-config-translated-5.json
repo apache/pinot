@@ -80,6 +80,11 @@
       "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector",
       "metricUrn": "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3"
     },
+    "maxThreshold_3:THRESHOLD": {
+      "max": 100,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector",
+      "metricUrn": "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3"
+    },
     "thresholdFilter_1:THRESHOLD_RULE_FILTER": {
       "min": 50,
       "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter",
