@@ -96,6 +96,7 @@ public class AvroUtils {
             pinotSchema.addField(new DateTimeFieldSpec(field.name(), dataType,
                 new DateTimeFormatSpec(1, timeUnit.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString())
                     .getFormat(), new DateTimeGranularitySpec(1, timeUnit).getGranularity()));
+            break;
           default:
             throw new UnsupportedOperationException(
                 "Unsupported field type: " + fieldType + " for field: " + fieldName);
