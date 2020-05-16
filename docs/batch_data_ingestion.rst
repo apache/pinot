@@ -78,13 +78,13 @@ Below is an example (also located at `examples/batch/airlineStats/ingestionJobSp
   # includeFileNamePattern: include file name pattern, supported glob pattern.
   # Sample usage:
   #   'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
-  #   'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
+  #   'glob:**/*.avro' will include all the avro files under inputDirURI recursively.
   includeFileNamePattern: 'glob:**/*.avro'
 
   # excludeFileNamePattern: exclude file name pattern, supported glob pattern.
   # Sample usage:
   #   'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
-  #   'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
+  #   'glob:**/*.avro' will exclude all the avro files under inputDirURI recursively.
   # _excludeFileNamePattern: ''
 
   # outputDirURI: Root directory of output segments, expected to have scheme configured in PinotFS.
@@ -171,7 +171,7 @@ Below command will kick off the ingestion job to generate Pinot segments and pus
 
 .. code-block:: bash
 
-   bin/pinot-ingestion-job.sh examples/batch/airlineStats/ingestionJobSpec.yaml
+   bin/pinot-ingestion-job.sh -jobSpec examples/batch/airlineStats/ingestionJobSpec.yaml
 
 After job finished, segments are stored in ` examples/batch/airlineStats/segments` following same layout of input directory layout.
 

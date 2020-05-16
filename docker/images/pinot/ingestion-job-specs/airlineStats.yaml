@@ -47,13 +47,13 @@ inputDirURI: 'examples/batch/airlineStats/rawdata'
 # includeFileNamePattern: include file name pattern, supported glob pattern.
 # Sample usage:
 #   'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
-#   'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
+#   'glob:**/*.avro' will include all the avro files under inputDirURI recursively.
 includeFileNamePattern: 'glob:**/*.avro'
 
 # excludeFileNamePattern: exclude file name pattern, supported glob pattern.
 # Sample usage:
 #   'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
-#   'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
+#   'glob:**/*.avro' will exclude all the avro files under inputDirURI recursively.
 # _excludeFileNamePattern: ''
 
 # outputDirURI: Root directory of output segments, expected to have scheme configured in PinotFS.
