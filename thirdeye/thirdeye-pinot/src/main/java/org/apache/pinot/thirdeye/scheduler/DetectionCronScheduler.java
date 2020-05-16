@@ -84,7 +84,7 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
           LOG.debug("Detection config " + key + " is inactive. Skipping.");
           continue;
         }
-        if (DetectionUtils.isDataQualityCheckEnabled(config)) {
+        if (config.isDataAvailabilitySchedule()) {
           LOG.debug("Detection config " + key + " is enabled for data availability scheduling. Skipping.");
           continue;
         }
@@ -151,11 +151,11 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
     this.scheduler.scheduleJob(detectionJob, trigger);
     LOG.info(String.format("scheduled detection pipeline job %s", detectionJob.getKey().getName()));
 
-    // Data SLA alerts will be scheduled only when enabled by the user.
+    // Data Quality alerts will be scheduled only when enabled by the user.
     if (DetectionUtils.isDataQualityCheckEnabled((DetectionConfigDTO) config)) {
       JobDetail dataQualityJob = JobBuilder.newJob(DataQualityPipelineJob.class).withIdentity(key).build();
       this.scheduler.scheduleJob(dataQualityJob, trigger);
-      LOG.info(String.format("scheduled data sla jobs %s", dataQualityJob.getKey().getName()));
+      LOG.info(String.format("scheduled data quality jobs %s", dataQualityJob.getKey().getName()));
     }
   }
 
