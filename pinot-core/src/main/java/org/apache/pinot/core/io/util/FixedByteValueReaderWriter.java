@@ -18,24 +18,13 @@
  */
 package org.apache.pinot.core.io.util;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public final class FixedByteValueReaderWriter implements Closeable, ValueReader {
-  // To deal with a multi-threading scenario in query processing threads
-  // (which are currently non-interruptible), a segment could be dropped by
-  // the parent thread and the child query thread could still be using
-  // segment memory which may have been unmapped depending on when the
-  // drop was completed. To protect against this scenario, the data buffer
-  // is made volatile and set to null in close() operation after releasing
-  // the buffer. This ensures that concurrent thread(s) trying to invoke
-  // set**() operations on this class will hit NPE as opposed accessing
-  // illegal/invalid memory (which will crash the JVM).
-  private volatile PinotDataBuffer _dataBuffer;
+public final class FixedByteValueReaderWriter implements ValueReader {
+  private final PinotDataBuffer _dataBuffer;
 
   public FixedByteValueReaderWriter(PinotDataBuffer dataBuffer) {
     _dataBuffer = dataBuffer;
@@ -120,11 +109,8 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
   }
 
   @Override
-  public void close()
-      throws IOException {
-    if (_dataBuffer != null) {
-      _dataBuffer.close();
-      _dataBuffer = null;
-    }
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
   }
 }

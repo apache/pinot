@@ -40,15 +40,14 @@ public class FixedIntArrayIdMapTest {
   private static final int NUM_COLUMNS = 3;
   private static final int INITIAL_CARDINALITY = 23;
   private static final int ON_HEAP_CACHE_SIZE = 10;
+  private static final Random RANDOM = new Random();
+
   private DirectMemoryManager _memoryManager;
-  private Random _random;
   private IdMap<FixedIntArray> _idMap;
 
   @BeforeClass
   public void setup() {
-    _random = new Random(System.nanoTime());
     _memoryManager = new DirectMemoryManager(FixedIntArrayIdMapTest.class.getName());
-
     _idMap = new FixedIntArrayOffHeapIdMap(INITIAL_CARDINALITY, ON_HEAP_CACHE_SIZE, NUM_COLUMNS, _memoryManager,
         FixedIntArrayIdMapTest.class.getName());
   }
@@ -56,7 +55,7 @@ public class FixedIntArrayIdMapTest {
   @AfterClass
   public void tearDown()
       throws IOException {
-    _idMap.clear();
+    _idMap.close();
     _memoryManager.close();
   }
 
@@ -71,24 +70,11 @@ public class FixedIntArrayIdMapTest {
    */
   @Test
   public void test() {
-
     BiMap<FixedIntArray, Integer> expectedMap = addValues(_idMap);
     int numValues = expectedMap.size();
 
     // Test invalid Value
     Assert.assertEquals(_idMap.getId(new FixedIntArray(new int[]{})), IdMap.INVALID_ID);
-
-    Assert.assertEquals(_idMap.size(), numValues);
-    testValues(expectedMap);
-
-    // Test the clear() api.
-    _idMap.clear();
-    Assert.assertEquals(_idMap.size(), 0);
-
-    // Test adding after clearing.
-    expectedMap.clear();
-    expectedMap = addValues(_idMap);
-    numValues = expectedMap.size();
 
     Assert.assertEquals(_idMap.size(), numValues);
     testValues(expectedMap);
@@ -111,7 +97,7 @@ public class FixedIntArrayIdMapTest {
     for (int row = 0; row < NUM_ROWS; row++) {
       int[] values = new int[NUM_COLUMNS];
       for (int col = 0; col < NUM_COLUMNS; col++) {
-        values[col] = _random.nextInt(10); // Max of 1000 unique values possible, so there will be duplicates.
+        values[col] = RANDOM.nextInt(10); // Max of 1000 unique values possible, so there will be duplicates.
       }
       FixedIntArray value = new FixedIntArray(values);
       idMap.put(value);

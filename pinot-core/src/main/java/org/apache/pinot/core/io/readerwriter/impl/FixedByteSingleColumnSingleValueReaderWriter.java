@@ -40,12 +40,12 @@ import org.slf4j.LoggerFactory;
  *   are not guaranteed to have a deterministic value. </li>
  * </ul>
  */
+// TODO: Check thread-safety
 public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColumnSingleValueReaderWriter {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleColumnSingleValueReaderWriter.class);
 
-  private List<WriterWithOffset> _writers = new ArrayList<>();
-  private List<ReaderWithOffset> _readers = new ArrayList<>();
-  private List<PinotDataBuffer> _dataBuffers = new ArrayList<>();
+  private final List<WriterWithOffset> _writers = new ArrayList<>();
+  private final List<ReaderWithOffset> _readers = new ArrayList<>();
 
   private final long _chunkSizeInBytes;
   private final int _numRowsPerChunk;
@@ -84,14 +84,11 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   @Override
   public void close()
       throws IOException {
-    for (ReaderWithOffset reader : _readers) {
-      reader.close();
-    }
     for (WriterWithOffset writer : _writers) {
       writer.close();
     }
-    for (PinotDataBuffer buffer : _dataBuffers) {
-      buffer.close();
+    for (ReaderWithOffset reader : _readers) {
+      reader.close();
     }
   }
 
@@ -176,18 +173,15 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
 
   private void addBuffer() {
     LOGGER.info("Allocating {} bytes for: {}", _chunkSizeInBytes, _allocationContext);
+    // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
-    _dataBuffers.add(buffer);
+    _writers.add(
+        new WriterWithOffset(new FixedByteSingleValueMultiColWriter(buffer, /*cols=*/1, new int[]{_columnSizesInBytes}),
+            _capacityInRows));
+    _readers.add(new ReaderWithOffset(
+        new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, new int[]{_columnSizesInBytes}),
+        _capacityInRows));
     _capacityInRows += _numRowsPerChunk;
-
-    FixedByteSingleValueMultiColReader reader =
-        new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, new int[]{_columnSizesInBytes});
-    FixedByteSingleValueMultiColWriter writer =
-        new FixedByteSingleValueMultiColWriter(buffer, /*cols=*/1, new int[]{_columnSizesInBytes});
-
-    final int startRowId = _numRowsPerChunk * (_dataBuffers.size() - 1);
-    _writers.add(new WriterWithOffset(writer, startRowId));
-    _readers.add(new ReaderWithOffset(reader, startRowId));
   }
 
   /**

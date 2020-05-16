@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2.store;
 
+import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -120,6 +121,15 @@ public class StarTreeLoaderUtils {
         @Override
         public DataSource getDataSource(String columnName) {
           return dataSourceMap.get(columnName);
+        }
+
+        @Override
+        public void close()
+            throws IOException {
+          // NOTE: Close the indexes managed by the star-tree (dictionary is managed inside the ColumnIndexContainer).
+          for (DataSource dataSource : dataSourceMap.values()) {
+            dataSource.getForwardIndex().close();
+          }
         }
       });
     }

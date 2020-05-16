@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
-import java.io.IOException;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
@@ -56,8 +55,7 @@ public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValue
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() {
     _reader.close();
   }
 }

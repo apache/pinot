@@ -53,10 +53,10 @@ public class LoaderUtils {
       ColumnIndexType indexType)
       throws IOException {
     long fileLength = indexFile.length();
-    try (PinotDataBuffer buffer = segmentWriter.newIndexFor(column, indexType, fileLength)) {
-      buffer.readFrom(0, indexFile, 0, fileLength);
-      FileUtils.forceDelete(indexFile);
-    }
+    // NOTE: DO NOT close buffer here as it is managed in the SegmentDirectory.
+    PinotDataBuffer buffer = segmentWriter.newIndexFor(column, indexType, fileLength);
+    buffer.readFrom(0, indexFile, 0, fileLength);
+    FileUtils.forceDelete(indexFile);
   }
 
   /**

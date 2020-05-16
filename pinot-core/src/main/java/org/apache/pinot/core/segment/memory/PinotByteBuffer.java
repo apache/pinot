@@ -27,13 +27,10 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.core.util.CleanerUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 @ThreadSafe
 public class PinotByteBuffer extends PinotDataBuffer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotByteBuffer.class);
   private final ByteBuffer _buffer;
   private final boolean _flushable;
 

@@ -105,30 +105,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public void destroy() {
-    LOGGER.info("Trying to destroy segment : {}", this.getSegmentName());
-    for (String column : _indexContainerMap.keySet()) {
-      ColumnIndexContainer columnIndexContainer = _indexContainerMap.get(column);
-
+    LOGGER.info("Trying to destroy segment : {}", getSegmentName());
+    for (Map.Entry<String, ColumnIndexContainer> entry : _indexContainerMap.entrySet()) {
       try {
-        Dictionary dictionary = columnIndexContainer.getDictionary();
-        if (dictionary != null) {
-          dictionary.close();
-        }
-      } catch (Exception e) {
-        LOGGER.error("Error when close dictionary index for column : " + column, e);
-      }
-      try {
-        columnIndexContainer.getForwardIndex().close();
-      } catch (Exception e) {
-        LOGGER.error("Error when close forward index for column : " + column, e);
-      }
-      try {
-        InvertedIndexReader invertedIndex = columnIndexContainer.getInvertedIndex();
-        if (invertedIndex != null) {
-          invertedIndex.close();
-        }
-      } catch (Exception e) {
-        LOGGER.error("Error when close inverted index for column : " + column, e);
+        entry.getValue().close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close indexes for column: {}. Continuing with error.", entry.getKey(), e);
       }
     }
     try {
@@ -136,14 +118,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     } catch (Exception e) {
       LOGGER.error("Failed to close segment directory: {}. Continuing with error.", _segmentDirectory, e);
     }
-    _indexContainerMap.clear();
-
-    try {
-      if (_starTreeIndexContainer != null) {
+    if (_starTreeIndexContainer != null) {
+      try {
         _starTreeIndexContainer.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close star-tree. Continuing with error.", e);
       }
-    } catch (IOException e) {
-      LOGGER.error("Failed to close star-tree. Continuing with error.", e);
     }
   }
 

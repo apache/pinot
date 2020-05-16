@@ -19,7 +19,6 @@
 package org.apache.pinot.core.io.util;
 
 import java.io.Closeable;
-import java.io.IOException;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -242,8 +241,8 @@ public final class PinotDataBitSet implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    _dataBuffer.close();
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
   }
 }

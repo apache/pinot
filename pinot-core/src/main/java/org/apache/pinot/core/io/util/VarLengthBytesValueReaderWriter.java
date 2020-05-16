@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.io.util;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -60,7 +58,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  *
  * @see FixedByteValueReaderWriter
  */
-public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
+public class VarLengthBytesValueReaderWriter implements ValueReader {
 
   /**
    * Magic bytes used to identify the dictionary files written in variable length bytes format.
@@ -236,8 +234,8 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    _dataBuffer.close();
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
   }
 }

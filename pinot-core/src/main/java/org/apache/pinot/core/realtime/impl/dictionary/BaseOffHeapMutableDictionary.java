@@ -158,12 +158,9 @@ public abstract class BaseOffHeapMutableDictionary extends BaseMutableDictionary
   // Number of entries in the dictionary. Max dictId is _numEntries-1.
   private volatile int _numEntries;
 
-  // We keep a list of PinotDataBuffer items from which we get the IntBuffer items, so
-  // that we can call close() on these.
-  private final List<PinotDataBuffer> _pinotDataBuffers = new ArrayList<>();
   private final int _initialRowCount;
-  protected final PinotDataBufferMemoryManager _memoryManager;
-  protected final String _allocationContext;
+  private final PinotDataBufferMemoryManager _memoryManager;
+  private final String _allocationContext;
 
   /**
    * A class to hold all the objects needed for the reverse mapping.
@@ -201,7 +198,7 @@ public abstract class BaseOffHeapMutableDictionary extends BaseMutableDictionary
 
   protected void init() {
     _numEntries = 0;
-    _valueToDict = new ValueToDictId(new ArrayList<IntBuffer>(0), new ConcurrentHashMap<Object, Integer>(0));
+    _valueToDict = new ValueToDictId(new ArrayList<>(), new ConcurrentHashMap<>());
     if (!_heapFirst || (_maxItemsInOverflowHash == 0)) {
       expand(_initialRowCount, 1);
     }
@@ -216,19 +213,6 @@ public abstract class BaseOffHeapMutableDictionary extends BaseMutableDictionary
   public void close()
       throws IOException {
     doClose();
-
-    _numEntries = 0;
-    ValueToDictId valueToDictId = _valueToDict;
-    _valueToDict = null;
-    Map<Object, Integer> overflowMap = valueToDictId.getOverflowMap();
-    overflowMap.clear();
-    List<IntBuffer> iBufs = valueToDictId.getIBufList();
-    iBufs.clear();
-
-    for (PinotDataBuffer pinotDataBuffer : _pinotDataBuffers) {
-      pinotDataBuffer.close();
-    }
-    _pinotDataBuffers.clear();
   }
 
   private int nearestPrime(int size) {
@@ -269,8 +253,8 @@ public abstract class BaseOffHeapMutableDictionary extends BaseMutableDictionary
       newList.add(iBuf);
     }
     LOGGER.info("Allocating {} bytes for: {}", bbSize, _allocationContext);
+    // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer buffer = _memoryManager.allocate(bbSize, _allocationContext);
-    _pinotDataBuffers.add(buffer);
     IntBuffer iBuf = buffer.toDirectByteBuffer(0L, bbSize).asIntBuffer();
     for (int i = 0; i < iBuf.capacity(); i++) {
       iBuf.put(i, NULL_VALUE_INDEX);

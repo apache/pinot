@@ -193,7 +193,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   @Nullable
   protected List<String> getRangeIndexColumns() {
     return null;
-    // TODO: Fix the JVM crash then uncomment this line
+    // TODO: Fix the range index then uncomment this line
 //    return DEFAULT_RANGE_INDEX_COLUMNS;
   }
 

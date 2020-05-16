@@ -20,21 +20,11 @@ package org.apache.pinot.core.io.util;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
-import java.io.IOException;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public final class FixedBitIntReaderWriter implements Closeable {
-  // To deal with a multi-threading scenario in query processing threads
-  // (which are currently non-interruptible), a segment could be dropped by
-  // the parent thread and the child query thread could still be using
-  // segment memory which may have been unmapped depending on when the
-  // drop was completed. To protect against this scenario, the data buffer
-  // is made volatile and set to null in close() operation after releasing
-  // the buffer. This ensures that concurrent thread(s) trying to invoke
-  // set**() operations on this class will hit NPE as opposed accessing
-  // illegal/invalid memory (which will crash the JVM).
-  private volatile PinotDataBitSet _dataBitSet;
+  private final PinotDataBitSet _dataBitSet;
   private final int _numBitsPerValue;
 
   public FixedBitIntReaderWriter(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
@@ -61,11 +51,7 @@ public final class FixedBitIntReaderWriter implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    if (_dataBitSet != null) {
-      _dataBitSet.close();
-      _dataBitSet = null;
-    }
+  public void close() {
+    _dataBitSet.close();
   }
 }

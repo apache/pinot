@@ -21,7 +21,6 @@ package org.apache.pinot.core.util;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
 import java.util.Arrays;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
@@ -72,16 +71,6 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   @Override
   public int size() {
     return length();
-  }
-
-  @Override
-  public void clear() {
-    try {
-      close();
-      init();
-    } catch (IOException e) {
-      Utils.rethrowException(e);
-    }
   }
 
   @Override

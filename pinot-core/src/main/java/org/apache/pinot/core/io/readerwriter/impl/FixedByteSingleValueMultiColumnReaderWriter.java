@@ -36,7 +36,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  */
 public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValueMultiColumnReaderWriter {
 
-  private List<FixedByteSingleValueMultiColWriter> _writers;
+  private final List<FixedByteSingleValueMultiColWriter> _writers;
   private volatile List<FixedByteSingleValueMultiColReader> _readers;
   private final int _numRowsPerChunk;
 
@@ -45,7 +45,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
   private String _allocationContext;
   private final long _chunkSizeInBytes;
   private int _capacityInRows;
-  private List<PinotDataBuffer> _dataBuffers;
   private int _numColumns;
 
   /**
@@ -66,7 +65,6 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
 
     _writers = new ArrayList<>();
     _readers = new ArrayList<>();
-    _dataBuffers = new ArrayList<>();
 
     _capacityInRows = 0;
     int rowSizeInBytes = 0;
@@ -161,12 +159,11 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
   @Override
   public void close()
       throws IOException {
-    _capacityInRows = 0;
-    _writers.clear();
-    _readers.clear();
-
-    for (PinotDataBuffer dataBuffer : _dataBuffers) {
-      dataBuffer.close();
+    for (FixedByteSingleValueMultiColWriter writer : _writers) {
+      writer.close();
+    }
+    for (FixedByteSingleValueMultiColReader reader : _readers) {
+      reader.close();
     }
   }
 
@@ -191,18 +188,13 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
    * Helper method to add data buffer during expansion.
    */
   private void addBuffer() {
+    // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
-    _dataBuffers.add(buffer);
     _capacityInRows += _numRowsPerChunk;
+    _writers.add(new FixedByteSingleValueMultiColWriter(buffer, _numColumns, _columnSizesInBytes));
 
     FixedByteSingleValueMultiColReader reader =
         new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, _columnSizesInBytes);
-
-    FixedByteSingleValueMultiColWriter writer =
-        new FixedByteSingleValueMultiColWriter(buffer, _numColumns, _columnSizesInBytes);
-
-    _writers.add(writer);
-
     // ArrayList is non-threadsafe. So add to a new copy and then change teh reference (_readers is volatile).
     List<FixedByteSingleValueMultiColReader> readers = new ArrayList<>(_readers);
     readers.add(reader);
