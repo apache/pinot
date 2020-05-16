@@ -57,6 +57,9 @@ public class GroovyTemplateUtils {
   }
 
   public static Map<String, Object> getTemplateContext(List<String> values) {
+    if (values == null) {
+      return Collections.emptyMap();
+    }
     Map<String, Object> context = new HashMap<>();
     for (String value : values) {
       String[] splits = value.split("=", 2);

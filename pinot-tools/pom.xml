@@ -281,7 +281,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand</mainClass>
               <name>pinot-ingestion-job</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
