@@ -36,9 +36,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,9 +72,8 @@ public class TimeBoundaryManager {
     Preconditions
         .checkNotNull(_timeColumn, "Time column must be configured in table config for table: %s", _offlineTableName);
     DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(_timeColumn);
-    Preconditions
-        .checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s", _timeColumn,
-            _offlineTableName);
+    Preconditions.checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s",
+        _timeColumn, _offlineTableName);
     DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
     _timeUnit = formatSpec.getColumnUnit();
     Preconditions

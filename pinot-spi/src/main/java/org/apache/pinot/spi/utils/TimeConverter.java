@@ -24,10 +24,9 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 
 
 /**
- * Deprecated. This conversion should be done via transform functions set on the schema field spec
+ * @deprecated This conversion should be done via transform functions set on the schema field spec
  * TimeConverter to convert value to/from milliseconds since epoch based on the given {@link TimeGranularitySpec}.
  */
-@Deprecated
 public class TimeConverter {
   private final TimeGranularitySpec _timeGranularitySpec;
 

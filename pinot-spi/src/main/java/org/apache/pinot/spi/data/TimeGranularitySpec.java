@@ -30,7 +30,7 @@ import org.joda.time.format.DateTimeFormat;
 
 
 /**
- * This has been deprecated. Use DateTimeFieldSpec instead.
+ * @deprecated Use DateTimeFieldSpec instead.
  * The <code>TimeGranularitySpec</code> class contains all specs related to time field.
  * <p>- <code>DataType</code>: data type of the time column (e.g. INT, LONG).
  * <p>- <code>TimeType</code>: time unit of the time column (e.g. MINUTES, HOURS).
@@ -47,7 +47,6 @@ import org.joda.time.format.DateTimeFormat;
  */
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
-@Deprecated
 public class TimeGranularitySpec {
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;
   private static final String DEFAULT_TIME_FORMAT = TimeFormat.EPOCH.toString();

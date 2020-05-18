@@ -175,10 +175,8 @@ public class TimeBoundaryManagerTest {
   }
 
   private void setSchemaDateTimeFieldSpec(String rawTableName, TimeUnit timeUnit) {
-    ZKMetadataProvider.setSchema(_propertyStore,
-        new Schema.SchemaBuilder().setSchemaName(rawTableName)
-            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:"+timeUnit+":EPOCH", "1:"+timeUnit)
-            .build());
+    ZKMetadataProvider.setSchema(_propertyStore, new Schema.SchemaBuilder().setSchemaName(rawTableName)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:" + timeUnit + ":EPOCH", "1:" + timeUnit).build());
   }
 
   private void setSegmentZKMetadata(String rawTableName, String segment, int endTimeInDays, TimeUnit timeUnit) {
