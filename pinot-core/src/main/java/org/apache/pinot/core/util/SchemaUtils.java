@@ -49,12 +49,11 @@ public class SchemaUtils {
    * TODO: for now, we assume that arguments to transform function are in the source i.e. there's no columns which are derived from transformed columns
    */
   public static Set<String> extractSourceFields(Schema schema) {
-    FunctionEvaluatorFactory functionEvaluatorFactory = new FunctionEvaluatorFactory();
     Set<String> sourceFieldNames = new HashSet<>();
 
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        FunctionEvaluator functionEvaluator = functionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
         if (functionEvaluator != null) {
           sourceFieldNames.addAll(functionEvaluator.getArguments());
         }
@@ -85,8 +84,7 @@ public class SchemaUtils {
           String column = fieldSpec.getName();
           String transformFunction = fieldSpec.getTransformFunction();
           if (transformFunction != null) {
-            FunctionEvaluatorFactory functionEvaluatorFactory = new FunctionEvaluatorFactory();
-            FunctionEvaluator functionEvaluator = functionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
+            FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
             if (functionEvaluator != null) {
               List<String> arguments = functionEvaluator.getArguments();
               // output column used as input

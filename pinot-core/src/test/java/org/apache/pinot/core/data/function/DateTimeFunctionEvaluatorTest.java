@@ -36,8 +36,7 @@ public class DateTimeFunctionEvaluatorTest {
   public void testDateTimeTransformFunctions(String transformFunction, List<String> arguments, GenericRow row,
       Object result)
       throws Exception {
-    InbuiltFunctionRegistry inbuiltFunctionRegistry = FunctionRegistryFactory.getInbuiltFunctionRegistry();
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(transformFunction, inbuiltFunctionRegistry);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(transformFunction);
     Assert.assertEquals(evaluator.getArguments(), arguments);
     Assert.assertEquals(evaluator.evaluate(row), result);
   }

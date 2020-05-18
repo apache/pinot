@@ -29,10 +29,6 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
  * Factory class to create an {@link FunctionEvaluator} for the field spec based on the {@link FieldSpec#getTransformFunction()}
  */
 public class FunctionEvaluatorFactory {
-
-  private final InbuiltFunctionRegistry _inbuiltFunctionRegistry =
-      FunctionRegistryFactory.getInbuiltFunctionRegistry();
-
   /**
    * Creates the {@link FunctionEvaluator} for the given field spec
    *
@@ -42,7 +38,7 @@ public class FunctionEvaluatorFactory {
    * 4. Return null, if none of the above
    */
   @Nullable
-  public FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
+  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
     FunctionEvaluator functionEvaluator = null;
 
     String columnName = fieldSpec.getName();
@@ -88,13 +84,13 @@ public class FunctionEvaluatorFactory {
     return functionEvaluator;
   }
 
-  private FunctionEvaluator getExpressionEvaluator(String transformExpression) {
+  private static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
     FunctionEvaluator functionEvaluator;
     try {
       if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {
         functionEvaluator = new GroovyFunctionEvaluator(transformExpression);
       } else {
-        functionEvaluator = new InbuiltFunctionEvaluator(transformExpression, _inbuiltFunctionRegistry);
+        functionEvaluator = new InbuiltFunctionEvaluator(transformExpression);
       }
     } catch (Exception e) {
       throw new IllegalStateException(

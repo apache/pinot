@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.data.function;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -28,27 +26,26 @@ import org.joda.time.format.DateTimeFormatter;
  * Handles DateTime conversions from long to strings and strings to longs based on passed patterns
  */
 public class DateTimePatternHandler {
-  private final Map<String, DateTimeFormatter> patternCache = new ConcurrentHashMap<>();
-
   /**
    * Converts the dateTimeString of passed pattern into a long of the millis since epoch
    */
-  public Long parseDateTimeStringToEpochMillis(String dateTimeString, String pattern) {
-    DateTimeFormatter dateTimeFormatter = getDateTimeFormatterFromCache(pattern);
+  public static Long parseDateTimeStringToEpochMillis(String dateTimeString, String pattern) {
+    DateTimeFormatter dateTimeFormatter = getDateTimeFormatter(pattern);
     return dateTimeFormatter.parseMillis(dateTimeString);
   }
 
   /**
    * Converts the millis representing seconds since epoch into a string of passed pattern
    */
-  public String parseEpochMillisToDateTimeString(Long millis, String pattern) {
-    DateTimeFormatter dateTimeFormatter = getDateTimeFormatterFromCache(pattern);
+  public static String parseEpochMillisToDateTimeString(Long millis, String pattern) {
+    DateTimeFormatter dateTimeFormatter = getDateTimeFormatter(pattern);
     return dateTimeFormatter.print(millis);
   }
 
-  private DateTimeFormatter getDateTimeFormatterFromCache(String pattern) {
+  private static DateTimeFormatter getDateTimeFormatter(String pattern) {
     // Note: withZoneUTC is overwritten if the timezone is specified directly in the pattern
-    return patternCache
-        .computeIfAbsent(pattern, missingPattern -> DateTimeFormat.forPattern(missingPattern).withZoneUTC());
+    // This also leverages an internal cache so it won't generate a new DateTimeFormatter for every row with
+    // the same pattern
+    return DateTimeFormat.forPattern(pattern).withZoneUTC();
   }
 }

@@ -34,14 +34,13 @@ public class InbuiltFunctionEvaluatorTest {
   public void testExpressionWithColumn()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    InbuiltFunctionRegistry inbuiltFunctionRegistry = new InbuiltFunctionRegistry(
-        Lists.newArrayList(myFunc.getClass().getDeclaredMethod("reverseString", String.class)));
-    FunctionInfo functionInfo = inbuiltFunctionRegistry
+    InbuiltFunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("reverseString", String.class));
+    FunctionInfo functionInfo = InbuiltFunctionRegistry
         .getFunctionByNameWithApplicableArgumentTypes("reverseString", new Class<?>[]{Object.class});
     System.out.println(functionInfo);
     String expression = "reverseString(testColumn)";
 
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression, inbuiltFunctionRegistry);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     Assert.assertEquals(evaluator.getArguments(), Lists.newArrayList("testColumn"));
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
@@ -56,12 +55,12 @@ public class InbuiltFunctionEvaluatorTest {
   public void testExpressionWithConstant()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    InbuiltFunctionRegistry inbuiltFunctionRegistry = new InbuiltFunctionRegistry(
-        Lists.newArrayList(myFunc.getClass().getDeclaredMethod("daysSinceEpoch", String.class, String.class)));
+    InbuiltFunctionRegistry
+        .registerFunction(myFunc.getClass().getDeclaredMethod("daysSinceEpoch", String.class, String.class));
     String input = "1980-01-01";
     String format = "yyyy-MM-dd";
     String expression = String.format("daysSinceEpoch('%s', '%s')", input, format);
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression, inbuiltFunctionRegistry);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     Assert.assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
     Object result = evaluator.evaluate(row);
@@ -72,14 +71,14 @@ public class InbuiltFunctionEvaluatorTest {
   public void testMultiFunctionExpression()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    InbuiltFunctionRegistry inbuiltFunctionRegistry = new InbuiltFunctionRegistry(Lists
-        .newArrayList(myFunc.getClass().getDeclaredMethod("reverseString", String.class),
-            myFunc.getClass().getDeclaredMethod("daysSinceEpoch", String.class, String.class)));
+    InbuiltFunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("reverseString", String.class));
+    InbuiltFunctionRegistry
+        .registerFunction(myFunc.getClass().getDeclaredMethod("daysSinceEpoch", String.class, String.class));
     String input = "1980-01-01";
     String reversedInput = myFunc.reverseString(input);
     String format = "yyyy-MM-dd";
     String expression = String.format("daysSinceEpoch(reverseString('%s'), '%s')", reversedInput, format);
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression, inbuiltFunctionRegistry);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     Assert.assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
     Object result = evaluator.evaluate(row);
@@ -90,10 +89,10 @@ public class InbuiltFunctionEvaluatorTest {
   public void testStateSharedBetweenRowsForExecution()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    InbuiltFunctionRegistry inbuiltFunctionRegistry = new InbuiltFunctionRegistry(
-        Lists.newArrayList(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class)));
+    InbuiltFunctionRegistry
+        .registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
     String expression = String.format("appendToStringAndReturn('%s')", "test ");
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression, inbuiltFunctionRegistry);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     Assert.assertTrue(evaluator.getArguments().isEmpty());
     GenericRow row = new GenericRow();
     Assert.assertEquals(evaluator.evaluate(row), "test ");

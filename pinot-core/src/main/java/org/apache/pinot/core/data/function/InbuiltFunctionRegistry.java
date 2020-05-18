@@ -23,17 +23,46 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Registry for inbuilt Pinot functions
  */
 public class InbuiltFunctionRegistry {
-  private final Map<String, FunctionInfo> _functionInfoMap = new HashMap<>();
+  private static final Logger LOGGER = LoggerFactory.getLogger(InbuiltFunctionRegistry.class);
+  private static final Map<String, FunctionInfo> _functionInfoMap = new HashMap<>();
 
-  InbuiltFunctionRegistry(List<Method> functionsToRegister) {
-    for (Method function : functionsToRegister) {
-      registerFunction(function);
+  static {
+    try {
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochSeconds", Long.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutes", Long.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHours", Long.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDays", Long.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochSecondsRounded", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutesRounded", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHoursRounded", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDaysRounded", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochSecondsBucket", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutesBucket", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHoursBucket", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDaysBucket", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochSeconds", Long.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochMinutes", Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochHours", Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochDays", Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochSecondsBucket", Long.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochMinutesBucket", Number.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochHoursBucket", Number.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochDaysBucket", Number.class, Number.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("toDateTime", Long.class, String.class));
+      registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromDateTime", String.class, String.class));
+
+      registerFunction(JsonFunctions.class.getDeclaredMethod("toJsonMapStr", Map.class));
+    } catch (NoSuchMethodException e) {
+      LOGGER.error("Caught exception when registering function", e);
+      throw new IllegalStateException(e);
     }
   }
 
@@ -41,14 +70,15 @@ public class InbuiltFunctionRegistry {
    * Given a function name and a set of argument types, asserts that a corresponding function
    * was registered during construction and returns it
    */
-  public FunctionInfo getFunctionByNameWithApplicableArgumentTypes(String functionName, Class<?>[] argumentTypes) {
+  public static FunctionInfo getFunctionByNameWithApplicableArgumentTypes(String functionName,
+      Class<?>[] argumentTypes) {
     Preconditions.checkArgument(_functionInfoMap.containsKey(functionName.toLowerCase()));
     FunctionInfo functionInfo = _functionInfoMap.get(functionName.toLowerCase());
     Preconditions.checkArgument(functionInfo.isApplicable(argumentTypes));
     return functionInfo;
   }
 
-  private void registerFunction(Method method) {
+  static void registerFunction(Method method) {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
     _functionInfoMap.put(method.getName().toLowerCase(), functionInfo);
   }
