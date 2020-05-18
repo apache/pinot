@@ -42,7 +42,7 @@ public class DefaultDataManagerCallbackImpl implements DataManagerCallback {
   }
 
   /**
-   * return cached default index segment callback to ensure better performance
+   * return cached default index segment callback for better performance
    * @return a default cached object of {@link org.apache.pinot.core.data.manager.callback.IndexSegmentCallback}
    */
   public IndexSegmentCallback getIndexSegmentCallback() {
