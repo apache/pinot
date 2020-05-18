@@ -183,7 +183,7 @@ public class DateTimeFunctionEvaluatorTest {
     GenericRow row10_2 = new GenericRow();
     row10_2.putValue("dateTime", 7897897890000L);
     inputs.add(new Object[]{"toDateTime(dateTime, 'EEE MMM dd HH:mm:ss z yyyy')", Lists.newArrayList(
-        "dateTime"), row10_2, "Mon Apr 10 20:31:30 +00:00 2220"});
+        "dateTime"), row10_2, "Mon Apr 10 20:31:30 UTC 2220"});
 
     // fromDateTime simple
     GenericRow row11_0 = new GenericRow();
