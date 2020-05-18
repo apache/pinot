@@ -42,8 +42,6 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class HybridQuickstart {
-  private File _offlineQuickStartDataDir;
-  private File _realtimeQuickStartDataDir;
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private File _schemaFile;
@@ -59,17 +57,12 @@ public class HybridQuickstart {
     new HybridQuickstart().execute();
   }
 
-  private QuickstartTableRequest prepareOfflineTableRequest()
+  private QuickstartTableRequest prepareOfflineTableRequest(File configDir)
       throws IOException {
-    _offlineQuickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
 
-    if (!_offlineQuickStartDataDir.exists()) {
-      Preconditions.checkState(_offlineQuickStartDataDir.mkdirs());
-    }
-
-    _schemaFile = new File(_offlineQuickStartDataDir, "airlineStats_schema.json");
-    _ingestionJobSpecFile = new File(_offlineQuickStartDataDir, "ingestionJobSpec.yaml");
-    File tableConfigFile = new File(_offlineQuickStartDataDir, "airlineStats_offline_table_config.json");
+    _schemaFile = new File(configDir, "airlineStats_schema.json");
+    _ingestionJobSpecFile = new File(configDir, "ingestionJobSpec.yaml");
+    File tableConfigFile = new File(configDir, "airlineStats_offline_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
     URL resource = classLoader.getResource("examples/batch/airlineStats/airlineStats_schema.json");
@@ -82,20 +75,15 @@ public class HybridQuickstart {
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    return new QuickstartTableRequest("airlineStats", _schemaFile, tableConfigFile, _ingestionJobSpecFile, _offlineQuickStartDataDir,
+    return new QuickstartTableRequest("airlineStats", _schemaFile, tableConfigFile, _ingestionJobSpecFile,
         FileFormat.AVRO);
   }
 
-  private QuickstartTableRequest prepareRealtimeTableRequest()
+  private QuickstartTableRequest prepareRealtimeTableRequest(File configDir)
       throws IOException {
-    _realtimeQuickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
 
-    if (!_realtimeQuickStartDataDir.exists()) {
-      Preconditions.checkState(_realtimeQuickStartDataDir.mkdirs());
-    }
-
-    _dataFile = new File(_realtimeQuickStartDataDir, "airlineStats_data.avro");
-    _realtimeTableConfigFile = new File(_realtimeQuickStartDataDir, "airlineStats_realtime_table_config.json");
+    _dataFile = new File(configDir, "airlineStats_data.avro");
+    _realtimeTableConfigFile = new File(configDir, "airlineStats_realtime_table_config.json");
 
     URL resource = Quickstart.class.getClassLoader().getResource(
         "examples/stream/airlineStats/airlineStats_realtime_table_config.json");
@@ -122,13 +110,16 @@ public class HybridQuickstart {
 
   public void execute()
       throws Exception {
-    QuickstartTableRequest offlineRequest = prepareOfflineTableRequest();
-    QuickstartTableRequest realtimeTableRequest = prepareRealtimeTableRequest();
 
-    File tempDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
-    Preconditions.checkState(tempDir.mkdirs());
+    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File configDir = new File(quickstartTmpDir, "configs");
+    File dataDir = new File(quickstartTmpDir, "data");
+    Preconditions.checkState(configDir.mkdirs());
+    Preconditions.checkState(dataDir.mkdirs());
+    QuickstartTableRequest offlineRequest = prepareOfflineTableRequest(configDir);
+    QuickstartTableRequest realtimeTableRequest = prepareRealtimeTableRequest(configDir);
     final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 1, 1, 1, tempDir);
+        new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 1, 1, 1, dataDir);
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
     printStatus(Color.YELLOW, "***** Starting Zookeeper, 1 servers, 1 brokers and 1 controller *****");
@@ -202,8 +193,7 @@ public class HybridQuickstart {
           runner.stop();
           _kafkaStarter.stop();
           ZkStarter.stopLocalZkServer(_zookeeperInstance);
-          FileUtils.deleteDirectory(_offlineQuickStartDataDir);
-          FileUtils.deleteDirectory(_realtimeQuickStartDataDir);
+          FileUtils.deleteDirectory(quickstartTmpDir);
         } catch (Exception e) {
           e.printStackTrace();
         }
