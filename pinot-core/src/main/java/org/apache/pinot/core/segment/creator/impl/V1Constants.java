@@ -51,6 +51,10 @@ public class V1Constants {
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";
       public static final String METRICS = "segment.metric.column.names";
+      /**
+       * The primary time column for the table. This will match the timeColumnName defined in the tableConfig.
+       * In the Pinot schema, this column can be defined as either a TimeFieldSpec or DateTimeFieldSpec
+       */
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";
       public static final String SEGMENT_START_TIME = "segment.start.time";

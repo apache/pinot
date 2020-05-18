@@ -64,7 +64,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       // Parse input time format: 'EPOCH' or 'SIMPLE_DATE_FORMAT' using pattern
       Preconditions.checkNotNull(dateTimeFormatSpec);
       TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
-      if (timeFormat.equals(TimeFormat.EPOCH)) {
+      if (timeFormat == TimeFormat.EPOCH) {
         _inputTimeUnit = dateTimeFormatSpec.getColumnUnit();
         _inputSDF = null;
       } else {
