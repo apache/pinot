@@ -34,8 +34,8 @@ public class InbuiltFunctionEvaluatorTest {
   public void testExpressionWithColumn()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    InbuiltFunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("reverseString", String.class));
-    FunctionInfo functionInfo = InbuiltFunctionRegistry
+    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("reverseString", String.class));
+    FunctionInfo functionInfo = FunctionRegistry
         .getFunctionByNameWithApplicableArgumentTypes("reverseString", new Class<?>[]{Object.class});
     System.out.println(functionInfo);
     String expression = "reverseString(testColumn)";
@@ -55,7 +55,7 @@ public class InbuiltFunctionEvaluatorTest {
   public void testExpressionWithConstant()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    InbuiltFunctionRegistry
+    FunctionRegistry
         .registerFunction(myFunc.getClass().getDeclaredMethod("daysSinceEpoch", String.class, String.class));
     String input = "1980-01-01";
     String format = "yyyy-MM-dd";
@@ -71,8 +71,8 @@ public class InbuiltFunctionEvaluatorTest {
   public void testMultiFunctionExpression()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    InbuiltFunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("reverseString", String.class));
-    InbuiltFunctionRegistry
+    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("reverseString", String.class));
+    FunctionRegistry
         .registerFunction(myFunc.getClass().getDeclaredMethod("daysSinceEpoch", String.class, String.class));
     String input = "1980-01-01";
     String reversedInput = myFunc.reverseString(input);
@@ -89,7 +89,7 @@ public class InbuiltFunctionEvaluatorTest {
   public void testStateSharedBetweenRowsForExecution()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    InbuiltFunctionRegistry
+    FunctionRegistry
         .registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
     String expression = String.format("appendToStringAndReturn('%s')", "test ");
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);

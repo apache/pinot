@@ -29,8 +29,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Registry for inbuilt Pinot functions
  */
-public class InbuiltFunctionRegistry {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InbuiltFunctionRegistry.class);
+public class FunctionRegistry {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
   private static final Map<String, FunctionInfo> _functionInfoMap = new HashMap<>();
 
   static {

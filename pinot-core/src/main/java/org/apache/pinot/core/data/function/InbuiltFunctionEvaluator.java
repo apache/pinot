@@ -84,7 +84,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     }
 
     FunctionInfo functionInfo =
-        InbuiltFunctionRegistry.getFunctionByNameWithApplicableArgumentTypes(transformName, argumentTypes);
+        FunctionRegistry.getFunctionByNameWithApplicableArgumentTypes(transformName, argumentTypes);
     return new FunctionExecutionNode(functionInfo, childNodes);
   }
 
