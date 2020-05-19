@@ -259,7 +259,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static void addPhysicalColumns(List src, Collection<String> dest) {
     for (Object o : src) {
       String column = o.toString();
-      if (!column.isEmpty() && column.charAt(0) != '$') {
+      if (!column.isEmpty() && column.charAt(0) != '$' && !dest.contains(column)) {
         dest.add(column);
       }
     }

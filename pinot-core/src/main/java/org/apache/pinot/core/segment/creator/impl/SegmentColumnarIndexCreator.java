@@ -362,52 +362,52 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(DIMENSIONS, config.getDimensions());
     properties.setProperty(METRICS, config.getMetrics());
     properties.setProperty(DATETIME_COLUMNS, config.getDateTimeColumnNames());
-    properties.setProperty(TIME_COLUMN_NAME, config.getTimeColumnName());
+    String timeColumnName = config.getTimeColumnName();
+    properties.setProperty(TIME_COLUMN_NAME, timeColumnName);
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
 
     // Write time related metadata (start time, end time, time unit)
-    String timeColumn = config.getTimeColumnName();
-    ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumn);
-    if (timeColumnIndexCreationInfo != null) {
-      long startTime;
-      long endTime;
-      TimeUnit timeUnit;
+    if (timeColumnName != null) {
+      ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumnName);
+      if (timeColumnIndexCreationInfo != null) {
+        long startTime;
+        long endTime;
+        TimeUnit timeUnit;
 
-      // Use start/end time in config if defined
-      if (config.getStartTime() != null) {
-        startTime = Long.parseLong(config.getStartTime());
-        endTime = Long.parseLong(config.getEndTime());
-        timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
-      } else {
-        String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
-        String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
-
-        if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
-          // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
-          DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
-          startTime = dateTimeFormatter.parseMillis(startTimeStr);
-          endTime = dateTimeFormatter.parseMillis(endTimeStr);
-          timeUnit = TimeUnit.MILLISECONDS;
-        } else {
-          // by default, time column type is TimeColumnType.EPOCH
-          startTime = Long.parseLong(startTimeStr);
-          endTime = Long.parseLong(endTimeStr);
+        // Use start/end time in config if defined
+        if (config.getStartTime() != null) {
+          startTime = Long.parseLong(config.getStartTime());
+          endTime = Long.parseLong(config.getEndTime());
           timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
+        } else {
+          String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
+          String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
+
+          if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+            // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
+            DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
+            startTime = dateTimeFormatter.parseMillis(startTimeStr);
+            endTime = dateTimeFormatter.parseMillis(endTimeStr);
+            timeUnit = TimeUnit.MILLISECONDS;
+          } else {
+            // by default, time column type is TimeColumnType.EPOCH
+            startTime = Long.parseLong(startTimeStr);
+            endTime = Long.parseLong(endTimeStr);
+            timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
+          }
         }
-      }
 
-      if (!config.isSkipTimeValueCheck()) {
-        Interval timeInterval =
-            new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
-        Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
-            "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
-            timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumn,
-            TimeUtils.VALID_TIME_INTERVAL);
-      }
+        if (!config.isSkipTimeValueCheck()) {
+          Interval timeInterval = new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
+          Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
+              "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
+              timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName, TimeUtils.VALID_TIME_INTERVAL);
+        }
 
-      properties.setProperty(SEGMENT_START_TIME, startTime);
-      properties.setProperty(SEGMENT_END_TIME, endTime);
-      properties.setProperty(TIME_UNIT, timeUnit);
+        properties.setProperty(SEGMENT_START_TIME, startTime);
+        properties.setProperty(SEGMENT_END_TIME, endTime);
+        properties.setProperty(TIME_UNIT, timeUnit);
+      }
     }
 
     for (Map.Entry<String, String> entry : config.getCustomProperties().entrySet()) {

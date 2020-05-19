@@ -79,13 +79,12 @@ public class DateTruncTransformFunctionTest
     return formatter.parseDateTime(iso8601).getMillis();
   }
 
-  private static void testDateTruncHelper(String literalInput, String unit, String tz, long expected) throws Exception {
+  private static void testDateTruncHelper(Schema schema, String literalInput, String unit, String tz, long expected)
+      throws Exception {
     long zmillisInput = iso8601ToUtcEpochMillis(literalInput);
     GenericRow row = new GenericRow();
     row.init(ImmutableMap.of(TIME_COLUMN, zmillisInput));
     List<GenericRow> rows = ImmutableList.of(row);
-    Schema schema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
 
@@ -122,57 +121,70 @@ public class DateTruncTransformFunctionTest
     }
   }
 
+
+
   @Test
   public void testPrestoCompatibleDateTimeConversionTransformFunction() throws Exception {
+    Schema schemaTimeFieldSpec = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
+    testDateTrunc(schemaTimeFieldSpec);
+
+    Schema schemaDateTimeFieldSpec = new Schema.SchemaBuilder()
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    testDateTrunc(schemaDateTimeFieldSpec);
+  }
+
+  private void testDateTrunc(Schema schema) throws Exception {
+
     DateTime result = TIMESTAMP;
     result = result.withMillisOfSecond(0);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "second", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "second", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withSecondOfMinute(0);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "minute", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "minute", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMinuteOfHour(0);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "hour", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "hour", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withHourOfDay(0);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "day", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "day", UTC_TIME_ZONE.getID(), result.getMillis());
 
     // ISO8601 week begins on Monday. For this timestamp (2001-08-22), 20th is the Monday of that week
     result = result.withDayOfMonth(20);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "week", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "week", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withDayOfMonth(1);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "month", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "month", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMonthOfYear(7);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "quarter", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "quarter", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMonthOfYear(1);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "year", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "year", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = WEIRD_TIMESTAMP;
     result = result.withMillisOfSecond(0);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "second", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "second", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withSecondOfMinute(0);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "minute", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "minute", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMinuteOfHour(0);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "hour", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "hour", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withHourOfDay(0);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "day", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "day", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withDayOfMonth(20);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "week", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "week", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withDayOfMonth(1);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "month", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "month", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMonthOfYear(7);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "quarter", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "quarter", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMonthOfYear(1);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "year", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "year", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
   }
 }

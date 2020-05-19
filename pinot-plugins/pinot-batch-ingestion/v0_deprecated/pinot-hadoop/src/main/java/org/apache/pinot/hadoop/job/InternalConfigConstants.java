@@ -29,6 +29,7 @@ public class InternalConfigConstants {
   public static final String SEGMENT_PUSH_FREQUENCY = "segment.push.frequency";
   public static final String SEGMENT_TIME_TYPE = "segment.time.type";
   public static final String SEGMENT_TIME_FORMAT = "segment.time.format";
+  public static final String SEGMENT_TIME_SDF_PATTERN = "segment.time.sdf.pattern";
 
   // Partitioning configs
   public static final String PARTITION_COLUMN_CONFIG = "partition.column";

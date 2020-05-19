@@ -162,10 +162,6 @@
       "dataType": "INT"
     },
     {
-      "name": "FlightDate",
-      "dataType": "STRING"
-    },
-    {
       "name": "FlightNum",
       "dataType": "INT"
     },
@@ -239,10 +235,6 @@
       "dataType": "INT"
     },
     {
-      "name": "Year",
-      "dataType": "INT"
-    },
-    {
       "name": "WheelsOn",
       "dataType": "INT"
     },
@@ -257,32 +249,6 @@
     {
       "name": "TotalAddGTime",
       "dataType": "INT"
-    },
-    {
-      "name": "NewAddedIntDimension",
-      "dataType": "INT"
-    },
-    {
-      "name": "NewAddedLongDimension",
-      "dataType": "LONG"
-    },
-    {
-      "name": "NewAddedFloatDimension",
-      "dataType": "FLOAT"
-    },
-    {
-      "name": "NewAddedDoubleDimension",
-      "dataType": "DOUBLE"
-    },
-    {
-      "name": "NewAddedSVStringDimension",
-      "dataType": "STRING"
-    },
-    {
-      "name": "NewAddedMVStringDimension",
-      "dataType": "STRING",
-      "singleValueField": false,
-      "defaultNullValue": ""
     }
   ],
   "metricFieldSpecs": [
@@ -349,31 +315,24 @@
     {
       "name": "WeatherDelay",
       "dataType": "INT"
-    },
-    {
-      "name": "NewAddedIntMetric",
-      "dataType": "INT",
-      "defaultNullValue": 1
-    },
-    {
-      "name": "NewAddedLongMetric",
-      "dataType": "LONG",
-      "defaultNullValue": 1
-    },
-    {
-      "name": "NewAddedFloatMetric",
-      "dataType": "FLOAT"
-    },
-    {
-      "name": "NewAddedDoubleMetric",
-      "dataType": "DOUBLE"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
-      "name": "DaysSinceEpoch",
-      "dataType": "INT",
-      "timeType": "DAYS"
-    }
-  }
+  "dateTimeFieldSpecs": [{
+    "name": "DaysSinceEpoch",
+    "dataType": "INT",
+    "format": "1:DAYS:EPOCH",
+    "granularity": "1:DAYS"
+  },
+  {
+    "name": "Year",
+    "dataType": "INT",
+    "format": "1:DAYS:SIMPLE_DATE_FORMAT:yyyy",
+    "granularity": "1:DAYS"
+  },
+  {
+    "name": "FlightDate",
+    "dataType": "STRING",
+    "format": "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd",
+    "granularity": "1:DAYS"
+  }]
 }

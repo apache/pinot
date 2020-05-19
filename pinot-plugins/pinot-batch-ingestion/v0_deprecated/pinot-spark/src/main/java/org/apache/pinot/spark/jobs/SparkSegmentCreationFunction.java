@@ -44,6 +44,8 @@ import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -119,23 +121,18 @@ public class SparkSegmentCreationFunction implements Serializable {
         Preconditions.checkState(_tableConfig != null,
             "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
         SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
-        String timeFormat = null;
-        TimeUnit timeType = null;
+        DateTimeFormatSpec dateTimeFormatSpec = null;
         String timeColumnName = _tableConfig.getValidationConfig().getTimeColumnName();
-
         if (timeColumnName != null) {
-          FieldSpec fieldSpec = _schema.getFieldSpecFor(timeColumnName);
-          if (fieldSpec != null) {
-            TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-            timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
-            timeType = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
+          DateTimeFieldSpec dateTimeFieldSpec = _schema.getSpecForTimeColumn(timeColumnName);
+          if (dateTimeFieldSpec != null) {
+            dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           }
         }
         _segmentNameGenerator =
             new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
                 _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
-                validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(),
-                timeType, timeFormat);
+                validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(), dateTimeFormatSpec);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);

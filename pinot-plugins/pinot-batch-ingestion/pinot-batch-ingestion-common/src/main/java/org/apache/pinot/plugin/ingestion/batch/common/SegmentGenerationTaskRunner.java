@@ -33,6 +33,8 @@ import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -123,25 +125,19 @@ public class SegmentGenerationTaskRunner implements Serializable {
       case SIMPLE_SEGMENT_NAME_GENERATOR:
         return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
       case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
-        Preconditions.checkState(tableConfig != null,
-            "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
         SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-        String timeFormat = null;
-        TimeUnit timeType = null;
+        DateTimeFormatSpec dateTimeFormatSpec = null;
         String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
 
         if (timeColumnName != null) {
-          FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
-          if (fieldSpec != null) {
-            TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-            timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
-            timeType = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
+          DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+          if (dateTimeFieldSpec != null) {
+            dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
           }
         }
         return new NormalizedDateSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
-            Boolean.valueOf(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
-            validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(),
-            timeType, timeFormat);
+            Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
+            validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(), dateTimeFormatSpec);
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }

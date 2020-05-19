@@ -39,6 +39,9 @@ import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -81,7 +84,9 @@ public class HelixBrokerStarterTest extends ControllerTest {
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVERS, true);
 
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, TIME_COLUMN_NAME), null).build();
+        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.INT,
+            new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString())
+                .getFormat(), new DateTimeGranularitySpec(1, TimeUnit.DAYS).getGranularity()).build();
     _helixResourceManager.addSchema(schema, true);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)

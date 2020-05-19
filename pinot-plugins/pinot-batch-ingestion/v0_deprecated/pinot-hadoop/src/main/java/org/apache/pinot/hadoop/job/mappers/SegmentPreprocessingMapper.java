@@ -33,6 +33,8 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.hadoop.job.InternalConfigConstants;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,9 +69,15 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
 
       String timeType = configuration.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
       String timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
-      TimeUnit timeUnit = TimeUnit.valueOf(timeType);
+      DateTimeFormatSpec dateTimeFormatSpec;
+      if (timeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
+        dateTimeFormatSpec = new DateTimeFormatSpec(1, timeType, timeFormat);
+      } else {
+        dateTimeFormatSpec = new DateTimeFormatSpec(1, timeType, timeFormat,
+            configuration.get(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN));
+      }
       _normalizedDateSegmentNameGenerator =
-          new NormalizedDateSegmentNameGenerator(tableName, null, false, "APPEND", pushFrequency, timeUnit, timeFormat);
+          new NormalizedDateSegmentNameGenerator(tableName, null, false, "APPEND", pushFrequency, dateTimeFormatSpec);
       _sampleNormalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
     }
 

@@ -53,7 +53,8 @@ public class MultiplePinotSegmentRecordReaderTest {
   private static String D_MV_1 = "d_mv_1";
   private static String M1 = "m1";
   private static String M2 = "m2";
-  private static String TIME = "t";
+  private static String TIME_1 = "t1";
+  private static String TIME_2 = "t2";
 
   private String _segmentOutputDir;
   private List<File> _segmentIndexDirList;
@@ -86,12 +87,13 @@ public class MultiplePinotSegmentRecordReaderTest {
         .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING)
         .addMetric(M1, FieldSpec.DataType.INT)
         .addMetric(M2, FieldSpec.DataType.FLOAT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, TIME), null)
+        .addDateTime(TIME_1, FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime(TIME_2, FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS")
         .build();
   }
 
   private TableConfig createTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME).build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_1).build();
   }
 
   @Test
@@ -117,7 +119,8 @@ public class MultiplePinotSegmentRecordReaderTest {
         Assert.assertTrue(PinotSegmentUtil.compareMultiValueColumn(outputRow.getValue(D_MV_1), row.getValue(D_MV_1)));
         Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
         Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
-        Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
+        Assert.assertEquals(outputRow.getValue(TIME_1), row.getValue(TIME_1));
+        Assert.assertEquals(outputRow.getValue(TIME_2), row.getValue(TIME_2));
       }
     }
   }

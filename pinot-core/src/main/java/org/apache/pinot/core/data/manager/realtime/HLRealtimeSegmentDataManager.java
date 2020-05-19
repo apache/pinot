@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.Meter;
 import java.io.File;
@@ -46,6 +47,8 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -111,7 +114,12 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentName = realtimeSegmentZKMetadata.getSegmentName();
     _tableNameWithType = tableConfig.getTableName();
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    _timeType = ((TimeFieldSpec) schema.getFieldSpecFor(_timeColumnName)).getOutgoingGranularitySpec().getTimeType();
+    Preconditions
+        .checkNotNull(_timeColumnName, "Must provide valid timeColumnName in tableConfig for realtime table {}",
+            _tableNameWithType);
+    DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(_timeColumnName);
+    Preconditions.checkNotNull(dateTimeFieldSpec, "Must provide field spec for time column {}", _timeColumnName);
+    _timeType = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat()).getColumnUnit();
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {

@@ -150,7 +150,7 @@ public class FieldSpecTest {
   }
 
   /**
-   * Test {@link TimeFieldSpec} constructors.
+   * Test {@link DateTimeFieldSpec} constructors.
    */
   @Test
   public void testDateTimeFieldSpecConstructor() {

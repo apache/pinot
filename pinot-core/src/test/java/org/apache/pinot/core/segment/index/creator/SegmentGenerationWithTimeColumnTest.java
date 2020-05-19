@@ -94,6 +94,19 @@ public class SegmentGenerationWithTimeColumnTest {
     Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
   }
 
+  /**
+   * Tests using DateTimeFieldSpec as time column
+   */
+  @Test
+  public void testSimpleDateSegmentGenerationNew()
+      throws Exception {
+    Schema schema = createDateTimeFieldSpecSchema(true);
+    File segmentDir = buildSegment(_tableConfig, schema, true, false);
+    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
+    Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
+  }
+
   @Test
   public void testEpochDateSegmentGeneration()
       throws Exception {
@@ -104,10 +117,34 @@ public class SegmentGenerationWithTimeColumnTest {
     Assert.assertEquals(metadata.getEndTime(), maxTime);
   }
 
+  /**
+   * Tests using DateTimeFieldSpec as time column
+   */
+  @Test
+  public void testEpochDateSegmentGenerationNew()
+      throws Exception {
+    Schema schema = createDateTimeFieldSpecSchema(false);
+    File segmentDir = buildSegment(_tableConfig, schema, false, false);
+    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    Assert.assertEquals(metadata.getStartTime(), minTime);
+    Assert.assertEquals(metadata.getEndTime(), maxTime);
+  }
+
+
   @Test(expectedExceptions = IllegalStateException.class)
   public void testSegmentGenerationWithInvalidTime()
       throws Exception {
     Schema schema = createSchema(false);
+    buildSegment(_tableConfig, schema, false, true);
+  }
+
+  /**
+   * Tests using DateTimeFieldSpec as time column
+   */
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testSegmentGenerationWithInvalidTimeNew()
+      throws Exception {
+    Schema schema = createDateTimeFieldSpecSchema(false);
     buildSegment(_tableConfig, schema, false, true);
   }
 
@@ -120,6 +157,18 @@ public class SegmentGenerationWithTimeColumnTest {
     } else {
       builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COL_NAME), null);
     }
+    return builder.build();
+  }
+
+  private Schema createDateTimeFieldSpecSchema(boolean isSimpleDate) {
+    Schema.SchemaBuilder builder =
+        new Schema.SchemaBuilder().addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING);
+    if (isSimpleDate) {
+      builder.addDateTime(TIME_COL_NAME, FieldSpec.DataType.INT, "1:DAYS:SIMPLE_DATE_FORMAT:"+TIME_COL_FORMAT, "1:DAYS");
+    } else {
+      builder.addDateTime(TIME_COL_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
+    }
+    builder.addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS");
     return builder.build();
   }
 

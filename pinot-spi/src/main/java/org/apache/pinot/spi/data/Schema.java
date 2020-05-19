@@ -506,11 +506,11 @@ public final class Schema {
     }
 
     /**
-     * Add timeFieldSpec with incoming and outgoing granularity spec
-     * TODO: This is going to be deprecated in favor of addDateTime().
-     *  Many tests use this to construct Schema with TimeFieldSpec.
-     *  This will continue to exist for a while, as it helps to test backward compatibility of schemas containing TimeFieldSpec
+     * @deprecated in favor of {@link SchemaBuilder#addDateTime(String, DataType, String, String)}
+     * Adds timeFieldSpec with incoming and outgoing granularity spec
+     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of schemas containing TimeFieldSpec
      */
+    @Deprecated
     public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
         @Nullable TimeGranularitySpec outgoingTimeGranularitySpec) {
       if (outgoingTimeGranularitySpec != null) {

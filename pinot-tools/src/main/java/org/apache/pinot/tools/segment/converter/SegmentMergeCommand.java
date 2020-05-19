@@ -37,6 +37,8 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -248,20 +250,17 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     String pushFrequency = validationConfig.getSegmentPushFrequency();
     String pushType = validationConfig.getSegmentPushType();
     String timeColumnName = validationConfig.getTimeColumnName();
-    TimeUnit timeType = null;
-    String timeFormat = null;
+    DateTimeFormatSpec dateTimeFormatSpec = null;
     if (timeColumnName != null) {
-      FieldSpec fieldSpec = schema.getFieldSpecFor(timeColumnName);
-      if (fieldSpec != null) {
-        TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-        timeType = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
-        timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
+      DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumnName);
+      if (dateTimeSpec != null) {
+        dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
       }
     }
 
     // Generate the final segment name using segment name generator
     NormalizedDateSegmentNameGenerator segmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, timeType, timeFormat);
+        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, dateTimeFormatSpec);
 
     return segmentNameGenerator.generateSegmentName(DEFAULT_SEQUENCE_ID, minStartTime, maxEndTime);
   }
