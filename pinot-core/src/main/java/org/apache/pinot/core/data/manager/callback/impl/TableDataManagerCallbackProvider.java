@@ -64,8 +64,6 @@ public class TableDataManagerCallbackProvider {
         LOGGER.error("failed to load table data manager class {}", upsertClassName);
         ExceptionUtils.rethrow(e);
       }
-      Preconditions.checkState(upsertTableDataManagerCallBackClass.isAssignableFrom(TableDataManagerCallback.class),
-          "configured class not assignable from Callback class");
     }
   }
 
