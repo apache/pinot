@@ -38,8 +38,8 @@ import org.testng.annotations.Test;
  * Tests Response Format = sql for selection, distinct, aggregations and aggregation group bys
  */
 public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValueQueriesTest {
-  private static String SV_GROUP_BY = " group by column8";
-  private static String MV_GROUP_BY = " group by column7";
+  private static String SV_GROUP_BY = " GROUP BY column8 TOP 1";
+  private static String MV_GROUP_BY = " GROUP BY column7 TOP 1";
 
   @Test
   public void testCountMV() {
@@ -72,7 +72,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
     rows.add(new Object[]{"674022574", 231056L});
-    expectedResultsSize = 10;
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -117,8 +117,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "maxmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"711508739", 2147483647.0});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647.0});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -127,7 +127,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "maxmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"353", 2147483647.0});
+    rows.add(new Object[]{"350", 2147483647.0});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -164,7 +164,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
     rows.add(new Object[]{"674022574", 1001.0});
-    expectedResultsSize = 10;
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -210,7 +210,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
     rows.add(new Object[]{"674022574", 402591409613620.0});
-    expectedResultsSize = 10;
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -255,8 +255,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "avgmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"1040894941", 2147483647.0});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647.0});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -265,7 +265,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "avgmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"208", 2147483647.0});
+    rows.add(new Object[]{"243", 2147483647.0});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -302,7 +302,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
     rows.add(new Object[]{"674022574", 2147482646.0});
-    expectedResultsSize = 10;
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -348,7 +348,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     rows = new ArrayList<>();
     rows.add(new Object[]{"674022574", 4784});
-    expectedResultsSize = 10;
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -394,7 +394,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
     rows.add(new Object[]{"674022574", 4715L});
-    expectedResultsSize = 10;
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -446,7 +446,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "distinctcountrawhllmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
     expectedRow0 = new Object[]{"674022574", 4715L};
-    expectedResultsSize = 10;
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -503,8 +503,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
       dataSchema = new DataSchema(new String[]{"column8", "percentile50mv(column6)"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
       rows = new ArrayList<>();
-      rows.add(new Object[]{"169878844", 2147483647.0});
-      expectedResultsSize = 10;
+      rows.add(new Object[]{"872818679", 2147483647.0});
+      expectedResultsSize = 1;
       QueriesTestUtils
           .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
               dataSchema);
@@ -513,7 +513,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
       dataSchema = new DataSchema(new String[]{"column7", "percentile50mv(column6)"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
       rows = new ArrayList<>();
-      rows.add(new Object[]{"372", 2147483647.0});
+      rows.add(new Object[]{"243", 2147483647.0});
       QueriesTestUtils
           .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
               dataSchema);
@@ -550,8 +550,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "percentile90mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"600729221", 2147483647.0});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647.0});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -560,7 +560,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "percentile90mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"475", 2147483647.0});
+    rows.add(new Object[]{"350", 2147483647.0});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -596,8 +596,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "percentile95mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"711508739", 2147483647.0});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647.0});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -606,7 +606,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "percentile95mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"354", 2147483647.0});
+    rows.add(new Object[]{"350", 2147483647.0});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -642,8 +642,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "percentile99mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"711508739", 2147483647.0});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647.0});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -652,7 +652,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "percentile99mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"353", 2147483647.0});
+    rows.add(new Object[]{"350", 2147483647.0});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -688,8 +688,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "percentileest50mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"169878844", 2147483647L});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647L});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -698,7 +698,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "percentileest50mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"372", 2147483647L});
+    rows.add(new Object[]{"243", 2147483647L});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -734,8 +734,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "percentileest90mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"600729221", 2147483647L});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647L});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -744,7 +744,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "percentileest90mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"475", 2147483647L});
+    rows.add(new Object[]{"350", 2147483647L});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -780,8 +780,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "percentileest95mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"711508739", 2147483647L});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647L});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -790,7 +790,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "percentileest95mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"354", 2147483647L});
+    rows.add(new Object[]{"350", 2147483647L});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -826,8 +826,8 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column8", "percentileest99mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"711508739", 2147483647L});
-    expectedResultsSize = 10;
+    rows.add(new Object[]{"872818679", 2147483647L});
+    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
@@ -836,7 +836,7 @@ public class InterSegmentResultTableMultiValueQueriesTest extends BaseMultiValue
     dataSchema = new DataSchema(new String[]{"column7", "percentileest99mv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
-    rows.add(new Object[]{"353", 2147483647L});
+    rows.add(new Object[]{"350", 2147483647L});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0L, 800000L, 400000L, rows, expectedResultsSize,
             dataSchema);
