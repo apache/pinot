@@ -182,7 +182,7 @@ public class DateTimeFunctionEvaluatorTest {
     // toDateTime with timezone
     GenericRow row10_2 = new GenericRow();
     row10_2.putValue("dateTime", 7897897890000L);
-    inputs.add(new Object[]{"toDateTime(dateTime, 'EEE MMM dd HH:mm:ss z yyyy')", Lists.newArrayList(
+    inputs.add(new Object[]{"toDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
         "dateTime"), row10_2, "Mon Apr 10 20:31:30 UTC 2220"});
 
     // fromDateTime simple
