@@ -192,9 +192,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Nullable
   protected List<String> getRangeIndexColumns() {
-    return null;
-    // TODO: Fix the range index then uncomment this line
-//    return DEFAULT_RANGE_INDEX_COLUMNS;
+    return DEFAULT_RANGE_INDEX_COLUMNS;
   }
 
   @Nullable

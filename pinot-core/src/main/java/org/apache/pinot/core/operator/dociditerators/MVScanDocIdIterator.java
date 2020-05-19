@@ -25,6 +25,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -132,13 +133,13 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
-  public MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer) {
+  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
 
     MutableRoaringBitmap result = new MutableRoaringBitmap();
     if (evaluator.isAlwaysFalse()) {
       return result;
     }
-    IntIterator intIterator = answer.getIntIterator();
+    IntIterator intIterator = docIds.getIntIterator();
     int docId = -1, length;
     while (intIterator.hasNext() && docId < endDocId) {
       docId = intIterator.next();

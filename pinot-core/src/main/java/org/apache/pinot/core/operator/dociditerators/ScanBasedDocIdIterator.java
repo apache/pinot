@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -33,7 +34,7 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
 
   boolean isMatch(int docId);
 
-  MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer);
+  MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds);
 
   /**
    * Get number of entries scanned.

@@ -57,7 +57,7 @@ public class FilterOperatorUtils {
     //Only for dictionary encoded columns and offline data sources
     if (predicateType == Predicate.Type.RANGE && dataSource.getDictionary() != null
         && dataSource.getRangeIndex() != null) {
-      return new RangeFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
+      return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
     }
 
     if (predicateType == Predicate.Type.TEXT_MATCH) {
@@ -150,17 +150,20 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof BitmapBasedFilterOperator) {
           return 1;
         }
-        if (filterOperator instanceof TextMatchFilterOperator) {
+        if (filterOperator instanceof RangeIndexBasedFilterOperator) {
           return 2;
         }
-        if (filterOperator instanceof AndFilterOperator) {
+        if (filterOperator instanceof TextMatchFilterOperator) {
           return 3;
         }
-        if (filterOperator instanceof OrFilterOperator) {
+        if (filterOperator instanceof AndFilterOperator) {
           return 4;
         }
+        if (filterOperator instanceof OrFilterOperator) {
+          return 5;
+        }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 5, debugOptions);
+          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 6, debugOptions);
         }
         if (filterOperator instanceof ExpressionFilterOperator) {
           return 10;

@@ -153,8 +153,8 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
-  public MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer) {
-    ProjectionOperator projectionOperator = new ProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(answer));
+  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
+    ProjectionOperator projectionOperator = new ProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(docIds));
     MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
     ProjectionBlock projectionBlock;
     while ((projectionBlock = projectionOperator.nextBlock()) != null) {

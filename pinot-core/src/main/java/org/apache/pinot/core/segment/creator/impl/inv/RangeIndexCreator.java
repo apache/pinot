@@ -34,7 +34,6 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -100,7 +99,7 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
   private final int _numValues;
   private int _nextDocId;
   private int _nextValueId;
-  private int _numDocsPerRange;
+  private int _numValuesPerRange;
   private FieldSpec.DataType _valueType;
 
   /**
@@ -108,14 +107,14 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
    * @param indexDir destination of the range index file
    * @param fieldSpec fieldspec of the column to generate the range index
    * @param valueType DataType of the column, INT if dictionary encoded, or INT, FLOAT, LONG, DOUBLE for raw encoded
-   * @param numRanges customize the number of ranges, if -1, we use DEFAULT_NUM_RANGES;
-   * @param numDocsPerRange customize the number of Docs Per Range, if -1 numDocsPerRange = totalValues/numRanges
+   * @param numRanges Number of ranges, use DEFAULT_NUM_RANGES if not configured (<= 0)
+   * @param numValuesPerRange Number of values per range, calculate from numRanges if not configured (<= 0)
    * @param numDocs total number of documents
    * @param numValues total number of values, used for Multi value columns (for single value columns numDocs== numValues)
    * @throws IOException
    */
   public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, FieldSpec.DataType valueType, int numRanges,
-      int numDocsPerRange, int numDocs, int numValues)
+      int numValuesPerRange, int numDocs, int numValues)
       throws IOException {
     _valueType = valueType;
     String columnName = fieldSpec.getName();
@@ -125,12 +124,14 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     _numValues = fieldSpec.isSingleValueField() ? numDocs : numValues;
     int valueSize = valueType.size();
     try {
-      //use DEFAULT_NUM_RANGES if numRanges is not set
-      if (numRanges < 0) {
-        numRanges = DEFAULT_NUM_RANGES;
-      }
-      if (numDocsPerRange < 0) {
-        _numDocsPerRange = (int) Math.ceil(_numValues / numRanges);
+      Preconditions.checkArgument(numRanges <= 0 || numValuesPerRange <= 0,
+          "At most one of 'numRanges' and 'numValuesPerRange' should be configured");
+      if (numRanges > 0) {
+        _numValuesPerRange = (_numValues + numRanges - 1) / numRanges;
+      } else if (numValuesPerRange > 0) {
+        _numValuesPerRange = numValuesPerRange;
+      } else {
+        _numValuesPerRange = (_numValues + DEFAULT_NUM_RANGES - 1) / DEFAULT_NUM_RANGES;
       }
 
       //Value buffer to store the values added via add method
@@ -234,7 +235,7 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     //go over the sorted value to compute ranges
     List<Pair<Integer, Integer>> ranges = new ArrayList<>();
 
-    int boundary = _numDocsPerRange;
+    int boundary = _numValuesPerRange;
     int start = 0;
     for (int i = 0; i < _numValues; i++) {
       if (i > start + boundary) {
@@ -412,7 +413,6 @@ public final class RangeIndexCreator implements InvertedIndexCreator {
     }
     valuesAsString.append("] ");
     LOGGER.info(valuesAsString.toString());
-
   }
 
   private PinotDataBuffer createTempBuffer(long size, File mmapFile)
