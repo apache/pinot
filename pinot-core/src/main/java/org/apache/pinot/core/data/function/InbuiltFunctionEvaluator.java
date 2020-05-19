@@ -22,6 +22,9 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionInvoker;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.spi.data.readers.GenericRow;
 

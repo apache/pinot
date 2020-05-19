@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.common.function;
 
 import java.util.concurrent.TimeUnit;
+import org.joda.time.format.DateTimeFormat;
 
 
 /**
@@ -215,5 +216,19 @@ public class DateTimeFunctions {
    */
   static Long fromDateTime(String dateTimeString, String pattern) {
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
+  }
+
+  /**
+   * Return current time as epoch millis
+   */
+  static Long now() {
+    return System.currentTimeMillis();
+  }
+
+  /**
+   * Return epoch millis value based on a given date time string and it's corresponding format.
+   */
+  public static Long formatDatetime(String input, String format) {
+    return DateTimeFormat.forPattern(format).parseMillis(input);
   }
 }

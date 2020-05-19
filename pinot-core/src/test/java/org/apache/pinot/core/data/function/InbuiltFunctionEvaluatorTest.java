@@ -19,6 +19,8 @@
 package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.Days;

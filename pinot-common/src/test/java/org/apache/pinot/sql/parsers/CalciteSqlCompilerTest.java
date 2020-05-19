@@ -21,6 +21,9 @@ package org.apache.pinot.sql.parsers;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
@@ -1470,18 +1473,54 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testNoArgFunction() {
-    String query = "SELECT now() FROM foo ";
+    String query = "SELECT noArgFunc() FROM foo ";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "now");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "noArgFunc");
 
-    query = "SELECT a FROM foo where time_col > now()";
+    query = "SELECT a FROM foo where time_col > noArgFunc()";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Function greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
     Function minus = greaterThan.getOperands().get(0).getFunctionCall();
-    Assert.assertEquals(minus.getOperands().get(1).getFunctionCall().getOperator(), "now");
+    Assert.assertEquals(minus.getOperands().get(1).getFunctionCall().getOperator(), "noArgFunc");
 
-    query = "SELECT sum(a), now() FROM foo group by now()";
+    query = "SELECT sum(a), noArgFunc() FROM foo group by noArgFunc()";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "now");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "noArgFunc");
+  }
+
+  @Test
+  public void testCompilationInvokedFunction() {
+    String query = "SELECT now() FROM foo ";
+    long lowerBound = System.currentTimeMillis();
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    long nowTs = pinotQuery.getSelectList().get(0).getLiteral().getLongValue();
+    long upperBound = System.currentTimeMillis();
+    Assert.assertTrue(nowTs >= lowerBound);
+    Assert.assertTrue(nowTs <= upperBound);
+
+    query = "SELECT a FROM foo where time_col > now()";
+    lowerBound = System.currentTimeMillis();
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Function greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
+    nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
+    upperBound = System.currentTimeMillis();
+    Assert.assertTrue(nowTs >= lowerBound);
+    Assert.assertTrue(nowTs <= upperBound);
+
+    query = "SELECT a FROM foo where time_col > formatDatetime('2020-01-01 UTC', 'yyyy-MM-dd z')";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
+    nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
+    Assert.assertEquals(nowTs, 1577836800000L);
+  }
+
+  @Test
+  public void testCompilationInvokedNestedFunctions() {
+    String query = "SELECT a FROM foo where time_col > toDateTime(now(), 'yyyy-MM-dd z')";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Function greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
+    String today = greaterThan.getOperands().get(1).getLiteral().getStringValue();
+    String expectedTodayStr = Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    Assert.assertEquals(today, expectedTodayStr);
   }
 }

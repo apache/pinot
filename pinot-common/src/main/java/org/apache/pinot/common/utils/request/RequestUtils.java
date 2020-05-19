@@ -50,6 +50,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
+import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 public class RequestUtils {
@@ -157,6 +158,28 @@ public class RequestUtils {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setDoubleValue(value);
     return expression;
+  }
+
+  public static Expression getLiteralExpression(Object object) {
+    if (object instanceof Integer) {
+      return RequestUtils.getLiteralExpression((Integer) object);
+    }
+    if (object instanceof Long) {
+      return RequestUtils.getLiteralExpression((Long) object);
+    }
+    if (object instanceof Float) {
+      return RequestUtils.getLiteralExpression((Float) object);
+    }
+    if (object instanceof Double) {
+      return RequestUtils.getLiteralExpression((Double) object);
+    }
+    if (object instanceof String) {
+      return RequestUtils.getLiteralExpression((String) object);
+    }
+    if(object instanceof SqlLiteral) {
+      return RequestUtils.getLiteralExpression((SqlLiteral) object);
+    }
+    throw new SqlCompilationException(new IllegalArgumentException("Unsupported Literal value type - " + object.getClass()));
   }
 
   public static Expression getFunctionExpression(String operator) {
