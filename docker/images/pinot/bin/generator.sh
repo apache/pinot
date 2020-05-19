@@ -54,7 +54,8 @@ fi
 
 echo "Creating segment for ${TEMPLATE_NAME} in ${SEGMENT_DIR}"
 ${ADMIN_PATH} CreateSegment \
--tableName "${TEMPLATE_NAME}" -segmentName "${TEMPLATE_NAME}" -format CSV -overwrite \
+-format csv \
+-tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -dataDir "${DATA_DIR}" \
 -outDir "${SEGMENT_DIR}" || exit 1
