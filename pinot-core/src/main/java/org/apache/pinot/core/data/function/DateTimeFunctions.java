@@ -63,9 +63,6 @@ import java.util.concurrent.TimeUnit;
  *   </code>
  */
 public class DateTimeFunctions {
-
-  private final DateTimePatternHandler _dateTimePatternHandler = new DateTimePatternHandler();
-
   /**
    * Convert epoch millis to epoch seconds
    */
@@ -209,14 +206,14 @@ public class DateTimeFunctions {
   /**
    * Converts epoch millis to DateTime string represented by pattern
    */
-  String toDateTime(Long millis, String pattern) {
-    return _dateTimePatternHandler.parseEpochMillisToDateTimeString(millis, pattern);
+  static String toDateTime(Long millis, String pattern) {
+    return DateTimePatternHandler.parseEpochMillisToDateTimeString(millis, pattern);
   }
 
   /**
    * Converts DateTime string represented by pattern to epoch millis
    */
-  Long fromDateTime(String dateTimeString, String pattern) {
-    return _dateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
+  static Long fromDateTime(String dateTimeString, String pattern) {
+    return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
   }
 }

@@ -36,8 +36,7 @@ public class DateTimeFunctionEvaluatorTest {
   public void testDateTimeTransformFunctions(String transformFunction, List<String> arguments, GenericRow row,
       Object result)
       throws Exception {
-    InbuiltFunctionRegistry inbuiltFunctionRegistry = FunctionRegistryFactory.getInbuiltFunctionRegistry();
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(transformFunction, inbuiltFunctionRegistry);
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(transformFunction);
     Assert.assertEquals(evaluator.getArguments(), arguments);
     Assert.assertEquals(evaluator.evaluate(row), result);
   }
@@ -183,8 +182,8 @@ public class DateTimeFunctionEvaluatorTest {
     // toDateTime with timezone
     GenericRow row10_2 = new GenericRow();
     row10_2.putValue("dateTime", 7897897890000L);
-    inputs.add(new Object[]{"toDateTime(dateTime, 'EEE MMM dd HH:mm:ss z yyyy')", Lists.newArrayList(
-        "dateTime"), row10_2, "Mon Apr 10 20:31:30 +00:00 2220"});
+    inputs.add(new Object[]{"toDateTime(dateTime, 'EEE MMM dd HH:mm:ss ZZZ yyyy')", Lists.newArrayList(
+        "dateTime"), row10_2, "Mon Apr 10 20:31:30 UTC 2220"});
 
     // fromDateTime simple
     GenericRow row11_0 = new GenericRow();

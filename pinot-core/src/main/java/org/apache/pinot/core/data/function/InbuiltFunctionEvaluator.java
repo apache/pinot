@@ -47,13 +47,11 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;
-  private final InbuiltFunctionRegistry _inbuiltFunctionRegistry;
   private final List<String> _arguments;
 
-  public InbuiltFunctionEvaluator(String expression, InbuiltFunctionRegistry inbuiltFunctionRegistry)
+  public InbuiltFunctionEvaluator(String expression)
       throws Exception {
     _arguments = new ArrayList<>();
-    _inbuiltFunctionRegistry = inbuiltFunctionRegistry;
     _rootNode = planExecution(TransformExpressionTree.compileToExpressionTree(expression));
   }
 
@@ -86,7 +84,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     }
 
     FunctionInfo functionInfo =
-        _inbuiltFunctionRegistry.getFunctionByNameWithApplicableArgumentTypes(transformName, argumentTypes);
+        FunctionRegistry.getFunctionByNameWithApplicableArgumentTypes(transformName, argumentTypes);
     return new FunctionExecutionNode(functionInfo, childNodes);
   }
 
