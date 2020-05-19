@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2;
 
+import java.io.Closeable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.startree.StarTree;
 
@@ -26,7 +27,7 @@ import org.apache.pinot.core.startree.StarTree;
  * The {@code StarTreeV2} class is a wrapper on top of star-tree, its metadata, and the data sources associated
  * with it.
  */
-public interface StarTreeV2 {
+public interface StarTreeV2 extends Closeable {
 
   /**
    * Returns the {@link StarTree} data structure.

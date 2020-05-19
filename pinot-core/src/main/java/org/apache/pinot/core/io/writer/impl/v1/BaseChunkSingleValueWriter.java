@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.io.writer.impl.v1;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;

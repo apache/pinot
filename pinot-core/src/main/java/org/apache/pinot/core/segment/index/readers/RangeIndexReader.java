@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.index.readers;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -33,72 +32,67 @@ import org.slf4j.LoggerFactory;
 public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexReader.class);
 
-  private final PinotDataBuffer _buffer;
-  private final int _version;
+  private final PinotDataBuffer _dataBuffer;
   private final FieldSpec.DataType _valueType;
   private final int _numRanges;
   final long _bitmapIndexOffset;
   private final Number[] _rangeStartArray;
   private final Number _lastRangeEnd;
 
-  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps = null;
+  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps;
 
-  /**
-   * Constructs an inverted index with the specified size.
-   * @param indexDataBuffer data buffer for the inverted index.
-   */
-  public RangeIndexReader(PinotDataBuffer indexDataBuffer) {
+  public RangeIndexReader(PinotDataBuffer dataBuffer) {
+    _dataBuffer = dataBuffer;
     long offset = 0;
-    _buffer = indexDataBuffer;
     //READER VERSION
-    _version = _buffer.getInt(offset);
+    int version = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
 
     //READ THE VALUE TYPE (INT, LONG, DOUBLE, FLOAT)
-    int valueTypeBytesLength = _buffer.getInt(offset);
+    int valueTypeBytesLength = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
     byte[] valueTypeBytes = new byte[valueTypeBytesLength];
-    _buffer.copyTo(offset, valueTypeBytes);
+    dataBuffer.copyTo(offset, valueTypeBytes);
     offset += valueTypeBytesLength;
     _valueType = FieldSpec.DataType.valueOf(new String(valueTypeBytes));
 
     //READ THE NUMBER OF RANGES
-    _numRanges = _buffer.getInt(offset);
+    _numRanges = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
     long rangeArrayStartOffset = offset;
 
     _rangeStartArray = new Number[_numRanges];
-    final long lastOffset = _buffer.getLong(offset + (_numRanges + 1) * _valueType.size() + _numRanges * Long.BYTES);
+    final long lastOffset = dataBuffer.getLong(offset + (_numRanges + 1) * _valueType.size() + _numRanges * Long.BYTES);
 
     _bitmapIndexOffset = offset + (_numRanges + 1) * _valueType.size();
 
-    Preconditions.checkState(lastOffset == _buffer.size(),
+    Preconditions.checkState(lastOffset == dataBuffer.size(),
         "The last offset should be equal to buffer size! Current lastOffset: " + lastOffset + ", buffer size: "
-            + _buffer.size());
+            + dataBuffer.size());
     switch (_valueType) {
       case INT:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = _buffer.getInt(rangeArrayStartOffset + i * Integer.BYTES);
+          _rangeStartArray[i] = dataBuffer.getInt(rangeArrayStartOffset + i * Integer.BYTES);
         }
-        _lastRangeEnd = _buffer.getInt(rangeArrayStartOffset + _numRanges * Integer.BYTES);
+        _lastRangeEnd = dataBuffer.getInt(rangeArrayStartOffset + _numRanges * Integer.BYTES);
         break;
       case LONG:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = _buffer.getLong(rangeArrayStartOffset + i * Long.BYTES);
+          _rangeStartArray[i] = dataBuffer.getLong(rangeArrayStartOffset + i * Long.BYTES);
         }
-        _lastRangeEnd = _buffer.getLong(rangeArrayStartOffset + _numRanges * Long.BYTES);
+        _lastRangeEnd = dataBuffer.getLong(rangeArrayStartOffset + _numRanges * Long.BYTES);
         break;
       case FLOAT:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = _buffer.getFloat(rangeArrayStartOffset + i * Float.BYTES);
+          _rangeStartArray[i] = dataBuffer.getFloat(rangeArrayStartOffset + i * Float.BYTES);
         }
-        _lastRangeEnd = _buffer.getFloat(rangeArrayStartOffset + _numRanges * Float.BYTES);
+        _lastRangeEnd = dataBuffer.getFloat(rangeArrayStartOffset + _numRanges * Float.BYTES);
         break;
       case DOUBLE:
         for (int i = 0; i < _numRanges; i++) {
-          _rangeStartArray[i] = _buffer.getDouble(rangeArrayStartOffset + i * Double.BYTES);
+          _rangeStartArray[i] = dataBuffer.getDouble(rangeArrayStartOffset + i * Double.BYTES);
         }
-        _lastRangeEnd = _buffer.getDouble(rangeArrayStartOffset + _numRanges * Double.BYTES);
+        _lastRangeEnd = dataBuffer.getDouble(rangeArrayStartOffset + _numRanges * Double.BYTES);
         break;
       default:
         throw new RuntimeException("Range Index Unsupported for dataType:" + _valueType);
@@ -160,18 +154,12 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
     final int bufferLength = (int) (nextOffset - currentOffset);
 
     // Slice the buffer appropriately for Roaring Bitmap
-    ByteBuffer bb = _buffer.toDirectByteBuffer(currentOffset, bufferLength);
+    ByteBuffer bb = _dataBuffer.toDirectByteBuffer(currentOffset, bufferLength);
     return new ImmutableRoaringBitmap(bb);
   }
 
   private long getOffset(final int rangeId) {
-    return _buffer.getLong(_bitmapIndexOffset + rangeId * Long.BYTES);
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    _buffer.close();
+    return _dataBuffer.getLong(_bitmapIndexOffset + rangeId * Long.BYTES);
   }
 
   /**
@@ -226,5 +214,11 @@ public class RangeIndexReader implements InvertedIndexReader<ImmutableRoaringBit
       return _rangeStartArray.length - 1;
     }
     return -1;
+  }
+
+  @Override
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
   }
 }

@@ -57,7 +57,8 @@ public class PinotDataBitSetTest {
     int[] values = new int[numValues];
     int dataBufferSize = (numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE;
 
-    try (PinotDataBitSet dataBitSet = getEmptyBitSet(dataBufferSize)) {
+    try (PinotDataBuffer dataBuffer = getEmptyDataBuffer(dataBufferSize);
+        PinotDataBitSet dataBitSet = new PinotDataBitSet(dataBuffer)) {
       for (int i = 0; i < numValues; i++) {
         int value = RANDOM.nextInt(maxAllowedValue);
         values[i] = value;
@@ -100,8 +101,9 @@ public class PinotDataBitSetTest {
   public void testSetUnsetBit()
       throws IOException {
     int dataBufferSize = RANDOM.nextInt(100) + 1;
-    boolean bits[] = new boolean[dataBufferSize * Byte.SIZE];
-    try (PinotDataBitSet dataBitSet = getEmptyBitSet(dataBufferSize)) {
+    boolean[] bits = new boolean[dataBufferSize * Byte.SIZE];
+    try (PinotDataBuffer dataBuffer = getEmptyDataBuffer(dataBufferSize);
+        PinotDataBitSet dataBitSet = new PinotDataBitSet(dataBuffer)) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
         int bitOffset = RANDOM.nextInt(dataBufferSize * Byte.SIZE);
         if (bits[bitOffset]) {
@@ -132,7 +134,8 @@ public class PinotDataBitSetTest {
       bitOffset += RANDOM.nextInt(10) + 1;
     }
     int dataBufferSize = setBitOffsets[NUM_ITERATIONS - 1] / Byte.SIZE + 1;
-    try (PinotDataBitSet dataBitSet = getEmptyBitSet(dataBufferSize)) {
+    try (PinotDataBuffer dataBuffer = getEmptyDataBuffer(dataBufferSize);
+        PinotDataBitSet dataBitSet = new PinotDataBitSet(dataBuffer)) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
         dataBitSet.setBit(setBitOffsets[i]);
       }
@@ -154,11 +157,11 @@ public class PinotDataBitSetTest {
     }
   }
 
-  private PinotDataBitSet getEmptyBitSet(int size) {
-    PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(size, ByteOrder.BIG_ENDIAN, null);
+  private PinotDataBuffer getEmptyDataBuffer(int size) {
+    PinotDataBuffer dataBuffer = PinotDataBuffer.allocateDirect(size, ByteOrder.BIG_ENDIAN, null);
     for (int i = 0; i < size; i++) {
-      pinotDataBuffer.readFrom(0, new byte[size]);
+      dataBuffer.readFrom(0, new byte[size]);
     }
-    return new PinotDataBitSet(pinotDataBuffer);
+    return dataBuffer;
   }
 }

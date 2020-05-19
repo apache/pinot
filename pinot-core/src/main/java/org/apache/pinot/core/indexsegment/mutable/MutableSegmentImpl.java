@@ -707,6 +707,7 @@ public class MutableSegmentImpl implements MutableSegment {
         ((RealtimeInvertedIndexReader) index).close();
       }
     }
+    _invertedIndexMap.clear();
 
     if (_realtimeLuceneReaders != null) {
       // set this to true as a way of signalling the refresh task thread to
@@ -729,20 +730,25 @@ public class MutableSegmentImpl implements MutableSegment {
       try {
         entry.getValue().close();
       } catch (IOException e) {
-        _logger.error("Could not close dictionary for column {}", entry.getKey());
+        _logger.error("Failed to close the dictionary for column: {}. Continuing with error.", entry.getKey(), e);
       }
     }
-    _invertedIndexMap.clear();
+
+    if (_recordIdMap != null) {
+      try {
+        _recordIdMap.close();
+      } catch (IOException e) {
+        _logger.error("Failed to close the record id map. Continuing with error.", e);
+      }
+    }
+
     _segmentMetadata.close();
+
+    // NOTE: Close the memory manager as the last step. It will release all the PinotDataBuffers allocated.
     try {
       _memoryManager.close();
     } catch (IOException e) {
-      _logger.error("Could not close memory manager", e);
-    }
-
-    // Clear the recordId map.
-    if (_recordIdMap != null) {
-      _recordIdMap.clear();
+      _logger.error("Failed to close the memory manager", e);
     }
   }
 
@@ -877,8 +883,9 @@ public class MutableSegmentImpl implements MutableSegment {
     // Time columns should be dictionary encoded.
     for (String timeColumnName : _physicalTimeColumnNames) {
       if (noDictionaryColumns.contains(timeColumnName)) {
-        _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
-            timeColumnName);
+        _logger
+            .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
+                timeColumnName);
         _aggregateMetrics = false;
         break;
       }

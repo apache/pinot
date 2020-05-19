@@ -20,26 +20,22 @@ package org.apache.pinot.core.segment.store;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class FilePerIndexDirectoryTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SingleFileIndexDirectoryTest.class);
-  private static final File TEST_DIRECTORY = new File(FilePerIndexDirectoryTest.class.toString());
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), FilePerIndexDirectoryTest.class.toString());
 
-  private File segmentDir;
   private SegmentMetadataImpl segmentMetadata;
 
   static final long ONE_KB = 1024L;
@@ -47,39 +43,25 @@ public class FilePerIndexDirectoryTest {
   static final long ONE_GB = ONE_MB * ONE_KB;
 
   @BeforeMethod
-  public void setUpTest()
-      throws IOException, ConfigurationException {
-    segmentDir = new File(TEST_DIRECTORY, "segmentDirectory");
-
-    if (segmentDir.exists()) {
-      FileUtils.deleteQuietly(segmentDir);
-    }
-    if (segmentDir.exists()) {
-      throw new RuntimeException("directory exists");
-    }
-    segmentDir.mkdirs();
+  public void setUp()
+      throws IOException {
+    TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
     segmentMetadata = ColumnIndexDirectoryTestHelper.writeMetadata(SegmentVersion.v1);
   }
 
   @AfterMethod
-  public void tearDownTest()
+  public void tearDown()
       throws IOException {
-    FileUtils.deleteQuietly(segmentDir);
-    Assert.assertFalse(segmentDir.exists());
-  }
-
-  @AfterClass
-  public void tearDownClass() {
-    FileUtils.deleteQuietly(TEST_DIRECTORY);
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   @Test
   public void testEmptyDirectory()
       throws Exception {
-    Assert.assertEquals(0, segmentDir.list().length, segmentDir.list().toString());
-    try (FilePerIndexDirectory fpiDir = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.heap);
+    Assert.assertEquals(0, TEMP_DIR.list().length, TEMP_DIR.list().toString());
+    try (FilePerIndexDirectory fpiDir = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.heap);
         PinotDataBuffer buffer = fpiDir.newBuffer("col1", ColumnIndexType.DICTIONARY, 1024)) {
-      Assert.assertEquals(1, segmentDir.list().length, segmentDir.list().toString());
+      Assert.assertEquals(1, TEMP_DIR.list().length, TEMP_DIR.list().toString());
 
       buffer.putLong(0, 0xbadfadL);
       buffer.putInt(8, 51);
@@ -87,9 +69,9 @@ public class FilePerIndexDirectoryTest {
       buffer.putInt(101, 55);
     }
 
-    Assert.assertEquals(1, segmentDir.list().length);
+    Assert.assertEquals(1, TEMP_DIR.list().length);
 
-    try (FilePerIndexDirectory colDir = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
+    try (FilePerIndexDirectory colDir = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap);
         PinotDataBuffer readBuffer = colDir.getBuffer("col1", ColumnIndexType.DICTIONARY)) {
       Assert.assertEquals(readBuffer.getLong(0), 0xbadfadL);
       Assert.assertEquals(readBuffer.getInt(8), 51);
@@ -114,18 +96,18 @@ public class FilePerIndexDirectoryTest {
       throws Exception {
     // first verify it all works for one mode
     testMultipleRW(ReadMode.heap, 6, 100 * ONE_MB);
-    try (ColumnIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+    try (ColumnIndexDirectory columnDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", 6);
     }
   }
 
   private void testMultipleRW(ReadMode readMode, int numIter, long size)
       throws Exception {
-    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, readMode)) {
+    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, readMode)) {
       ColumnIndexDirectoryTestHelper.performMultipleWrites(columnDirectory, "foo", size, numIter);
     }
     // now read and validate data
-    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, readMode)) {
+    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, readMode)) {
       ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", numIter);
     }
   }
@@ -133,27 +115,26 @@ public class FilePerIndexDirectoryTest {
   @Test(expectedExceptions = RuntimeException.class)
   public void testWriteExisting()
       throws Exception {
-    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-        PinotDataBuffer buffer = columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024)) {
+    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+      columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024);
     }
-    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-        PinotDataBuffer repeatBuffer = columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024)) {
+    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+      columnDirectory.newBuffer("column1", ColumnIndexType.DICTIONARY, 1024);
     }
   }
 
   @Test(expectedExceptions = RuntimeException.class)
   public void testMissingIndex()
       throws IOException {
-    try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-        PinotDataBuffer buffer = fpiDirectory.getBuffer("noSuchColumn", ColumnIndexType.DICTIONARY)) {
-
+    try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+      fpiDirectory.getBuffer("noSuchColumn", ColumnIndexType.DICTIONARY);
     }
   }
 
   @Test
   public void testHasIndex()
       throws IOException {
-    try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+    try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
       PinotDataBuffer buffer = fpiDirectory.newBuffer("foo", ColumnIndexType.DICTIONARY, 1024);
       buffer.putInt(0, 100);
       Assert.assertTrue(fpiDirectory.hasIndexFor("foo", ColumnIndexType.DICTIONARY));
@@ -163,11 +144,9 @@ public class FilePerIndexDirectoryTest {
   @Test
   public void testRemoveIndex()
       throws IOException {
-    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
-      try (PinotDataBuffer buffer = fpi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024)) {
-      }
-      try (PinotDataBuffer buffer = fpi.newBuffer("col2", ColumnIndexType.DICTIONARY,100)) {
-      }
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, segmentMetadata, ReadMode.mmap)) {
+      fpi.newBuffer("col1", ColumnIndexType.FORWARD_INDEX, 1024);
+      fpi.newBuffer("col2", ColumnIndexType.DICTIONARY, 100);
       Assert.assertTrue(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
       Assert.assertTrue(fpi.getFileFor("col2", ColumnIndexType.DICTIONARY).exists());
       Assert.assertTrue(fpi.isIndexRemovalSupported());

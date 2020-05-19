@@ -240,4 +240,19 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }
   }
+
+  @Override
+  public void close()
+      throws IOException {
+    _forwardIndex.close();
+    if (_invertedIndex != null) {
+      _invertedIndex.close();
+    }
+    if (_rangeIndex != null) {
+      _rangeIndex.close();
+    }
+    if (_dictionary != null) {
+      _dictionary.close();
+    }
+  }
 }

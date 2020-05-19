@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.util;
 
+import java.io.Closeable;
+
+
 /**
  * Interface for a map from Key to auto-generated contiguous integer Id's.
  *
  * @param <Key>
  */
-public interface IdMap<Key> {
+public interface IdMap<Key> extends Closeable {
   int INVALID_ID = -1;
 
   /**
@@ -68,9 +71,4 @@ public interface IdMap<Key> {
    * @return Size of the map.
    */
   int size();
-
-  /**
-   * Clears all contents of the map.
-   */
-  void clear();
 }

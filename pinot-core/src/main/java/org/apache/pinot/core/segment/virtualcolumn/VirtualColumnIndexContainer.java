@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.virtualcolumn;
 
+import java.io.IOException;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
@@ -69,5 +70,17 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   @Override
   public NullValueVectorReaderImpl getNullValueVector() {
     return null;
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    _forwardIndex.close();
+    if (_invertedIndex != null) {
+      _invertedIndex.close();
+    }
+    if (_dictionary != null) {
+      _dictionary.close();
+    }
   }
 }

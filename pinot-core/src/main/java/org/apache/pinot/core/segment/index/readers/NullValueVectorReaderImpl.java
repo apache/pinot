@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-import java.io.IOException;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -27,9 +26,8 @@ public class NullValueVectorReaderImpl implements NullValueVectorReader {
 
   private final ImmutableRoaringBitmap _nullBitmap;
 
-  public NullValueVectorReaderImpl(PinotDataBuffer nullValueVectorBuffer) throws IOException {
-    _nullBitmap = new ImmutableRoaringBitmap(nullValueVectorBuffer.toDirectByteBuffer(0,
-        (int) nullValueVectorBuffer.size()));
+  public NullValueVectorReaderImpl(PinotDataBuffer dataBuffer) {
+    _nullBitmap = new ImmutableRoaringBitmap(dataBuffer.toDirectByteBuffer(0, (int) dataBuffer.size()));
   }
 
   public boolean isNull(int docId) {

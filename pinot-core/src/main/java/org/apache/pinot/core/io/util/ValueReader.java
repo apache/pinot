@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.io.util;
 
-import java.io.IOException;
+import java.io.Closeable;
 
 
 /**
  * Interface for value readers, which read a value at a given index.
  */
-public interface ValueReader {
+public interface ValueReader extends Closeable {
 
   int getInt(int index);
 
@@ -48,7 +48,4 @@ public interface ValueReader {
    * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
    */
   byte[] getBytes(int index, int numBytesPerValue);
-
-  void close()
-      throws IOException;
 }

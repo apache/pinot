@@ -24,8 +24,6 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 import static org.mockito.Matchers.anyString;
@@ -34,14 +32,12 @@ import static org.mockito.Mockito.when;
 
 
 public class ColumnIndexDirectoryTestHelper {
-  private static Logger LOGGER = LoggerFactory.getLogger(ColumnIndexDirectoryTestHelper.class);
-
   static ColumnIndexType[] indexTypes =
       {ColumnIndexType.DICTIONARY, ColumnIndexType.FORWARD_INDEX, ColumnIndexType.INVERTED_INDEX, ColumnIndexType.BLOOM_FILTER, ColumnIndexType.NULLVALUE_VECTOR};
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {
-    String columnName = column + "." + Integer.toString(index);
+    String columnName = column + "." + index;
     // skip star tree. It's managed differently
     ColumnIndexType indexType = indexTypes[index % indexTypes.length];
     PinotDataBuffer buf = columnDirectory.newBuffer(columnName, indexType, size);
@@ -50,7 +46,7 @@ public class ColumnIndexDirectoryTestHelper {
 
   static PinotDataBuffer getIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int index)
       throws IOException {
-    String columnName = column + "." + Integer.toString(index);
+    String columnName = column + "." + index;
     // skip star tree
     ColumnIndexType indexType = indexTypes[index % indexTypes.length];
     PinotDataBuffer buf = columnDirectory.getBuffer(columnName, indexType);
@@ -59,12 +55,12 @@ public class ColumnIndexDirectoryTestHelper {
 
   static void verifyMultipleReads(ColumnIndexDirectory columnDirectory, String column, int numIter)
       throws Exception {
-    for (int ii = 0; ii < numIter; ii++) {
-      try (PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.getIndexBuffer(columnDirectory, column, ii)) {
-        int numValues = (int) (buf.size() / 4);
-        for (int j = 0; j < numValues; ++j) {
-          Assert.assertEquals(buf.getInt(j * 4), j, "Inconsistent value at index: " + j);
-        }
+    for (int i = 0; i < numIter; i++) {
+      // NOTE: PinotDataBuffer is tracked in the ColumnIndexDirectory. No need to close it here.
+      PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.getIndexBuffer(columnDirectory, column, i);
+      int numValues = (int) (buf.size() / 4);
+      for (int j = 0; j < numValues; ++j) {
+        Assert.assertEquals(buf.getInt(j * 4), j, "Inconsistent value at index: " + j);
       }
     }
   }
@@ -74,11 +70,11 @@ public class ColumnIndexDirectoryTestHelper {
     // size is the size of large buffer...split it into parts
     int bufsize = (int) (size / numIter);
     for (int i = 0; i < numIter; i++) {
-      try (PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.newIndexBuffer(columnDirectory, column, bufsize, i)) {
-        int numValues = bufsize / 4;
-        for (int j = 0; j < numValues; j++) {
-          buf.putInt(j * 4, j);
-        }
+      // NOTE: PinotDataBuffer is tracked in the ColumnIndexDirectory. No need to close it here.
+      PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.newIndexBuffer(columnDirectory, column, bufsize, i);
+      int numValues = bufsize / 4;
+      for (int j = 0; j < numValues; j++) {
+        buf.putInt(j * 4, j);
       }
     }
   }
