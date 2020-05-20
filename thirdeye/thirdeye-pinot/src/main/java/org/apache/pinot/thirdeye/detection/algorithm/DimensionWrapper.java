@@ -227,6 +227,7 @@ public class DimensionWrapper extends DetectionPipeline {
 
       for (String nestedMetricUrn : this.nestedMetricUrns) {
         nestedMetrics.add(MetricEntity.fromURN(nestedMetricUrn));
+        evaluationMetricUrns.add(nestedMetricUrn);
       }
     }
 
