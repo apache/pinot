@@ -29,7 +29,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.dataquality.wrapper.DataSlaWrapper;
-import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.DataQualityMergeWrapper;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionMetricAttributeHolder;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
@@ -80,7 +80,7 @@ public class DataQualityTranslatorBuilder extends DetectionConfigTranslatorBuild
       return properties;
     }
 
-    properties.putAll(buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(), nestedPipelines, mergerProperties));
+    properties.putAll(buildWrapperProperties(DataQualityMergeWrapper.class.getName(), nestedPipelines, mergerProperties));
     return properties;
   }
 

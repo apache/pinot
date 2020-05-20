@@ -186,11 +186,11 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
   /**
    * Align and round off start time to the upper boundary of the granularity
    */
-  private static long alignToUpperBoundary(long start, DatasetConfigDTO datasetConfig) {
+  private static long alignToUpperBoundary(long timestamp, DatasetConfigDTO datasetConfig) {
     Period granularityPeriod = datasetConfig.bucketTimeGranularity().toPeriod();
     DateTimeZone timezone = DateTimeZone.forID(datasetConfig.getTimezone());
-    DateTime startTime = new DateTime(start - 1, timezone).plus(granularityPeriod);
-    return startTime.getMillis() / granularityPeriod.toStandardDuration().getMillis() * granularityPeriod.toStandardDuration().getMillis();
+    DateTime startTime = new DateTime(timestamp - 1, timezone).plus(granularityPeriod);
+    return (startTime.getMillis() / granularityPeriod.toStandardDuration().getMillis()) * granularityPeriod.toStandardDuration().getMillis();
   }
 
   /**

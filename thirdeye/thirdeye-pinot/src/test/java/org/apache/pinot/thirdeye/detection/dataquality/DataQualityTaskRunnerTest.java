@@ -233,7 +233,8 @@ public class DataQualityTaskRunnerTest {
         mockDataProvider
     );
 
-    // CHECK 0: Report data missing immediately if delayed within a day (sla = 0_DAYS)
+    // CHECK 0: Report data missing immediately if delayed even by a minute (sla = 0_DAYS)
+    // This comes into effect if the detection runs more frequently than the dataset granularity.
     detectionConfigDTO = translateSlaConfig(detectorId, "sla-config-0.yaml");
 
     // 1st scan - sla breach
@@ -342,6 +343,11 @@ public class DataQualityTaskRunnerTest {
     // CHECK 4: Report data missing when there is a gap btw LastRefreshTime & SLA window start
     detectionConfigDTO = translateSlaConfig(detectorId, "sla-config-1.yaml");
 
+    // 2 cases are possible:
+    // a. with availability events
+    // b. no availability events - directly query source for just the window
+
+    // a. with availability events
     // 1st scan after issue - sla breach
     //  time:  3____4    5    6           // We have data till 3rd, data since 4th is missing/delayed
     //  scan:            |----|
@@ -353,6 +359,25 @@ public class DataQualityTaskRunnerTest {
     anomalies = retrieveAllAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     expectedAnomalies.add(makeSlaAnomaly(4, 6, "1_DAYS", "slaRule1:DATA_SLA"));
+    Assert.assertTrue(anomalies.containsAll(expectedAnomalies));
+    // clean up
+    expectedAnomalies.clear();
+    cleanUpAnomalies();
+
+
+    // b. no availability events - directly query source
+    datasetConfigDTO.setLastRefreshTime(0);
+    // 1st scan after issue - sla breach
+    //  time:  3____4    5    6           // We have data till 3rd, data since 4th is missing/delayed
+    //  scan:            |----|
+    this.info.setStart(START_TIME + 5 * GRANULARITY);
+    this.info.setEnd(START_TIME + 6 * GRANULARITY);
+    runner.execute(this.info, this.context);
+
+    // 1 data sla anomaly should be created from 4 to 6
+    anomalies = retrieveAllAnomalies();
+    Assert.assertEquals(anomalies.size(), 1);
+    expectedAnomalies.add(makeSlaAnomaly(5, 6, "1_DAYS", "slaRule1:DATA_SLA"));
     Assert.assertTrue(anomalies.containsAll(expectedAnomalies));
     // clean up
     expectedAnomalies.clear();
@@ -406,7 +431,7 @@ public class DataQualityTaskRunnerTest {
     this.info.setEnd(sliceOverlapAboveThreshold.getEnd());
     runner.execute(this.info, this.context);
 
-    // 0 data sla anomaly should be created as data is considered to be completely availability (above threshold)
+    // 0 data sla anomaly should be created as data is considered to be completely available (above threshold)
     anomalies = retrieveAllAnomalies();
     Assert.assertEquals(anomalies.size(), 0);
   }
@@ -578,14 +603,13 @@ public class DataQualityTaskRunnerTest {
     );
     runner.execute(this.info, this.context);
 
-    // We will now have 3 anomalies in our database (2 parent and 1 child)
-    // 1 parent and 1 child created during the previous iterations
+    // We will now have 3 anomalies in our database
     // In the current iteration we will create 1 new anomaly from (5 to 7)
     anomalies = retrieveAllAnomalies();
     Assert.assertEquals(anomalies.size(), 3);
     expectedAnomalies = new ArrayList<>();
-    expectedAnomalies.add(makeSlaAnomaly(5, 7, "1_DAYS", "slaRule1:DATA_SLA"));
-    expectedAnomalies.add(makeSlaAnomaly(5, 7, "1_DAYS", "slaRule1:DATA_SLA"));
+    expectedAnomalies.add(makeSlaAnomaly(4, 5, "1_DAYS", "slaRule1:DATA_SLA"));
+    expectedAnomalies.add(makeSlaAnomaly(4, 6, "1_DAYS", "slaRule1:DATA_SLA"));
     expectedAnomalies.add(makeSlaAnomaly(5, 7, "1_DAYS", "slaRule1:DATA_SLA"));
     Assert.assertTrue(anomalies.containsAll(expectedAnomalies));
   }

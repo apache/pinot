@@ -59,6 +59,7 @@ public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
 
   private static final int DEFAULT_ALERT_DELAY = 1;
   private static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
+  public static final String QUARTZ_SUBSCRIPTION_GROUPER = TaskConstants.TaskType.DETECTION_ALERT.toString();
 
   final Scheduler scheduler;
   private ScheduledExecutorService scheduledExecutorService;
@@ -111,7 +112,7 @@ public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
 
   @Override
   public Set<JobKey> getScheduledJobs() throws SchedulerException {
-    return scheduler.getJobKeys(GroupMatcher.jobGroupEquals(TaskConstants.TaskType.DETECTION_ALERT.toString()));
+    return scheduler.getJobKeys(GroupMatcher.jobGroupEquals(QUARTZ_SUBSCRIPTION_GROUPER));
   }
 
   @Override
@@ -121,12 +122,11 @@ public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
   }
 
   @Override
-  public void startJob(AbstractBean config, JobKey key) throws SchedulerException {
+  public void startJob(AbstractBean config, JobDetail job) throws SchedulerException {
     Trigger trigger = TriggerBuilder.newTrigger().withSchedule(
         CronScheduleBuilder.cronSchedule(((DetectionAlertConfigBean) config).getCronExpression())).build();
-    JobDetail job = JobBuilder.newJob(DetectionAlertJob.class).withIdentity(key).build();
     this.scheduler.scheduleJob(job, trigger);
-    LOG.info(String.format("scheduled subscription pipeline job %s", key.getName()));
+    LOG.info(String.format("scheduled subscription pipeline job %s", job.getKey().getName()));
   }
 
   @Override
@@ -139,8 +139,8 @@ public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
   }
 
   @Override
-  public String getJobKey(Long id) {
-    return String.format("%s_%d", TaskConstants.TaskType.DETECTION_ALERT, id);
+  public String getJobKey(Long id, TaskConstants.TaskType taskType) {
+    return String.format("%s_%d", taskType, id);
   }
 
   private void deleteAlertJob(JobKey scheduledJobKey) throws SchedulerException {
@@ -157,7 +157,8 @@ public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
     Long id = alertConfig.getId();
     boolean isActive = alertConfig.isActive();
 
-    JobKey key = new JobKey(getJobKey(id), TaskConstants.TaskType.DETECTION_ALERT.toString());
+    JobKey key = new JobKey(getJobKey(id, TaskConstants.TaskType.DETECTION_ALERT), QUARTZ_SUBSCRIPTION_GROUPER);
+    JobDetail job = JobBuilder.newJob(DetectionAlertJob.class).withIdentity(key).build();
     boolean isScheduled = scheduledJobs.contains(key);
 
     if (isActive) {
@@ -173,11 +174,11 @@ public class SubscriptionCronScheduler implements ThirdEyeCronScheduler {
               "Cron expression for config {} with jobKey {} has been changed from {}  to {}. " + "Restarting schedule",
               id, key, cronInSchedule, cronInDatabase);
           stopJob(key);
-          startJob(alertConfig, key);
+          startJob(alertConfig, job);
         }
       } else {
         LOG.info("Found active but not scheduled {}", id);
-        startJob(alertConfig, key);
+        startJob(alertConfig, job);
       }
     } else {
       if (isScheduled) {

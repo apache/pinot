@@ -725,13 +725,13 @@ public class RunAdhocDatabaseQueriesTool {
 
   public static void main(String[] args) throws Exception {
 
-    File persistenceFile = new File(args[0]);
+    File persistenceFile = new File("/Users/akrai/persistence-linux.yml");
     if (!persistenceFile.exists()) {
       System.err.println("Missing file:" + persistenceFile);
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.disableAllActiveDetections(Collections.singleton(142644400L));
+    dq.disableAllActiveDetections(Collections.singleton(160640739L));
     LOG.info("DONE");
   }
 

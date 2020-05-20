@@ -2,7 +2,7 @@
   "dataQualityProperties": {
     "className": "org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
     "nested": [{
-      "className": "org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
+      "className": "org.apache.pinot.thirdeye.detection.wrapper.DataQualityMergeWrapper",
       "nested": [{
         "qualityCheck": "$slaRule1:DATA_SLA",
         "className": "org.apache.pinot.thirdeye.detection.dataquality.wrapper.DataSlaWrapper",

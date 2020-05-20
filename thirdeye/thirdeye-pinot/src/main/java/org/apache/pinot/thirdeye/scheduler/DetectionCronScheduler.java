@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.scheduler;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
@@ -55,6 +56,7 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
 
   public static final int DEFAULT_DETECTION_DELAY = 1;
   public static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
+  public static final String QUARTZ_DETECTION_GROUPER = TaskConstants.TaskType.DETECTION.toString();
 
   final DetectionConfigManager detectionDAO;
   final Scheduler scheduler;
@@ -79,28 +81,45 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
 
       // add or update
       for (DetectionConfigDTO config : configs) {
-        JobKey key = new JobKey(getJobKey(config.getId()), TaskConstants.TaskType.DETECTION.toString());
         if (!config.isActive()) {
-          LOG.debug("Detection config " + key + " is inactive. Skipping.");
+          LOG.debug("Detection config " + config.getId() + " is inactive. Skipping.");
           continue;
         }
         if (config.isDataAvailabilitySchedule()) {
-          LOG.debug("Detection config " + key + " is enabled for data availability scheduling. Skipping.");
+          LOG.debug("Detection config " + config.getId() + " is enabled for data availability scheduling. Skipping.");
           continue;
         }
+
         try {
-          if (scheduler.checkExists(key)) {
-            LOG.info("Detection config  " + key.getName() + " is already scheduled");
-            if (isJobUpdated(config, key)) {
-              // restart job
-              stopJob(key);
-              startJob(config, key);
+          // Schedule detection jobs
+          JobKey detectionJobKey = new JobKey(getJobKey(config.getId(), TaskConstants.TaskType.DETECTION),
+              QUARTZ_DETECTION_GROUPER);
+          JobDetail detectionJob = JobBuilder.newJob(DetectionPipelineJob.class).withIdentity(detectionJobKey).build();
+          if (scheduler.checkExists(detectionJobKey)) {
+            LOG.info("Detection config " + detectionJobKey.getName() + " is already scheduled for detection");
+            if (isJobUpdated(config, detectionJobKey)) {
+              restartJob(config, detectionJob);
             }
           } else {
-            startJob(config, key);
+            startJob(config, detectionJob);
+          }
+
+          // Schedule data quality jobs
+          JobKey dataQualityJobKey = new JobKey(getJobKey(config.getId(), TaskConstants.TaskType.DATA_QUALITY),
+              QUARTZ_DETECTION_GROUPER);
+          JobDetail dataQualityJob = JobBuilder.newJob(DataQualityPipelineJob.class).withIdentity(dataQualityJobKey).build();
+          if (scheduler.checkExists(dataQualityJobKey)) {
+            LOG.info("Detection config " + dataQualityJobKey.getName() + " is already scheduled for data quality");
+            if (isJobUpdated(config, dataQualityJobKey)) {
+              restartJob(config, dataQualityJob);
+            }
+          } else {
+            if (DetectionUtils.isDataQualityCheckEnabled(config)) {
+              startJob(config, dataQualityJob);
+            }
           }
         } catch (Exception e) {
-          LOG.error("Error creating/updating job key {}", key);
+          LOG.error("Error creating/updating job key for detection config {}", config.getId());
         }
       }
 
@@ -131,9 +150,14 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
     }
   }
 
+  private void restartJob(DetectionConfigDTO config, JobDetail job) throws SchedulerException {
+    stopJob(job.getKey());
+    startJob(config, job);
+  }
+
   @Override
   public Set<JobKey> getScheduledJobs() throws SchedulerException {
-    return this.scheduler.getJobKeys(GroupMatcher.jobGroupEquals(TaskConstants.TaskType.DETECTION.toString()));
+    return this.scheduler.getJobKeys(GroupMatcher.jobGroupEquals(QUARTZ_DETECTION_GROUPER));
   }
 
   @Override
@@ -143,20 +167,11 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
   }
 
   @Override
-  public void startJob(AbstractBean config, JobKey key) throws SchedulerException {
+  public void startJob(AbstractBean config, JobDetail job) throws SchedulerException {
     Trigger trigger = TriggerBuilder.newTrigger().withSchedule(
         CronScheduleBuilder.cronSchedule(((DetectionConfigBean) config).getCron())).build();
-    JobDetail detectionJob = JobBuilder.newJob(DetectionPipelineJob.class).withIdentity(key).build();
-
-    this.scheduler.scheduleJob(detectionJob, trigger);
-    LOG.info(String.format("scheduled detection pipeline job %s", detectionJob.getKey().getName()));
-
-    // Data Quality alerts will be scheduled only when enabled by the user.
-    if (DetectionUtils.isDataQualityCheckEnabled((DetectionConfigDTO) config)) {
-      JobDetail dataQualityJob = JobBuilder.newJob(DataQualityPipelineJob.class).withIdentity(key).build();
-      this.scheduler.scheduleJob(dataQualityJob, trigger);
-      LOG.info(String.format("scheduled data quality jobs %s", dataQualityJob.getKey().getName()));
-    }
+    this.scheduler.scheduleJob(job, trigger);
+    LOG.info(String.format("scheduled detection pipeline job %s", job.getKey().getName()));
   }
 
   @Override
@@ -170,8 +185,8 @@ public class DetectionCronScheduler implements ThirdEyeCronScheduler {
   }
 
   @Override
-  public String getJobKey(Long id) {
-    return String.format("%s_%d", TaskConstants.TaskType.DETECTION, id);
+  public String getJobKey(Long id, TaskConstants.TaskType taskType) {
+    return String.format("%s_%d", taskType, id);
   }
 
   private boolean isJobUpdated(DetectionConfigDTO config, JobKey key) throws SchedulerException {

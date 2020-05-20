@@ -1,6 +1,6 @@
 {
   "dataQualityProperties": {
-    "className": "org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
+    "className": "org.apache.pinot.thirdeye.detection.wrapper.DataQualityMergeWrapper",
     "maxGap": 0,
     "maxDuration": 100000000,
     "nested": [{
