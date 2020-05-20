@@ -442,6 +442,88 @@ public class GenericPojoDao {
     }
   }
 
+  public <E extends AbstractBean> List<E> list(final Class<E> beanClass, long limit, long offset) {
+    long tStart = System.nanoTime();
+    try {
+      return runTask(connection -> {
+        List<GenericJsonEntity> entities;
+        Predicate predicate = Predicate.EQ("beanClass", beanClass.getName());
+        try (PreparedStatement selectStatement =
+            sqlQueryBuilder.createfindByParamsStatementWithLimit(connection, GenericJsonEntity.class, predicate, limit, offset)) {
+          try (ResultSet resultSet = selectStatement.executeQuery()) {
+            entities = genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
+          }
+        }
+        List<E> result = new ArrayList<>();
+        if (entities != null) {
+          for (GenericJsonEntity entity : entities) {
+            ThirdeyeMetricsUtil.dbReadByteCounter.inc(entity.getJsonVal().length());
+            E e = OBJECT_MAPPER.readValue(entity.getJsonVal(), beanClass);
+            e.setId(entity.getId());
+            e.setUpdateTime(entity.getUpdateTime());
+            result.add(e);
+          }
+        }
+        return result;
+      }, Collections.emptyList());
+    } finally {
+      ThirdeyeMetricsUtil.dbReadCallCounter.inc();
+      ThirdeyeMetricsUtil.dbReadDurationCounter.inc(System.nanoTime() - tStart);
+    }
+  }
+
+  public <E extends AbstractBean> List<E> getByPredicateJsonVal(Predicate predicate, final Class<E> beanClass) {
+    long tStart = System.nanoTime();
+    try {
+      return runTask(connection -> {
+        List<GenericJsonEntity> entities;
+        Predicate p = Predicate.AND(predicate, Predicate.EQ("beanClass", beanClass.getName()));
+        try (PreparedStatement selectStatement =
+            sqlQueryBuilder.createFindByParamsStatement(connection, GenericJsonEntity.class, p)) {
+          try (ResultSet resultSet = selectStatement.executeQuery()) {
+            entities = genericResultSetMapper.mapAll(resultSet, GenericJsonEntity.class);
+          }
+        }
+        List<E> result = new ArrayList<>();
+        if (entities != null) {
+          for (GenericJsonEntity entity : entities) {
+            ThirdeyeMetricsUtil.dbReadByteCounter.inc(entity.getJsonVal().length());
+            E e = OBJECT_MAPPER.readValue(entity.getJsonVal(), beanClass);
+            e.setId(entity.getId());
+            e.setUpdateTime(entity.getUpdateTime());
+            result.add(e);
+          }
+        }
+        return result;
+      }, Collections.emptyList());
+    } finally {
+      ThirdeyeMetricsUtil.dbReadCallCounter.inc();
+      ThirdeyeMetricsUtil.dbReadDurationCounter.inc(System.nanoTime() - tStart);
+    }
+  }
+
+  public <E extends AbstractBean> long count(final Class<E> beanClass) {
+    long tStart = System.nanoTime();
+    try {
+      return runTask(connection -> {
+        PojoInfo pojoInfo = pojoInfoMap.get(beanClass);
+        try (PreparedStatement selectStatement =
+            sqlQueryBuilder.createCountStatement(connection, pojoInfo.indexEntityClass)) {
+          try (ResultSet resultSet = selectStatement.executeQuery()) {
+            if (resultSet.next()) {
+              return resultSet.getInt(1);
+            } else {
+              throw new IllegalStateException("can't parse count query response");
+            }
+          }
+        }
+      }, -1);
+    } finally {
+      ThirdeyeMetricsUtil.dbReadCallCounter.inc();
+      ThirdeyeMetricsUtil.dbReadDurationCounter.inc(System.nanoTime() - tStart);
+    }
+  }
+
   public <E extends AbstractBean> E get(final Long id, final Class<E> pojoClass) {
     long tStart = System.nanoTime();
     try {

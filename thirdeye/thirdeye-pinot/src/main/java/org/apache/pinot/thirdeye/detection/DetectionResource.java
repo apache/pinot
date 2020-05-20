@@ -85,7 +85,6 @@ import org.apache.pinot.thirdeye.formatter.DetectionAlertConfigFormatter;
 import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.AnomalyOffset;
-import org.h2.command.dml.Merge;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
