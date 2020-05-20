@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.io.util;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -37,7 +38,16 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
   public abstract void readInt(int startIndex, int length, int[] out);
 
-  public abstract void readInt(int[] rows, int rowsStartIndex, int length, int[] out, int outpos);
+  public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
+    int startDocId = docIds[docIdsStartIndex];
+    int endDocId = docIds[docIdsStartIndex + length - 1];
+    int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+    readInt(startDocId, endDocId - startDocId + 1, dictIds);
+    out[outpos] = dictIds[0];
+    for (int i = 1; i < length; i++) {
+      out[outpos + i] = dictIds[docIds[docIdsStartIndex + i] - startDocId];
+    }
+  }
 
   public static PinotDataBitSetV2 createBitSet(PinotDataBuffer pinotDataBuffer, int numBitsPerValue) {
     switch (numBitsPerValue) {
@@ -88,66 +98,94 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       long bitOffset = (long) startIndex * _numBitsPerValue;
       int byteOffset = (int) (bitOffset / Byte.SIZE);
       bitOffset = bitOffset & 7;
-      int val;
+      int packed = 0;
       int i = 0;
+
+      // unaligned read within a byte
       if (bitOffset != 0) {
-        val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
         if (bitOffset == 2) {
-          out[0] = (val >>> 4) & 3;
-          out[1] = (val >>> 2) & 3;
-          out[2] = val & 3;
+          // unpack 3 integers from bits 2-7
+          out[0] = (packed >>> 4) & 3;
+          out[1] = (packed >>> 2) & 3;
+          out[2] = packed & 3;
           i = 3;
+          length -= 3;
         }
         else if (bitOffset == 4) {
-          out[0] = (val >>> 2) & 3;
-          out[1] = val & 3;
+          // unpack 2 integers from bits 4 to 7
+          out[0] = (packed >>> 2) & 3;
+          out[1] = packed & 3;
           i = 2;
+          length -= 2;
         } else {
-          out[0] = val & 3;
+          // unpack integer from bits 6 to 7
+          out[0] = packed & 3;
           i = 1;
+          length -= 1;
         }
         byteOffset++;
       }
-      while (i < length) {
-        val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
-        out[i] = val >>> 6;
-        out[i + 1] = (val >>> 4) & 3;
-        out[i + 2] = (val >>> 2) & 3;
-        out[i + 3] = val & 3;
+
+      // aligned reads at 4-byte boundary to unpack 16 integers
+      while (length >= 16) {
+        packed = _dataBuffer.getInt(byteOffset);
+        out[i] = packed >>> 30;
+        out[i + 1] = (packed >>> 28) & 3;
+        out[i + 2] = (packed >>> 26) & 3;
+        out[i + 3] = (packed >>> 24) & 3;
+        out[i + 4] = (packed >>> 22) & 3;
+        out[i + 5] = (packed >>> 20) & 3;
+        out[i + 6] = (packed >>> 18) & 3;
+        out[i + 7] = (packed >>> 16) & 3;
+        out[i + 8] = (packed >>> 14) & 3;
+        out[i + 9] = (packed >>> 12) & 3;
+        out[i + 10] = (packed >>> 10) & 3;
+        out[i + 11] = (packed >>> 8) & 3;
+        out[i + 12] = (packed >>> 6) & 3;
+        out[i + 13] = (packed >>> 4) & 3;
+        out[i + 14] = (packed >>> 2) & 3;
+        out[i + 15] = packed & 3;
+        length -= 16;
+        byteOffset += 4;
+        i += 16;
+      }
+
+      // aligned read at byte boundary to unpack 4 integers
+      while (length >= 4) {
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[i] = packed >>> 6;
+        out[i + 1] = (packed >>> 4) & 3;
+        out[i + 2] = (packed >>> 2) & 3;
+        out[i + 3] = packed & 3;
+        length -= 4;
+        byteOffset++;
         i += 4;
       }
-    }
 
-    @Override
-    public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
-      int startDocId = docIds[docIdsStartIndex];
-      int endDocId = docIds[docIdsStartIndex + length - 1];
-      long bitOffset = (long) startDocId * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
-      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
-      for (int i = startDocId; i <= endDocId; i += 16) {
-        int val = _dataBuffer.getInt(byteOffset);
-        dictIds[i] = val >>> 30;
-        dictIds[i + 1] = (val >>> 28) & 3;
-        dictIds[i + 2] = (val >>> 26) & 3;
-        dictIds[i + 3] = (val >>> 24) & 3;
-        dictIds[i + 4] = (val >>> 22) & 3;
-        dictIds[i + 5] = (val >>> 20) & 3;
-        dictIds[i + 6] = (val >>> 18) & 3;
-        dictIds[i + 7] = (val >>> 16) & 3;
-        dictIds[i + 8] = (val >>> 14) & 3;
-        dictIds[i + 9] = (val >>> 12) & 3;
-        dictIds[i + 10] = (val >>> 10) & 3;
-        dictIds[i + 11] = (val >>> 8) & 3;
-        dictIds[i + 12] = (val >>> 6) & 3;
-        dictIds[i + 13] = (val >>> 4) & 3;
-        dictIds[i + 14] = (val >>> 2) & 3;
-        dictIds[i + 15] = val & 3;
-        byteOffset += 4;
+      // handle spill-over
+
+      if (length > 0) {
+        // unpack from bits 0-1
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[i] = packed >>> 6;
+        length--;
       }
-      for (int i = 0; i < length; i++) {
-        out[outpos + i] = dictIds[docIds[docIdsStartIndex + i]];
+
+      if (length > 0) {
+        // unpack from bits 2-3
+        out[i + 1] = (packed >>> 4) & 3;
+        length--;
       }
+
+      if (length > 0) {
+        // unpack from bits 4-5
+        out[i + 2] = (packed >>> 2) & 3;
+        length--;
+      }
+
+      // TODO: consider removing this check. For now keep it to strengthen the tests
+      Preconditions.checkState(length == 0);
     }
   }
 
@@ -171,45 +209,53 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       long bitOffset = (long) startIndex * _numBitsPerValue;
       int byteOffset = (int) (bitOffset / Byte.SIZE);
       bitOffset = bitOffset & 7;
-      int val;
+      int packed = 0;
       int i = 0;
+
+      // unaligned read within a byte from bits 4-7
       if (bitOffset != 0) {
-        val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
-        out[0] = val & 0xf;
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[0] = packed & 0xf;
         i = 1;
         byteOffset++;
+        length--;
       }
-      while (i < length){
-        val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
-        out[i] = val >>> 4;
-        out[i + 1] = val & 0xf;
-        byteOffset++;
-        i += 2;
-      }
-    }
 
-    @Override
-    public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
-      int startDocId = docIds[docIdsStartIndex];
-      int endDocId = docIds[docIdsStartIndex + length - 1];
-      long bitOffset = (long) startDocId * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
-      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
-      for (int i = startDocId; i <= endDocId; i += 8) {
-        int val = _dataBuffer.getInt(byteOffset);
-        dictIds[i] = val >>> 28;
-        dictIds[i + 1] = (val >>> 24) & 0xf;
-        dictIds[i + 2] = (val >>> 20) & 0xf;
-        dictIds[i + 3] = (val >>> 16) & 0xf;
-        dictIds[i + 4] = (val >>> 12) & 0xf;
-        dictIds[i + 5] = (val >>> 8) & 0xf;
-        dictIds[i + 6] = (val >>> 4) & 0xf;
-        dictIds[i + 7] = val & 0xf;
+      // aligned read at 4-byte boundary to unpack 8 integers
+      while (length >= 8) {
+        packed = _dataBuffer.getInt(byteOffset);
+        out[i] = packed >>> 28;
+        out[i + 1] = (packed >>> 24) & 0xf;
+        out[i + 2] = (packed >>> 20) & 0xf;
+        out[i + 3] = (packed >>> 16) & 0xf;
+        out[i + 4] = (packed >>> 12) & 0xf;
+        out[i + 5] = (packed >>> 8) & 0xf;
+        out[i + 6] = (packed >>> 4) & 0xf;
+        out[i + 7] = packed & 0xf;
+        length -= 8;
+        i += 8;
         byteOffset += 4;
       }
-      for (int i = 0; i < length; i++) {
-        out[outpos + i] = dictIds[docIds[docIdsStartIndex + i]];
+
+      // aligned read at byte boundary to unpack 2 integers
+      while (length >= 2) {
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[i] = packed >>> 4;
+        out[i + 1] = packed & 0xf;
+        length -= 2;
+        i += 2;
+        byteOffset++;
       }
+
+      // handle spill over -- unpack from bits 0-3
+      if (length > 0) {
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[i] = packed >>> 4;
+        length--;
+      }
+
+      // TODO: remove this
+      Preconditions.checkState(length == 0);
     }
   }
 
@@ -223,40 +269,34 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     public int readInt(int index) {
       long bitOffset = (long) index * _numBitsPerValue;
       int byteOffset = (int) (bitOffset / Byte.SIZE);
-      // due to sign-extension, this will result in -ve value
-      int val = _dataBuffer.getByte(byteOffset);
-      // use the mask to get +ve for the 8 bits
-      return val & 0xff;
+      return ((int)_dataBuffer.getByte(byteOffset)) & 0xff;
     }
 
     @Override
     public void readInt(int startIndex, int length, int[] out) {
       long bitOffset = (long) startIndex * _numBitsPerValue;
       int byteOffset = (int) (bitOffset / Byte.SIZE);
-      for (int i = 0; i < length; i++) {
-        int val = _dataBuffer.getByte(byteOffset);
-        out[i] = val & 0xff;
-        byteOffset++;
-      }
-    }
+      int i = 0;
+      int packed = 0;
 
-    @Override
-    public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
-      int startDocId = docIds[docIdsStartIndex];
-      int endDocId = docIds[docIdsStartIndex + length - 1];
-      long bitOffset = (long) startDocId * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
-      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
-      for (int i = startDocId; i <= endDocId; i += 4) {
-        int val = _dataBuffer.getInt(byteOffset);
-        dictIds[i] = val >>> 24;
-        dictIds[i + 1] = (val >>> 16) & 0xff;
-        dictIds[i + 2] = (val >>> 8) & 0xff;
-        dictIds[i + 1] = val & 0xff;
+      // aligned read at 4-byte boundary to unpack 4 integers
+      while (length >= 4) {
+        packed = _dataBuffer.getInt(byteOffset);
+        out[i] = packed >>> 24;
+        out[i + 1] = (packed >>> 16) & 0xff;
+        out[i + 2] = (packed >>> 8) & 0xff;
+        out[i + 3] = packed & 0xff;
+        length -= 4;
         byteOffset += 4;
+        i += 4;
       }
-      for (int i = 0; i < length; i++) {
-        out[outpos + i] = dictIds[docIds[docIdsStartIndex + i]];
+
+      // handle spill over at byte boundary
+      while (length > 0) {
+        out[i] = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        i++;
+        length--;
+        byteOffset++;
       }
     }
   }
@@ -271,41 +311,33 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     public int readInt(int index) {
       long bitOffset = (long) index * _numBitsPerValue;
       int byteOffset = (int) (bitOffset / Byte.SIZE);
-      // due to sign-extension, this will result in -ve value
-      int val = _dataBuffer.getShort(byteOffset);
-      // use the mask to get +ve value for the 16 bits
-      return val & 0xffff;
+      return ((int)_dataBuffer.getShort(byteOffset)) & 0xffff;
     }
 
     @Override
     public void readInt(int startIndex, int length, int[] out) {
       long bitOffset = (long) startIndex * _numBitsPerValue;
       int byteOffset = (int) (bitOffset / Byte.SIZE);
-      for (int i = 0; i < length; i++) {
-        // due to sign-extension, this will result in -ve value
-        int val = _dataBuffer.getShort(byteOffset);
-        // use the mask to get positive value for the 16 bits
-        out[i] = val & 0xffff;
-        byteOffset += 2;
-      }
-    }
+      int i = 0;
+      int packed = 0;
 
-    @Override
-    public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
-      int startDocId = docIds[docIdsStartIndex];
-      int endDocId = docIds[docIdsStartIndex + length - 1];
-      long bitOffset = (long) startDocId * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
-      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
-      for (int i = startDocId; i <= endDocId; i += 2) {
-        int val = _dataBuffer.getInt(byteOffset);
-        dictIds[i] = val >>> 16;
-        dictIds[i + 1] = val & 0xffff;
+      // aligned reads at 4-byte boundary to unpack 2 integers
+      while (length >= 2) {
+        packed = _dataBuffer.getInt(byteOffset);
+        out[i] = packed >>> 16;
+        out[i + 1] = packed & 0xffff;
+        length -= 2;
+        i += 2;
         byteOffset += 4;
       }
-      for (int i = 0; i < length; i++) {
-        out[outpos + i] = dictIds[docIds[docIdsStartIndex + i]];
+
+      // handle spill over
+      if (length > 0) {
+        out[i] = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        length--;
       }
+
+      Preconditions.checkState(length == 0);
     }
   }
 
@@ -328,33 +360,17 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         byteOffset += 4;
       }
     }
-
-    @Override
-    public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
-      int startDocId = docIds[docIdsStartIndex];
-      int endDocId = docIds[docIdsStartIndex + length - 1];
-      long bitOffset = (long) startDocId * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
-      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
-      for (int i = startDocId; i <= endDocId; i++) {
-        dictIds[i] = _dataBuffer.getInt(byteOffset);
-        byteOffset += 4;
-      }
-      for (int i = 0; i < length; i++) {
-        out[outpos + i] = dictIds[docIds[docIdsStartIndex + i]];
-      }
-    }
   }
 
-  public void writeInt(int index, int numBitsPerValue, int value) {
-    long bitOffset = (long) index * numBitsPerValue;
+  protected void writeInt(int index, int value) {
+    long bitOffset = (long) index * _numBitsPerValue;
     int byteOffset = (int) (bitOffset / Byte.SIZE);
     int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
 
     int firstByte = _dataBuffer.getByte(byteOffset);
 
     int firstByteMask = BYTE_MASK >>> bitOffsetInFirstByte;
-    int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
+    int numBitsLeft = _numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
     if (numBitsLeft <= 0) {
       // The value is inside the first byte
       firstByteMask &= BYTE_MASK << -numBitsLeft;
@@ -373,8 +389,8 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     }
   }
 
-  public void writeInt(int startIndex, int numBitsPerValue, int length, int[] values) {
-    long startBitOffset = (long) startIndex * numBitsPerValue;
+  public void writeInt(int startIndex, int length, int[] values) {
+    long startBitOffset = (long) startIndex * _numBitsPerValue;
     int byteOffset = (int) (startBitOffset / Byte.SIZE);
     int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);
 
@@ -387,7 +403,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         firstByte = _dataBuffer.getByte(++byteOffset);
       }
       int firstByteMask = BYTE_MASK >>> bitOffsetInFirstByte;
-      int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
+      int numBitsLeft = _numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
       if (numBitsLeft <= 0) {
         // The value is inside the first byte
         firstByteMask &= BYTE_MASK << -numBitsLeft;

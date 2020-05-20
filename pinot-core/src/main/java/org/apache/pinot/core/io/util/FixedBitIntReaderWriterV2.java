@@ -27,13 +27,11 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 public final class FixedBitIntReaderWriterV2 implements Closeable {
   private volatile PinotDataBitSetV2 _dataBitSet;
-  private final int _numBitsPerValue;
 
   public FixedBitIntReaderWriterV2(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
     Preconditions
         .checkState(dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
     _dataBitSet = PinotDataBitSetV2.createBitSet(dataBuffer, numBitsPerValue);
-    _numBitsPerValue = numBitsPerValue;
   }
 
   /**
@@ -86,11 +84,11 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
   }
 
   public void writeInt(int index, int value) {
-    _dataBitSet.writeInt(index, _numBitsPerValue, value);
+    _dataBitSet.writeInt(index, value);
   }
 
   public void writeInt(int startIndex, int length, int[] values) {
-    _dataBitSet.writeInt(startIndex, _numBitsPerValue, length, values);
+    _dataBitSet.writeInt(startIndex, length, values);
   }
 
   @Override
