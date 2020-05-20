@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api.upload;
 
 import java.io.File;
 import java.net.URI;
-import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.helix.ZNRecord;
@@ -60,7 +59,7 @@ public class ZKOperator {
 
   public void completeSegmentOperations(String rawTableName, SegmentMetadata segmentMetadata,
       URI finalSegmentLocationURI, File currentSegmentLocation, boolean enableParallelPushProtection,
-      @Nullable HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation)
+      HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation)
       throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
@@ -70,7 +69,7 @@ public class ZKOperator {
         _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
     if (segmentMetadataZnRecord == null) {
       LOGGER.info("Adding new segment {} from table {}", segmentName, rawTableName);
-      String crypter = headers != null ? headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER) : null;
+      String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, crypter,
           rawTableName, segmentName, moveSegmentToFinalLocation);
       return;
@@ -203,7 +202,7 @@ public class ZKOperator {
   }
 
   private void processNewSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
-      File currentSegmentLocation, String zkDownloadURI, @Nullable String crypter, String rawTableName, String segmentName,
+      File currentSegmentLocation, String zkDownloadURI, String crypter, String rawTableName, String segmentName,
       boolean moveSegmentToFinalLocation) {
     // For v1 segment uploads, we will not move the segment
     if (moveSegmentToFinalLocation) {

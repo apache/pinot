@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
@@ -42,7 +41,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
   @Option(name = "-mode", required = true, metaVar = "<String>", usage = "Mode of the PerfBenchmarkRunner (startAll|startAllButServer|startServerWithPreLoadedSegments).")
   private String _mode;
 
-  @Option(name = "-dataDir", required = false, metaVar = "<String>", usage = "Path to data directory.")
+  @Option(name = "-dataDir", required = false, metaVar = "<String>", usage = "Path to directory containing un-tarred segments.")
   private String _dataDir;
 
   @Option(name = "-tempDir", required = false, metaVar = "<String>", usage = "Path to temporary directory to start the cluster")
@@ -161,14 +160,13 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
     boolean tableConfigured = false;
     File[] segments = new File(dataDir, tableName).listFiles();
     Preconditions.checkNotNull(segments);
-    ControllerFilePathProvider.init(driver.getControllerConf());
     for (File segment : segments) {
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segment);
       if (!tableConfigured) {
         driver.configureTable(tableName, invertedIndexColumns, bloomFilterColumns);
         tableConfigured = true;
       }
-      driver.addSegment(tableName, segment, segmentMetadata);
+      driver.addSegment(tableName, segmentMetadata);
     }
   }
 
