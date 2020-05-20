@@ -62,7 +62,8 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  * bounded by the number of groups limit (globalGroupIdUpperBound is always smaller or equal to numGroupsLimit).
  */
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
-  private final static int DEFAULT_HASH_MAP_INITIAL_SIZE = 16;
+  private final static int INITIAL_MAP_SIZE = 256;
+  private final static int MAX_CACHING_MAP_SIZE = 1048576;
   private final TransformExpressionTree[] _groupByExpressions;
   private final int _numGroupByExpressions;
   private final int[] _cardinalities;
@@ -111,24 +112,30 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
     if (longOverflow) {
       _globalGroupIdUpperBound = numGroupsLimit;
-      if (!mapBasedRawKeyHolders.containsKey(ArrayMapBasedHolder.class.getName())) {
-        mapBasedRawKeyHolders.put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(_globalGroupIdUpperBound).getInternal());
+      Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(ArrayMapBasedHolder.class.getName(),
+          o -> new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
+      _rawKeyHolder = new ArrayMapBasedHolder(mapInternal);
+      if (((Object2IntOpenHashMap)mapInternal).size() > MAX_CACHING_MAP_SIZE) {
+        mapBasedRawKeyHolders.put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
       }
-      _rawKeyHolder = new ArrayMapBasedHolder(mapBasedRawKeyHolders.get(ArrayMapBasedHolder.class.getName()));
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
         _globalGroupIdUpperBound = numGroupsLimit;
-        if (!mapBasedRawKeyHolders.containsKey(LongMapBasedHolder.class.getName())) {
-          mapBasedRawKeyHolders.put(LongMapBasedHolder.class.getName(), new LongMapBasedHolder(_globalGroupIdUpperBound).getInternal());
+        Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(LongMapBasedHolder.class.getName(),
+            o -> new LongMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
+        _rawKeyHolder = new LongMapBasedHolder(mapInternal);
+        if (((Long2IntOpenHashMap)mapInternal).size() > MAX_CACHING_MAP_SIZE) {
+          mapBasedRawKeyHolders.put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
         }
-        _rawKeyHolder = new LongMapBasedHolder(mapBasedRawKeyHolders.get(LongMapBasedHolder.class.getName()));
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
         if (cardinalityProduct > arrayBasedThreshold) {
-          if (!mapBasedRawKeyHolders.containsKey(IntMapBasedHolder.class.getName())) {
-            mapBasedRawKeyHolders.put(IntMapBasedHolder.class.getName(), new IntMapBasedHolder(_globalGroupIdUpperBound).getInternal());
+          Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(IntMapBasedHolder.class.getName(),
+              o -> new IntMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
+          _rawKeyHolder = new IntMapBasedHolder(mapInternal);
+          if (((Int2IntOpenHashMap)mapInternal).size() > MAX_CACHING_MAP_SIZE) {
+            mapBasedRawKeyHolders.put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
           }
-          _rawKeyHolder = new IntMapBasedHolder(mapBasedRawKeyHolders.get(IntMapBasedHolder.class.getName()));
         } else {
           _rawKeyHolder = new ArrayBasedHolder();
         }
