@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
@@ -45,6 +46,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
 
+  // Thread local (reusable) hashMap as holder for group keys
+  private static final ThreadLocal<Map> THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS =
+      ThreadLocal.withInitial(() -> new HashMap());
   protected final AggregationFunction[] _aggregationFunctions;
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _groupByResultHolders;
@@ -86,7 +90,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       }
     } else {
       _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
-          maxInitialResultHolderCapacity);
+          maxInitialResultHolderCapacity, THREAD_LOCAL_DICTIONARY_BASED_GROUP_KEY_HOLDERS.get());
     }
 
     // Initialize result holders
