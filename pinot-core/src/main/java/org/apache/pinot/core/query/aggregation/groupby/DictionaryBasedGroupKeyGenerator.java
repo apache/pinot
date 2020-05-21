@@ -61,6 +61,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  * bounded by the number of groups limit (globalGroupIdUpperBound is always smaller or equal to numGroupsLimit).
  */
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
+  private final static int DEFAULT_HASH_MAP_INITIAL_SIZE = 16;
   private final TransformExpressionTree[] _groupByExpressions;
   private final int _numGroupByExpressions;
   private final int[] _cardinalities;
@@ -109,15 +110,15 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     if (longOverflow) {
       _globalGroupIdUpperBound = numGroupsLimit;
-      _rawKeyHolder = new ArrayMapBasedHolder(_globalGroupIdUpperBound);
+      _rawKeyHolder = new ArrayMapBasedHolder(DEFAULT_HASH_MAP_INITIAL_SIZE);
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
         _globalGroupIdUpperBound = numGroupsLimit;
-        _rawKeyHolder = new LongMapBasedHolder(_globalGroupIdUpperBound);
+        _rawKeyHolder = new LongMapBasedHolder(DEFAULT_HASH_MAP_INITIAL_SIZE);
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
         if (cardinalityProduct > arrayBasedThreshold) {
-          _rawKeyHolder = new IntMapBasedHolder(_globalGroupIdUpperBound);
+          _rawKeyHolder = new IntMapBasedHolder(DEFAULT_HASH_MAP_INITIAL_SIZE);
         } else {
           _rawKeyHolder = new ArrayBasedHolder();
         }
