@@ -42,6 +42,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     int startDocId = docIds[docIdsStartIndex];
     int endDocId = docIds[docIdsStartIndex + length - 1];
     int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+    // do a contiguous bulk read
     readInt(startDocId, endDocId - startDocId + 1, dictIds);
     out[outpos] = dictIds[0];
     for (int i = 1; i < length; i++) {
