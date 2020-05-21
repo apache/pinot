@@ -318,14 +318,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
-    DIMENSION, METRIC, TIME, DATE_TIME
+    DIMENSION, METRIC, TIME, DATE_TIME, COMPLEX
   }
 
   /**
    * The <code>DataType</code> enum is used to demonstrate the data type of a field.
    */
   public enum DataType {
-    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES;
+    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES, STRUCT, MAP, LIST;
 
     /**
      * Returns the data type stored in Pinot.
