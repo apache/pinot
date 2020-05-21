@@ -207,7 +207,7 @@ public class PinotDataBitSetV2Test {
   @Test
   public void testBit16Encoded() throws Exception {
     int cardinality = 40000;
-    int rows = 10000;
+    int rows = 100000;
     int[] forwardIndex = new int[rows];
     Random random = new Random();
 
@@ -256,22 +256,32 @@ public class PinotDataBitSetV2Test {
       Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
     }
 
+    // no aligned reads
+    startDocId = 7;
+    bitSet.readInt(7, 1, unpacked);
+    Assert.assertEquals(forwardIndex[startDocId], unpacked[0]);
+
     // test bulk API for sequential but not necessarily consecutive
-    batchLength = 50;
-    int docId = 5;
+    testBulkSequentialWithGaps(bitSet, 1, 50, -1, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 5, 50, 4, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 17, 109, 19, forwardIndex);
+
+    bitSet.close();
+  }
+
+  private void testBulkSequentialWithGaps(PinotDataBitSetV2 bitset, int gaps, int batchLength, int startDocId, int[] forwardIndex) {
+    int docId = startDocId;
     int[] docIds = new int[batchLength];
-    random = new Random();
+    Random random = new Random();
     for (int i = 0; i < batchLength; i++) {
-      docId = docId + 1 + random.nextInt(5);
+      docId = docId + 1 + random.nextInt(gaps);
       docIds[i] = docId;
     }
-    unpacked = new int[batchLength];
-    bitSet.readInt(docIds, 0, batchLength, unpacked, 0);
+    int[] unpacked = new int[batchLength];
+    bitset.readInt(docIds, 0, batchLength, unpacked, 0);
     for (int i = 0; i < batchLength; i++) {
       Assert.assertEquals(forwardIndex[docIds[i]], unpacked[i]);
     }
-
-    bitSet.close();
   }
 
   private PinotDataBitSetV2 getEmptyBitSet(int size, int numBitsPerValue) {
