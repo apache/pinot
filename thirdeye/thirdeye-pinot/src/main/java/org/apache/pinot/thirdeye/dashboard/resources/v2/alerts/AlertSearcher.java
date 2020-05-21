@@ -24,6 +24,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -116,7 +117,12 @@ public class AlertSearcher {
 
   private List<DetectionAlertConfigDTO> findRelatedSubscriptionGroups(AlertSearchQuery searchQuery) {
     AlertSearchFilter searchFilter = searchQuery.searchFilter;
+    if (searchFilter.getApplications().isEmpty() && searchFilter.getSubscriptionGroups().isEmpty()
+        && searchFilter.getSubscribedBy().isEmpty()) {
+      return this.detectionAlertConfigDAO.findAll();
+    }
     List<Predicate> predicates = new ArrayList<>();
+    Set<DetectionAlertConfigDTO> subscriptionGroups = new HashSet<>();
     if (!searchFilter.getApplications().isEmpty()) {
       predicates.add(Predicate.IN("application", searchFilter.getApplications().toArray()));
     }
@@ -124,10 +130,23 @@ public class AlertSearcher {
       predicates.add(Predicate.IN("name", searchFilter.getSubscriptionGroups().toArray()));
     }
     if (!predicates.isEmpty()) {
-      return this.detectionAlertConfigDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[0])));
-    } else {
-      return this.detectionAlertConfigDAO.findAll();
+      subscriptionGroups.addAll(
+          this.detectionAlertConfigDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[0]))));
     }
+    if (!searchFilter.getSubscribedBy().isEmpty()) {
+      List<DetectionAlertConfigDTO> jsonValResult = this.detectionAlertConfigDAO.findByPredicateJsonVal(Predicate.OR(
+          searchFilter.getSubscribedBy()
+              .stream()
+              .map(name -> Predicate.LIKE("jsonVal", "%recipients%" + name + "%"))
+              .toArray(Predicate[]::new)));
+      if (predicates.isEmpty()) {
+        subscriptionGroups.addAll(jsonValResult);
+      } else {
+        // intersect the result from both tables
+        subscriptionGroups = jsonValResult.stream().filter(subscriptionGroups::contains).collect(Collectors.toSet());
+      }
+    }
+    return new ArrayList<>(subscriptionGroups);
   }
 
   private List<DetectionConfigDTO> findDetectionConfig(AlertSearchQuery searchQuery,
@@ -141,7 +160,7 @@ public class AlertSearcher {
     // look up and run the search filters on the detection config index
     List<DetectionConfigDTO> indexedResult = new ArrayList<>();
     List<Predicate> indexPredicates = new ArrayList<>();
-    if (!searchFilter.getApplications().isEmpty() || !searchFilter.getSubscriptionGroups().isEmpty()) {
+    if (!searchFilter.getApplications().isEmpty() || !searchFilter.getSubscriptionGroups().isEmpty() || !searchFilter.getSubscribedBy().isEmpty()) {
       Set<Long> detectionConfigIds = new TreeSet<>();
       for (DetectionAlertConfigDTO subscriptionGroup : subscriptionGroups) {
         detectionConfigIds.addAll(subscriptionGroup.getVectorClocks().keySet());
@@ -208,7 +227,7 @@ public class AlertSearcher {
       jsonValResult.addAll(indexedResult);
       result = jsonValResult;
     }
-    return result;
+    return result.stream().sorted(Comparator.comparingLong(AbstractDTO::getId).reversed()).collect(Collectors.toList());
   }
 
   /**

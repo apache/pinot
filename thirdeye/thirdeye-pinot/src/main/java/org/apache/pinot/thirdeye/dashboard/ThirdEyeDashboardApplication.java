@@ -75,7 +75,7 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
 import org.apache.pinot.thirdeye.detection.DetectionResource;
-import org.apache.pinot.thirdeye.detection.annotation.DetectionConfigurationResource;
+import org.apache.pinot.thirdeye.detection.DetectionConfigurationResource;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;

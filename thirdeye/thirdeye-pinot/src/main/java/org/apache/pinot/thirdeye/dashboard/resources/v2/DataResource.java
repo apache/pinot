@@ -19,7 +19,10 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import org.apache.pinot.thirdeye.api.Constants;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
+import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Multimap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -36,8 +39,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
-
+import java.util.stream.Collectors;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -45,17 +49,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
-
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Strings;
-import com.google.common.cache.LoadingCache;
-import com.google.common.collect.Multimap;
+import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.time.TimeRange;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewHandler;
@@ -63,13 +58,23 @@ import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewRequest;
 import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.ApplicationBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionAlertConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -77,6 +82,11 @@ import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Do's and Dont's
@@ -103,6 +113,9 @@ public class DataResource {
   private final DatasetConfigManager datasetConfigDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final AlertConfigManager alertConfigDAO;
+  private final DetectionConfigManager detectionConfigDAO;
+  private final DetectionAlertConfigManager detectionAlertConfigDAO;
+  private final ApplicationManager applicationManager;
 
   private final LoadingCache<String, Long> collectionMaxDataTimeCache;
   private final LoadingCache<String, String> dimensionsFilterCache;
@@ -114,6 +127,9 @@ public class DataResource {
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.alertConfigDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.detectionConfigDAO = DAO_REGISTRY.getDetectionConfigManager();
+    this.detectionAlertConfigDAO = DAO_REGISTRY.getDetectionAlertConfigManager();
+    this.applicationManager = DAO_REGISTRY.getApplicationDAO();
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
@@ -191,6 +207,64 @@ public class DataResource {
       metric.setDataset(dataset.getName());
     }
     return metric;
+  }
+
+  /**
+   * Gets detection configs where name like.
+   *
+   * @param name the name
+   * @return the detections where name like
+   */
+  @GET
+  @Path("autocomplete/detection")
+  public List<DetectionConfigDTO> getDetectionsWhereNameLike(@ApiParam("detection name") @QueryParam("name") String name) {
+    List<DetectionConfigDTO> result = this.detectionConfigDAO.findByPredicate(Predicate.LIKE("name", "%" + name.trim() + "%"));
+    result.sort(Comparator.comparing(DetectionConfigBean::getName));
+    return result;
+  }
+
+  /**
+   * Gets subscription groups where name like.
+   *
+   * @param name the name
+   * @return the subscription where name like
+   */
+  @GET
+  @Path("autocomplete/subscription")
+  public List<DetectionAlertConfigDTO> getSubscriptionWhereNameLike(@QueryParam("name") String name) {
+    List<DetectionAlertConfigDTO> result = this.detectionAlertConfigDAO.findByPredicate(Predicate.LIKE("name", "%" + name.trim() + "%"));
+    result.sort(Comparator.comparing(DetectionAlertConfigBean::getName));
+    return result;
+  }
+
+  /**
+   * Gets applications where name like.
+   *
+   * @param name the name
+   * @return the applications where name like
+   */
+  @GET
+  @Path("autocomplete/application")
+  public List<ApplicationDTO> getApplicationsWhereNameLike(@QueryParam("name") String name) {
+    List<ApplicationDTO> result = this.applicationManager.findByPredicate(Predicate.LIKE("application", "%" + name.trim() + "%"));
+    result.sort(Comparator.comparing(ApplicationBean::getApplication));
+    return result;
+  }
+
+  /**
+   * Gets detection config creators where name like.
+   *
+   * @param name the name
+   * @return the created bys where name like
+   */
+  @GET
+  @Path("autocomplete/detection-createdby")
+  public Set<String> getCreatedBysWhereNameLike(@QueryParam("name") String name) {
+    List<DetectionConfigDTO> result = this.detectionConfigDAO.findByPredicate(Predicate.LIKE("createdBy", "%" + name.trim() + "%"));
+    return result.stream()
+        .map(DetectionConfigBean::getCreatedBy)
+        .sorted()
+        .collect(Collectors.toCollection(TreeSet::new));
   }
 
   /**

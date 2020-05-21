@@ -31,6 +31,7 @@ public class AlertSearchFilter {
   private final List<String> applications;
   private final List<String> subscriptionGroups;
   private final List<String> createdBy;
+  private final List<String> subscribedBy;
   private final List<String> ruleTypes;
   private final List<String> metrics;
   private final List<String> datasets;
@@ -41,6 +42,7 @@ public class AlertSearchFilter {
     this.applications = Collections.emptyList();
     this.subscriptionGroups = Collections.emptyList();
     this.createdBy = Collections.emptyList();
+    this.subscribedBy = Collections.emptyList();
     this.ruleTypes = Collections.emptyList();
     this.datasets = Collections.emptyList();
     this.metrics = Collections.emptyList();
@@ -55,17 +57,19 @@ public class AlertSearchFilter {
    * @param subscriptionGroups the subscription groups
    * @param names the names
    * @param createdBy the createdBy
+   * @param subscribedBy the subscribed by
    * @param ruleTypes the rule types
    * @param metrics the metrics
    * @param datasets the datasets
    * @param active the active
    */
   public AlertSearchFilter(List<String> applications, List<String> subscriptionGroups, List<String> names,
-      List<String> createdBy, List<String> ruleTypes, List<String> metrics, List<String> datasets, Boolean active) {
+      List<String> createdBy, List<String> subscribedBy, List<String> ruleTypes, List<String> metrics, List<String> datasets, Boolean active) {
     this.applications = applications;
     this.subscriptionGroups = subscriptionGroups;
     this.names = names;
     this.createdBy = createdBy;
+    this.subscribedBy = subscribedBy;
     this.ruleTypes = ruleTypes;
     this.metrics = metrics;
     this.datasets = datasets;
@@ -97,6 +101,15 @@ public class AlertSearchFilter {
    */
   public List<String> getCreatedBy() {
     return createdBy;
+  }
+
+  /**
+   * Gets subscribedBy.
+   *
+   * @return the subscribedBy
+   */
+  public List<String> getSubscribedBy() {
+    return subscribedBy;
   }
 
   /**
@@ -151,7 +164,7 @@ public class AlertSearchFilter {
    */
   public boolean isEmpty() {
     return this.applications.isEmpty() && this.subscriptionGroups.isEmpty() && this.names.isEmpty()
-        && this.createdBy.isEmpty() && this.ruleTypes.isEmpty() && this.metrics.isEmpty() && this.datasets.isEmpty()
+        && this.createdBy.isEmpty() && this.subscribedBy.isEmpty() && this.ruleTypes.isEmpty() && this.metrics.isEmpty() && this.datasets.isEmpty()
         && active == null;
   }
 }
