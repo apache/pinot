@@ -373,7 +373,7 @@ public final class Schema {
       for (ComplexFieldSpec complexFieldSpec : _complexFieldSpecs) {
         jsonArray.add(complexFieldSpec.toJsonObject());
       }
-      jsonObject.set("dateTimeFieldSpecs", jsonArray);
+      jsonObject.set("complexFieldSpecs", jsonArray);
     }
     return jsonObject;
   }
