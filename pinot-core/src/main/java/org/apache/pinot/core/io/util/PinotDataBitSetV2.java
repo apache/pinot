@@ -101,6 +101,16 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       int packed = 0;
       int i = 0;
 
+      /*
+       * Bytes are read as follows to get maximum vectorization
+       *
+       * [1 byte] - read from either the 2nd/4th/6th bit to 7th bit to unpack 1/2/3 integers
+       * [chunks of 4 bytes] - read 4 bytes at a time to unpack 16 integers
+       * [1 chunk of 2 bytes] - read 2 bytes to unpack 8 integers
+       * [1 byte] - read the byte to unpack 4 integers
+       * [1 byte] - unpack 1/2/3 integers from first 2/4/6 bits
+       */
+
       // unaligned read within a byte
       if (bitOffset != 0) {
         packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
@@ -151,8 +161,23 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         i += 16;
       }
 
+      if (length >= 8) {
+        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        out[i] = (packed >>> 14) & 3;
+        out[i + 1] = (packed >>> 12) & 3;
+        out[i + 2] = (packed >>> 10) & 3;
+        out[i + 3] = (packed >>> 8) & 3;
+        out[i + 4] = (packed >>> 6) & 3;
+        out[i + 5] = (packed >>> 4) & 3;
+        out[i + 6] = (packed >>> 2) & 3;
+        out[i + 7] = packed & 3;
+        length -= 8;
+        byteOffset += 2;
+        i += 8;
+      }
+
       // aligned read at byte boundary to unpack 4 integers
-      while (length >= 4) {
+      if (length >= 4) {
         packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 6;
         out[i + 1] = (packed >>> 4) & 3;
@@ -212,6 +237,15 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       int packed = 0;
       int i = 0;
 
+      /*
+       * Bytes are read as follows to get maximum vectorization
+       *
+       * [1 byte] - read from the 4th bit to 7th bit to unpack 1 integer
+       * [chunks of 4 bytes] - read 4 bytes at a time to unpack 8 integers
+       * [1 chunk of 2 bytes] - read 2 bytes to unpack 4 integers
+       * [1 byte] - unpack 1 integer from first 4 bits
+       */
+
       // unaligned read within a byte from bits 4-7
       if (bitOffset != 0) {
         packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
@@ -237,8 +271,20 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         byteOffset += 4;
       }
 
+      // aligned read at 2-byte boundary to unpack 4 integers
+      if (length >= 4) {
+        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        out[i] = (packed >>> 12) & 0xf;
+        out[i + 1] = (packed >>> 8) & 0xf;
+        out[i + 2] = (packed >>> 4) & 0xf;
+        out[i + 3] = packed & 0xf;
+        length -= 4;
+        i += 4;
+        byteOffset += 2;
+      }
+
       // aligned read at byte boundary to unpack 2 integers
-      while (length >= 2) {
+      if (length >= 2) {
         packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 4;
         out[i + 1] = packed & 0xf;
@@ -254,7 +300,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         length--;
       }
 
-      // TODO: remove this
       Preconditions.checkState(length == 0);
     }
   }
@@ -279,6 +324,14 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       int i = 0;
       int packed = 0;
 
+      /*
+       * Bytes are read as follows to get maximum vectorization
+       *
+       * [chunks of 4 bytes] - read 4 bytes at a time to unpack 4 integers
+       * [1 chunk of 2 bytes] - read 2 bytes to unpack 4 integers
+       * [1 byte] - unpack 1 integer from first 4 bits
+       */
+
       // aligned read at 4-byte boundary to unpack 4 integers
       while (length >= 4) {
         packed = _dataBuffer.getInt(byteOffset);
@@ -291,13 +344,23 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         i += 4;
       }
 
-      // handle spill over at byte boundary
-      while (length > 0) {
-        out[i] = (int)_dataBuffer.getByte(byteOffset) & 0xff;
-        i++;
-        length--;
-        byteOffset++;
+      // aligned read at 2-byte boundary to unpack 2 integers
+      if (length >= 2) {
+        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        out[i] = (packed >>> 8) & 0xff;
+        out[i + 1] = packed & 0xff;
+        length -= 2;
+        byteOffset += 2;
+        i += 2;
       }
+
+      // handle spill over at byte boundary to unpack 1 integer
+      if (length > 0) {
+        out[i] = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        length--;
+      }
+
+      Preconditions.checkState(length == 0);
     }
   }
 
@@ -319,7 +382,14 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       long bitOffset = (long) startIndex * _numBitsPerValue;
       int byteOffset = (int) (bitOffset / Byte.SIZE);
       int i = 0;
-      int packed = 0;
+      int packed;
+
+      /*
+       * Bytes are read as follows to get maximum vectorization
+       *
+       * [chunks of 4 bytes] - read 4 bytes at a time to unpack 2 integers
+       * [1 chunk of 2 bytes] - read 2 bytes to unpack 1 integer
+       */
 
       // aligned reads at 4-byte boundary to unpack 2 integers
       while (length >= 2) {
@@ -331,7 +401,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         byteOffset += 4;
       }
 
-      // handle spill over
+      // handle spill over at 2-byte boundary to unpack 1 integer
       if (length > 0) {
         out[i] = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
         length--;

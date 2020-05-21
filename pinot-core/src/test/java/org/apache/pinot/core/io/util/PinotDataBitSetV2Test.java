@@ -9,6 +9,14 @@ import org.testng.annotations.Test;
 
 public class PinotDataBitSetV2Test {
 
+  private void batchRead(PinotDataBitSetV2 bitset, int startDocId, int batchLength, int[] unpacked,
+      int[] forwardIndex) {
+    bitset.readInt(startDocId, batchLength, unpacked);
+    for (int i = 0; i < batchLength; i++) {
+      Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
+    }
+  }
+
   @Test
   public void testBit2Encoded() throws Exception {
     int cardinality = 3;
@@ -31,7 +39,7 @@ public class PinotDataBitSetV2Test {
       bitSet.writeInt(i, forwardIndex[i]);
     }
 
-    // single read
+    // test single read API for sequential consecutive
     for (int i = 0; i < rows; i++) {
       int unpacked = bitSet.readInt(i);
       Assert.assertEquals(forwardIndex[i], unpacked);
@@ -39,16 +47,58 @@ public class PinotDataBitSetV2Test {
 
     // for each batch:
     // 3 aligned reads at 4-byte boundary to unpack 16 integers after each read -- 48 integers unpacked
-    // followed by reading the next byte to unpack 2 integer from first 4 bits
+    // followed by reading the next byte to unpack 2 integers from first 4 bits
     int batchLength = 50;
     int[] unpacked = new int[batchLength];
-    int startDocId = 0;
+    int startDocId;
     for (startDocId = 0; startDocId < rows; startDocId += 50) {
       bitSet.readInt(startDocId, batchLength, unpacked);
       for (int i = 0; i < batchLength; i++) {
         Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
       }
     }
+
+    // 3 aligned reads at 4-byte boundary to unpack 16 integers after each read -- 48 integers unpacked
+    // followed by reading the next 2 bytes to unpack 8 integers
+    batchLength = 56;
+    unpacked = new int[batchLength];
+    startDocId = 1;
+    batchRead(bitSet, startDocId, batchLength, unpacked, forwardIndex);
+
+    // 3 aligned reads at 4-byte boundary to unpack 16 integers after each read -- 48 integers unpacked
+    // followed by reading the next 2 bytes to unpack 8 integers
+    // followed by reading the next byte to unpack 4 integers
+    batchLength = 60;
+    unpacked = new int[batchLength];
+    startDocId = 20;
+    batchRead(bitSet, startDocId, batchLength, unpacked, forwardIndex);
+
+    // 3 aligned reads at 4-byte boundary to unpack 16 integers after each read -- 48 integers unpacked
+    // followed by reading the next 2 bytes to unpack 8 integers
+    // followed by reading the next byte to unpack 4 integers
+    // followed by reading the next byte to unpack 1 integer from first 2 bits
+    batchLength = 61;
+    unpacked = new int[batchLength];
+    startDocId = 20;
+    batchRead(bitSet, startDocId, batchLength, unpacked, forwardIndex);
+
+    // 3 aligned reads at 4-byte boundary to unpack 16 integers after each read -- 48 integers unpacked
+    // followed by reading the next 2 bytes to unpack 8 integers
+    // followed by reading the next byte to unpack 4 integers
+    // followed by reading the next byte to unpack 2 integers from first 4 bits
+    batchLength = 62;
+    unpacked = new int[batchLength];
+    startDocId = 20;
+    batchRead(bitSet, startDocId, batchLength, unpacked, forwardIndex);
+
+    // 3 aligned reads at 4-byte boundary to unpack 16 integers after each read -- 48 integers unpacked
+    // followed by reading the next 2 bytes to unpack 8 integers
+    // followed by reading the next byte to unpack 4 integers
+    // followed by reading the next byte to unpack 6 integers from first 6 bits
+    batchLength = 63;
+    unpacked = new int[batchLength];
+    startDocId = 20;
+    batchRead(bitSet, startDocId, batchLength, unpacked, forwardIndex);
 
     // for each batch:
     // unaligned read on the first byte to unpack 3 integers
@@ -63,8 +113,6 @@ public class PinotDataBitSetV2Test {
       Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
     }
 
-    // exercise all cases in PinotDataBitSetV2.Bit2Encoded
-    // for each batch:
     // unaligned read on the first byte to unpack 3 integers (bits 2 to 7)
     // followed by 3 aligned reads at 4-byte boundary to unpack 16 integers after each read -- 48 integers unpacked
     // followed by 1 aligned read at byte boundary to unpack 4 integers -- 4 integers unpacked
@@ -128,17 +176,20 @@ public class PinotDataBitSetV2Test {
       bitSet.writeInt(i, forwardIndex[i]);
     }
 
+    // test single read API for sequential consecutive
     for (int i = 0; i < rows; i++) {
       int unpacked = bitSet.readInt(i);
       Assert.assertEquals(forwardIndex[i], unpacked);
     }
 
-    // for each batch:
+    // test array API for sequential consecutive
+
+    // for each batch: do a combination of aligned and unaligned reads
     // 6 aligned reads at 4-byte boundary to unpack 8 integers after each read -- 48 integers unpacked
     // followed by reading the next byte to unpack 2 integers
     int batchLength = 50;
     int[] unpacked = new int[batchLength];
-    int startDocId = 0;
+    int startDocId;
     for (startDocId = 0; startDocId < rows; startDocId += batchLength) {
       bitSet.readInt(startDocId, batchLength, unpacked);
       for (int i = 0; i < batchLength; i++) {
@@ -146,18 +197,66 @@ public class PinotDataBitSetV2Test {
       }
     }
 
+    // 12 aligned reads at 4-byte boundary to unpack 8 integers after each read -- 96 integers unpacked
+    batchLength = 96;
+    unpacked = new int[batchLength];
+    startDocId = 19;
+    bitSet.readInt(startDocId, batchLength, unpacked);
+    for (int i = 0; i < batchLength; i++) {
+      Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
+    }
+
+    // only a single unaligned read from the middle of a byte (44th bit)
+    batchLength = 1;
+    startDocId = 21;
+    bitSet.readInt(startDocId, batchLength, unpacked);
+    Assert.assertEquals(forwardIndex[startDocId], unpacked[0]);
+
     // unaligned read within a byte to unpack an integer from bits 4 to 7
     // followed by 2 aligned reads at 4-byte boundary to unpack 8 integers after each read -- unpacked 16 integers
+    // followed by 1 aligned read at 2-byte boundary to unpack 4 integers
     // followed by 1 aligned read at byte boundary to unpack 2 integers
     // followed by reading the next byte to unpack integer from first 4 bits
-    // 1 + 16 + 2 + 1 = 20 unpacked integers
+    // 1 + 16 + 4 + 2 + 1 = 24 unpacked integers
     startDocId = 1;
-    batchLength = 20;
+    batchLength = 24;
     unpacked = new int[batchLength];
     bitSet.readInt(startDocId, batchLength, unpacked);
     for (int i = 0; i < batchLength; i++) {
       Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
     }
+
+    // unaligned read within a byte to unpack an integer from bits 4 to 7
+    // 1 aligned read at 2-byte boundary to unpack 4 integers
+    // followed by 1 aligned read at byte boundary to unpack 2 integers
+    // followed by reading the next byte to unpack integer from first 4 bits
+    // 1 + 4 + 2 + 1 = 8 unpacked integers
+    startDocId = 1;
+    batchLength = 8;
+    unpacked = new int[batchLength];
+    bitSet.readInt(startDocId, batchLength, unpacked);
+    for (int i = 0; i < batchLength; i++) {
+      Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
+    }
+
+    // 1 aligned read at 2-byte boundary to unpack 4 integers
+    // followed by 1 aligned read at byte boundary to unpack 2 integers
+    // followed by reading the next byte to unpack integer from first 4 bits
+    // 4 + 2 + 1 = 7 unpacked integers
+    startDocId = 4;
+    batchLength = 7;
+    unpacked = new int[batchLength];
+    bitSet.readInt(startDocId, batchLength, unpacked);
+    for (int i = 0; i < batchLength; i++) {
+      Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
+    }
+
+    // test bulk API for sequential but not necessarily consecutive
+    testBulkSequentialWithGaps(bitSet, 1, 50, -1, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 5, 57, 4, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 17, 109, 19, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 17, 1, 19, forwardIndex);
+
     bitSet.close();
   }
 
@@ -183,23 +282,48 @@ public class PinotDataBitSetV2Test {
       bitSet.writeInt(i, forwardIndex[i]);
     }
 
+    // test single read API for sequential consecutive
     for (int i = 0; i < rows; i++) {
       int unpacked = bitSet.readInt(i);
       Assert.assertEquals(forwardIndex[i], unpacked);
     }
+
+    // test array API for sequential consecutive
 
     // for each batch:
     // 12 aligned reads at 4-byte boundary to unpack 4 integers after each read -- 48 integers unpacked
     // followed by reading the next 2 bytes to unpack 2 integers
     int batchLength = 50;
     int[] unpacked = new int[batchLength];
-    int startDocId = 0;
+    int startDocId;
     for (startDocId = 0; startDocId < rows; startDocId += batchLength) {
       bitSet.readInt(startDocId, batchLength, unpacked);
       for (int i = 0; i < batchLength; i++) {
         Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
       }
     }
+
+    // for each batch:
+    // 24 aligned reads at 4-byte boundary to unpack 4 integers after each read -- 96 integers unpacked
+    batchLength = 96;
+    unpacked = new int[batchLength];
+    startDocId = 7;
+    bitSet.readInt(startDocId, batchLength, unpacked);
+    for (int i = 0; i < batchLength; i++) {
+      Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
+    }
+
+    // unaligned spill over
+    startDocId = 19;
+    batchLength = 3;
+    bitSet.readInt(startDocId, batchLength, unpacked);
+    Assert.assertEquals(forwardIndex[startDocId], unpacked[0]);
+
+    // test bulk API for sequential but not necessarily consecutive
+    testBulkSequentialWithGaps(bitSet, 1, 50, -1, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 5, 57, 4, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 17, 109, 19, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 17, 1, 19, forwardIndex);
 
     bitSet.close();
   }
@@ -232,13 +356,13 @@ public class PinotDataBitSetV2Test {
       Assert.assertEquals(forwardIndex[i], unpacked);
     }
 
-    // test bulk API for sequential consecutive
+    // test array API for sequential consecutive
 
     // for each batch:
     // 25 aligned reads at 4-byte boundary to unpack 2 integers after each read -- 50 integers unpacked
     int batchLength = 50;
     int[] unpacked = new int[batchLength];
-    int startDocId = 0;
+    int startDocId;
     for (startDocId = 0; startDocId < rows; startDocId += batchLength) {
       bitSet.readInt(startDocId, batchLength, unpacked);
       for (int i = 0; i < batchLength; i++) {
@@ -256,15 +380,17 @@ public class PinotDataBitSetV2Test {
       Assert.assertEquals(forwardIndex[startDocId + i], unpacked[i]);
     }
 
-    // no aligned reads
+    // unaligned spill over
     startDocId = 7;
-    bitSet.readInt(7, 1, unpacked);
+    batchLength = 1;
+    bitSet.readInt(startDocId, batchLength, unpacked);
     Assert.assertEquals(forwardIndex[startDocId], unpacked[0]);
 
-    // test bulk API for sequential but not necessarily consecutive
+    // test array API for sequential but not necessarily consecutive
     testBulkSequentialWithGaps(bitSet, 1, 50, -1, forwardIndex);
-    testBulkSequentialWithGaps(bitSet, 5, 50, 4, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 5, 57, 4, forwardIndex);
     testBulkSequentialWithGaps(bitSet, 17, 109, 19, forwardIndex);
+    testBulkSequentialWithGaps(bitSet, 17, 1, 19, forwardIndex);
 
     bitSet.close();
   }
