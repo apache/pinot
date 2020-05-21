@@ -26,6 +26,29 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 
 
+/**
+ * FieldSpec for complex fields. The {@link org.apache.pinot.spi.data.FieldSpec.FieldType}
+ * is COMPLEX and the inner data type represents the root data type of the field.
+ * It could be STRUCT, MAP or LIST. A complex field is composable with a single root type
+ * and a number of child types. Although we have multi-value primitive columns, LIST
+ * is for representing lists of both complex and primitives inside a complex field.
+ *
+ * Consider a person json where the root type is STRUCT and composes of inner members:
+ *  STRUCT(
+ *          name: STRING
+ *          age: INT
+ *          salary: INT
+ *          addresses: LIST (STRUCT
+ *                              apt: INT
+ *                              street: STRING
+ *                              city: STRING
+ *                              zip: INT
+ *                          )
+ *        )
+ *
+ * The fieldspec would be COMPLEX with type as STRUCT and 4 inner members
+ * to model the hierarchy
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class ComplexFieldSpec extends FieldSpec {
 
@@ -39,7 +62,7 @@ public final class ComplexFieldSpec extends FieldSpec {
 
   public ComplexFieldSpec(@Nonnull String name, DataType dataType, boolean isSingleValueField) {
     super(name, dataType, isSingleValueField);
-    Preconditions.checkArgument(dataType == DataType.STRUCT || dataType == DataType.LIST);
+    Preconditions.checkArgument(dataType == DataType.STRUCT || dataType == DataType.MAP || dataType == DataType.LIST);
     _childFieldSpecs = new HashMap<>();
   }
 
@@ -51,7 +74,7 @@ public final class ComplexFieldSpec extends FieldSpec {
     _childFieldSpecs.put(child, fieldSpec);
   }
 
-  public Map<String,FieldSpec> getChildFieldSpecs() {
+  public Map<String, FieldSpec> getChildFieldSpecs() {
     return _childFieldSpecs;
   }
 
@@ -64,7 +87,6 @@ public final class ComplexFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: COMPLEX, field name: " + _name + ", data type: " + _dataType + ", is single-value field: "
-        + _isSingleValueField + ", default null value: " + _defaultNullValue + " >";
+    return "field type: COMPLEX, field name: " + _name + ", root data type: " + _dataType;
   }
 }

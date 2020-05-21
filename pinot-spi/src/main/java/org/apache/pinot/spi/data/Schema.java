@@ -65,6 +65,7 @@ public final class Schema {
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
+  private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
 
   // Json ignored fields
   private transient final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
@@ -187,6 +188,9 @@ public final class Schema {
       case DATE_TIME:
         _dateTimeNames.add(columnName);
         _dateTimeFieldSpecs.add((DateTimeFieldSpec) fieldSpec);
+        break;
+      case COMPLEX:
+        _complexFieldSpecs.add((ComplexFieldSpec) fieldSpec);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
@@ -364,6 +368,13 @@ public final class Schema {
       }
       jsonObject.set("dateTimeFieldSpecs", jsonArray);
     }
+    if (!_complexFieldSpecs.isEmpty()) {
+      ArrayNode jsonArray = JsonUtils.newArrayNode();
+      for (ComplexFieldSpec complexFieldSpec : _complexFieldSpecs) {
+        jsonArray.add(complexFieldSpec.toJsonObject());
+      }
+      jsonObject.set("dateTimeFieldSpecs", jsonArray);
+    }
     return jsonObject;
   }
 
@@ -436,6 +447,16 @@ public final class Schema {
               return false;
           }
           break;
+        case COMPLEX:
+          switch (dataType) {
+            case STRUCT:
+            case MAP:
+            case LIST:
+              break;
+            default:
+              ctxLogger.info("Unsupported data type: {} in COMPLEX field: {}", dataType, fieldName);
+              return false;
+          }
         default:
           ctxLogger.info("Unsupported field type: {} for field: {}", dataType, fieldName);
           return false;
@@ -537,6 +558,16 @@ public final class Schema {
       DateTimeFieldSpec dateTimeFieldSpec =
           new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue, transformFunction);
       _schema.addField(dateTimeFieldSpec);
+      return this;
+    }
+
+    /**
+     * Add complex field spec
+     * @param name name of complex (nested) field
+     * @param dataType root data type of complex field
+     */
+    public SchemaBuilder addComplex(String name, DataType dataType) {
+      _schema.addField(new ComplexFieldSpec(name, dataType, /* single value field */ true));
       return this;
     }
 
