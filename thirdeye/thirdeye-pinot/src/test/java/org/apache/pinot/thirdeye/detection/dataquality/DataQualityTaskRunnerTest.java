@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
@@ -199,7 +200,8 @@ public class DataQualityTaskRunnerTest {
     anomalyDTO.setMetricUrn("thirdeye:metric:123");
     anomalyDTO.setMetric("thirdeye-test");
     anomalyDTO.setCollection("thirdeye-test-dataset");
-    anomalyDTO.setType(AnomalyType.DATA_MISSING);
+    anomalyDTO.setType(AnomalyType.DATA_SLA);
+    anomalyDTO.setAnomalyResultSource(AnomalyResultSource.DATA_QUALITY_DETECTION);
     anomalyDTO.setDetectionConfigId(this.detectorId);
     anomalyDTO.setChildIds(Collections.emptySet());
 
@@ -544,7 +546,8 @@ public class DataQualityTaskRunnerTest {
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), START_TIME + 4 * GRANULARITY);
     Assert.assertEquals(anomalies.get(0).getEndTime(), START_TIME + 5 * GRANULARITY);
-    Assert.assertEquals(anomalies.get(0).getType(), AnomalyType.DATA_MISSING);
+    Assert.assertEquals(anomalies.get(0).getType(), AnomalyType.DATA_SLA);
+    Assert.assertTrue(anomalies.get(0).getAnomalyResultSource().equals(AnomalyResultSource.DATA_QUALITY_DETECTION));
     Map<String, String> anomalyProps = new HashMap<>();
     anomalyProps.put("datasetLastRefreshTime", String.valueOf(START_TIME + 4 * GRANULARITY - 1));
     anomalyProps.put("sla", "1_DAYS");
@@ -586,7 +589,8 @@ public class DataQualityTaskRunnerTest {
     MergedAnomalyResultDTO slaAnomaly = anomalies.get(0);
     Assert.assertEquals(slaAnomaly.getStartTime(), START_TIME + 4 * GRANULARITY);
     Assert.assertEquals(slaAnomaly.getEndTime(), START_TIME + 5 * GRANULARITY);
-    Assert.assertEquals(slaAnomaly.getType(), AnomalyType.DATA_MISSING);
+    Assert.assertEquals(slaAnomaly.getType(), AnomalyType.DATA_SLA);
+    Assert.assertTrue(slaAnomaly.getAnomalyResultSource().equals(AnomalyResultSource.DATA_QUALITY_DETECTION));
     Map<String, String> anomalyProps = new HashMap<>();
     anomalyProps.put("datasetLastRefreshTime", String.valueOf(START_TIME + 4 * GRANULARITY - 1));
     anomalyProps.put("sla", "1_DAYS");

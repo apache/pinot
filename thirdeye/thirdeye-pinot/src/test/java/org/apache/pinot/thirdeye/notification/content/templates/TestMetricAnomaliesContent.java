@@ -18,6 +18,7 @@ package org.apache.pinot.thirdeye.notification.content.templates;
 
 import java.util.Properties;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
@@ -174,7 +175,8 @@ public class TestMetricAnomaliesContent {
         new DateTime(2020, 1, 7, 17, 0, dateTimeZone).getMillis(),
         TEST, TEST, 0.1, 1l, new DateTime(2020, 1, 7, 17, 1, dateTimeZone).getMillis());
     anomaly.setDetectionConfigId(detectionConfigDTO.getId());
-    anomaly.setType(AnomalyType.DATA_MISSING);
+    anomaly.setType(AnomalyType.DATA_SLA);
+    anomaly.setAnomalyResultSource(AnomalyResultSource.DATA_QUALITY_DETECTION);
     anomaly.setMetricUrn("thirdeye:metric:3");
     Map<String, String> props = new HashMap<>();
     props.put("sla", "3_DAYS");
@@ -187,7 +189,8 @@ public class TestMetricAnomaliesContent {
         new DateTime(2020, 1, 7, 5, 5, dateTimeZone).getMillis(),
         TEST, TEST, 0.1, 1l, new DateTime(2020, 1, 7, 5, 6, dateTimeZone).getMillis());
     anomaly.setDetectionConfigId(detectionConfigDTO.getId());
-    anomaly.setType(AnomalyType.DATA_MISSING);
+    anomaly.setType(AnomalyType.DATA_SLA);
+    anomaly.setAnomalyResultSource(AnomalyResultSource.DATA_QUALITY_DETECTION);
     anomaly.setMetricUrn("thirdeye:metric:3");
     props = new HashMap<>();
     props.put("datasetLastRefreshTime", "" + new DateTime(2020, 1, 4, 0, 0, dateTimeZone).getMillis());
@@ -201,7 +204,8 @@ public class TestMetricAnomaliesContent {
         new DateTime(2020, 1, 1, 15, 0, dateTimeZone).getMillis(),
         TEST, TEST, 0.1, 1l, new DateTime(2020, 1, 1, 16, 0, dateTimeZone).getMillis());
     anomaly.setDetectionConfigId(detectionConfigDTO.getId());
-    anomaly.setType(AnomalyType.DATA_MISSING);
+    anomaly.setType(AnomalyType.DATA_SLA);
+    anomaly.setAnomalyResultSource(AnomalyResultSource.DATA_QUALITY_DETECTION);
     anomaly.setMetricUrn("thirdeye:metric:3");
     props = new HashMap<>();
     props.put("datasetLastRefreshTime", "" + new DateTime(2020, 1, 1, 10, 5, dateTimeZone).getMillis());

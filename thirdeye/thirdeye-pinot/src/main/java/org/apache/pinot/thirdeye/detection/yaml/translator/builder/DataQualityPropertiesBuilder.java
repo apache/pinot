@@ -39,11 +39,11 @@ import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
 /**
  * This class is responsible for translating the data quality properties
  */
-public class DataQualityTranslatorBuilder extends DetectionConfigTranslatorBuilder {
+public class DataQualityPropertiesBuilder extends DetectionConfigPropertiesBuilder {
 
   static final String PROP_QUALITY_CHECK = "qualityCheck";
 
-  public DataQualityTranslatorBuilder(DetectionMetricAttributeHolder metricAttributesMap, DataProvider provider) {
+  public DataQualityPropertiesBuilder(DetectionMetricAttributeHolder metricAttributesMap, DataProvider provider) {
     super(metricAttributesMap, provider);
   }
 

@@ -49,11 +49,11 @@ import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
 /**
  * This class is responsible for translating the detection properties
  */
-public class DetectionTranslatorBuilder extends DetectionConfigTranslatorBuilder {
+public class DetectionPropertiesBuilder extends DetectionConfigPropertiesBuilder {
 
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM");
 
-  public DetectionTranslatorBuilder(DetectionMetricAttributeHolder metricAttributesMap, DataProvider provider) {
+  public DetectionPropertiesBuilder(DetectionMetricAttributeHolder metricAttributesMap, DataProvider provider) {
     super(metricAttributesMap, provider);
   }
 
@@ -62,6 +62,7 @@ public class DetectionTranslatorBuilder extends DetectionConfigTranslatorBuilder
    *
    * @param metricAlertConfigMap holds the parsed yaml for a single metric alert
    */
+  @Override
   public Map<String, Object> buildMetricAlertProperties(Map<String, Object> metricAlertConfigMap) {
     MetricConfigDTO metricConfigDTO = metricAttributesMap.fetchMetric(metricAlertConfigMap);
     DatasetConfigDTO datasetConfigDTO = metricAttributesMap.fetchDataset(metricAlertConfigMap);
@@ -117,6 +118,7 @@ public class DetectionTranslatorBuilder extends DetectionConfigTranslatorBuilder
     return properties;
   }
 
+  @Override
   public Map<String, Object> buildCompositeAlertProperties(Map<String, Object> compositeAlertConfigMap) {
     // Recursively translate all the sub-alerts
     List<Map<String, Object>> subDetectionYamls = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_ALERTS));

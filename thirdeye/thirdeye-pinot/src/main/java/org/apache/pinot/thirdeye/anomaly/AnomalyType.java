@@ -27,7 +27,7 @@ public enum AnomalyType {
   // There is a trend change for underline metric.
   TREND_CHANGE ("Trend Change"),
   // The metric is not available within specified time.
-  DATA_MISSING ("Data Missing");
+  DATA_SLA ("SLA Violation");
 
   private String label;
 

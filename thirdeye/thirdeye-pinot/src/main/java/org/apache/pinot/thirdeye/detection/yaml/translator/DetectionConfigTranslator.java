@@ -30,9 +30,9 @@ import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
-import org.apache.pinot.thirdeye.detection.yaml.translator.builder.DetectionConfigTranslatorBuilder;
-import org.apache.pinot.thirdeye.detection.yaml.translator.builder.DataQualityTranslatorBuilder;
-import org.apache.pinot.thirdeye.detection.yaml.translator.builder.DetectionTranslatorBuilder;
+import org.apache.pinot.thirdeye.detection.yaml.translator.builder.DetectionConfigPropertiesBuilder;
+import org.apache.pinot.thirdeye.detection.yaml.translator.builder.DataQualityPropertiesBuilder;
+import org.apache.pinot.thirdeye.detection.yaml.translator.builder.DetectionPropertiesBuilder;
 
 
 /**
@@ -122,8 +122,8 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   static final String METRIC_ALERT = "METRIC_ALERT";
 
   private DataProvider dataProvider;
-  private DetectionConfigTranslatorBuilder detectionTranslatorBuilder;
-  private DetectionConfigTranslatorBuilder dataQualityTranslatorBuilder;
+  private DetectionConfigPropertiesBuilder detectionTranslatorBuilder;
+  private DetectionConfigPropertiesBuilder dataQualityTranslatorBuilder;
   private DetectionMetricAttributeHolder metricAttributesMap;
 
   public DetectionConfigTranslator(String yamlConfig, DataProvider provider) {
@@ -134,8 +134,8 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     super(yamlConfig, validator);
     this.dataProvider = provider;
     this.metricAttributesMap = new DetectionMetricAttributeHolder(provider);
-    this.detectionTranslatorBuilder = new DetectionTranslatorBuilder(metricAttributesMap, provider);
-    this.dataQualityTranslatorBuilder = new DataQualityTranslatorBuilder(metricAttributesMap, provider);
+    this.detectionTranslatorBuilder = new DetectionPropertiesBuilder(metricAttributesMap, provider);
+    this.dataQualityTranslatorBuilder = new DataQualityPropertiesBuilder(metricAttributesMap, provider);
   }
 
   @Override

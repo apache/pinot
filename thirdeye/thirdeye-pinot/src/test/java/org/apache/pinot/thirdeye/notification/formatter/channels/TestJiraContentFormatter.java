@@ -32,6 +32,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -129,7 +130,8 @@ public class TestJiraContentFormatter {
     anomalyResultDTO2.setDetectionConfigId(this.detectionConfigId);
     anomalyResultDTO2.setCollection(COLLECTION_VALUE);
     anomalyResultDTO2.setMetric(METRIC_VALUE);
-    anomalyResultDTO2.setType(AnomalyType.DATA_MISSING);
+    anomalyResultDTO2.setType(AnomalyType.DATA_SLA);
+    anomalyResultDTO2.setAnomalyResultSource(AnomalyResultSource.DATA_QUALITY_DETECTION);
     anomalyResultDTO2.setMetricUrn("thirdeye:metric:124");
     Map<String, String> props = new HashMap<>();
     props.put("sla", "2_HOURS");

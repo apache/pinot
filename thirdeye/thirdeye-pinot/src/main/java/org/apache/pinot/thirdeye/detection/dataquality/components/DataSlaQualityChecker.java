@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -55,7 +56,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Performs data sla checks for the window and generates DATA_MISSING anomalies.
+ * Performs data sla checks for the window and generates DATA_SLA anomalies.
  *
  * Data SLA is verified based on the following information.
  * a. The dataset refresh timestamp updated by the event based data availability pipeline (if applicable).
@@ -127,6 +128,8 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
   private long fetchLatestDatasetRefreshTime(InputData data, MetricEntity me, Interval window) {
     long startTime = window.getStart().getMillis();
     long endTime = window.getEnd().getMillis();
+    // Note that we only measure the overall dataset availability. Filters are not considered as the
+    // data availability events fire at the dataset level.
     MetricSlice metricSlice = MetricSlice.from(me.getId(), startTime, endTime, ArrayListMultimap.create());
 
     // Fetch dataset refresh time based on the data availability events
@@ -191,15 +194,16 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
   }
 
   /**
-   * Creates a DATA_MISSING anomaly from ceiling(start) to ceiling(end) for the detection id.
-   * If existing DATA_MISSING anomalies are present, then it will be merged accordingly.
+   * Creates a DATA_SLA anomaly from ceiling(start) to ceiling(end) for the detection id.
+   * If existing DATA_SLA anomalies are present, then it will be merged accordingly.
    */
   private MergedAnomalyResultDTO createDataSLAAnomaly(MetricSlice slice, DatasetConfigDTO datasetConfig) {
     MergedAnomalyResultDTO anomaly = DetectionUtils.makeAnomaly(
         alignToUpperBoundary(slice.getStart(), datasetConfig),
         alignToUpperBoundary(slice.getEnd(), datasetConfig));
     anomaly.setCollection(datasetConfig.getName());
-    anomaly.setType(AnomalyType.DATA_MISSING);
+    anomaly.setType(AnomalyType.DATA_SLA);
+    anomaly.setAnomalyResultSource(AnomalyResultSource.DATA_QUALITY_DETECTION);
 
     // Store the metadata in the anomaly
     Map<String, String> properties = new HashMap<>();

@@ -41,10 +41,9 @@ import static org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner.*;
 
 
 /**
- * This is the root of the detection config translator builder. Other translators
- * extend from this class.
+ * This is the root of the detection config builder. Other translators extend from this class.
  */
-public abstract class DetectionConfigTranslatorBuilder {
+public abstract class DetectionConfigPropertiesBuilder {
 
   public static final String PROP_SUB_ENTITY_NAME = "subEntityName";
   public static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
@@ -85,7 +84,7 @@ public abstract class DetectionConfigTranslatorBuilder {
   final DataProvider dataProvider;
   static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
 
-  DetectionConfigTranslatorBuilder(DetectionMetricAttributeHolder metricAttributesMap, DataProvider dataProvider) {
+  DetectionConfigPropertiesBuilder(DetectionMetricAttributeHolder metricAttributesMap, DataProvider dataProvider) {
     this.metricAttributesMap = metricAttributesMap;
     this.dataProvider = dataProvider;
   }

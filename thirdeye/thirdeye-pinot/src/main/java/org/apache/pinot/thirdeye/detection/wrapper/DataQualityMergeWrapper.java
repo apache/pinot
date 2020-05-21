@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.wrapper;
 
+import com.google.common.collect.Collections2;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -26,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -49,14 +51,12 @@ public class DataQualityMergeWrapper extends MergeWrapper {
 
   @Override
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
-    AnomalySlice effectiveSlice = this.slice.withDetectionId(this.config.getId())
-        .withStart(this.getStartTime(generated) - this.maxGap - 1)
-        .withEnd(this.getEndTime(generated) + this.maxGap + 1);
+    List<MergedAnomalyResultDTO> retrieved = super.retrieveAnomaliesFromDatabase(generated);
 
-    Collection<MergedAnomalyResultDTO> anomalies =
-        this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice);
-
-    return anomalies.stream().filter(anomaly -> !anomaly.isChild()).collect(Collectors.toList());
+    return new ArrayList<>(Collections2.filter(retrieved,
+        anomaly -> !anomaly.isChild() &&
+            anomaly.getAnomalyResultSource().equals(AnomalyResultSource.DATA_QUALITY_DETECTION)
+    ));
   }
 
   @Override

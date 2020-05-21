@@ -318,7 +318,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
     String liftValue = String.format(PERCENTAGE_FORMAT, lift * 100);
 
     // Fetch the lift value for a SLA anomaly
-    if (anomaly.getType().equals(AnomalyType.DATA_MISSING)) {
+    if (anomaly.getType().equals(AnomalyType.DATA_SLA)) {
       liftValue = getFormattedSLALiftValue(anomaly);
     }
 
@@ -329,7 +329,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
    * The lift value for an SLA anomaly is delay from the configured sla. (Ex: 2 days & 3 hours)
    */
   protected static String getFormattedSLALiftValue(MergedAnomalyResultDTO anomaly) {
-    if (!anomaly.getType().equals(AnomalyType.DATA_MISSING)
+    if (!anomaly.getType().equals(AnomalyType.DATA_SLA)
         || anomaly.getProperties() == null || anomaly.getProperties().isEmpty()
         || !anomaly.getProperties().containsKey("sla")
         || !anomaly.getProperties().containsKey("datasetLastRefreshTime")) {
@@ -357,7 +357,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
    * The predicted value for an SLA anomaly is the configured sla. (Ex: 2_DAYS)
    */
   protected static String getSLAPredictedValue(MergedAnomalyResultDTO anomaly) {
-    if (!anomaly.getType().equals(AnomalyType.DATA_MISSING)
+    if (!anomaly.getType().equals(AnomalyType.DATA_SLA)
         || anomaly.getProperties() == null || anomaly.getProperties().isEmpty()
         || !anomaly.getProperties().containsKey("sla")) {
       return "-";
@@ -373,7 +373,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
     String predicted = ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal());
 
     // For SLA anomalies, we use the sla as the predicted value
-    if (anomaly.getType().equals(AnomalyType.DATA_MISSING)) {
+    if (anomaly.getType().equals(AnomalyType.DATA_SLA)) {
       predicted = getSLAPredictedValue(anomaly);
     }
 
