@@ -34,6 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The data quality job submitted to the scheduler. This job creates data quality tasks which
+ * the runners will later pick and execute.
+ */
 public class DataQualityPipelineJob implements Job {
   private static final Logger LOG = LoggerFactory.getLogger(DataQualityPipelineJob.class);
 

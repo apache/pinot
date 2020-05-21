@@ -143,7 +143,7 @@ public class DataQualityTaskRunnerTest {
   }
 
   /**
-   * Prepare slice [start inclusive, end exclusive)
+   * Prepare slice [offsetStart, offsetEnd)
    */
   private MetricSlice prepareMetricSlice(long offsetStart, long offsetEnd) {
     long start = START_TIME + offsetStart * GRANULARITY;
@@ -159,7 +159,7 @@ public class DataQualityTaskRunnerTest {
   }
 
   /**
-   * Prepares a mock time-series with Geometric progression values starting from 100
+   * Prepares a mock time-series [offsetStart, offsetEnd] with Geometric progression values starting from 100
    */
   private DataFrame prepareMockTimeseries(long offsetStart, long offsetEnd) {
     long[] values = new long[(int) (offsetEnd - offsetStart + 1)];
@@ -367,6 +367,7 @@ public class DataQualityTaskRunnerTest {
 
     // b. no availability events - directly query source
     datasetConfigDTO.setLastRefreshTime(0);
+    datasetDAO.update(datasetConfigDTO);
     // 1st scan after issue - sla breach
     //  time:  3____4    5    6           // We have data till 3rd, data since 4th is missing/delayed
     //  scan:            |----|
@@ -385,18 +386,15 @@ public class DataQualityTaskRunnerTest {
   }
 
   /**
-   * Test that no data SLA anomalies are created when data is partially available
-   * We do not deal with partial data in this current iteration/phase
+   * Test that data SLA anomalies are created when data is partially available
    */
   @Test
   public void testDataSlaWhenDataPartiallyAvailable() throws Exception {
     Map<MetricSlice, DataFrame> timeSeries = new HashMap<>();
-    // Prepare mock time-series with a lot of missing values after offset 3
-    MetricSlice sliceOverlapBelowThreshold = prepareMetricSlice(2, 10);
-    timeSeries.put(sliceOverlapBelowThreshold, prepareMockTimeseries(2, 3));
-    // Prepare mock time-series with a few missing values after offset 3
-    MetricSlice sliceOverlapAboveThreshold = prepareMetricSlice(2, 4);
-    timeSeries.put(sliceOverlapAboveThreshold, prepareMockTimeseries(2, 3));
+    // Assumption - As per data availability info, we have data till 3rd.
+    datasetConfigDTO.setLastRefreshTime(START_TIME + 4 * GRANULARITY - 1);
+    datasetDAO.update(datasetConfigDTO);
+
     MockDataProvider mockDataProvider = new MockDataProvider()
         .setLoader(this.loader)
         .setTimeseries(timeSeries)
@@ -410,11 +408,12 @@ public class DataQualityTaskRunnerTest {
         this.loader,
         mockDataProvider
     );
-    datasetConfigDTO.setLastRefreshTime(0);
-    datasetDAO.update(datasetConfigDTO);
 
-    this.info.setStart(sliceOverlapBelowThreshold.getStart());
-    this.info.setEnd(sliceOverlapBelowThreshold.getEnd());
+    // Create detection window (2 - 10) with a lot of empty data points (no data after 3rd).
+    MetricSlice sliceWithManyEmptyDataPoints = prepareMetricSlice(2, 10);
+    timeSeries.put(sliceWithManyEmptyDataPoints, prepareMockTimeseries(2, 3));
+    this.info.setStart(sliceWithManyEmptyDataPoints.getStart());
+    this.info.setEnd(sliceWithManyEmptyDataPoints.getEnd());
     runner.execute(this.info, this.context);
 
     // 1 data sla anomaly should be created for the missing days
@@ -427,13 +426,36 @@ public class DataQualityTaskRunnerTest {
     expectedAnomalies.clear();
     cleanUpAnomalies();
 
-    this.info.setStart(sliceOverlapAboveThreshold.getStart());
-    this.info.setEnd(sliceOverlapAboveThreshold.getEnd());
+
+    // Create another detection window (2 - 10) with no empty data points.
+    MetricSlice sliceWithFullDataPoints = prepareMetricSlice(2, 10);
+    timeSeries.put(sliceWithFullDataPoints, prepareMockTimeseries(2, 9));
+    this.info.setStart(sliceWithFullDataPoints.getStart());
+    this.info.setEnd(sliceWithFullDataPoints.getEnd());
     runner.execute(this.info, this.context);
 
     // 0 data sla anomaly should be created as data is considered to be completely available (above threshold)
     anomalies = retrieveAllAnomalies();
     Assert.assertEquals(anomalies.size(), 0);
+
+
+    // Create another detection window (2 - 10) with more data points than the data availability event.
+    MetricSlice sliceWithMoreDataPointsThanEvent = prepareMetricSlice(2, 10);
+    timeSeries.put(sliceWithMoreDataPointsThanEvent, prepareMockTimeseries(2, 7));
+    this.info.setStart(sliceWithMoreDataPointsThanEvent.getStart());
+    this.info.setEnd(sliceWithMoreDataPointsThanEvent.getEnd());
+    runner.execute(this.info, this.context);
+
+    // 1 data sla anomaly should be created for the missing days
+    // Data source has more data than what the availability event reports, the sla anomaly should reflect accordingly.
+    anomalies = retrieveAllAnomalies();
+    Assert.assertEquals(anomalies.size(), 1);
+    expectedAnomalies = new ArrayList<>();
+    expectedAnomalies.add(makeSlaAnomaly(8, 10, "1_DAYS", "slaRule1:DATA_SLA"));
+    Assert.assertTrue(anomalies.containsAll(expectedAnomalies));
+    //clean up
+    expectedAnomalies.clear();
+    cleanUpAnomalies();
   }
 
   /**

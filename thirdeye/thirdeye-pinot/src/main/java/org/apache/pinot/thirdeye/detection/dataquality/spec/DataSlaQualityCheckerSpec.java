@@ -26,7 +26,7 @@ import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DataSlaQualityCheckerSpec extends AbstractSpec {
-  private String sla = "1_DAYS";
+  private String sla = "3_DAYS";
 
   public String getSla() {
     return sla;

@@ -56,6 +56,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Performs data sla checks for the window and generates DATA_MISSING anomalies.
+ *
+ * Data SLA is verified based on the following information.
+ * a. The dataset refresh timestamp updated by the event based data availability pipeline (if applicable).
+ * b. Otherwise, we will query the data source and run sla checks.
  */
 @Components(title = "Data Sla Quality Checker",
     type = "DATA_SLA",
@@ -91,55 +95,22 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
   }
 
   /**
-   * Runs the data sla check for the window on the given metric
+   * Runs the data sla check for the window on the given metric.
    */
   private List<MergedAnomalyResultDTO> runSLACheck(MetricEntity me, Interval window) {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-
-    // We want to measure the overall dataset availability (filters can be ignored)
-    long startTime = window.getStart().getMillis();
-    long endTime = window.getEnd().getMillis();
-    MetricSlice metricSlice = MetricSlice.from(me.getId(), startTime, endTime, ArrayListMultimap.<String, String>create());
+    long expectedDatasetRefreshTime = window.getEnd().getMillis();
     InputData data = this.dataFetcher.fetchData(new InputDataSpec()
-        .withTimeseriesSlices(Collections.singletonList(metricSlice))
         .withMetricIdsForDataset(Collections.singletonList(me.getId()))
         .withMetricIds(Collections.singletonList(me.getId())));
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
 
     try {
-      long datasetLastRefreshTime = datasetConfig.getLastRefreshTime();
-      if (datasetLastRefreshTime <= 0) {
-        // no availability event -> assume we have processed data till the current detection start
-        datasetLastRefreshTime = startTime - 1;
-      }
+      long datasetLastRefreshTime = fetchLatestDatasetRefreshTime(data, me, window);
+      MetricSlice slice = MetricSlice.from(me.getId(), datasetLastRefreshTime + 1, expectedDatasetRefreshTime);
 
-      MetricSlice slice = MetricSlice.from(me.getId(), datasetLastRefreshTime + 1, endTime);
-      if (isMissingData(datasetLastRefreshTime, startTime)) {
-        // Double check with data source as 2 things are possible.
-        // 1. This dataset/source may not support availability events
-        // 2. The data availability event pipeline has some issue.
-
-        DataFrame dataFrame = data.getTimeseries().get(metricSlice);
-        if (dataFrame == null || dataFrame.isEmpty()) {
-          // no data
-          if (hasMissedSLA(datasetLastRefreshTime, endTime)) {
-            anomalies.add(createDataSLAAnomaly(slice, datasetConfig));
-          }
-        } else {
-          datasetLastRefreshTime = dataFrame.getDoubles("timestamp").max().longValue();
-          if (isPartialData(datasetLastRefreshTime, endTime, datasetConfig)) {
-            if (hasMissedSLA(datasetLastRefreshTime, endTime)) {
-              slice = MetricSlice.from(me.getId(), datasetLastRefreshTime + 1, endTime);
-              anomalies.add(createDataSLAAnomaly(slice, datasetConfig));
-            }
-          }
-        }
-      } else if (isPartialData(datasetLastRefreshTime, endTime, datasetConfig)) {
-        // Optimize for the common case - the common case is that the data availability events are arriving
-        // correctly and we need not re-fetch the data to double check.
-        if (hasMissedSLA(datasetLastRefreshTime, endTime)) {
-          anomalies.add(createDataSLAAnomaly(slice, datasetConfig));
-        }
+      if (isSLAViolated(datasetLastRefreshTime, expectedDatasetRefreshTime)) {
+        anomalies.add(createDataSLAAnomaly(slice, datasetConfig));
       }
     } catch (Exception e) {
       LOG.error(String.format("Failed to run sla check on metric URN %s", me.getUrn()), e);
@@ -149,11 +120,36 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
   }
 
   /**
-   * We say the data is missing if we do not have data in the sla detection window.
-   * Or more specifically if the dataset watermark is below the sla detection window.
+   * Fetches the latest timestamp for the dataset. It relies on 2 sources:
+   * a. Data-trigger/availability based refresh timestamp
+   * b. If not available, check by directly querying the data-source.
    */
-  private boolean isMissingData(long datasetLastRefreshTime, long startTime) {
-    return datasetLastRefreshTime < startTime;
+  private long fetchLatestDatasetRefreshTime(InputData data, MetricEntity me, Interval window) {
+    long startTime = window.getStart().getMillis();
+    long endTime = window.getEnd().getMillis();
+    MetricSlice metricSlice = MetricSlice.from(me.getId(), startTime, endTime, ArrayListMultimap.create());
+
+    // Fetch dataset refresh time based on the data availability events
+    DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
+    long eventBasedRefreshTime = datasetConfig.getLastRefreshTime();
+    if (eventBasedRefreshTime <= 0) {
+      // no availability event -> assume we have processed data till the current detection start
+      eventBasedRefreshTime = startTime - 1;
+    }
+
+    // If the data availability event indicates no data or partial data, we will confirm with the data source.
+    if (eventBasedRefreshTime < startTime || isPartialData(eventBasedRefreshTime, endTime, datasetConfig)) {
+      // Double check with data source. This can happen if,
+      // 1. This dataset/source doesn't not support data trigger/availability events
+      // 2. The data trigger event didn't arrive due to some upstream issue.
+      DataFrame dataFrame = this.dataFetcher.fetchData(new InputDataSpec()
+          .withTimeseriesSlices(Collections.singletonList(metricSlice))).getTimeseries().get(metricSlice);
+      if (dataFrame != null && !dataFrame.isEmpty()) {
+        return dataFrame.getDoubles("timestamp").max().longValue();
+      }
+    }
+
+    return eventBasedRefreshTime;
   }
 
   /**
@@ -163,12 +159,13 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
    * For example:
    * Assume that the data is delayed and our current sla detection window is [1st Feb to 3rd Feb). During this scan,
    * let's say data for 1st Feb arrives. Now, we have a situation where partial data is present. In other words, in the
-   * current sla detection window [1st to 3rd Feb) we have data for 1st Feb but data for 2nd Feb is missing. This is the
-   * partial data scenario.
+   * current sla detection window [1st to 3rd Feb) we have data for 1st Feb but data for 2nd Feb is missing.
+   *
+   * Based on this information, we can smartly decide if we need to query the data source or not.
    */
-  private boolean isPartialData(long datasetLastRefreshTime, long endTime, DatasetConfigDTO datasetConfig) {
+  private boolean isPartialData(long actual, long expected, DatasetConfigDTO datasetConfig) {
     long granularity = datasetConfig.bucketTimeGranularity().toMillis();
-    return (endTime - datasetLastRefreshTime) * 1.0 / granularity > 1;
+    return (expected - actual) * 1.0 / granularity > 1;
   }
 
   /**
@@ -176,11 +173,11 @@ public class DataSlaQualityChecker implements AnomalyDetector<DataSlaQualityChec
    *
    * fetch the user configured SLA, otherwise default 3_DAYS.
    */
-  private boolean hasMissedSLA(long datasetLastRefreshTime, long slaDetectionEndTime) {
+  private boolean isSLAViolated(long actualRefreshTime, long expectedRefreshTime) {
     String sla = StringUtils.isNotEmpty(this.sla) ? this.sla : DEFAULT_DATA_SLA;
     long delay = TimeGranularity.fromString(sla).toPeriod().toStandardDuration().getMillis();
 
-    return (slaDetectionEndTime - datasetLastRefreshTime) >= delay;
+    return (expectedRefreshTime - actualRefreshTime) > delay;
   }
 
   /**
