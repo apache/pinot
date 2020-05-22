@@ -82,7 +82,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: server-config
+            name: {{ include "pinot.server.config" . }}
       {{- if not .Values.server.persistence.enabled }}
         - name: data
           emptyDir: {}

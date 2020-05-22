@@ -141,3 +141,24 @@ The name of the pinot broker external service.
 {{- define "pinot.broker.external" -}}
 {{- printf "%s-external" (include "pinot.broker.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+The name of the pinot controller config.
+*/}}
+{{- define "pinot.controller.config" -}}
+{{- printf "%s-config" (include "pinot.controller.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The name of the pinot broker config.
+*/}}
+{{- define "pinot.broker.config" -}}
+{{- printf "%s-config" (include "pinot.broker.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The name of the pinot server config.
+*/}}
+{{- define "pinot.server.config" -}}
+{{- printf "%s-config" (include "pinot.server.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
