@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.io.util;
 
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -27,6 +26,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 public abstract class PinotDataBitSetV2 implements Closeable {
   private static final int BYTE_MASK = 0xFF;
+  static final int MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ = 16; // comes from 2-bit encoding
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
@@ -34,10 +34,40 @@ public abstract class PinotDataBitSetV2 implements Closeable {
   protected PinotDataBuffer _dataBuffer;
   protected int _numBitsPerValue;
 
+  /**
+   * Unpack single dictId at the given docId. This is efficient
+   * because of simplified bitmath.
+   * @param index docId
+   * @return unpacked dictId
+   */
   public abstract int readInt(int index);
 
+  /**
+   * Unpack dictIds for a contiguous range of docIds represented by startIndex
+   * and length. This uses vectorization as much as possible for all the aligned
+   * reads and also takes care of the small byte-sized window of unaligned read.
+   * @param startIndex start docId
+   * @param length length
+   * @param out out array to store the unpacked dictIds
+   */
   public abstract void readInt(int startIndex, int length, int[] out);
 
+  /**
+   * Unpack dictIds for an array of docIds[] which is not necessarily
+   * contiguous. So there could be gaps in the array:
+   * e.g: [1, 3, 7, 9, 11, 12]
+   * The actual read is done by the previous API since that is efficient
+   * as it exploits contiguity and uses vectorization. However, since
+   * the out[] array has to be correctly populated with the unpacked dictId
+   * for each docId, a post-processing step is needed after the bulk contiguous
+   * read to correctly set the unpacked dictId into the out array throwing away
+   * the unnecessary dictIds unpacked as part of contiguous read
+   * @param docIds docIds array
+   * @param docIdsStartIndex starting index in the docIds array
+   * @param length length to read (number of docIds to read in the array)
+   * @param out out array to store the unpacked dictIds
+   * @param outpos starting index in the out array
+   */
   public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
     int startDocId = docIds[docIdsStartIndex];
     int endDocId = docIds[docIdsStartIndex + length - 1];
@@ -45,6 +75,8 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     // do a contiguous bulk read
     readInt(startDocId, endDocId - startDocId + 1, dictIds);
     out[outpos] = dictIds[0];
+    // set the unpacked dictId correctly. this is needed since there could
+    // be gaps and some dictIds may have to be thrown/ignored.
     for (int i = 1; i < length; i++) {
       out[outpos + i] = dictIds[docIds[docIdsStartIndex + i] - startDocId];
     }
@@ -79,19 +111,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       int byteOffset = (int) (bitOffset / Byte.SIZE);
       int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
-      if (bitOffset == 0) {
-        return val >>> 6;
-      }
-      if (bitOffset == 2) {
-        return (val >>> 4) & 3;
-      }
-      if (bitOffset == 4) {
-        return (val >>> 2) & 3;
-      }
-      if (bitOffset == 6) {
-        return val & 3;
-      }
-      throw new IllegalStateException("Unexpected bit offset for 2 bit-encoding for index: " + index);
+      return  (val >>> (6 - bitOffset)) & 3;
     }
 
     @Override
@@ -209,9 +229,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         out[i + 2] = (packed >>> 2) & 3;
         length--;
       }
-
-      // TODO: consider removing this check. For now keep it to strengthen the tests
-      Preconditions.checkState(length == 0);
     }
   }
 
@@ -300,8 +317,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         out[i] = packed >>> 4;
         length--;
       }
-
-      Preconditions.checkState(length == 0);
     }
   }
 
@@ -360,8 +375,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         out[i] = (int)_dataBuffer.getByte(byteOffset) & 0xff;
         length--;
       }
-
-      Preconditions.checkState(length == 0);
     }
   }
 
@@ -407,8 +420,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
         out[i] = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
         length--;
       }
-
-      Preconditions.checkState(length == 0);
     }
   }
 

@@ -56,7 +56,32 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
 
   /**
    * Array based API to read dictionaryIds for an array of docIds
-   * which are monotonically increasing but not necessarily contiguous
+   * which are monotonically increasing but not necessarily contiguous.
+   * The difference between this and previous array based API {@link #readInt(int, int, int[])}
+   * is that unlike the other API, we are provided an array of docIds.
+   * So even though the docIds in docIds[] array are monotonically increasing,
+   * they may not necessarily be contiguous. They can have gaps.
+   *
+   * {@link PinotDataBitSetV2} implements efficient bulk contiguous API
+   * to read dictionaryIds for a contiguous range of docIds represented
+   * by startDocId and length. This API although works wit docIds with gaps,
+   * it still tries to leverage the underlying bulk contiguous API as much
+   * as possible to get benefits of vectorization.
+   *
+   * For a given docIds[] array, we determine if we should use the
+   * bulk contiguous API or not by checking if the length of the array
+   * is >= 50% of actual docIdRange (lastDocId - firstDocId + 1). This
+   * sort of gives a very rough idea of the gaps in docIds.
+   *
+   * It is inaccurate since it is solely dependent on the first and
+   * last docId. However, getting an exact idea of the gaps in docIds[]
+   * array will first require a single pass through the array to compute
+   * the deviations between each docId and then take mean/stddev of that.
+   * This will be expensive as it requires pre-processing.
+   *
+   * To increase the probability of using the bulk contiguous API, we make
+   * this decision for every fixed-size chunk of docIds[] array.
+   *
    * @param docIds array of docIds to read the dictionaryIds for
    * @param docIdStartIndex start index in docIds array
    * @param docIdLength length to process in docIds array
@@ -64,10 +89,28 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
    * @param valuesStartIndex start index in values array
    */
   public void readValues(int[] docIds, int docIdStartIndex, int docIdLength, int[] values, int valuesStartIndex) {
-    int docIdEndIndex = docIdStartIndex + docIdLength - 1;
-    if (shouldBulkRead(docIds, docIdStartIndex, docIdEndIndex)) {
-      _dataBitSet.readInt(docIds, docIdStartIndex, docIdLength, values, valuesStartIndex);
-    } else {
+    int bulkReadChunks = docIdLength / PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
+    int remainingChunk = docIdLength % PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
+    int docIdEndIndex;
+    while (bulkReadChunks > 0) {
+      docIdEndIndex = docIdStartIndex + PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ - 1;
+      if (shouldBulkRead(docIds, docIdStartIndex, docIdEndIndex)) {
+        // use the bulk API
+        _dataBitSet.readInt(docIds, docIdStartIndex, PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ, values, valuesStartIndex);
+        valuesStartIndex += PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
+      } else {
+        // use the single read API
+        for (int i = docIdStartIndex; i <= docIdEndIndex; i++) {
+          values[valuesStartIndex++] = _dataBitSet.readInt(docIds[i]);
+        }
+      }
+      docIdStartIndex += PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
+      bulkReadChunks--;
+      docIdLength -= PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
+    }
+    if (remainingChunk > 0) {
+      // use the single read API
+      docIdEndIndex = docIdStartIndex + docIdLength - 1;
       for (int i = docIdStartIndex; i <= docIdEndIndex; i++) {
         values[valuesStartIndex++] = _dataBitSet.readInt(docIds[i]);
       }
@@ -77,10 +120,7 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
   private boolean shouldBulkRead(int[] docIds, int startIndex, int endIndex) {
     int numDocsToRead = endIndex - startIndex + 1;
     int docIdRange = docIds[endIndex] - docIds[startIndex] + 1;
-    if (docIdRange > DocIdSetPlanNode.MAX_DOC_PER_CALL) {
-      return false;
-    }
-    return numDocsToRead >= ((double)docIdRange * 0.7);
+    return numDocsToRead >= ((double)docIdRange * 0.5);
   }
 
   public void writeInt(int index, int value) {
