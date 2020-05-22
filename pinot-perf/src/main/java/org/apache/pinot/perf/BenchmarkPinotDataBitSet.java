@@ -45,7 +45,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 @Fork(1)
 @State(Scope.Benchmark)
-public class FwdIndexBenchmarkJMH {
+public class BenchmarkPinotDataBitSet {
 
   private static final int CARDINALITY_2_BITS = 3;
   private static final int CARDINALITY_4_BITS = 12;
@@ -302,7 +302,7 @@ public class FwdIndexBenchmarkJMH {
 
   public static void main(String[] args)
       throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder().include(FwdIndexBenchmarkJMH.class.getSimpleName())
+    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkPinotDataBitSet.class.getSimpleName())
         .warmupIterations(1).measurementIterations(1);
     new Runner(opt.build()).run();
   }
