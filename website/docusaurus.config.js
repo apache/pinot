@@ -62,10 +62,10 @@ module.exports = {
             },
             {
               label: 'Architecture',
-              to: 'https://docs.pinot.apache.org/concepts/architecture',
+              to: 'https://docs.pinot.apache.org/basics/architecture',
             },
             {
-              label: 'PluginsArchitecture',
+              label: 'Plugins Architecture',
               to: 'https://docs.pinot.apache.org/plugins/plugin-architecture',
             },
           ],
@@ -100,7 +100,7 @@ module.exports = {
             },
             {
               label: 'User Guide',
-              to: 'https://docs.pinot.apache.org/pinot-user-guide',
+              to: 'https://docs.pinot.apache.org/users',
             },
             {
               label: 'Administration',
