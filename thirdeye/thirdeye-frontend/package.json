@@ -1,9 +1,8 @@
 {
   "name": "thirdeye-frontend",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.0.0",
   "description": "Thirdeye Frontend WebApp",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "",
   "directories": {
     "doc": "doc",
@@ -88,7 +87,7 @@
     "toastr": "^2.1.4"
   },
   "engines": {
-    "node": "10.*"
+    "node": ">=10.*"
   },
   "dependencies": {
     "bower": "^1.8.8",

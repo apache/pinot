@@ -22,16 +22,17 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>${revision}${sha1}</version>
   <packaging>pom</packaging>
   <name>thirdeye</name>
 
   <modules>
-    <module>thirdeye-frontend</module>
     <module>thirdeye-pinot</module>
   </modules>
 
   <properties>
+    <revision>1.0.0</revision>
+    <sha1>-SNAPSHOT</sha1>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <pinot.version>0.1.0</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -84,6 +85,13 @@
     <json.version>20170516</json.version>
   </properties>
 
+  <distributionManagement>
+    <repository>
+      <id>bintray-linkedin-maven</id>
+      <url>https://api.bintray.com/maven/linkedin/maven/thirdeye/;publish=1</url>
+    </repository>
+  </distributionManagement>
+  
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
