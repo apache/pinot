@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -58,6 +59,7 @@ public class PeerServerSegmentFetcherTest {
   private static final String INSTANCE_ID1 = "Server_localhost_1000";
   private static final String INSTANCE_ID2 = "Server_localhost_1001";
   private static int downloadCount = 0;
+  private PeerServerSegmentFetcher _peerServerSegmentFetcher;
 
   @BeforeClass
   public void initSegmentFetcherFactoryWithPeerServerSegmentFetcher()
@@ -94,17 +96,16 @@ public class PeerServerSegmentFetcherTest {
       when(helixAdmin.getInstanceConfig(any(String.class), eq(INSTANCE_ID2))).thenReturn(instanceConfig2);
     }
 
-    SegmentFetcherFactory.init(config, helixManager, CLUSTER_NAME);
-
-    assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTP_PROTOCOL).getClass(), HttpSegmentFetcher.class);
-    assertEquals(SegmentFetcherFactory.getSegmentFetcher(HTTPS_PROTOCOL).getClass(), HttpsSegmentFetcher.class);
-    assertEquals(SegmentFetcherFactory.getSegmentFetcher(PEER_2_PEER_PROTOCOL).getClass(), PeerServerSegmentFetcher.class);
+    FakeHttpSegmentFetcher httpSegmentFetcher = new FakeHttpSegmentFetcher();
+    httpSegmentFetcher.init(new PropertiesConfiguration());
+    _peerServerSegmentFetcher = new PeerServerSegmentFetcher(httpSegmentFetcher, "http", helixManager, CLUSTER_NAME);
+    _peerServerSegmentFetcher.init(new PropertiesConfiguration());
   }
 
   @Test
   public void testPeerServerSegmentDownloadSuccess()
       throws Exception {
-    SegmentFetcherFactory.fetchSegmentToLocal(new URI(StringUtil.join("/","server://", SEGMENT_1)),
+    _peerServerSegmentFetcher.fetchSegmentToLocal(new URI(StringUtil.join("/","peer://", SEGMENT_1)),
         new File(System.getProperty("java.io.tmpdir"), "tmp-" + SEGMENT_1 + "." + System.currentTimeMillis()));
     assertEquals(downloadCount, 1);
   }
@@ -113,7 +114,7 @@ public class PeerServerSegmentFetcherTest {
   public void testPeerServerSegmentDownloadFailure()
       throws Exception {
     try {
-      SegmentFetcherFactory.fetchSegmentToLocal(new URI(StringUtil.join("/", "server://", SEGMENT_2)),
+      _peerServerSegmentFetcher.fetchSegmentToLocal(new URI(StringUtil.join("/", "peer://", SEGMENT_2)),
           new File(System.getProperty("java.io.tmpdir"), "tmp-" + SEGMENT_2 + "." + System.currentTimeMillis()));
       fail("The segement download from peer servers should fail.");
     } catch (Exception e) {
@@ -121,7 +122,7 @@ public class PeerServerSegmentFetcherTest {
     }
   }
 
-  public static class FakeHttpSegmentFetcher extends HttpSegmentFetcher {
+  public class FakeHttpSegmentFetcher extends HttpSegmentFetcher {
     @Override
     public void fetchSegmentToLocal(URI uri, File dest)
         throws Exception {

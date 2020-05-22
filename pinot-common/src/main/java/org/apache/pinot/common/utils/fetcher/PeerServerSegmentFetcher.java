@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
@@ -34,42 +35,46 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
  * This segment fetcher downloads the segment by first discovering the server having the segment through external view
  * of a Pinot table and then downloading the segment from the peer server using a configured http or https fetcher. By
  * default, HttpSegmentFetcher is used.
  * The format fo expected segment address uri is
- *    server:///segment_name
+ *    peer:///segment_name
  * Note the host component is empty.
- * To use this segment fetcher, servers need to put "server" in their segment fetcher protocol.
  */
 public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PeerServerSegmentFetcher.class);
-  private static final String PEER_2_PEER_PROTOCOL = "server";
-  private static final String DOWNLOADER_CLASS = ".downloader.class";
+  private static final String PEER_2_PEER_PROTOCOL = "peer";
+  private static final String PEER_SEGMENT_DOWNLOAD_SCHEME = "peerSegmentDownloadScheme";
   private HelixManager _helixManager;
   private String _helixClusterName;
   private HttpSegmentFetcher _httpSegmentFetcher;
+  // The value is either https or http
+  private final String _httpScheme;
 
   public PeerServerSegmentFetcher(Configuration config, HelixManager helixManager, String helixClusterName) {
     _helixManager = helixManager;
     _helixClusterName = helixClusterName;
-    String segmentDownloaderClass = config.getString(PEER_2_PEER_PROTOCOL + DOWNLOADER_CLASS);
-    try {
-      _httpSegmentFetcher = PluginManager.get().createInstance(segmentDownloaderClass);
-    } catch (Exception e) {
-      LOGGER.warn(
-          "Error during initializing segment downloader for peer2peer segment fetcher: {}. Fall back to use default HttpSegmentFetcher.",
-          segmentDownloaderClass, e);
-      _httpSegmentFetcher = new HttpSegmentFetcher();
+    switch (config.getString(PEER_SEGMENT_DOWNLOAD_SCHEME)) {
+      case "https":
+        _httpSegmentFetcher = new HttpsSegmentFetcher();
+        _httpScheme = "https";
+        break;
+      default:
+        _httpSegmentFetcher = new HttpSegmentFetcher();
+        _httpScheme = "http";
     }
     _httpSegmentFetcher.init(config);
+  }
+
+  public PeerServerSegmentFetcher(HttpSegmentFetcher httpSegmentFetcher, String httpScheme, HelixManager helixManager,
+      String helixClusterName) {
+    _helixManager = helixManager;
+    _helixClusterName = helixClusterName;
+    _httpSegmentFetcher = httpSegmentFetcher;
+    _httpScheme = httpScheme;
   }
 
   @Override
@@ -94,7 +99,7 @@ public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
   }
 
   // Return the address of an ONLINE server hosting a segment. The returned address is of format
-  //  http://hostname:port/segments/tablenameWithType/segmentName
+  //  http(s)://hostname:port/segments/tablenameWithType/segmentName
   private String getPeerServerURI(String segmentName) {
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     String tableNameWithType =
@@ -142,7 +147,8 @@ public class PeerServerSegmentFetcher extends BaseSegmentFetcher {
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
       }
 
-      return StringUtil.join("/", "http://" + hostName + ":" + port, "segments", tableNameWithType, segmentName);
+      return StringUtil
+          .join("/", _httpScheme + "://" + hostName + ":" + port, "segments", tableNameWithType, segmentName);
     }
     return null;
   }
