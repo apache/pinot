@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection;
+package org.apache.pinot.thirdeye.detection.dataquality;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,14 +26,20 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
+import org.apache.pinot.thirdeye.detection.TaskUtils;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DetectionDataSLAJob implements Job {
-  private static final Logger LOG = LoggerFactory.getLogger(DetectionDataSLAJob.class);
+/**
+ * The data quality job submitted to the scheduler. This job creates data quality tasks which
+ * the runners will later pick and execute.
+ */
+public class DataQualityPipelineJob implements Job {
+  private static final Logger LOG = LoggerFactory.getLogger(DataQualityPipelineJob.class);
 
   private final TaskManager taskDAO = DAORegistry.getInstance().getTaskDAO();
 
@@ -45,10 +51,10 @@ public class DetectionDataSLAJob implements Job {
     DetectionPipelineTaskInfo taskInfo = TaskUtils.buildTaskInfo(jobExecutionContext);
 
     // if a task is pending and not time out yet, don't schedule more
-    String jobName = String.format("%s_%d", TaskConstants.TaskType.DATA_SLA, taskInfo.configId);
+    String jobName = String.format("%s_%d", TaskConstants.TaskType.DATA_QUALITY, taskInfo.getConfigId());
     if (TaskUtils.checkTaskAlreadyRun(jobName, taskInfo, DATA_AVAILABILITY_TASK_TIMEOUT)) {
       LOG.info("Skip scheduling {} task for {} with start time {}. Task is already in the queue.",
-          TaskConstants.TaskType.DATA_SLA, jobName, taskInfo.getStart());
+          TaskConstants.TaskType.DATA_QUALITY, jobName, taskInfo.getStart());
       return;
     }
 
@@ -59,9 +65,9 @@ public class DetectionDataSLAJob implements Job {
       LOG.error("Exception when converting DetectionPipelineTaskInfo {} to jsonString", taskInfo, e);
     }
 
-    TaskDTO taskDTO = TaskUtils.buildTask(taskInfo.configId, taskInfoJson, TaskConstants.TaskType.DATA_SLA);
+    TaskDTO taskDTO = TaskUtils.buildTask(taskInfo.getConfigId(), taskInfoJson, TaskConstants.TaskType.DATA_QUALITY);
     long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created {} task {} with taskId {}", TaskConstants.TaskType.DATA_SLA, taskDTO, taskId);
+    LOG.info("Created {} task {} with taskId {}", TaskConstants.TaskType.DATA_QUALITY, taskDTO, taskId);
   }
 }
 

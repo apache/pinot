@@ -19,17 +19,14 @@
 
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
-import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
@@ -39,7 +36,7 @@ import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
 /**
  * A data holder to store the processed information per metric
  */
-class DetectionMetricAttributeHolder {
+public class DetectionMetricAttributeHolder {
 
   private static final String PROP_METRIC = "metric";
   private static final String PROP_DATASET = "dataset";
@@ -47,6 +44,8 @@ class DetectionMetricAttributeHolder {
 
   private final Map<String, DetectionMetricProperties> metricAttributesMap = new HashMap<>();
   private final DataProvider dataProvider;
+  private final List<DatasetConfigDTO> datasetConfigs = new ArrayList<>();
+  private final Map<String, Object> components = new HashMap<>();
 
   DetectionMetricAttributeHolder(DataProvider provider) {
     this.dataProvider = provider;
@@ -62,6 +61,7 @@ class DetectionMetricAttributeHolder {
     }
 
     DatasetConfigDTO datasetConfig = fetchDatasetConfigDTO(this.dataProvider, datasetName);
+    datasetConfigs.add(datasetConfig);
 
     MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(metricName, datasetConfig.getDataset());
 
@@ -72,15 +72,19 @@ class DetectionMetricAttributeHolder {
     return metricAliasKey;
   }
 
-  DatasetConfigDTO fetchDataset(Map<String, Object> metricAlertConfigMap) {
+  public List<DatasetConfigDTO> getAllDatasets() {
+    return datasetConfigs;
+  }
+
+  public DatasetConfigDTO fetchDataset(Map<String, Object> metricAlertConfigMap) {
     return metricAttributesMap.get(loadMetricCache(metricAlertConfigMap)).getDatasetConfigDTO();
   }
 
-  MetricConfigDTO fetchMetric(Map<String, Object> metricAlertConfigMap) {
+  public MetricConfigDTO fetchMetric(Map<String, Object> metricAlertConfigMap) {
     return metricAttributesMap.get(loadMetricCache(metricAlertConfigMap)).getMetricConfigDTO();
   }
 
-  String fetchCron(Map<String, Object> metricAlertConfigMap) {
+  public String fetchCron(Map<String, Object> metricAlertConfigMap) {
     return metricAttributesMap.get(loadMetricCache(metricAlertConfigMap)).getCron();
   }
 
@@ -101,4 +105,13 @@ class DetectionMetricAttributeHolder {
         return "0 0 0 * * ?";
     }
   }
+
+  public void addComponent(String componentKey, Map<String, Object> componentSpecs) {
+    components.put(componentKey, componentSpecs);
+  }
+
+  public Map<String, Object> getAllComponenets() {
+    return components;
+  }
+
 }

@@ -16,26 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.thirdeye.anomaly;
 
-/**
- * The type of anomaly.
- */
-public enum AnomalyType {
-  // Metric deviates from normal behavior. This is the default type.
-  DEVIATION ("Deviation"),
-  // There is a trend change for underline metric.
-  TREND_CHANGE ("Trend Change"),
-  // The metric is not available within specified time.
-  DATA_SLA ("SLA Violation");
+package org.apache.pinot.thirdeye.detection.dataquality.spec;
 
-  private String label;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 
-  AnomalyType(String label) {
-    this.label = label;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class DataSlaQualityCheckerSpec extends AbstractSpec {
+  private String sla = "3_DAYS";
+
+  public String getSla() {
+    return sla;
   }
 
-  public String getLabel() {
-    return label;
+  public void setSla(String sla) {
+    this.sla = sla;
   }
 }

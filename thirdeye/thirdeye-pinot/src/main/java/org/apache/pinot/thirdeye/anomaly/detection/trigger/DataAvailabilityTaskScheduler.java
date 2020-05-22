@@ -122,9 +122,10 @@ public class DataAvailabilityTaskScheduler implements Runnable {
             long endtime = System.currentTimeMillis();
             createDetectionTask(detectionConfig, endtime);
 
-            if (DetectionUtils.isDataAvailabilityCheckEnabled(detectionConfig)) {
-              createDataSLACheckTask(detectionConfig, endtime);
-              LOG.info("Scheduling a task for data availability {} due to the fallback mechanism.", detectionConfigId);
+            if (DetectionUtils.isDataQualityCheckEnabled(detectionConfig)) {
+              createDataQualityTask(detectionConfig, endtime);
+              LOG.info("Scheduling a task for data sla check on detection config {} due to the fallback mechanism.",
+                  detectionConfigId);
             }
 
             detectionIdToLastTaskEndTimeMap.put(detectionConfig.getId(), endtime);
@@ -213,8 +214,8 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     return createTask(TaskConstants.TaskType.DETECTION, detectionConfig, end);
   }
 
-  private long createDataSLACheckTask(DetectionConfigDTO detectionConfig, long end) throws JsonProcessingException {
-    return createTask(TaskConstants.TaskType.DATA_SLA, detectionConfig, end);
+  private long createDataQualityTask(DetectionConfigDTO detectionConfig, long end) throws JsonProcessingException {
+    return createTask(TaskConstants.TaskType.DATA_QUALITY, detectionConfig, end);
   }
 
   private void loadLatestTaskCreateTime(DetectionConfigDTO detectionConfig) throws Exception {

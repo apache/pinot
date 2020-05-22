@@ -23,7 +23,9 @@
 package org.apache.pinot.thirdeye.scheduler;
 
 import java.util.Set;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
+import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.SchedulerException;
 
@@ -40,7 +42,7 @@ public interface ThirdEyeCronScheduler extends Runnable {
   void shutdown() throws SchedulerException;
 
   // Trigger the scheduler to start creating jobs.
-  void startJob(AbstractBean config, JobKey key) throws SchedulerException;
+  void startJob(AbstractBean config, JobDetail key) throws SchedulerException;
 
   // Stop the scheduler from scheduling more jobs.
   void stopJob(JobKey key) throws SchedulerException;
@@ -49,5 +51,5 @@ public interface ThirdEyeCronScheduler extends Runnable {
   Set<JobKey> getScheduledJobs() throws SchedulerException;
 
   // Get the key for the scheduling job
-  String getJobKey(Long id);
+  String getJobKey(Long id, TaskConstants.TaskType taskType);
 }

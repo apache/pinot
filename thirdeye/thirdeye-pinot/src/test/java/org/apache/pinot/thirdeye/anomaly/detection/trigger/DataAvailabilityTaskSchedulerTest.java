@@ -241,7 +241,7 @@ public class DataAvailabilityTaskSchedulerTest {
     Map<String, Object> metricSla = new HashMap<>();
     Map<String, Object> props = new HashMap<>();
     props.put("testMetricUrn", metricSla);
-    detection.setDataSLAProperties(props);
+    detection.setDataQualityProperties(props);
     long detection1 = detectionConfigDAO.save(detection);
     long halfHourAgo = TEST_TIME - TimeUnit.MINUTES.toMillis(30);
     createDataset(1, TEST_TIME, halfHourAgo);
@@ -258,7 +258,7 @@ public class DataAvailabilityTaskSchedulerTest {
     jobNames.add(waitingTasks.get(0).getJobName());
     jobNames.add(waitingTasks.get(1).getJobName());
     Assert.assertTrue(jobNames.contains(TaskConstants.TaskType.DETECTION.toString() + "_" + detection1));
-    Assert.assertTrue(jobNames.contains(TaskConstants.TaskType.DATA_SLA.toString() + "_" + detection1));
+    Assert.assertTrue(jobNames.contains(TaskConstants.TaskType.DATA_QUALITY.toString() + "_" + detection1));
   }
 
   @Test

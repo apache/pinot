@@ -78,12 +78,12 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
             @Override
-            public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
-              return mergedAnomalyResultDTO != null
-                  && !mergedAnomalyResultDTO.isChild()
-                  && !AlertUtils.hasFeedback(mergedAnomalyResultDTO)
-                  && mergedAnomalyResultDTO.getCreatedTime() > finalStartTime
-                  && mergedAnomalyResultDTO.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
+            public boolean apply(@Nullable MergedAnomalyResultDTO anomaly) {
+              return anomaly != null && !anomaly.isChild()
+                  && !AlertUtils.hasFeedback(anomaly)
+                  && anomaly.getCreatedTime() > finalStartTime
+                  && (anomaly.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION) ||
+                  anomaly.getAnomalyResultSource().equals(AnomalyResultSource.DATA_QUALITY_DETECTION));
             }
           });
 

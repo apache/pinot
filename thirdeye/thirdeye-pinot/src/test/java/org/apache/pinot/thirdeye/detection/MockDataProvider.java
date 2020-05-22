@@ -32,6 +32,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
@@ -215,6 +216,18 @@ public class MockDataProvider implements DataProvider {
   @Override
   public DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) throws Exception {
     return this.loader.from(this, config, start, end);
+  }
+
+  @Override
+  public List<DatasetConfigDTO> fetchDatasetByDisplayName(String datasetDisplayName) {
+    List<DatasetConfigDTO> datasetConfigDTOs = new ArrayList<>();
+    for (DatasetConfigDTO datasetConfigDTO : getDatasets()) {
+      if (datasetConfigDTO.getDisplayName().equals(datasetDisplayName)) {
+        datasetConfigDTOs.add(datasetConfigDTO);
+      }
+    }
+
+    return datasetConfigDTOs;
   }
 
   public Map<MetricSlice, DataFrame> getTimeseries() {

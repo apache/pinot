@@ -166,10 +166,13 @@ public class DetectionUtils {
    * @return anomaly template
    */
   public static MergedAnomalyResultDTO makeAnomaly(MetricSlice slice) {
-    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
-    anomaly.setStartTime(slice.getStart());
-    anomaly.setEndTime(slice.getEnd());
+    return makeAnomaly(slice.getStart(), slice.getEnd());
+  }
 
+  public static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
+    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
+    anomaly.setStartTime(start);
+    anomaly.setEndTime(end);
     return anomaly;
   }
 
@@ -344,11 +347,11 @@ public class DetectionUtils {
   }
 
   /**
-   * Verify if this detection has data availability checks enabled
+   * Verify if this detection has data quality checks enabled
    */
-  public static boolean isDataAvailabilityCheckEnabled(DetectionConfigDTO detectionConfig) {
-    return detectionConfig.getDataSLAProperties() != null
-        && !detectionConfig.getDataSLAProperties().isEmpty();
+  public static boolean isDataQualityCheckEnabled(DetectionConfigDTO detectionConfig) {
+    return detectionConfig.getDataQualityProperties() != null
+        && !detectionConfig.getDataQualityProperties().isEmpty();
   }
 
   public static long makeTimeout(long deadline) {

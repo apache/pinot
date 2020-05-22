@@ -46,7 +46,7 @@ public class TaskInfoFactory {
     TaskInfo taskInfo = null;
     try {
       switch(taskType) {
-        case DATA_SLA:
+        case DATA_QUALITY:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionPipelineTaskInfo.class);
           break;
         case DETECTION:

@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.constant;
 
 public enum AnomalyResultSource {
   DEFAULT_ANOMALY_DETECTION,
+  DATA_QUALITY_DETECTION,
   ANOMALY_REPLAY,
   USER_LABELED_ANOMALY
 }

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -59,8 +60,9 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
     Collection<MergedAnomalyResultDTO> anomalies =
         this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice);
 
-    return anomalies.stream()
-        .filter(anomaly -> !anomaly.isChild() && ThirdEyeUtils.isDetectedByMultipleComponents(anomaly))
+    return anomalies.stream().filter(anomaly -> !anomaly.isChild()
+        && anomaly.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION)
+        && ThirdEyeUtils.isDetectedByMultipleComponents(anomaly))
         .collect(Collectors.toList());
   }
 

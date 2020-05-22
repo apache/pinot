@@ -8,8 +8,8 @@ ThirdEye has detected [*2 anomalies*|test/app/#/anomalies?anomalyIds=4,5] on the
 *Description:*
 
 ||Start||Duration||Type||Dimensions||Current||Predicted||Change||
-|[Jan 01, 10:05 PDT|test/app/#/rootcause?anomalyId=4]|24 hours   |Deviation   |key:value\\|_0_|_0_      |_+100.00 %_|
-|[Jan 01, 10:05 PDT|test/app/#/rootcause?anomalyId=5]|12.75 hours|Data Missing|-|_0_|_2_HOURS_|_+12 hours & 45mins_|
+|[Jan 01, 10:05 PDT|test/app/#/rootcause?anomalyId=4]|24 hours   |Deviation    |key:value\\|_0_|_0_      |_+100.00 %_|
+|[Jan 01, 10:05 PDT|test/app/#/rootcause?anomalyId=5]|12.75 hours|SLA Violation|-|_0_|_2_HOURS_|_+12 hours & 45mins_|
 
 =======================================================================================
 
