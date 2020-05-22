@@ -63,17 +63,25 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
    * they may not necessarily be contiguous. They can have gaps.
    *
    * {@link PinotDataBitSetV2} implements efficient bulk contiguous API
+   * {@link PinotDataBitSetV2#readInt(int, int, int[])}
    * to read dictionaryIds for a contiguous range of docIds represented
-   * by startDocId and length. This API although works wit docIds with gaps,
-   * it still tries to leverage the underlying bulk contiguous API as much
-   * as possible to get benefits of vectorization.
+   * by startDocId and length.
+   *
+   * This API although works on docIds with gaps, it still tries to
+   * leverage the underlying bulk contiguous API as much as possible to
+   * get benefits of vectorization.
    *
    * For a given docIds[] array, we determine if we should use the
    * bulk contiguous API or not by checking if the length of the array
    * is >= 50% of actual docIdRange (lastDocId - firstDocId + 1). This
-   * sort of gives a very rough idea of the gaps in docIds.
+   * sort of gives a very rough idea of the gaps in docIds. We will benefit
+   * from bulk contiguous read if the gaps are narrow implying fewer dictIds
+   * unpacked as part of contiguous read will have to be thrown away/ignored.
+   * If the gaps are wide, a higher number of dictIds will be thrown away
+   * before we construct the out array
    *
-   * It is inaccurate since it is solely dependent on the first and
+   * This method of determining if bulk contiguous should be used or not
+   * is inaccurate since it is solely dependent on the first and
    * last docId. However, getting an exact idea of the gaps in docIds[]
    * array will first require a single pass through the array to compute
    * the deviations between each docId and then take mean/stddev of that.
@@ -95,7 +103,8 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
     while (bulkReadChunks > 0) {
       docIdEndIndex = docIdStartIndex + PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ - 1;
       if (shouldBulkRead(docIds, docIdStartIndex, docIdEndIndex)) {
-        // use the bulk API
+        // use the bulk API. it takes care of populating the values array correctly
+        // by throwing away the extra dictIds
         _dataBitSet.readInt(docIds, docIdStartIndex, PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ, values, valuesStartIndex);
         valuesStartIndex += PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
       } else {
