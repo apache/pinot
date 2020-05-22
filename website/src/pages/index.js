@@ -240,7 +240,7 @@ function Installation() {
             <Jump to="https://docs.pinot.apache.org/getting-started/kubernetes-quickstart">Helm</Jump>
           </div>
           <div className="col">
-            <Jump to="https://docs.pinot.apache.org/getting-started/quickstart">Cloud</Jump>
+            <Jump to="https://docs.pinot.apache.org/basics/getting-started/public-cloud-examples">Cloud</Jump>
           </div>
           <div className="col">
             <Jump to="https://docs.pinot.apache.org/getting-started/running-pinot-locally">Manual/Local</Jump>
