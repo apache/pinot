@@ -1520,7 +1520,54 @@ public class CalciteSqlCompilerTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Function greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
     String today = greaterThan.getOperands().get(1).getLiteral().getStringValue();
-    String expectedTodayStr = Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    String expectedTodayStr =
+        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
     Assert.assertEquals(today, expectedTodayStr);
+  }
+
+  @Test
+  public void testCompileTimeExpression()
+      throws SqlParseException {
+    // True
+    long lowerBound = System.currentTimeMillis();
+    Expression expression = CalciteSqlParser.compileToExpression("now()");
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertTrue(expression.getLiteral() != null);
+    long nowTs = expression.getLiteral().getLongValue();
+    long upperBound = System.currentTimeMillis();
+    Assert.assertTrue(nowTs >= lowerBound);
+    Assert.assertTrue(nowTs <= upperBound);
+    expression = CalciteSqlParser.compileToExpression("toDateTime(now(), 'yyyy-MM-dd z')");
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertTrue(expression.getLiteral() != null);
+    String today = expression.getLiteral().getStringValue();
+    String expectedTodayStr =
+        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    Assert.assertEquals(today, expectedTodayStr);
+    expression = CalciteSqlParser.compileToExpression("toDateTime(playerName)");
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    Assert.assertEquals(expression.getFunctionCall().getOperator(), "toDateTime");
+    Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "playerName");
+    expression = CalciteSqlParser.compileToExpression("reverse(playerName)");
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    Assert.assertEquals(expression.getFunctionCall().getOperator(), "reverse");
+    Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "playerName");
+    expression = CalciteSqlParser.compileToExpression("reverse('playerName')");
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertTrue(expression.getLiteral() != null);
+    Assert.assertEquals(expression.getLiteral().getFieldValue(), "emaNreyalp");
+    expression = CalciteSqlParser.compileToExpression("count(*)");
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertTrue(expression.getFunctionCall() != null);
+    Assert.assertEquals(expression.getFunctionCall().getOperator(), "COUNT");
+    Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "*");
   }
 }

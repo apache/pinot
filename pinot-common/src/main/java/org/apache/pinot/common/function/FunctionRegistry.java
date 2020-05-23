@@ -88,6 +88,8 @@ public class FunctionRegistry {
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("now"));
 
       FunctionRegistry.registerFunction(JsonFunctions.class.getDeclaredMethod("toJsonMapStr", Map.class));
+
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("reverse", String.class));
     } catch (NoSuchMethodException e) {
       LOGGER.error("Caught exception when registering function", e);
       throw new IllegalStateException(e);
