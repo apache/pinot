@@ -212,20 +212,32 @@ function Installation() {
 
         <Tabs
           className="mini"
-          defaultValue="humans"
+          defaultValue="helm"
           values={[
-            { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
-            { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
+            { label: <><i className="feather icon-download-cloud"></i> Using Helm</>, value: 'helm', },
+            { label: <><i className="feather icon-download"></i> Using Binary</>, value: 'binary', },
+            { label: <><i className="feather icon-github"></i> Build From Source</>, value: 'github', },
           ]
         }>
-          <TabItem value="humans">
+          <TabItem value="helm">
             <CodeBlock className="language-bash">
-              wget https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-bin.tar.gz
+              {
+                `helm repo add pinot https://raw.githubusercontent.com/apache/incubator-pinot/master/kubernetes/helm\nkubectl create ns pinot\nhelm install pinot pinot/pinot -n pinot --set cluster.name=pinot`
+              }
             </CodeBlock>
           </TabItem>
-          <TabItem value="machines">
+          <TabItem value="binary">
             <CodeBlock className="language-bash">
-            wget https://www.apache.org/dyn/closer.lua/incubator/pinot/apache-pinot-incubating-0.3.0/apache-pinot-incubating-0.3.0-src.tar.gz -y
+              {
+                `VERSION=0.3.0\nwget https://downloads.apache.org/incubator/pinot/apache-pinot-incubating-$VERSION/apache-pinot-incubating-$VERSION-bin.tar.gz\ntar vxf apache-pinot-incubating-*-bin.tar.gz\ncd apache-pinot-incubating-*-bin\nbin/quick-start-batch.sh`
+              }
+            </CodeBlock>
+          </TabItem>
+          <TabItem value="github">
+            <CodeBlock className="language-bash">
+              {
+                `# Clone a repo\ngit clone https://github.com/apache/incubator-pinot.git\ncd incubator-pinot\n\n# Build Pinot\nmvn clean install -DskipTests -Pbin-dist\n\n# Run the Quick Demo\ncd pinot-distribution/target/apache-pinot-incubating-*-SNAPSHOT-bin/apache-pinot-incubating-*-SNAPSHOT-bin\nbin/quick-start-batch.sh`
+              }
             </CodeBlock>
           </TabItem>
         </Tabs>
