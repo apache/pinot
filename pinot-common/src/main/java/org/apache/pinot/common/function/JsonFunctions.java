@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Map;

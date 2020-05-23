@@ -45,6 +45,9 @@ import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionInvoker;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -66,7 +69,7 @@ public class CalciteSqlParser {
    * or not they quoted; after which, identifiers are matched
    * case-insensitively. Double quotes allow identifiers to contain
    * non-alphanumeric characters. */
-  private static Lex PINOT_LEX = Lex.MYSQL_ANSI;
+  private static final Lex PINOT_LEX = Lex.MYSQL_ANSI;
 
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
   // provide more hints for query processing.
@@ -593,29 +596,77 @@ public class CalciteSqlParser {
           // Move on to process default logic.
         }
       default:
-        SqlBasicCall funcSqlNode = (SqlBasicCall) node;
-        String funcName = funcSqlNode.getOperator().getKind().name();
-        if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
-          funcName = funcSqlNode.getOperator().getName();
-        }
-        if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null)
-            && funcSqlNode.getFunctionQuantifier().toValue()
-            .equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
-          funcName = AggregationFunctionType.DISTINCTCOUNT.getName();
-        }
-        final Expression funcExpr = RequestUtils.getFunctionExpression(funcName);
-        for (SqlNode child : funcSqlNode.getOperands()) {
-          if (child instanceof SqlNodeList) {
-            final Iterator<SqlNode> iterator = ((SqlNodeList) child).iterator();
-            while (iterator.hasNext()) {
-              final SqlNode next = iterator.next();
-              funcExpr.getFunctionCall().addToOperands(toExpression(next));
-            }
-          } else {
-            funcExpr.getFunctionCall().addToOperands(toExpression(child));
-          }
-        }
-        return funcExpr;
+        return evaluateFunctionExpression((SqlBasicCall) node);
     }
+  }
+
+  private static String extractFunctionName(SqlBasicCall funcSqlNode) {
+    String funcName = funcSqlNode.getOperator().getKind().name();
+    if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
+      funcName = funcSqlNode.getOperator().getName();
+    }
+    if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null)
+        && funcSqlNode.getFunctionQuantifier().toValue()
+        .equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+      funcName = AggregationFunctionType.DISTINCTCOUNT.getName();
+    }
+    return funcName;
+  }
+
+  private static Expression evaluateFunctionExpression(SqlBasicCall funcSqlNode) {
+    String funcName = extractFunctionName(funcSqlNode);
+    Expression funcExpr = RequestUtils.getFunctionExpression(funcName);
+    if (FunctionRegistry.containsFunctionByName(funcName) && isCompileTimeEvaluationPossible(funcExpr)) {
+      int functionOperandsLength = funcSqlNode.getOperands().length;
+      FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(funcName);
+      Object[] arguments = new Object[functionOperandsLength];
+      for (int i = 0; i < functionOperandsLength; i++) {
+        if (funcSqlNode.getOperands()[i] instanceof SqlLiteral) {
+          arguments[i] = ((SqlLiteral) funcSqlNode.getOperands()[i]).toValue();
+        } else {
+          // Evaluate function call (SqlBasicCall) recursively.
+          arguments[i] = evaluateFunctionExpression((SqlBasicCall) funcSqlNode.getOperands()[i]).getLiteral().getFieldValue();
+        }
+      }
+      try {
+        FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+        Object result = invoker.process(arguments);
+        return RequestUtils.getLiteralExpression(result);
+      } catch (Exception e) {
+        throw new SqlCompilationException(new IllegalArgumentException("Unsupported function - " + funcName, e));
+      }
+    }
+    for (SqlNode child : funcSqlNode.getOperands()) {
+      if (child instanceof SqlNodeList) {
+        final Iterator<SqlNode> iterator = ((SqlNodeList) child).iterator();
+        while (iterator.hasNext()) {
+          final SqlNode next = iterator.next();
+          funcExpr.getFunctionCall().addToOperands(toExpression(next));
+        }
+      } else {
+        funcExpr.getFunctionCall().addToOperands(toExpression(child));
+      }
+    }
+    return funcExpr;
+  }
+  /**
+   * Utility method to check if the function can be evaluated during the query compilation phae
+   * @param funcExpr
+   * @return true if all arguments are literals
+   */
+  private static boolean isCompileTimeEvaluationPossible(Expression funcExpr) {
+    Function functionCall = funcExpr.getFunctionCall();
+    if (functionCall.getOperandsSize() > 0) {
+      for (Expression expression : functionCall.getOperands()) {
+        if (expression.getType() == ExpressionType.FUNCTION) {
+          if (!isCompileTimeEvaluationPossible(expression)){
+            return false;
+          }
+        } else if (expression.getType() != ExpressionType.LITERAL) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 }

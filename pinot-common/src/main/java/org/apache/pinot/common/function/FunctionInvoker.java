@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.function;
+package org.apache.pinot.common.function;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -49,11 +50,14 @@ public class FunctionInvoker {
       throws Exception {
     _functionInfo = functionInfo;
     _method = functionInfo.getMethod();
+    _method.setAccessible(true);
     Class<?> clazz = functionInfo.getClazz();
     if (Modifier.isStatic(_method.getModifiers())) {
       _instance = null;
     } else {
-      _instance = clazz.newInstance();
+      Constructor<?> constructor = clazz.getDeclaredConstructor();
+      constructor.setAccessible(true);
+      _instance = constructor.newInstance();
     }
   }
 
