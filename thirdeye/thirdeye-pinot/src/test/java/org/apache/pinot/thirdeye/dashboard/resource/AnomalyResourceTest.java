@@ -104,7 +104,7 @@ public class AnomalyResourceTest {
 
   @Test
   public void testDeleteAnomalyFunctions() {
-    AnomalyResource anomalyResource = new AnomalyResource(null, null, null);
+    AnomalyResource anomalyResource = new AnomalyResource(null, null);
     anomalyResource.deleteAnomalyFunctions(func2 + "," + func3 + ", 9999");
 
     // Anomaly functions and the associated anomalies are cleaned up correctly
@@ -123,13 +123,13 @@ public class AnomalyResourceTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDeleteAnomalyFunctionsNullArguments() {
-    AnomalyResource anomalyResource = new AnomalyResource(null, null, null);
+    AnomalyResource anomalyResource = new AnomalyResource(null, null);
     anomalyResource.deleteAnomalyFunctions(null);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDeleteAnomalyFunctionsEmptyArguments() {
-    AnomalyResource anomalyResource = new AnomalyResource(null, null, null);
+    AnomalyResource anomalyResource = new AnomalyResource(null, null);
     anomalyResource.deleteAnomalyFunctions("");
   }
 }

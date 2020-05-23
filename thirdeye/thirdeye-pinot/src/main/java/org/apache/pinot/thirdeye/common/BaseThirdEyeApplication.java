@@ -20,18 +20,15 @@
 package org.apache.pinot.thirdeye.common;
 
 import com.fasterxml.jackson.databind.Module;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameSerializer;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
-import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
@@ -55,7 +52,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected MergedAnomalyResultManager mergedAnomalyResultDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
-  protected AutotuneConfigManager functionAutotuneConfigDAO;
 
   protected DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -68,7 +64,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     mergedAnomalyResultDAO = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     datasetConfigDAO = DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);
     metricConfigDAO = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
-    functionAutotuneConfigDAO = DaoProviderUtil.getInstance(AutotuneConfigManagerImpl.class);
   }
 
   /**

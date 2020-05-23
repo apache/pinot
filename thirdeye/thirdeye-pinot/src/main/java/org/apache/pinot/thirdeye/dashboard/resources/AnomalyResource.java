@@ -24,7 +24,6 @@ import com.google.common.cache.LoadingCache;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
-import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import org.apache.pinot.thirdeye.api.Constants;
@@ -35,7 +34,6 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
@@ -101,7 +99,6 @@ public class AnomalyResource {
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private AlertConfigManager emailConfigurationDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private AutotuneConfigManager autotuneConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
@@ -109,13 +106,11 @@ public class AnomalyResource {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory,
-      AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
+  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;

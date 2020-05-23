@@ -261,13 +261,4 @@ public class DataCompletenessUtils {
     return bucketNameToCountStar;
   }
 
-  public static double getPercentCompleteness(PercentCompletenessFunctionInput input) {
-    String algorithmClass = input.getAlgorithmClass();
-    List<Long> baselineCounts = input.getBaselineCounts();
-    Long currentCount = input.getCurrentCount();
-
-    DataCompletenessAlgorithm dataCompletenessAlgorithm =
-        DataCompletenessAlgorithmFactory.getDataCompletenessAlgorithmFromClass(algorithmClass);
-    return dataCompletenessAlgorithm.getPercentCompleteness(baselineCounts, currentCount);
-  }
 }

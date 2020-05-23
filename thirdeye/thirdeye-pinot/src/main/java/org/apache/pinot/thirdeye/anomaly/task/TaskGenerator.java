@@ -18,19 +18,10 @@
  */
 
 package org.apache.pinot.thirdeye.anomaly.task;
-
-import org.apache.pinot.thirdeye.anomaly.classification.ClassificationJobContext;
-import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskInfo;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
-
-import org.apache.pinot.thirdeye.anomaly.alert.AlertJobContext;
-import org.apache.pinot.thirdeye.anomaly.alert.AlertTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobContext;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
@@ -71,21 +62,6 @@ public class TaskGenerator {
 
   }
 
-  public List<AlertTaskInfo> createAlertTasksV2(AlertJobContext alertJobContext,
-      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
-
-    List<AlertTaskInfo> tasks = new ArrayList<>();
-    AlertConfigDTO alertConfig = alertJobContext.getAlertConfigDTO();
-    long jobExecutionId = alertJobContext.getJobExecutionId();
-
-    AlertTaskInfo taskInfo =
-        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
-            alertConfig);
-    tasks.add(taskInfo);
-    return tasks;
-  }
-
-
   public List<MonitorTaskInfo> createMonitorTasks(MonitorJobContext monitorJobContext) {
     List<MonitorTaskInfo> tasks = new ArrayList<>();
     MonitorConfiguration monitorConfiguration = monitorJobContext.getMonitorConfiguration();
@@ -108,19 +84,6 @@ public class TaskGenerator {
     expireTaskInfo.setRawAnomalyRetentionDays(monitorConfiguration.getRawAnomalyRetentionDays());
     tasks.add(expireTaskInfo);
 
-    return tasks;
-  }
-
-  public List<ClassificationTaskInfo> createGroupingTasks(ClassificationJobContext classificationJobContext,
-      long monitoringWindowStartTime, long monitoringWindowEndTime) {
-    long jobExecutionId = classificationJobContext.getJobExecutionId();
-    ClassificationConfigDTO groupingConfig = classificationJobContext.getConfigDTO();
-    ClassificationTaskInfo classificationTaskInfo =
-        new ClassificationTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
-            groupingConfig);
-
-    List<ClassificationTaskInfo> tasks = new ArrayList<>();
-    tasks.add(classificationTaskInfo);
     return tasks;
   }
 

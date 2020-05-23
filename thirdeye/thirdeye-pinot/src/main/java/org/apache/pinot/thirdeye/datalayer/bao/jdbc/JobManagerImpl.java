@@ -24,16 +24,12 @@ import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.collections4.CollectionUtils;
 import org.joda.time.DateTime;
-
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.persist.Transactional;
 import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;

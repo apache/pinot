@@ -29,10 +29,7 @@ public class TaskConstants {
     ANOMALY_DETECTION,
     MERGE,
     // TODO: deprecate ALERT task type
-    ALERT,
-    ALERT2,
     MONITOR,
-    DATA_COMPLETENESS,
     CLASSIFICATION,
     REPLAY
   }

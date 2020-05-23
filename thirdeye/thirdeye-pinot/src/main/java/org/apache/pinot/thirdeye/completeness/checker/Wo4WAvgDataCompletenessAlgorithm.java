@@ -41,6 +41,7 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 /**
  * This is the implementation of the WO4W Average function or checking data completeness of datasets
  */
+@Deprecated
 public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorithm {
 
   public static double DEFAULT_EXPECTED_COMPLETENESS = 80;

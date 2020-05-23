@@ -55,7 +55,6 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
@@ -1047,8 +1046,8 @@ public class AnomaliesResource {
     }
     anomalyDetails.setExternalUrl(externalUrl);
     if (MapUtils.isNotEmpty(mergedAnomaly.getProperties()) && mergedAnomaly.getProperties()
-        .containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
-      anomalyDetails.setIssueType(mergedAnomaly.getProperties().get(ClassificationTaskRunner.ISSUE_TYPE_KEY));
+        .containsKey(MergedAnomalyResultDTO.ISSUE_TYPE_KEY)) {
+      anomalyDetails.setIssueType(mergedAnomaly.getProperties().get(MergedAnomalyResultDTO.ISSUE_TYPE_KEY));
     }
 
     return anomalyDetails;
