@@ -318,6 +318,9 @@ public class CalciteSqlParser {
   }
 
   private static void queryRewrite(PinotQuery pinotQuery) {
+    // Invoke compilation time functions
+    invokeCompileTimeFunctions(pinotQuery);
+
     // Update Predicate Comparison
     if (pinotQuery.isSetFilterExpression()) {
       Expression filterExpression = pinotQuery.getFilterExpression();
@@ -329,6 +332,25 @@ public class CalciteSqlParser {
     Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
     applyAlias(aliasMap, pinotQuery);
     validate(aliasMap, pinotQuery);
+  }
+
+  private static void invokeCompileTimeFunctions(PinotQuery pinotQuery) {
+    for (int i = 0; i < pinotQuery.getSelectListSize(); i++) {
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getSelectList().get(i));
+      pinotQuery.getSelectList().set(i, expression);
+    }
+    for (int i = 0; i < pinotQuery.getGroupByListSize(); i++) {
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getGroupByList().get(i));
+      pinotQuery.getGroupByList().set(i, expression);
+    }
+    for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
+      Expression expression = invokeCompileTimeFunctionExpression(pinotQuery.getOrderByList().get(i));
+      pinotQuery.getOrderByList().set(i, expression);
+    }
+    Expression filterExpression = invokeCompileTimeFunctionExpression(pinotQuery.getFilterExpression());
+    pinotQuery.setFilterExpression(filterExpression);
+    Expression havingExpression = invokeCompileTimeFunctionExpression(pinotQuery.getHavingExpression());
+    pinotQuery.setHavingExpression(havingExpression);
   }
 
   // This method converts a predicate expression to the what Pinot could evaluate.
@@ -596,7 +618,7 @@ public class CalciteSqlParser {
           // Move on to process default logic.
         }
       default:
-        return evaluateFunctionExpression((SqlBasicCall) node);
+        return compileFunctionExpression((SqlBasicCall) node);
     }
   }
 
@@ -613,29 +635,9 @@ public class CalciteSqlParser {
     return funcName;
   }
 
-  private static Expression evaluateFunctionExpression(SqlBasicCall funcSqlNode) {
+  private static Expression compileFunctionExpression(SqlBasicCall funcSqlNode) {
     String funcName = extractFunctionName(funcSqlNode);
     Expression funcExpr = RequestUtils.getFunctionExpression(funcName);
-    if (FunctionRegistry.containsFunctionByName(funcName) && isCompileTimeEvaluationPossible(funcExpr)) {
-      int functionOperandsLength = funcSqlNode.getOperands().length;
-      FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(funcName);
-      Object[] arguments = new Object[functionOperandsLength];
-      for (int i = 0; i < functionOperandsLength; i++) {
-        if (funcSqlNode.getOperands()[i] instanceof SqlLiteral) {
-          arguments[i] = ((SqlLiteral) funcSqlNode.getOperands()[i]).toValue();
-        } else {
-          // Evaluate function call (SqlBasicCall) recursively.
-          arguments[i] = evaluateFunctionExpression((SqlBasicCall) funcSqlNode.getOperands()[i]).getLiteral().getFieldValue();
-        }
-      }
-      try {
-        FunctionInvoker invoker = new FunctionInvoker(functionInfo);
-        Object result = invoker.process(arguments);
-        return RequestUtils.getLiteralExpression(result);
-      } catch (Exception e) {
-        throw new SqlCompilationException(new IllegalArgumentException("Unsupported function - " + funcName, e));
-      }
-    }
     for (SqlNode child : funcSqlNode.getOperands()) {
       if (child instanceof SqlNodeList) {
         final Iterator<SqlNode> iterator = ((SqlNodeList) child).iterator();
@@ -649,24 +651,36 @@ public class CalciteSqlParser {
     }
     return funcExpr;
   }
-  /**
-   * Utility method to check if the function can be evaluated during the query compilation phae
-   * @param funcExpr
-   * @return true if all arguments are literals
-   */
-  private static boolean isCompileTimeEvaluationPossible(Expression funcExpr) {
-    Function functionCall = funcExpr.getFunctionCall();
-    if (functionCall.getOperandsSize() > 0) {
-      for (Expression expression : functionCall.getOperands()) {
-        if (expression.getType() == ExpressionType.FUNCTION) {
-          if (!isCompileTimeEvaluationPossible(expression)){
-            return false;
-          }
-        } else if (expression.getType() != ExpressionType.LITERAL) {
-          return false;
-        }
+
+  protected static Expression invokeCompileTimeFunctionExpression(Expression funcExpr) {
+    if (funcExpr == null || funcExpr.getFunctionCall() == null) {
+      return funcExpr;
+    }
+    Function function = funcExpr.getFunctionCall();
+    int functionOperandsLength = function.getOperandsSize();
+    boolean compilable = true;
+    for (int i = 0; i < functionOperandsLength; i++) {
+      Expression operand = invokeCompileTimeFunctionExpression(function.getOperands().get(i));
+      if (operand.getLiteral() == null) {
+        compilable = false;
+      }
+      function.getOperands().set(i, operand);
+    }
+    String funcName = function.getOperator();
+    if (FunctionRegistry.containsFunctionByName(funcName) && compilable) {
+      FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(funcName);
+      Object[] arguments = new Object[functionOperandsLength];
+      for (int i = 0; i < functionOperandsLength; i++) {
+        arguments[i] = function.getOperands().get(i).getLiteral().getFieldValue();
+      }
+      try {
+        FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+        Object result = invoker.process(arguments);
+        return RequestUtils.getLiteralExpression(result);
+      } catch (Exception e) {
+        throw new SqlCompilationException(new IllegalArgumentException("Unsupported function - " + funcName, e));
       }
     }
-    return true;
+    return funcExpr;
   }
 }
