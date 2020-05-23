@@ -88,4 +88,4 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: broker-config
+            name: {{ include "pinot.broker.config" . }}

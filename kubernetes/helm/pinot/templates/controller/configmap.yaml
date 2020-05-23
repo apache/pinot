@@ -20,7 +20,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: controller-config
+  name: {{ include "pinot.controller.config" . }}
 data:
   pinot-controller.conf: |-
     controller.helix.cluster.name={{ .Values.cluster.name }}

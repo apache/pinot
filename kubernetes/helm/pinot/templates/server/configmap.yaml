@@ -20,7 +20,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: server-config
+  name: {{ include "pinot.server.config" . }}
 data:
   pinot-server.conf: |-
     pinot.server.netty.port={{ .Values.server.ports.netty }}

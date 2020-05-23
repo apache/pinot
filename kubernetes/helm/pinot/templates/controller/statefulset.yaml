@@ -75,7 +75,7 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: controller-config
+          name: {{ include "pinot.controller.config" . }}
 {{- if not .Values.controller.persistence.enabled }}
       - name: data
         emptyDir: {}
