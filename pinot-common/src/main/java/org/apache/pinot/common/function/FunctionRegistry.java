@@ -63,6 +63,7 @@ public class FunctionRegistry {
 
   static {
     try {
+      FunctionRegistry.registerFunction(String.class.getDeclaredMethod("reverse", String.class));
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochSeconds", Long.class));
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutes", Long.class));
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHours", Long.class));

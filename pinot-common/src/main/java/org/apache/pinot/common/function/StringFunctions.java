@@ -32,4 +32,5 @@ public class StringFunctions {
   static String reverse(String input) {
     return StringUtils.reverse(input);
   }
+
 }
