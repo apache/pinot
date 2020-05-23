@@ -224,11 +224,4 @@ public class DateTimeFunctions {
   static Long now() {
     return System.currentTimeMillis();
   }
-
-  /**
-   * Return epoch millis value based on a given date time string and it's corresponding format.
-   */
-  public static Long formatDatetime(String input, String format) {
-    return DateTimeFormat.forPattern(format).parseMillis(input);
-  }
 }

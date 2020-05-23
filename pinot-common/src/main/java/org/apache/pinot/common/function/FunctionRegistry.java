@@ -86,7 +86,6 @@ public class FunctionRegistry {
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toDateTime", Long.class, String.class));
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromDateTime", String.class, String.class));
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("now"));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("formatDatetime", String.class, String.class));
 
       FunctionRegistry.registerFunction(JsonFunctions.class.getDeclaredMethod("toJsonMapStr", Map.class));
     } catch (NoSuchMethodException e) {

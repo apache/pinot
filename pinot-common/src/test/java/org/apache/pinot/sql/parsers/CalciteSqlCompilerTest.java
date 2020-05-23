@@ -1507,7 +1507,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertTrue(nowTs >= lowerBound);
     Assert.assertTrue(nowTs <= upperBound);
 
-    query = "SELECT a FROM foo where time_col > formatDatetime('2020-01-01 UTC', 'yyyy-MM-dd z')";
+    query = "SELECT a FROM foo where time_col > fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z')";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
     nowTs = greaterThan.getOperands().get(1).getLiteral().getLongValue();
