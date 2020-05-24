@@ -36,11 +36,12 @@ public class PostAggregationFunction {
   private final ColumnDataType _resultType;
 
   public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(functionName);
-    Preconditions.checkArgument(functionInfo != null, "Unsupported function: %s", functionName);
+    int numArguments = argumentTypes.length;
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+    Preconditions
+        .checkArgument(functionInfo != null, "Unsupported function: %s with %s parameters", functionName, numArguments);
     _functionInvoker = new FunctionInvoker(functionInfo);
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-    int numArguments = argumentTypes.length;
     Preconditions.checkArgument(numArguments == parameterTypes.length,
         "Wrong number of arguments for method: %s, expected: %s, actual: %s", functionInfo.getMethod(),
         parameterTypes.length, numArguments);

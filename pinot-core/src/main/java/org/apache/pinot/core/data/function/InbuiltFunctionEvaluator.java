@@ -87,7 +87,10 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       childNodes[i] = childNode;
     }
 
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(function.getFunctionName());
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(function.getFunctionName(), numArguments);
+    Preconditions
+        .checkState(functionInfo != null, "Unsupported function: %s with %s parameters", function.getFunctionName(),
+            numArguments);
     return new FunctionExecutionNode(functionInfo, childNodes);
   }
 

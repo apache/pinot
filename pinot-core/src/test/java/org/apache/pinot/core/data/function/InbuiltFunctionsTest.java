@@ -21,6 +21,8 @@ package org.apache.pinot.core.data.function;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -215,6 +217,81 @@ public class InbuiltFunctionsTest {
     row11_2.putValue("dateTime", "Mon Aug 24 12:36:46 America/Los_Angeles 2009");
     inputs.add(new Object[]{"fromDateTime(dateTime, \"EEE MMM dd HH:mm:ss ZZZ yyyy\")", Lists.newArrayList(
         "dateTime"), row11_2, 1251142606000L});
+
+    // timezone_hour and timezone_minute
+    List<String> expectedArguments = Collections.singletonList("tz");
+    GenericRow row12_0 = new GenericRow();
+    row12_0.putValue("tz", "UTC");
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row12_0, 0});
+    inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row12_0, 0});
+
+    GenericRow row12_1 = new GenericRow();
+    row12_1.putValue("tz", "America/Los_Angeles");
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row12_1, 17});
+    inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row12_1, 0});
+
+    GenericRow row12_2 = new GenericRow();
+    row12_2.putValue("tz", "Pacific/Marquesas");
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row12_2, 14});
+    inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row12_2, 30});
+
+    GenericRow row12_3 = new GenericRow();
+    row12_3.putValue("tz", "Etc/GMT+12");
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row12_3, 12});
+    inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row12_3, 0});
+
+    GenericRow row12_4 = new GenericRow();
+    row12_4.putValue("tz", "Etc/GMT+1");
+    inputs.add(new Object[]{"timezone_hour(tz)", expectedArguments, row12_4, 23});
+    inputs.add(new Object[]{"timezone_minute(tz)", expectedArguments, row12_4, 0});
+
+    // Convenience extraction functions
+    expectedArguments = Collections.singletonList("millis");
+    GenericRow row13_0 = new GenericRow();
+    // Sat May 23 2020 22:23:13.123 UTC
+    row13_0.putValue("millis", 1590272593123L);
+
+    inputs.add(new Object[]{"year(millis)", expectedArguments, row13_0, 2020});
+    inputs.add(new Object[]{"year_of_week(millis)", expectedArguments, row13_0, 2020});
+    inputs.add(new Object[]{"yow(millis)", expectedArguments, row13_0, 2020});
+    inputs.add(new Object[]{"quarter(millis)", expectedArguments, row13_0, 2});
+    inputs.add(new Object[]{"month(millis)", expectedArguments, row13_0, 5});
+    inputs.add(new Object[]{"week(millis)", expectedArguments, row13_0, 21});
+    inputs.add(new Object[]{"week_of_year(millis)", expectedArguments, row13_0, 21});
+    inputs.add(new Object[]{"day_of_year(millis)", expectedArguments, row13_0, 144});
+    inputs.add(new Object[]{"doy(millis)", expectedArguments, row13_0, 144});
+    inputs.add(new Object[]{"day(millis)", expectedArguments, row13_0, 23});
+    inputs.add(new Object[]{"day_of_month(millis)", expectedArguments, row13_0, 23});
+    inputs.add(new Object[]{"day_of_week(millis)", expectedArguments, row13_0, 6});
+    inputs.add(new Object[]{"dow(millis)", expectedArguments, row13_0, 6});
+    inputs.add(new Object[]{"hour(millis)", expectedArguments, row13_0, 22});
+    inputs.add(new Object[]{"minute(millis)", expectedArguments, row13_0, 23});
+    inputs.add(new Object[]{"second(millis)", expectedArguments, row13_0, 13});
+    inputs.add(new Object[]{"millisecond(millis)", expectedArguments, row13_0, 123});
+
+    expectedArguments = Arrays.asList("millis", "tz");
+    GenericRow row13_1 = new GenericRow();
+    // Sat May 23 2020 15:23:13.123 America/Los_Angeles
+    row13_1.putValue("millis", 1590272593123L);
+    row13_1.putValue("tz", "America/Los_Angeles");
+
+    inputs.add(new Object[]{"year(millis, tz)", expectedArguments, row13_1, 2020});
+    inputs.add(new Object[]{"year_of_week(millis, tz)", expectedArguments, row13_1, 2020});
+    inputs.add(new Object[]{"yow(millis, tz)", expectedArguments, row13_1, 2020});
+    inputs.add(new Object[]{"quarter(millis, tz)", expectedArguments, row13_1, 2});
+    inputs.add(new Object[]{"month(millis, tz)", expectedArguments, row13_1, 5});
+    inputs.add(new Object[]{"week(millis, tz)", expectedArguments, row13_1, 21});
+    inputs.add(new Object[]{"week_of_year(millis, tz)", expectedArguments, row13_1, 21});
+    inputs.add(new Object[]{"day_of_year(millis, tz)", expectedArguments, row13_1, 144});
+    inputs.add(new Object[]{"doy(millis, tz)", expectedArguments, row13_1, 144});
+    inputs.add(new Object[]{"day(millis, tz)", expectedArguments, row13_1, 23});
+    inputs.add(new Object[]{"day_of_month(millis, tz)", expectedArguments, row13_1, 23});
+    inputs.add(new Object[]{"day_of_week(millis, tz)", expectedArguments, row13_1, 6});
+    inputs.add(new Object[]{"dow(millis, tz)", expectedArguments, row13_1, 6});
+    inputs.add(new Object[]{"hour(millis, tz)", expectedArguments, row13_1, 15});
+    inputs.add(new Object[]{"minute(millis, tz)", expectedArguments, row13_1, 23});
+    inputs.add(new Object[]{"second(millis, tz)", expectedArguments, row13_1, 13});
+    inputs.add(new Object[]{"millisecond(millis, tz)", expectedArguments, row13_1, 123});
 
     return inputs.toArray(new Object[0][]);
   }
