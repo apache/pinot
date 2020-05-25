@@ -54,7 +54,8 @@ RUN git clone ${PINOT_GIT_URL} ${TE_BUILD_DIR} \
     && mkdir -p ${TE_HOME}/config/default \
     && mkdir -p ${TE_HOME}/bin \
     && cp -rp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config/* ${TE_HOME}/config/default/. \
-    && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-1.0-SNAPSHOT.jar ${TE_HOME}/bin/. \
+    && rm ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-*-sources.jar \
+    && cp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/target/thirdeye-pinot-*.jar ${TE_HOME}/bin/thirdeye-pinot.jar \
     && rm -rf ${TE_BUILD_DIR}
 
 FROM openjdk:8-jdk-slim
