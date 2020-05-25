@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.common.function;
 
-import org.apache.commons.lang.StringUtils;
+
+import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -26,11 +28,80 @@ import org.apache.commons.lang.StringUtils;
  *
  */
 public class StringFunctions {
-  /**
-   * Reverse any given string
-   */
+  private final static Pattern LTRIM = Pattern.compile("^\\s+");
+  private final static Pattern RTRIM = Pattern.compile("\\s+$");
+
   static String reverse(String input) {
     return StringUtils.reverse(input);
   }
 
+  static String lower(String input) {
+    return input.toLowerCase();
+  }
+
+  static String upper(String input) {
+    return input.toUpperCase();
+  }
+
+  static String substr(String input, Integer beginIndex) {
+    return input.substring(beginIndex);
+  }
+
+  static String substr(String input, Integer beginIndex, Integer endIndex) {
+    if (endIndex == -1) {
+      return substr(input, beginIndex);
+    }
+    return input.substring(beginIndex, endIndex);
+  }
+
+  static String concat(String input1, String input2, String seperator) {
+    String result = input1;
+    result = result + seperator + input2;
+    return result;
+  }
+
+  static String trim(String input) {
+    return input.trim();
+  }
+
+  static String ltrim(String input) {
+    return LTRIM.matcher(input).replaceAll("");
+  }
+
+  static String rtrim(String input) {
+    return RTRIM.matcher(input).replaceAll("");
+  }
+
+  static Integer length(String input) {
+    return input.length();
+  }
+
+  static Integer strpos(String input, String find, Integer instance) {
+    return StringUtils.ordinalIndexOf(input, find, instance);
+  }
+
+  static Boolean startsWith(String input, String prefix) {
+    return input.startsWith(prefix);
+  }
+
+  static String replace(String input, String find, String substitute) {
+    return input.replaceAll(find, substitute);
+  }
+
+  static String rpad(String input, Integer size, String pad) {
+    return StringUtils.rightPad(input, size, pad);
+  }
+
+  static String lpad(String input, Integer size, String pad) {
+    return StringUtils.leftPad(input, size, pad);
+  }
+
+  static Integer codepoint(String input) {
+    return input.codePointAt(0);
+  }
+
+  static String chr(Integer codepoint) {
+    char[] result = Character.toChars(codepoint);
+    return new String(result);
+  }
 }

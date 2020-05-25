@@ -63,7 +63,22 @@ public class FunctionRegistry {
 
   static {
     try {
-      FunctionRegistry.registerFunction(String.class.getDeclaredMethod("reverse", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("reverse", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("lower", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("upper", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("trim", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("ltrim", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("rtrim", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("length", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("codepoint", String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("concat", String.class, String.class, String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("replace", String.class, String.class, String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("rpad", String.class, Integer.class, String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("lpad", String.class, Integer.class, String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("chr", Integer.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("strpos", String.class, String.class, Integer.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("startsWith", String.class, String.class));
+      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("substr", String.class, Integer.class, Integer.class));
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochSeconds", Long.class));
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutes", Long.class));
       FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHours", Long.class));

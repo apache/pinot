@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -45,8 +46,9 @@ public class GenericTransformFunction extends BaseTransformFunction {
   String[] _stringResult;
 
   public GenericTransformFunction() {
-    _nonLiteralArgIndices = new ArrayList();
-    _nonLiteralArgType = new ArrayList();
+    _nonLiteralArgIndices = new ArrayList<>();
+    _nonLiteralArgType = new ArrayList<>();
+    _nonLiteralTransformFunction = new ArrayList<>();
   }
 
   @Override
@@ -63,37 +65,53 @@ public class GenericTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    //assert method.args.length == arguments.size
-    _args = new Object[arguments.size()];
+    Preconditions.checkArgument(arguments.size() == _functionInvoker.getParameterTypes().length,
+        "The number of arguments are not same for scalar function and transform function: %s", getName());
 
+    _args = new Object[arguments.size()];
     for (int i = 0; i < arguments.size(); i++) {
       TransformFunction function = arguments.get(i);
       if (function instanceof LiteralTransformFunction) {
         String literal = ((LiteralTransformFunction) function).getLiteral();
-        //convert String to the right dataType based on method param
-
         Class paramType = _functionInvoker.getParameterTypes()[i];
         switch (paramType.getTypeName()) {
-          case "Integer":
+          case "java.lang.Integer":
             _args[i] = Integer.parseInt(literal);
             break;
-          case "String":
+          case "java.lang.String":
             _args[i] = literal;
             break;
-            //add other types and throw exception for non primitive/string classes
+          case "java.lang.Double":
+            _args[i] = Double.valueOf(literal);
+            break;
+          case "java.lang.Long":
+            _args[i] = Long.valueOf(literal);
+            break;
+          default:
+            throw new RuntimeException(
+                "Unsupported data type " + paramType.getTypeName() + "for transform function " + getName());
         }
       } else {
         _nonLiteralArgIndices.add(i);
+        _nonLiteralTransformFunction.add(function);
         Class paramType = _functionInvoker.getParameterTypes()[i];
-        //find the right pinot data Type
+
         switch (paramType.getTypeName()) {
-          case "Integer":
+          case "java.lang.Integer":
             _nonLiteralArgType.add(FieldSpec.DataType.INT);
             break;
-          case "String":
+          case "java.lang.String":
             _nonLiteralArgType.add(FieldSpec.DataType.STRING);
             break;
-            //todo add other types
+          case "java.lang.Double":
+            _nonLiteralArgType.add(FieldSpec.DataType.DOUBLE);
+            break;
+          case "java.lang.Long":
+            _nonLiteralArgType.add(FieldSpec.DataType.LONG);
+            break;
+          default:
+            throw new RuntimeException(
+                "Unsupported data type " + paramType.getTypeName() + "for transform function " + getName());
         }
       }
     }
@@ -121,7 +139,22 @@ public class GenericTransformFunction extends BaseTransformFunction {
       switch (returnType) {
         case STRING:
           nonLiteralBlockValues[i] = transformFunc.transformToStringValuesSV(projectionBlock);
-          //todo handle other types
+          break;
+        case INT:
+          int[] values = transformFunc.transformToIntValuesSV(projectionBlock);
+          nonLiteralBlockValues[i] = Arrays.stream(values).boxed().toArray(Integer[]::new);
+          break;
+        case DOUBLE:
+          double[] doubleValues = transformFunc.transformToDoubleValuesSV(projectionBlock);
+          nonLiteralBlockValues[i] = Arrays.stream(doubleValues).boxed().toArray(Double[]::new);
+          break;
+        case LONG:
+          long[] longValues = transformFunc.transformToLongValuesSV(projectionBlock);
+          nonLiteralBlockValues[i] = Arrays.stream(longValues).boxed().toArray(Long[]::new);
+          break;
+        default:
+          throw new RuntimeException(
+              "Unsupported return data type " + returnType + "for transform function " + getName());
       }
     }
 

@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
@@ -96,7 +97,7 @@ public abstract class BaseTransformFunctionTest {
       _longSVValues[i] = RANDOM.nextLong();
       _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
-      _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
+      _stringSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
 
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];
