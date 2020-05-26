@@ -39,6 +39,7 @@ import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
+import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
@@ -610,6 +611,25 @@ public class CalciteSqlParser {
         }
         asFuncExpr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(aliasName));
         return asFuncExpr;
+      case CASE:
+        // CASE WHEN Statement is model as a function with variable length parameters.
+        // Assume N is number of WHEN Statements, total number of parameters is (2 * N + 1).
+        // - N: Convert each WHEN Statement into a function Expression;
+        // - N: Convert each THEN Statement into an Expression;
+        // - 1: Convert ELSE Statement into an Expression.
+        SqlCase caseSqlNode = (SqlCase) node;
+        SqlNodeList whenOperands = caseSqlNode.getWhenOperands();
+        SqlNodeList thenOperands = caseSqlNode.getThenOperands();
+        SqlNode elseOperand = caseSqlNode.getElseOperand();
+        Expression caseFuncExpr = RequestUtils.getFunctionExpression(SqlKind.CASE.name());
+        for (SqlNode whenSqlNode : whenOperands.getList()) {
+          caseFuncExpr.getFunctionCall().addToOperands(toExpression(whenSqlNode));
+        }
+        for (SqlNode thenSqlNode : thenOperands.getList()) {
+          caseFuncExpr.getFunctionCall().addToOperands(toExpression(thenSqlNode));
+        }
+        caseFuncExpr.getFunctionCall().addToOperands(toExpression(elseOperand));
+        return caseFuncExpr;
       case OTHER:
         if (node instanceof SqlDataTypeSpec) {
           // This is to handle expression like: CAST(col AS INT)

@@ -50,6 +50,70 @@ import org.testng.annotations.Test;
 public class CalciteSqlCompilerTest {
 
   @Test
+  public void testCaseWhenStatements() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT OrderID, Quantity,\n"
+            + "CASE\n"
+            + "    WHEN Quantity > 30 THEN 'The quantity is greater than 30'\n"
+            + "    WHEN Quantity = 30 THEN 'The quantity is 30'\n"
+            + "    ELSE 'The quantity is under 30'\n"
+            + "END AS QuantityText\n"
+            + "FROM OrderDetails");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "OrderID");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "Quantity");
+    Function asFunc = pinotQuery.getSelectList().get(2).getFunctionCall();
+    Assert.assertEquals(asFunc.getOperator(), SqlKind.AS.name());
+    Function caseFunc = asFunc.getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(caseFunc.getOperator(), SqlKind.CASE.name());
+    Assert.assertEquals(caseFunc.getOperandsSize(), 5);
+    Function greatThanFunc = caseFunc.getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(greatThanFunc.getOperator(), SqlKind.GREATER_THAN.name());
+    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
+    Function equalsFunc = caseFunc.getOperands().get(1).getFunctionCall();
+    Assert.assertEquals(equalsFunc.getOperator(), SqlKind.EQUALS.name());
+    Assert.assertEquals(equalsFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(equalsFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
+    Assert.assertEquals(caseFunc.getOperands().get(2).getLiteral().getFieldValue(), "The quantity is greater than 30");
+    Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), "The quantity is 30");
+    Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), "The quantity is under 30");
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT Quantity,\n"
+            + "SUM(CASE\n"
+            + "    WHEN Quantity > 30 THEN 3\n"
+            + "    WHEN Quantity > 20 THEN 2\n"
+            + "    WHEN Quantity > 10 THEN 1\n"
+            + "    ELSE 0\n"
+            + "END) AS new_sum_quant\n"
+            + "FROM OrderDetails");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "Quantity");
+    asFunc = pinotQuery.getSelectList().get(1).getFunctionCall();
+    Assert.assertEquals(asFunc.getOperator(), SqlKind.AS.name());
+    Function sumFunc = asFunc.getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(sumFunc.getOperator(), SqlKind.SUM.name());
+    caseFunc = sumFunc.getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(caseFunc.getOperator(), SqlKind.CASE.name());
+    Assert.assertEquals(caseFunc.getOperandsSize(), 7);
+    greatThanFunc = caseFunc.getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(greatThanFunc.getOperator(), SqlKind.GREATER_THAN.name());
+    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
+    greatThanFunc = caseFunc.getOperands().get(1).getFunctionCall();
+    Assert.assertEquals(greatThanFunc.getOperator(), SqlKind.GREATER_THAN.name());
+    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 20L);
+    greatThanFunc = caseFunc.getOperands().get(2).getFunctionCall();
+    Assert.assertEquals(greatThanFunc.getOperator(), SqlKind.GREATER_THAN.name());
+    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 10L);
+    Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), 3L);
+    Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), 2L);
+    Assert.assertEquals(caseFunc.getOperands().get(5).getLiteral().getFieldValue(), 1L);
+    Assert.assertEquals(caseFunc.getOperands().get(6).getLiteral().getFieldValue(), 0L);
+  }
+
+  @Test
   public void testQuotedStrings() {
     PinotQuery pinotQuery =
         CalciteSqlParser.compileToPinotQuery("select * from vegetables where origin = 'Martha''s Vineyard'");
