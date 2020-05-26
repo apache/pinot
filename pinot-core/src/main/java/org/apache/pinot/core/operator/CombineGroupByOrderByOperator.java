@@ -169,7 +169,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
                 Object[] columns = new Object[numColumns];
                 int columnIndex = 0;
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-                String[] stringKey = groupKey._stringKey.split(GroupKeyGenerator.DELIMITER);
+                String[] stringKey = groupKey._stringKey.split(GroupKeyGenerator.DELIMITER, -1);
                 Object[] objectKey = new Object[numGroupBy];
                 for (int i = 0; i < stringKey.length; i++) {
                   Object convertedKey = converterFunctions[i].apply(stringKey[i]);
