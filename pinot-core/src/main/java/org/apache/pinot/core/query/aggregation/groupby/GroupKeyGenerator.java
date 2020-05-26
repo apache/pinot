@@ -79,5 +79,13 @@ public interface GroupKeyGenerator {
   class GroupKey {
     public int _groupId;
     public String _stringKey;
+
+    /**
+     * Returns the group key as an array
+     */
+    public String[] getKeys() {
+      // Set limit to -1 to prevent removing trailing empty strings
+      return _stringKey.split(GroupKeyGenerator.DELIMITER, -1);
+    }
   }
 }
