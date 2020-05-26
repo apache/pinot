@@ -67,7 +67,7 @@ public class AlertSearcherTest {
   @Test
   public void testSearchActive() {
     AlertSearcher searcher = new AlertSearcher();
-    Map<String, Object> result = searcher.search(new AlertSearchFilter(Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), true), 10 ,0);
+    Map<String, Object> result = searcher.search(new AlertSearchFilter(Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), true), 10 ,0);
     Assert.assertEquals(result.get("count"), 1L);
     Assert.assertEquals(result.get("limit"), 10L);
     Assert.assertEquals(result.get("offset"), 0L);

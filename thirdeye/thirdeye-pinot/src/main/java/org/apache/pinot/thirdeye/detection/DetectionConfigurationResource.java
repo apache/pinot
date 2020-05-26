@@ -15,27 +15,41 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
+ *
  */
 
-package org.apache.pinot.thirdeye.detection.annotation;
+package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiParam;
+import java.util.List;
+import java.util.stream.Collectors;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.detection.annotation.Components;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 
 
-@Path("/detection/annotation")
+@Path("/detection/rule")
+@Api(tags = {Constants.DETECTION_TAG})
 public class DetectionConfigurationResource {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static DetectionRegistry detectionRegistry = DetectionRegistry.getInstance();
 
+  private static String TUNABLE_TYPE = "TUNABLE";
+  private static String BASELINE_TYPE = "BASELINE";
+
   @GET
-  public Response getConfigurations(@ApiParam("tag") String tag) throws Exception {
-    return Response.ok(
-        OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(detectionRegistry.getAllAnnotation()))
-        .build();
+  public Response getRules() throws Exception {
+    List<Components> componentsList = detectionRegistry.getAllAnnotation();
+    componentsList = componentsList.stream().filter(component -> {
+      String type = component.type().toUpperCase();
+      return !type.contains(TUNABLE_TYPE) && !type.contains(BASELINE_TYPE);
+    }).collect(Collectors.toList());
+    return Response.ok(OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(componentsList)).build();
   }
 }

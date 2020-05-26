@@ -58,6 +58,7 @@ public class AlertResource {
    * @param subscriptionGroups the subscription groups for the alerts
    * @param names the names for the alerts
    * @param createdBy the owners for the alerts
+   * @param subscribedBy the subscriber for the alerts
    * @param ruleTypes the rule types for the alerts
    * @param metrics the metrics for the alerts
    * @param datasets the datasets for the alerts
@@ -70,10 +71,11 @@ public class AlertResource {
   public Response findAlerts(@QueryParam("limit") @DefaultValue("10") long limit,
       @QueryParam("offset") @DefaultValue("0") long offset, @QueryParam("application") List<String> applications,
       @QueryParam("subscriptionGroup") List<String> subscriptionGroups, @QueryParam("names") List<String> names,
-      @QueryParam("createdBy") List<String> createdBy, @QueryParam("ruleType") List<String> ruleTypes,
+      @QueryParam("createdBy") List<String> createdBy, @QueryParam("subscribedBy") List<String> subscribedBy, @QueryParam("ruleType") List<String> ruleTypes,
       @QueryParam("metric") List<String> metrics, @QueryParam("dataset") List<String> datasets,
       @QueryParam("active") Boolean active) {
-    AlertSearchFilter searchFilter = new AlertSearchFilter(applications, subscriptionGroups, names, createdBy, ruleTypes, metrics, datasets, active);
+    AlertSearchFilter searchFilter =
+        new AlertSearchFilter(applications, subscriptionGroups, names, createdBy, subscribedBy, ruleTypes, metrics, datasets, active);
     return Response.ok().entity(this.alertSearcher.search(searchFilter, limit, offset)).build();
   }
 }
