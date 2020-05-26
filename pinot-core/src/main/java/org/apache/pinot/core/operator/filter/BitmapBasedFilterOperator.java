@@ -25,62 +25,73 @@ import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
+@SuppressWarnings("rawtypes")
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "BitmapBasedFilterOperator";
 
   private final PredicateEvaluator _predicateEvaluator;
-  private final DataSource _dataSource;
-  private final ImmutableRoaringBitmap[] _bitmaps;
-  private final int _startDocId;
-  // TODO: change it to exclusive
-  // Inclusive
-  private final int _endDocId;
+  private final InvertedIndexReader _invertedIndexReader;
+  private final ImmutableRoaringBitmap _docIds;
   private final boolean _exclusive;
+  private final int _numDocs;
 
-  BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,
-      int endDocId) {
-    // NOTE:
-    // Predicate that is always evaluated as true or false should not be passed into the BitmapBasedFilterOperator for
-    // performance concern.
-    // If predicate is always evaluated as true, use MatchAllFilterOperator; if predicate is always evaluated as false,
-    // use EmptyFilterOperator.
-    Preconditions.checkArgument(!predicateEvaluator.isAlwaysTrue() && !predicateEvaluator.isAlwaysFalse());
-
+  BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _dataSource = dataSource;
-    _bitmaps = null;
-    _startDocId = startDocId;
-    _endDocId = endDocId;
+    _invertedIndexReader = dataSource.getInvertedIndex();
+    _docIds = null;
     _exclusive = predicateEvaluator.isExclusive();
+    _numDocs = numDocs;
   }
 
-  public BitmapBasedFilterOperator(ImmutableRoaringBitmap[] bitmaps, int startDocId, int endDocId, boolean exclusive) {
+  public BitmapBasedFilterOperator(ImmutableRoaringBitmap docIds, boolean exclusive, int numDocs) {
     _predicateEvaluator = null;
-    _dataSource = null;
-    _bitmaps = bitmaps;
-    _startDocId = startDocId;
-    _endDocId = endDocId;
+    _invertedIndexReader = null;
+    _docIds = docIds;
     _exclusive = exclusive;
+    _numDocs = numDocs;
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    if (_bitmaps != null) {
-      return new FilterBlock(new BitmapDocIdSet(_bitmaps, _startDocId, _endDocId, _exclusive));
+    if (_docIds != null) {
+      if (_exclusive) {
+        return new FilterBlock(new BitmapDocIdSet(ImmutableRoaringBitmap.flip(_docIds, 0L, _numDocs), _numDocs));
+      } else {
+        return new FilterBlock(new BitmapDocIdSet(_docIds, _numDocs));
+      }
     }
 
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
-
-    InvertedIndexReader invertedIndex = _dataSource.getInvertedIndex();
-    int length = dictIds.length;
-    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[length];
-    for (int i = 0; i < length; i++) {
-      bitmaps[i] = (ImmutableRoaringBitmap) invertedIndex.getDocIds(dictIds[i]);
+    int numDictIds = dictIds.length;
+    // NOTE: PredicateEvaluator without matching/non-matching dictionary ids should not reach here.
+    Preconditions.checkState(numDictIds > 0);
+    if (numDictIds == 1) {
+      ImmutableRoaringBitmap docIds = (ImmutableRoaringBitmap) _invertedIndexReader.getDocIds(dictIds[0]);
+      if (_exclusive) {
+        if (docIds instanceof MutableRoaringBitmap) {
+          MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) docIds;
+          mutableRoaringBitmap.flip(0L, _numDocs);
+          return new FilterBlock(new BitmapDocIdSet(mutableRoaringBitmap, _numDocs));
+        } else {
+          return new FilterBlock(new BitmapDocIdSet(ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs), _numDocs));
+        }
+      } else {
+        return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs));
+      }
+    } else {
+      ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numDictIds];
+      for (int i = 0; i < numDictIds; i++) {
+        bitmaps[i] = (ImmutableRoaringBitmap) _invertedIndexReader.getDocIds(dictIds[i]);
+      }
+      MutableRoaringBitmap docIds = ImmutableRoaringBitmap.or(bitmaps);
+      if (_exclusive) {
+        docIds.flip(0L, _numDocs);
+      }
+      return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs));
     }
-
-    return new FilterBlock(new BitmapDocIdSet(bitmaps, _startDocId, _endDocId, _exclusive));
   }
 
   @Override

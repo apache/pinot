@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+
+
 public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
   protected boolean _alwaysTrue;
   protected boolean _alwaysFalse;
@@ -35,6 +38,11 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
   @Override
   public final boolean isDictionaryBased() {
     return true;
+  }
+
+  @Override
+  public DataType getDataType() {
+    return DataType.INT;
   }
 
   @Override

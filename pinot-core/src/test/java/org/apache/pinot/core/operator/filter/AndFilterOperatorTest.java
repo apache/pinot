@@ -93,7 +93,7 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> childOperators = new ArrayList<>();
     childOperators.add(new TestFilterOperator(docIds3));
     childOperators.add(new TestFilterOperator(docIds2));
-    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators);
+    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, 40);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);

@@ -27,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
 
 
 public class FilterOperatorUtils {
@@ -47,33 +48,27 @@ public class FilterOperatorUtils {
       return new MatchAllFilterOperator(numDocs);
     }
 
-    int startDocId = 0;
-    // NOTE: end document Id is inclusive
-    // TODO: make it exclusive
-    int endDocId = numDocs - 1;
-
     Predicate.Type predicateType = predicateEvaluator.getPredicateType();
-
-    //Only for dictionary encoded columns and offline data sources
-    if (predicateType == Predicate.Type.RANGE && dataSource.getDictionary() != null
-        && dataSource.getRangeIndex() != null) {
-      return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
-    }
-
-    if (predicateType == Predicate.Type.TEXT_MATCH) {
-      return new TextMatchFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
-    }
-
-    // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
-    if (dataSource.getInvertedIndex() != null && predicateType != Predicate.Type.REGEXP_LIKE) {
+    if (predicateType == Predicate.Type.RANGE) {
       if (dataSource.getDataSourceMetadata().isSorted()) {
-        return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
-      } else if (predicateType != Predicate.Type.RANGE) {
-        // TODO: add support for bitmap inverted index operator can be used for RANGE predicate
-        return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
+        return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
+      if (dataSource.getRangeIndex() != null) {
+        return new RangeIndexBasedFilterOperator((OfflineDictionaryBasedRangePredicateEvaluator) predicateEvaluator,
+            dataSource, numDocs);
+      }
+      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+    } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
+      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+    } else {
+      if (dataSource.getDataSourceMetadata().isSorted()) {
+        return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+      }
+      if (dataSource.getInvertedIndex() != null) {
+        return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+      }
+      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
     }
-    return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
   }
 
   /**
@@ -125,7 +120,7 @@ public class FilterOperatorUtils {
       return childFilterOperators.get(0);
     } else {
       // Return the OR filter operator with child filter operators
-      return new OrFilterOperator(childFilterOperators);
+      return new OrFilterOperator(childFilterOperators, numDocs);
     }
   }
 
@@ -144,7 +139,7 @@ public class FilterOperatorUtils {
       }
 
       int getPriority(BaseFilterOperator filterOperator) {
-        if (filterOperator instanceof SortedInvertedIndexBasedFilterOperator) {
+        if (filterOperator instanceof SortedIndexBasedFilterOperator) {
           return 0;
         }
         if (filterOperator instanceof BitmapBasedFilterOperator) {

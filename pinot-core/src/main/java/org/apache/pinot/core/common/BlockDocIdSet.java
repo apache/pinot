@@ -18,9 +18,15 @@
  */
 package org.apache.pinot.core.common;
 
+/**
+ * The interface {@code BlockDocIdSet} represents all the matching document ids for a predicate.
+ * TODO: Redesign the filtering to skip the BlockDocIdSet and directly use BlockDocIdIterator
+ */
 public interface BlockDocIdSet {
 
+  /**
+   * Returns an iterator of the matching document ids. The document ids returned from the iterator should be in
+   * ascending order.
+   */
   BlockDocIdIterator iterator();
-
-  <T> T getRaw();
 }

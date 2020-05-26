@@ -29,13 +29,13 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -65,7 +65,7 @@ public class NotInPredicateEvaluatorFactory {
    * @return Raw value based NOT_IN predicate evaluator
    */
   public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate,
-      FieldSpec.DataType dataType) {
+      DataType dataType) {
     switch (dataType) {
       case INT:
         return new IntRawValueBasedNotInPredicateEvaluator(notInPredicate);
@@ -165,6 +165,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.INT;
+    }
+
+    @Override
     public boolean applySV(int value) {
       return !_nonMatchingValues.contains(value);
     }
@@ -184,6 +189,11 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.NOT_IN;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.LONG;
     }
 
     @Override
@@ -209,6 +219,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.FLOAT;
+    }
+
+    @Override
     public boolean applySV(float value) {
       return !_nonMatchingValues.contains(value);
     }
@@ -228,6 +243,11 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.NOT_IN;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.DOUBLE;
     }
 
     @Override
@@ -251,6 +271,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.STRING;
+    }
+
+    @Override
     public boolean applySV(String value) {
       return !_nonMatchingValues.contains(value);
     }
@@ -270,6 +295,11 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.NOT_IN;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BYTES;
     }
 
     @Override

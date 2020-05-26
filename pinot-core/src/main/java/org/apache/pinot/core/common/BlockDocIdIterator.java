@@ -25,25 +25,17 @@ package org.apache.pinot.core.common;
 public interface BlockDocIdIterator {
 
   /**
-   * Get the next document id.
-   *
-   * @return Next document id or EOF if there is no more documents
+   * Returns the next matching document id, or {@link Constants#EOF} if there is no more matching documents.
+   * <p>NOTE: There should be no more calls to this method after it returns {@link Constants#EOF}.
    */
   int next();
 
   /**
-   * Advance to the first document whose id is equal or greater than the given target document id.
-   * <p>If the given target document id is smaller or equal to the current document id, then return the current one.
-   *
-   * @param targetDocId The target document id
-   * @return First document id that is equal or greater than target or EOF if no document matches
+   * Returns the first matching document whose id is greater than or equal to the given target document id, or
+   * {@link Constants#EOF} if there is no such document.
+   * <p>NOTE: The target document id should be GREATER THAN the document id previous returned because the iterator
+   *          should not return the same value twice.
+   * <p>NOTE: There should be no more calls to this method after it returns {@link Constants#EOF}.
    */
   int advance(int targetDocId);
-
-  /**
-   * Get the current document id that was returned by the previous call to next() or advance().
-   *
-   * @return The current document id, -1 if next/advance is not called yet, EOF if the iteration has exhausted
-   */
-  int currentDocId();
 }

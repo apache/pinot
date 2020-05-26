@@ -18,48 +18,26 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.SizeBasedDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.MVScanDocIdIterator;
+import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
-// TODO: Rename this class to MatchAllDocIdSet.
-public final class SizeBasedDocIdSet implements FilterBlockDocIdSet {
-  private final int _maxDocId;
 
-  public SizeBasedDocIdSet(int maxDocId) {
-    _maxDocId = maxDocId;
+public final class MVScanDocIdSet implements FilterBlockDocIdSet {
+  private final MVScanDocIdIterator _docIdIterator;
+
+  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, MultiValueSet valueSet, int numDocs,
+      int maxNumEntriesPerValue) {
+    _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, valueSet.iterator(), numDocs, maxNumEntriesPerValue);
   }
 
   @Override
-  public int getMinDocId() {
-    return 0;
-  }
-
-  @Override
-  public int getMaxDocId() {
-    return _maxDocId;
-  }
-
-  @Override
-  public void setStartDocId(int startDocId) {
-  }
-
-  @Override
-  public void setEndDocId(int endDocId) {
+  public MVScanDocIdIterator iterator() {
+    return _docIdIterator;
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    // No value scanned because all docs are matched and will be returned.
-    return 0L;
-  }
-
-  @Override
-  public BlockDocIdIterator iterator() {
-    return new SizeBasedDocIdIterator(_maxDocId);
-  }
-
-  @Override
-  public <T> T getRaw() {
-    throw new UnsupportedOperationException();
+    return _docIdIterator.getNumEntriesScanned();
   }
 }

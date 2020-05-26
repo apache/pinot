@@ -16,13 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.docidsets;
+package org.apache.pinot.core.operator.dociditerators;
 
-import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public interface ScanBasedDocIdSet extends FilterBlockDocIdSet {
+/**
+ * All bitmap-based filter iterators should implement this interface to allow intersection to be optimized.
+ */
+public interface BitmapBasedDocIdIterator extends BlockDocIdIterator {
 
-  @Override
-  ScanBasedDocIdIterator iterator();
+  /**
+   * Returns a bitmap of the matching document ids.
+   */
+  ImmutableRoaringBitmap getDocIds();
 }

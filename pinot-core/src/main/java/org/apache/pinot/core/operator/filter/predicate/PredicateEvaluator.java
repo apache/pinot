@@ -19,10 +19,10 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public interface PredicateEvaluator {
-
 
   /**
    * APIs for both dictionary based and raw value based predicate evaluator
@@ -37,6 +37,11 @@ public interface PredicateEvaluator {
    * Return whether the predicate evaluator is dictionary based or raw value based.
    */
   boolean isDictionaryBased();
+
+  /**
+   * Returns the data type expected by the PredicateEvaluator. Returns INT for dictionary-based PredicateEvaluator.
+   */
+  DataType getDataType();
 
   /**
    * Return whether the predicate is exclusive (e.g. NEQ, NOT_IN).
@@ -182,5 +187,4 @@ public interface PredicateEvaluator {
    * @return Whether the entry matches the predicate
    */
   boolean applyMV(byte[][] values, int length);
-
 }

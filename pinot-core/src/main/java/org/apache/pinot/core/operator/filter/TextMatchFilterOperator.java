@@ -18,54 +18,34 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.base.Preconditions;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.Predicate;
-import org.apache.pinot.core.common.predicate.TextMatchPredicate;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.TextMatchPredicateEvaluatorFactory;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
-import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
  * Filter operator for supporting the execution of text search
  * queries: WHERE TEXT_MATCH(column_name, query_string....)
  */
+@SuppressWarnings("rawtypes")
 public class TextMatchFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "TextMatchFilterOperator";
 
-  private final Predicate _predicate;
-  private final DataSource _dataSource;
-  private final int _startDocId;
-  private final int _endDocId;
+  private final InvertedIndexReader _textIndexReader;
+  private final String _searchQuery;
+  private final int _numDocs;
 
-  public TextMatchFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId, int endDocId) {
-    Preconditions.checkArgument(predicateEvaluator instanceof TextMatchPredicateEvaluatorFactory.RawValueBasedTextMatchPredicateEvaluator &&
-    !predicateEvaluator.isAlwaysTrue() && !predicateEvaluator.isAlwaysFalse());
-    TextMatchPredicateEvaluatorFactory.RawValueBasedTextMatchPredicateEvaluator evaluator = (TextMatchPredicateEvaluatorFactory.RawValueBasedTextMatchPredicateEvaluator)predicateEvaluator;
-    _predicate = evaluator.getPredicate();
-    _dataSource = dataSource;
-    _startDocId = startDocId;
-    _endDocId = endDocId;
+  public TextMatchFilterOperator(InvertedIndexReader textIndexReader, String searchQuery, int numDocs) {
+    _textIndexReader = textIndexReader;
+    _searchQuery = searchQuery;
+    _numDocs = numDocs;
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    InvertedIndexReader textIndexReader = _dataSource.getInvertedIndex();
-    Preconditions.checkNotNull(textIndexReader, "Error: expecting non-null text index");
-    String searchQuery = ((TextMatchPredicate)_predicate).getSearchQuery();
-    MutableRoaringBitmap docIds = (MutableRoaringBitmap) textIndexReader.getDocIds(searchQuery);
-    return new FilterBlock(new BitmapDocIdSet(new ImmutableRoaringBitmap[]{docIds}, _startDocId, _endDocId, false));
+    return new FilterBlock(
+        new BitmapDocIdSet((ImmutableRoaringBitmap) _textIndexReader.getDocIds(_searchQuery), _numDocs));
   }
 
   @Override

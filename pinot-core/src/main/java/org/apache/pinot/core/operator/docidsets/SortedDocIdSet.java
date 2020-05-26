@@ -19,84 +19,26 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.utils.Pairs.IntPair;
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.EmptyBlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 
 
-public class SortedDocIdSet implements FilterBlockDocIdSet {
+public final class SortedDocIdSet implements FilterBlockDocIdSet {
+  private final List<IntPair> _docIdRanges;
 
-  public final List<IntPair> pairs;
-  public final AtomicLong timeMeasure = new AtomicLong(0);
-  int startDocId;
-  int endDocId;
-  private String datasourceName;
-
-  public SortedDocIdSet(String datasourceName, List<IntPair> pairs) {
-    this.datasourceName = datasourceName;
-    this.pairs = pairs;
+  // NOTE: No need to track numDocs because sorted index can only apply to ImmutableSegment, so the document ids are
+  //       always smaller than numDocs.
+  public SortedDocIdSet(List<IntPair> docIdRanges) {
+    _docIdRanges = docIdRanges;
   }
 
   @Override
-  public int getMinDocId() {
-    if (pairs.size() > 0) {
-      return pairs.get(0).getLeft();
-    } else {
-      return 0;
-    }
-  }
-
-  @Override
-  public int getMaxDocId() {
-    if (pairs.size() > 0) {
-      return pairs.get(pairs.size() - 1).getRight();
-    } else {
-      return 0;
-    }
-  }
-
-  /**
-   * After setting the startDocId, next calls will always return from &gt;=startDocId
-   * @param startDocId
-   */
-  @Override
-  public void setStartDocId(int startDocId) {
-    this.startDocId = startDocId;
-  }
-
-  /**
-   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
-   * @param endDocId
-   */
-  @Override
-  public void setEndDocId(int endDocId) {
-    this.endDocId = endDocId;
+  public SortedDocIdIterator iterator() {
+    return new SortedDocIdIterator(_docIdRanges);
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    // No value scanned when filtering with sorted index.
     return 0L;
-  }
-
-  @Override
-  public BlockDocIdIterator iterator() {
-    if (pairs == null || pairs.isEmpty()) {
-      return EmptyBlockDocIdIterator.getInstance();
-    }
-    return new SortedDocIdIterator(datasourceName, pairs);
-  }
-
-  @SuppressWarnings("unchecked")
-  @Override
-  public <T> T getRaw() {
-    return (T) pairs;
-  }
-
-  @Override
-  public String toString() {
-    return pairs.toString();
   }
 }

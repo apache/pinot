@@ -23,15 +23,16 @@ import org.apache.pinot.core.common.Constants;
 
 
 /**
- * Singleton class which extends {@link BlockDocIdIterator} that is empty, i.e. does not contain any document.
+ * The {@code EmptyDocIdIterator} is a singleton class iterator for EmptyDocIdSet. It always returns
+ * {@link Constants#EOF}.
  */
-public final class EmptyBlockDocIdIterator implements BlockDocIdIterator {
-  private EmptyBlockDocIdIterator() {
+public final class EmptyDocIdIterator implements BlockDocIdIterator {
+  private EmptyDocIdIterator() {
   }
 
-  private static final EmptyBlockDocIdIterator INSTANCE = new EmptyBlockDocIdIterator();
+  private static final EmptyDocIdIterator INSTANCE = new EmptyDocIdIterator();
 
-  public static EmptyBlockDocIdIterator getInstance() {
+  public static EmptyDocIdIterator getInstance() {
     return INSTANCE;
   }
 
@@ -42,11 +43,6 @@ public final class EmptyBlockDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int advance(int targetDocId) {
-    return Constants.EOF;
-  }
-
-  @Override
-  public int currentDocId() {
     return Constants.EOF;
   }
 }

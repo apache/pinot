@@ -215,11 +215,6 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean isResultMatchingAll() {
-    return false;
-  }
-
-  @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
   }
@@ -244,9 +239,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         new ArrayList<>(1 + starTreeResult._remainingPredicateColumns.size());
 
     // Add the bitmap of matching documents from star tree
-    childFilterOperators.add(
-        new BitmapBasedFilterOperator(new ImmutableRoaringBitmap[]{starTreeResult._matchedDocIds}, 0, numDocs - 1,
-            false));
+    childFilterOperators.add(new BitmapBasedFilterOperator(starTreeResult._matchedDocIds, false, numDocs));
 
     // Add remaining predicates
     for (String remainingPredicateColumn : starTreeResult._remainingPredicateColumns) {

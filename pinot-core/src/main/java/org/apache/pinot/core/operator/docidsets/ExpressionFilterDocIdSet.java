@@ -25,60 +25,21 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 
 
-public class ExpressionFilterDocIdSet implements ScanBasedDocIdSet {
-  private final TransformFunction _transformFunction;
-  private final PredicateEvaluator _predicateEvaluator;
-  private final Map<String, DataSource> _dataSourceMap;
-
-  private int _startDocId;
-  private int _endDocId;
-  private ExpressionScanDocIdIterator _iterator;
+public final class ExpressionFilterDocIdSet implements FilterBlockDocIdSet {
+  private final ExpressionScanDocIdIterator _docIdIterator;
 
   public ExpressionFilterDocIdSet(TransformFunction transformFunction, PredicateEvaluator predicateEvaluator,
       Map<String, DataSource> dataSourceMap, int numDocs) {
-    _transformFunction = transformFunction;
-    _predicateEvaluator = predicateEvaluator;
-    _dataSourceMap = dataSourceMap;
-    _startDocId = 0;
-    _endDocId = numDocs;
-  }
-
-  @Override
-  public int getMinDocId() {
-    return _startDocId;
-  }
-
-  @Override
-  public int getMaxDocId() {
-    // NOTE: Return value is inclusive
-    return _endDocId - 1;
-  }
-
-  @Override
-  public void setStartDocId(int startDocId) {
-    _startDocId = startDocId;
-  }
-
-  @Override
-  public void setEndDocId(int endDocId) {
-    // NOTE: The passed in argument is inclusive
-    _endDocId = endDocId + 1;
-  }
-
-  @Override
-  public long getNumEntriesScannedInFilter() {
-    return _iterator.getNumEntriesScanned();
+    _docIdIterator = new ExpressionScanDocIdIterator(transformFunction, predicateEvaluator, dataSourceMap, numDocs);
   }
 
   @Override
   public ExpressionScanDocIdIterator iterator() {
-    _iterator = new ExpressionScanDocIdIterator(_transformFunction, _predicateEvaluator, _dataSourceMap, _startDocId,
-        _endDocId);
-    return _iterator;
+    return _docIdIterator;
   }
 
   @Override
-  public <T> T getRaw() {
-    throw new UnsupportedOperationException();
+  public long getNumEntriesScannedInFilter() {
+    return _docIdIterator.getNumEntriesScanned();
   }
 }

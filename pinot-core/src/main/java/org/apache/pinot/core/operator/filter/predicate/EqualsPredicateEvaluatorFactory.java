@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -53,7 +53,7 @@ public class EqualsPredicateEvaluatorFactory {
    * @return Raw value based EQ predicate evaluator
    */
   public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate,
-      FieldSpec.DataType dataType) {
+      DataType dataType) {
     switch (dataType) {
       case INT:
         return new IntRawValueBasedEqPredicateEvaluator(eqPredicate);
@@ -118,6 +118,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.INT;
+    }
+
+    @Override
     public boolean applySV(int value) {
       return _matchingValue == value;
     }
@@ -133,6 +138,11 @@ public class EqualsPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.EQ;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.LONG;
     }
 
     @Override
@@ -154,6 +164,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.FLOAT;
+    }
+
+    @Override
     public boolean applySV(float value) {
       return _matchingValue == value;
     }
@@ -169,6 +184,11 @@ public class EqualsPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.EQ;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.DOUBLE;
     }
 
     @Override
@@ -190,6 +210,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.STRING;
+    }
+
+    @Override
     public boolean applySV(String value) {
       return _matchingValue.equals(value);
     }
@@ -205,6 +230,11 @@ public class EqualsPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.EQ;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BYTES;
     }
 
     @Override

@@ -36,10 +36,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * The {@code ExpressionScanDocIdIterator} is the scan-based doc id iterator that can handle filters on the expressions.
- * It leverages the projection operator to batch processing the records block by block.
+ * The {@code ExpressionScanDocIdIterator} is the scan-based iterator for ExpressionFilterDocIdSet that can handle
+ * filters on the expressions. It leverages the projection operator to batch processing the records block by block.
  */
-public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
+public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
   private final Map<String, DataSource> _dataSourceMap;
@@ -48,55 +48,26 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
   private final int[] _docIdBuffer = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
   private int _numDocIdsFilled;
 
-  private int _currentDocId = -1;
-  private MutableRoaringBitmap _matchingDocIds;
+  private int _blockEndDocId = 0;
   private PeekableIntIterator _docIdIterator;
-  private int _blockEndDocId;
 
   // NOTE: Number of entries scanned is not accurate because we might need to scan multiple columns in order to solve
-  // the expression, but we only track the number of entries for the resolved expression
-  private int _numEntriesScanned = 0;
+  //       the expression, but we only track the number of entries scanned for the resolved expression.
+  private long _numEntriesScanned = 0L;
 
   public ExpressionScanDocIdIterator(TransformFunction transformFunction, PredicateEvaluator predicateEvaluator,
-      Map<String, DataSource> dataSourceMap, int startDocId, int endDocId) {
+      Map<String, DataSource> dataSourceMap, int numDocs) {
     _transformFunction = transformFunction;
     _predicateEvaluator = predicateEvaluator;
     _dataSourceMap = dataSourceMap;
-    _blockEndDocId = startDocId;
-    _endDocId = endDocId;
-  }
-
-  @Override
-  public boolean isMatch(int docId) {
-    if (_currentDocId == Constants.EOF) {
-      return false;
-    }
-    if (docId < _blockEndDocId) {
-      // Document id within the current block
-      return _matchingDocIds.contains(docId);
-    } else {
-      // Search the block following the document id
-      _blockEndDocId = docId;
-      _matchingDocIds = null;
-      _docIdIterator = null;
-      if (next() == Constants.EOF) {
-        return false;
-      } else {
-        return _matchingDocIds.contains(docId);
-      }
-    }
+    _endDocId = numDocs;
   }
 
   @Override
   public int next() {
-    if (_currentDocId == Constants.EOF) {
-      return Constants.EOF;
-    }
-
     // If there are remaining records in the current block, return them first
     if (_docIdIterator != null && _docIdIterator.hasNext()) {
-      _currentDocId = _docIdIterator.next();
-      return _currentDocId;
+      return _docIdIterator.next();
     }
 
     // Evaluate the records in the next block
@@ -109,47 +80,30 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       processProjectionBlock(projectionBlock, matchingDocIds);
       if (!matchingDocIds.isEmpty()) {
-        _matchingDocIds = matchingDocIds;
         _docIdIterator = matchingDocIds.getIntIterator();
-        _currentDocId = _docIdIterator.next();
-        return _currentDocId;
+        return _docIdIterator.next();
       }
     }
 
-    _currentDocId = Constants.EOF;
     return Constants.EOF;
   }
 
   @Override
   public int advance(int targetDocId) {
-    if (_currentDocId == Constants.EOF) {
-      return Constants.EOF;
-    }
-    if (targetDocId <= _currentDocId) {
-      return _currentDocId;
-    }
-
     if (targetDocId < _blockEndDocId) {
       // Search the current block first
       _docIdIterator.advanceIfNeeded(targetDocId);
       if (_docIdIterator.hasNext()) {
-        _currentDocId = _docIdIterator.next();
-        return _currentDocId;
+        return _docIdIterator.next();
       }
     } else {
-      // Skipping the blocks before the target document id
+      // Skip the blocks before the target document id
       _blockEndDocId = targetDocId;
     }
 
     // Search the block following the target document id
-    _matchingDocIds = null;
     _docIdIterator = null;
     return next();
-  }
-
-  @Override
-  public int currentDocId() {
-    return _currentDocId;
   }
 
   @Override
@@ -305,7 +259,7 @@ public class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
-  public int getNumEntriesScanned() {
+  public long getNumEntriesScanned() {
     return _numEntriesScanned;
   }
 

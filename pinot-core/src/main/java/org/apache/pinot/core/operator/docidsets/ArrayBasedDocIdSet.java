@@ -18,32 +18,21 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
 
 
 public final class ArrayBasedDocIdSet implements BlockDocIdSet {
-
-  private final int[] _docIdArray;
+  private final int[] _docIds;
   private final int _searchableLength;
 
-  public ArrayBasedDocIdSet(int[] docIdArray, int searchableLength) {
-    _docIdArray = docIdArray;
+  public ArrayBasedDocIdSet(int[] docIds, int searchableLength) {
+    _docIds = docIds;
     _searchableLength = searchableLength;
   }
 
   @Override
-  public BlockDocIdIterator iterator() {
-    return new ArrayBasedDocIdIterator(_docIdArray, _searchableLength);
-  }
-
-  @Override
-  public int[] getRaw() {
-    return _docIdArray;
-  }
-
-  public int size() {
-    return _searchableLength;
+  public ArrayBasedDocIdIterator iterator() {
+    return new ArrayBasedDocIdIterator(_docIds, _searchableLength);
   }
 }
