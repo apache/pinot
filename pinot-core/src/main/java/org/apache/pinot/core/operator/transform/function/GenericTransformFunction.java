@@ -44,6 +44,10 @@ public class GenericTransformFunction extends BaseTransformFunction {
   List<FieldSpec.DataType> _nonLiteralArgType;
   List<TransformFunction> _nonLiteralTransformFunction;
   String[] _stringResult;
+  int[] _integerResult;
+  float[] _floatResult;
+  double[] _doubleResult;
+  long[] _longResult;
 
   public GenericTransformFunction() {
     _nonLiteralArgIndices = new ArrayList<>();
@@ -84,6 +88,9 @@ public class GenericTransformFunction extends BaseTransformFunction {
           case "java.lang.Double":
             _args[i] = Double.valueOf(literal);
             break;
+          case "java.lang.Float":
+            _args[i] = Float.valueOf(literal);
+            break;
           case "java.lang.Long":
             _args[i] = Long.valueOf(literal);
             break;
@@ -106,6 +113,9 @@ public class GenericTransformFunction extends BaseTransformFunction {
           case "java.lang.Double":
             _nonLiteralArgType.add(FieldSpec.DataType.DOUBLE);
             break;
+          case "java.lang.Float":
+            _nonLiteralArgType.add(FieldSpec.DataType.FLOAT);
+            break;
           case "java.lang.Long":
             _nonLiteralArgType.add(FieldSpec.DataType.LONG);
             break;
@@ -119,7 +129,56 @@ public class GenericTransformFunction extends BaseTransformFunction {
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return STRING_SV_NO_DICTIONARY_METADATA;
+    Class returnType = _functionInvoker.getReturnType();
+    switch(returnType.getTypeName()) {
+      case "java.lang.Integer": return INT_SV_NO_DICTIONARY_METADATA;
+      case "java.lang.Long": return LONG_SV_NO_DICTIONARY_METADATA;
+      case "java.lang.Float": return DOUBLE_SV_NO_DICTIONARY_METADATA;
+      case "java.lang.Double": return DOUBLE_SV_NO_DICTIONARY_METADATA;
+      case "java.lang.String": return STRING_SV_NO_DICTIONARY_METADATA;
+      default:
+        throw new RuntimeException("Unsupported data type " + returnType.getTypeName() + "for transform function " + getName());
+    }
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    if (_integerResult == null) {
+      _integerResult = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    transformValues(projectionBlock);
+    return _integerResult;
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+    if (_longResult == null) {
+      _longResult = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    transformValues(projectionBlock);
+    return _longResult;
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+    if (_floatResult == null) {
+      _floatResult = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    transformValues(projectionBlock);
+    return _floatResult;
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    if (_doubleResult == null) {
+      _doubleResult = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    transformValues(projectionBlock);
+    return _doubleResult;
   }
 
   @SuppressWarnings("Duplicates")
@@ -128,11 +187,48 @@ public class GenericTransformFunction extends BaseTransformFunction {
     if (_stringResult == null) {
       _stringResult = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
+    transformValues(projectionBlock);
+    return _stringResult;
+  }
 
+  private void transformValues(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     int numNonLiteralArgs = _nonLiteralArgIndices.size();
     Object[][] nonLiteralBlockValues = new Object[numNonLiteralArgs][];
 
+    transformNonLiteralArgsToValues(projectionBlock, numNonLiteralArgs, nonLiteralBlockValues);
+
+    //now invoke the actual function
+    for (int i = 0; i < length; i++) {
+      for (int k = 0; k < numNonLiteralArgs; k++) {
+        _args[_nonLiteralArgIndices.get(k)] = nonLiteralBlockValues[k][i];
+      }
+
+      Class returnType = _functionInvoker.getReturnType();
+      switch(returnType.getTypeName()) {
+        case "java.lang.Integer":
+          _integerResult[i] = (Integer) _functionInvoker.process(_args);
+          break;
+        case "java.lang.Long":
+          _longResult[i] = (Long) _functionInvoker.process(_args);
+          break;
+        case "java.lang.Float":
+          _floatResult[i] = (Float) _functionInvoker.process(_args);
+          break;
+        case "java.lang.Double":
+          _doubleResult[i] = (Double) _functionInvoker.process(_args);
+          break;
+        case "java.lang.String":
+          _stringResult[i] = (String) _functionInvoker.process(_args);
+          break;
+        default:
+          throw new RuntimeException("Unsupported data type " + returnType.getTypeName() + "for transform function " + getName());
+      }
+    }
+  }
+
+  private void transformNonLiteralArgsToValues(ProjectionBlock projectionBlock, int numNonLiteralArgs,
+      Object[][] nonLiteralBlockValues) {
     for (int i = 0; i < numNonLiteralArgs; i++) {
       TransformFunction transformFunc = _nonLiteralTransformFunction.get(i);
       FieldSpec.DataType returnType = _nonLiteralArgType.get(i);
@@ -148,6 +244,14 @@ public class GenericTransformFunction extends BaseTransformFunction {
           double[] doubleValues = transformFunc.transformToDoubleValuesSV(projectionBlock);
           nonLiteralBlockValues[i] = Arrays.stream(doubleValues).boxed().toArray(Double[]::new);
           break;
+        case FLOAT:
+          float[] floatValues = transformFunc.transformToFloatValuesSV(projectionBlock);
+          Float[] floatObjectValues = new Float[floatValues.length];
+          for (int j = 0; j < floatValues.length; j++) {
+            floatObjectValues[j] = floatValues[j];
+          }
+          nonLiteralBlockValues[i] = floatObjectValues;
+          break;
         case LONG:
           long[] longValues = transformFunc.transformToLongValuesSV(projectionBlock);
           nonLiteralBlockValues[i] = Arrays.stream(longValues).boxed().toArray(Long[]::new);
@@ -157,14 +261,5 @@ public class GenericTransformFunction extends BaseTransformFunction {
               "Unsupported return data type " + returnType + "for transform function " + getName());
       }
     }
-
-    //now invoke the actual function
-    for (int i = 0; i < length; i++) {
-      for (int k = 0; k < numNonLiteralArgs; k++) {
-        _args[_nonLiteralArgIndices.get(k)] = nonLiteralBlockValues[k][i];
-      }
-      _stringResult[i] = (String) _functionInvoker.process(_args);
-    }
-    return _stringResult;
   }
 }
