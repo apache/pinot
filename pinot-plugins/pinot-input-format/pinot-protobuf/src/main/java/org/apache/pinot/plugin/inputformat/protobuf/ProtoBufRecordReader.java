@@ -72,12 +72,11 @@ public class ProtoBufRecordReader implements RecordReader {
     _dataFile = dataFile;
     _schema = schema;
     Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
-    ProtoBufRecordExtractorConfig recordExtractorConfig = new ProtoBufRecordExtractorConfig();
     ProtoBufRecordReaderConfig protoBufRecordReaderConfig = (ProtoBufRecordReaderConfig) recordReaderConfig;
     InputStream fin = getDescriptorFileInputStream(protoBufRecordReaderConfig);
     buildProtoBufDescriptor(fin);
     _recordExtractor = new ProtoBufRecordExtractor();
-    _recordExtractor.init(sourceFields, recordExtractorConfig);
+    _recordExtractor.init(sourceFields, null);
     init();
   }
 
@@ -115,8 +114,8 @@ public class ProtoBufRecordReader implements RecordReader {
       throws IOException {
     Message message = null;
     try {
-      DynamicMessage tmp = DynamicMessage.getDefaultInstance(_descriptor);
-      Message.Builder builder = tmp.newBuilderForType();
+      DynamicMessage tempDynamicMessage = DynamicMessage.getDefaultInstance(_descriptor);
+      Message.Builder builder = tempDynamicMessage.newBuilderForType();
       builder.mergeDelimitedFrom(_inputStream);
       message = builder.build();
     } catch (Exception e) {
