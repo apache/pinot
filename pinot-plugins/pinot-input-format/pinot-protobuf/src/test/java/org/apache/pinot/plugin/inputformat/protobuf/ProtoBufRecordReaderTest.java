@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -132,7 +133,8 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
   protected RecordReader createRecordReader()
       throws Exception {
     RecordReader recordReader = new ProtoBufRecordReader();
-    recordReader.init(_tempFile, getPinotSchema(), getProtoRecordReaderConfig());
+    Set<String> sourceFields = getSourceFields(getPinotSchema());
+    recordReader.init(_tempFile, sourceFields, getProtoRecordReaderConfig());
     return recordReader;
   }
 

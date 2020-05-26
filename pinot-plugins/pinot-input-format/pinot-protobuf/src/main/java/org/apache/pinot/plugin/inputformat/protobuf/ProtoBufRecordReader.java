@@ -35,12 +35,9 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.utils.ResourceFinder;
-import org.apache.pinot.spi.utils.SchemaFieldExtractorUtils;
-
 
 public class ProtoBufRecordReader implements RecordReader {
   private File _dataFile;
-  private Schema _schema;
   private ProtoBufRecordExtractor _recordExtractor;
 
   private InputStream _inputStream;
@@ -67,16 +64,14 @@ public class ProtoBufRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
-    _schema = schema;
-    Set<String> sourceFields = SchemaFieldExtractorUtils.extract(schema);
     ProtoBufRecordReaderConfig protoBufRecordReaderConfig = (ProtoBufRecordReaderConfig) recordReaderConfig;
     InputStream fin = getDescriptorFileInputStream(protoBufRecordReaderConfig);
     buildProtoBufDescriptor(fin);
     _recordExtractor = new ProtoBufRecordExtractor();
-    _recordExtractor.init(sourceFields, null);
+    _recordExtractor.init(fieldsToRead, null);
     init();
   }
 
@@ -131,11 +126,6 @@ public class ProtoBufRecordReader implements RecordReader {
       throws IOException {
     _inputStream.close();
     init();
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
   }
 
   @Override
