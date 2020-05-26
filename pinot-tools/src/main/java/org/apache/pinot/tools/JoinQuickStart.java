@@ -22,19 +22,22 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
-public class JoinQuickStart {
+public class JoinQuickStart extends QuickStartBase {
 
-  private void execute()
+  public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir = new File(_tmpDir, String.valueOf(System.currentTimeMillis()));
 
     // Baseball stat table
     File baseBallStatsBaseDir = new File(quickstartTmpDir, "baseballStats");
@@ -120,7 +123,9 @@ public class JoinQuickStart {
 
   public static void main(String[] args)
       throws Exception {
-    PluginManager.get().init();
-    new JoinQuickStart().execute();
+    List<String> arguments = new ArrayList<>();
+    arguments.addAll(Arrays.asList("QuickStart", "-type", "JOIN"));
+    arguments.addAll(Arrays.asList(args));
+    PinotAdministrator.main(arguments.toArray(new String[arguments.size()]));
   }
 }

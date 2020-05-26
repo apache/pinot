@@ -18,28 +18,18 @@
  */
 package org.apache.pinot.tools;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import org.apache.pinot.tools.admin.PinotAdministrator;
+import java.io.File;
+import org.apache.commons.io.FileUtils;
 
 
-public class BatchQuickstartWithMinion extends Quickstart {
+public abstract class QuickStartBase {
+  protected File _tmpDir = FileUtils.getTempDirectory();
 
-  public String getBootstrapDataDir() {
-    return "examples/minions/batch/baseballStats";
+  public QuickStartBase setTmpDir(String tmpDir) {
+    this._tmpDir = new File(tmpDir);
+    return this;
   }
 
-  @Override
-  public int getNumMinions() {
-    return 1;
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    List<String> arguments = new ArrayList<>();
-    arguments.addAll(Arrays.asList("QuickStart", "-type", "BATCH-MINION"));
-    arguments.addAll(Arrays.asList(args));
-    PinotAdministrator.main(arguments.toArray(new String[arguments.size()]));
-  }
+  public abstract void execute()
+      throws Exception;
 }
