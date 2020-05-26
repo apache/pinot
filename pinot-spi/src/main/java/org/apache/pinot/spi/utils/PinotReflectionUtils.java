@@ -30,7 +30,7 @@ import org.reflections.util.FilterBuilder;
 public class PinotReflectionUtils {
   private static final String PINOT_PACKAGE_PREFIX = "org.apache.pinot";
 
-  public static Set<Class<?>> getClassesThroughReflection(final String regexPattern,
+  public synchronized static Set<Class<?>> getClassesThroughReflection(final String regexPattern,
       final Class<? extends Annotation> annotation) {
     Reflections reflections = new Reflections(
         new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(PINOT_PACKAGE_PREFIX))

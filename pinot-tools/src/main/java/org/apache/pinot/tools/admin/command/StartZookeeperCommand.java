@@ -40,7 +40,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   private int _zkPort = 2181;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory for zookeper data.")
-  private String _dataDir = TMP_DIR + "PinotAdmin/zkData";
+  private String _dataDir = CURRENT_USER_DIR + "PinotAdmin/zkData";
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;

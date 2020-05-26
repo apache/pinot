@@ -40,22 +40,30 @@ import org.slf4j.LoggerFactory;
  */
 public class StartControllerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);
-  @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
-  private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
+
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
+
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
+
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
-  private String _dataDir = TMP_DIR + "PinotController";
+  private String _dataDir = CURRENT_USER_DIR + "data/PinotController";
+
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
+
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
+
+  @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
+  private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
+
+  @Option(name = "-configFileName", required = false, aliases = {"-config", "-configFile", "-controllerConfig", "-controllerConf"}, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;
+
   // This can be set via the set method, or via config file input.
   private boolean _tenantIsolation = true;
 

@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 
 public class PinotConfigUtils {
-
   public static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConfigUtils.class);
   private static final String CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT =
@@ -55,7 +54,6 @@ public class PinotConfigUtils {
     if (StringUtils.isEmpty(clusterName)) {
       throw new RuntimeException("clusterName cannot be empty.");
     }
-
     Map<String, Object> properties = new HashMap<>();
     properties.put(ControllerConf.ZK_STR, zkAddress);
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, clusterName);
@@ -139,15 +137,20 @@ public class PinotConfigUtils {
     return null;
   }
 
-  public static Map<String, Object> generateBrokerConf(int brokerPort) {
+  public static Map<String, Object> generateBrokerConf(String clusterName, String zkAddress, String brokerHost,
+      int brokerPort)
+      throws SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
+    properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME, !StringUtils.isEmpty(brokerHost) ? brokerHost : NetUtils.getHostAddress());
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
-
     return properties;
   }
 
-  public static Map<String, Object> generateServerConf(String serverHost, int serverPort, int serverAdminPort,
-      String serverDataDir, String serverSegmentDir) throws SocketException, UnknownHostException {
+  public static Map<String, Object> generateServerConf(String clusterName, String zkAddress, String serverHost,
+      int serverPort, int serverAdminPort, String serverDataDir, String serverSegmentDir)
+      throws SocketException, UnknownHostException {
     if (serverHost == null) {
       serverHost = NetUtils.getHostAddress();
     }
@@ -164,6 +167,8 @@ public class PinotConfigUtils {
       serverSegmentDir = TMP_DIR + String.format("Server_%s_%d/server/segment", serverHost, serverPort);
     }
     Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, serverHost);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, serverPort);
     properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, serverAdminPort);
@@ -173,12 +178,14 @@ public class PinotConfigUtils {
     return properties;
   }
 
-  public static Map<String, Object> generateMinionConf(String minionHost, int minionPort)
+  public static Map<String, Object> generateMinionConf(String clusterName, String zkAddress, String minionHost, int minionPort)
       throws SocketException, UnknownHostException {
     if (minionHost == null) {
       minionHost = NetUtils.getHostAddress();
     }
     Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
     properties.put(CommonConstants.Helix.KEY_OF_MINION_HOST, minionHost);
     properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, minionPort != 0 ? minionPort : getAvailablePort());
 

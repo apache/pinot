@@ -111,7 +111,7 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
     if (_configFileName != null) {
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
     } else {
-      properties.putAll(PinotConfigUtils.generateMinionConf(_minionHost, _minionPort));
+      properties.putAll(PinotConfigUtils.generateMinionConf(_clusterName, _zkAddress, _minionHost, _minionPort));
     }
     if (_configOverrides != null) {
       properties.putAll(_configOverrides);

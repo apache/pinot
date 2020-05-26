@@ -62,15 +62,15 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help;
-  @Option(name = "-zkAddress", required = true, metaVar = "<http>", usage = "Http address of Zookeeper.")
+  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.", forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
-  @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Pinot cluster name.")
+  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.", forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
   private String _clusterName = DEFAULT_CLUSTER_NAME;
-  @Option(name = "-port", required = true, metaVar = "<int>", usage = "Pinot service manager admin port, -1 means disable, 0 means a random available port.")
-  private int _port;
-  @Option(name = "-bootstrapConfigPaths", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service config file paths. Each config file requires an extra config: 'pinot.service.role' to indicate which service to start.", forbids = {"-bootstrapServices"})
+  @Option(name = "-port", required = false, metaVar = "<int>", usage = "Pinot service manager admin port, -1 means disable, 0 means a random available port.", forbids = {"-bootstrapConfigPaths", "-bootstrapServices"})
+  private int _port = -1;
+  @Option(name = "-bootstrapConfigPaths", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service config file paths. Each config file requires an extra config: 'pinot.service.role' to indicate which service to start.", forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapServices"})
   private String[] _bootstrapConfigPaths;
-  @Option(name = "-bootstrapServices", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER", forbids = {"-bootstrapConfigPaths"})
+  @Option(name = "-bootstrapServices", handler = StringArrayOptionHandler.class, required = false, usage = "A list of Pinot service roles to start with default config. E.g. CONTROLLER/BROKER/SERVER", forbids = {"-zkAddress", "-clusterName", "-port", "-bootstrapConfigPaths"})
   private String[] _bootstrapServices = BOOTSTRAP_SERVICES;
 
   private PinotServiceManager _pinotServiceManager;
@@ -206,9 +206,9 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
         return PinotConfigUtils.generateControllerConf(_zkAddress, _clusterName, null, DEFAULT_CONTROLLER_PORT, null,
             ControllerConf.ControllerMode.DUAL, true);
       case BROKER:
-        return PinotConfigUtils.generateBrokerConf(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+        return PinotConfigUtils.generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
       case SERVER:
-        return PinotConfigUtils.generateServerConf(null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
+        return PinotConfigUtils.generateServerConf(_clusterName, _zkAddress,null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
             CommonConstants.Server.DEFAULT_ADMIN_API_PORT, null, null);
       default:
         throw new RuntimeException("No default config found for service role: " + serviceRole);

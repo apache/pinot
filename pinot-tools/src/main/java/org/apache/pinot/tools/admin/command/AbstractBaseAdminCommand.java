@@ -49,7 +49,7 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   static final String DEFAULT_CONTROLLER_PORT = "9000";
   static final String URI_TABLES_PATH = "/tables/";
 
-  static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
+  static final String CURRENT_USER_DIR = System.getProperty("user.dir") + File.separator;
 
   public AbstractBaseAdminCommand(boolean addShutdownHook) {
     super(addShutdownHook);

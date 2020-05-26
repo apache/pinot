@@ -185,10 +185,8 @@ public class PinotServiceManagerInstanceResource {
           properties.put(CONFIG_OF_CONTROLLER_METRICS_PREFIX,
               String.format("%s.%s_%s", DEFAULT_METRICS_PREFIX, controllerHost, controllerPort));
         }
-
         break;
       case BROKER:
-
         if (!properties.containsKey(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT)) {
           properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, getAvailablePort());
         }
