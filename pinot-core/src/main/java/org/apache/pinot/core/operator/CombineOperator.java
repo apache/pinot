@@ -168,13 +168,13 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     try {
       mergedBlock = mergedBlockFuture.get(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
-      LOGGER.error("Caught InterruptedException.", e);
+      LOGGER.error("Caught InterruptedException. (brokerRequest = {})", _brokerRequest, e);
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.FUTURE_CALL_ERROR, e));
     } catch (ExecutionException e) {
-      LOGGER.error("Caught ExecutionException.", e);
+      LOGGER.error("Caught ExecutionException. (brokerRequest = {})", _brokerRequest, e);
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
     } catch (TimeoutException e) {
-      LOGGER.error("Caught TimeoutException", e);
+      LOGGER.error("Caught TimeoutException. (brokerRequest = {})", _brokerRequest, e);
       mergedBlockFuture.cancel(true);
       mergedBlock =
           new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));

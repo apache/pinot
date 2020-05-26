@@ -174,8 +174,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
           } catch (EarlyTerminationException e) {
             // Early-terminated because query times out or is already satisfied
           } catch (Exception e) {
-            LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}", index,
-                _operators.get(index).getClass().getName(), e);
+            LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}, brokerRequest {}", index,
+                _operators.get(index).getClass().getName(), _brokerRequest, e);
             mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
           } finally {
             operatorLatch.countDown();
@@ -189,7 +189,9 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
       if (!opCompleted) {
         // If this happens, the broker side should already timed out, just log the error and return
-        String errorMessage = "Timed out while combining group-by results after " + _timeOutMs + "ms";
+        String errorMessage =
+            String.format("Timed out while combining group-by results after %dms, brokerRequest = %s", _timeOutMs,
+                _brokerRequest);
         LOGGER.error(errorMessage);
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
       }
