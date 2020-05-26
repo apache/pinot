@@ -22,8 +22,6 @@ package org.apache.pinot.thirdeye.datalayer.pojo;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
-import org.apache.pinot.thirdeye.completeness.checker.Wo4WAvgDataCompletenessAlgorithm;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -34,8 +32,6 @@ import java.util.concurrent.TimeUnit;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class DatasetConfigBean extends AbstractBean {
-
-  public static final String DEFAULT_COMPLETENESS_ALGORITHM = Wo4WAvgDataCompletenessAlgorithm.class.getName();
   public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
   // This is the expected delay for the hourly/daily data source.
   // 1 hour delay means we always expect to have 1 hour's before's data.
@@ -93,10 +89,6 @@ public class DatasetConfigBean extends AbstractBean {
   private boolean requiresCompletenessCheck = false;
   // delay expected for a dataset for data to arrive
   private TimeGranularity expectedDelay = DEFAULT_DAILY_EXPECTED_DELAY;
-  // algorithm to use for computing data completeness
-  private String dataCompletenessAlgorithm = DEFAULT_COMPLETENESS_ALGORITHM;
-  // expected percentage completeness for dataset to be marked complete
-  private double expectedCompleteness = Wo4WAvgDataCompletenessAlgorithm.DEFAULT_EXPECTED_COMPLETENESS;
   // latest timestamp of the dataset updated by external events
   private long lastRefreshTime;
   // timestamp of receiving the last update event
@@ -267,25 +259,6 @@ public class DatasetConfigBean extends AbstractBean {
     this.expectedDelay = expectedDelay;
   }
 
-
-  public double getExpectedCompleteness() {
-    return expectedCompleteness;
-  }
-
-  public void setExpectedCompleteness(double expectedCompleteness) {
-    this.expectedCompleteness = expectedCompleteness;
-  }
-
-
-
-  public String getDataCompletenessAlgorithm() {
-    return dataCompletenessAlgorithm;
-  }
-
-  public void setDataCompletenessAlgorithm(String dataCompletenessAlgorithm) {
-    this.dataCompletenessAlgorithm = dataCompletenessAlgorithm;
-  }
-
   public Map<String, String> getProperties() {
     return properties;
   }
@@ -328,8 +301,7 @@ public class DatasetConfigBean extends AbstractBean {
     }
     DatasetConfigBean that = (DatasetConfigBean) o;
     return active == that.active && additive == that.additive && realtime == that.realtime
-        && requiresCompletenessCheck == that.requiresCompletenessCheck
-        && Double.compare(that.expectedCompleteness, expectedCompleteness) == 0 && Objects.equals(dataset, that.dataset)
+        && requiresCompletenessCheck == that.requiresCompletenessCheck && Objects.equals(dataset, that.dataset)
         && Objects.equals(displayName, that.displayName) && Objects.equals(dimensions, that.dimensions)
         && Objects.equals(timeColumn, that.timeColumn) && timeUnit == that.timeUnit && Objects.equals(timeDuration,
         that.timeDuration) && Objects.equals(timeFormat, that.timeFormat) && Objects.equals(timezone, that.timezone)
@@ -337,15 +309,13 @@ public class DatasetConfigBean extends AbstractBean {
         dimensionsHaveNoPreAggregation, that.dimensionsHaveNoPreAggregation) && Objects.equals(preAggregatedKeyword,
         that.preAggregatedKeyword) && Objects.equals(nonAdditiveBucketSize, that.nonAdditiveBucketSize)
         && nonAdditiveBucketUnit == that.nonAdditiveBucketUnit && Objects.equals(expectedDelay, that.expectedDelay)
-        && Objects.equals(dataCompletenessAlgorithm, that.dataCompletenessAlgorithm) && Objects.equals(properties,
-        that.properties);
+        && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(dataset, displayName, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
         dataSource, owners, active, additive, dimensionsHaveNoPreAggregation, preAggregatedKeyword,
-        nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime, requiresCompletenessCheck, expectedDelay,
-        dataCompletenessAlgorithm, expectedCompleteness, properties);
+        nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime, requiresCompletenessCheck, expectedDelay, properties);
   }
 }

@@ -34,7 +34,6 @@ import org.apache.pinot.thirdeye.datalayer.entity.AlertSnapshotIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ApplicationIndex;
-import org.apache.pinot.thirdeye.datalayer.entity.AutotuneConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ClassificationConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
