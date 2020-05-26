@@ -20,48 +20,16 @@
 package org.apache.pinot.thirdeye.anomaly.task;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobContext;
-import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorJobContext;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskInfo;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 
 /**
  * Generates tasks for a job depending on the task type
  */
 public class TaskGenerator {
-
-  public List<DetectionTaskInfo> createDetectionTasks(DetectionJobContext detectionJobContext,
-      List<DateTime> monitoringWindowStartTimes, List<DateTime> monitoringWindowEndTimes)
-      throws Exception {
-
-    List<DetectionTaskInfo> tasks = new ArrayList<>();
-    AnomalyFunctionDTO anomalyFunctionSpec = detectionJobContext.getAnomalyFunctionSpec();
-
-    long jobExecutionId = detectionJobContext.getJobExecutionId();
-    // generate tasks
-    String exploreDimensionsString = anomalyFunctionSpec.getExploreDimensions();
-    if (StringUtils.isBlank(exploreDimensionsString)) {
-      DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId,
-          monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec, null,
-          detectionJobContext.getDetectionJobType());
-      tasks.add(taskInfo);
-    } else {
-      DetectionTaskInfo taskInfo =
-          new DetectionTaskInfo(jobExecutionId, monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec,
-              exploreDimensionsString, detectionJobContext.getDetectionJobType());
-        tasks.add(taskInfo);
-    }
-
-    return tasks;
-
-  }
-
   public List<MonitorTaskInfo> createMonitorTasks(MonitorJobContext monitorJobContext) {
     List<MonitorTaskInfo> tasks = new ArrayList<>();
     MonitorConfiguration monitorConfiguration = monitorJobContext.getMonitorConfiguration();

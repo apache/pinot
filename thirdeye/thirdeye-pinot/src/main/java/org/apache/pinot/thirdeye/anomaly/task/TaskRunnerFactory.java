@@ -19,14 +19,12 @@
 
 package org.apache.pinot.thirdeye.anomaly.task;
 
-import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskRunner;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskRunner;
 import org.apache.pinot.thirdeye.detection.dataquality.DataQualityPipelineTaskRunner;
 import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskRunner;
-
 
 /**
  * This class returns an instance of the task runner depending on the task type
@@ -47,11 +45,6 @@ public class TaskRunnerFactory {
         break;
       case YAML_DETECTION_ONBOARD:
         taskRunner = new YamlOnboardingTaskRunner();
-        break;
-      case ANOMALY_DETECTION:
-        taskRunner = new DetectionTaskRunner();
-        break;
-      case MERGE:
         break;
       case MONITOR:
         taskRunner = new MonitorTaskRunner();

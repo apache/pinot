@@ -26,18 +26,12 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 public class MonitorJobScheduler {
-
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobScheduler.class);
-
   private ScheduledExecutorService scheduledExecutorService;
-
-  private JobManager anomalyJobDAO;
   private TaskManager anomalyTaskDAO;
   private MonitorConfiguration monitorConfiguration;
   private MonitorJobRunner monitorJobRunner;
@@ -45,7 +39,6 @@ public class MonitorJobScheduler {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public MonitorJobScheduler(MonitorConfiguration monitorConfiguration) {
-    this.anomalyJobDAO = DAO_REGISTRY.getJobDAO();
     this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
     this.monitorConfiguration = monitorConfiguration;
     scheduledExecutorService = Executors.newScheduledThreadPool(10);
@@ -55,7 +48,6 @@ public class MonitorJobScheduler {
     LOG.info("Starting monitor service");
 
     monitorJobContext = new MonitorJobContext();
-    monitorJobContext.setJobDAO(anomalyJobDAO);
     monitorJobContext.setTaskDAO(anomalyTaskDAO);
     monitorJobContext.setMonitorConfiguration(monitorConfiguration);
 

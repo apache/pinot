@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.anomaly;
 
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityEventListenerDriver;
 import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityTaskScheduler;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventResource;
@@ -38,8 +37,6 @@ import org.apache.pinot.thirdeye.datasource.pinot.resources.PinotDataSourceResou
 import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.scheduler.DetectionCronScheduler;
 import org.apache.pinot.thirdeye.scheduler.SubscriptionCronScheduler;
-import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
-import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
@@ -56,10 +53,7 @@ public class ThirdEyeAnomalyApplication
 
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
-  private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AutoOnboardService autoOnboardService = null;
-  private AlertFilterFactory alertFilterFactory = null;
-  private AnomalyClassifierFactory anomalyClassifierFactory = null;
   private HolidayEventsLoader holidayEventsLoader = null;
   private MockEventsLoader mockEventsLoader = null;
   private RequestStatisticsLogger requestStatisticsLogger = null;
@@ -121,11 +115,7 @@ public class ThirdEyeAnomalyApplication
         requestStatisticsLogger.start();
 
         if (config.isWorker()) {
-          initAnomalyFunctionFactory(config.getFunctionConfigPath());
-          initAlertFilterFactory(config.getAlertFilterConfigPath());
-          initAnomalyClassifierFactory(config.getAnomalyClassifierConfigPath());
-
-          taskDriver = new TaskDriver(config, anomalyFunctionFactory, alertFilterFactory, anomalyClassifierFactory);
+          taskDriver = new TaskDriver(config);
           taskDriver.start();
         }
         if (config.isMonitor()) {
@@ -205,23 +195,4 @@ public class ThirdEyeAnomalyApplication
       }
     });
   }
-
-  private void initAnomalyFunctionFactory(String functoinConfigPath) {
-    if (anomalyFunctionFactory == null) {
-      anomalyFunctionFactory = new AnomalyFunctionFactory(functoinConfigPath);
-    }
-  }
-
-  private void initAlertFilterFactory(String alertFilterConfigPath) {
-    if (alertFilterFactory == null) {
-      alertFilterFactory = new AlertFilterFactory(alertFilterConfigPath);
-    }
-  }
-
-  private void initAnomalyClassifierFactory(String anomalyClassifierConfigPath) {
-    if (anomalyClassifierFactory == null) {
-      anomalyClassifierFactory = new AnomalyClassifierFactory(anomalyClassifierConfigPath);
-    }
-  }
-
 }

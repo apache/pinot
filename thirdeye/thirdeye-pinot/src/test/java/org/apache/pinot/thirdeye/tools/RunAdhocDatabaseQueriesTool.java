@@ -408,7 +408,7 @@ public class RunAdhocDatabaseQueriesTool {
       try {
         long anomalyFunctionId = Long.parseLong(names[0]);
         jobDTO.setConfigId(anomalyFunctionId);
-        jobDTO.setTaskType(TaskConstants.TaskType.ANOMALY_DETECTION);
+        jobDTO.setTaskType(TaskConstants.TaskType.DETECTION);
         jobDTO.setLastModified(new Timestamp(System.currentTimeMillis()));
         jobDAO.save(jobDTO);
       } catch (Exception e) {

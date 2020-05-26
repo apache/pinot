@@ -23,10 +23,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -70,9 +68,7 @@ public class TaskDriver {
 
   private volatile boolean shutdown = false;
 
-  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
-      AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory,
-      AnomalyClassifierFactory anomalyClassifierFactory) {
+  public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration) {
     driverConfiguration = thirdEyeAnomalyConfiguration.getTaskDriverConfiguration();
     workerId = thirdEyeAnomalyConfiguration.getId();
     taskDAO = DAO_REGISTRY.getTaskDAO();
@@ -83,10 +79,7 @@ public class TaskDriver {
             driverConfiguration.getMaxParallelTasks(),
             new ThreadFactoryBuilder().setNameFormat("task-watcher-%d").setDaemon(true).build());
     taskContext = new TaskContext();
-    taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
-    taskContext.setAlertFilterFactory(alertFilterFactory);
-    taskContext.setAnomalyClassifierFactory(anomalyClassifierFactory);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);
   }

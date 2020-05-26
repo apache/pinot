@@ -25,12 +25,10 @@ import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameSerializer;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
-import org.apache.pinot.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
@@ -48,7 +46,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
   protected AnomalyFunctionManager anomalyFunctionDAO;
-  protected JobManager jobDAO;
   protected MergedAnomalyResultManager mergedAnomalyResultDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
@@ -60,7 +57,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
     DaoProviderUtil.init(new File(persistenceConfig));
     anomalyFunctionDAO = DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
-    jobDAO = DaoProviderUtil.getInstance(JobManagerImpl.class);
     mergedAnomalyResultDAO = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     datasetConfigDAO = DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);
     metricConfigDAO = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);

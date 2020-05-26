@@ -26,12 +26,8 @@ public class TaskConstants {
     DETECTION,
     DETECTION_ALERT,
     YAML_DETECTION_ONBOARD,
-    ANOMALY_DETECTION,
-    MERGE,
     // TODO: deprecate ALERT task type
-    MONITOR,
-    CLASSIFICATION,
-    REPLAY
+    MONITOR
   }
 
   public enum TaskStatus {

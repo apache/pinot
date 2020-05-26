@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.anomaly.task;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
@@ -54,12 +53,6 @@ public class TaskInfoFactory {
           break;
         case YAML_DETECTION_ONBOARD:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, YamlOnboardingTaskInfo.class);
-          break;
-        case ANOMALY_DETECTION:
-          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionTaskInfo.class);
-          break;
-        case MERGE:
-          LOG.error("TaskType MERGE not supported");
           break;
         case MONITOR:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, MonitorTaskInfo.class);

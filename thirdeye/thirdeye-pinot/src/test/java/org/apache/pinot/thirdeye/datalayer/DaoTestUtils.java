@@ -195,7 +195,7 @@ public class DaoTestUtils {
     JobDTO jobSpec = new JobDTO();
     jobSpec.setJobName("Test_Anomaly_Job");
     jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
-    jobSpec.setTaskType(TaskConstants.TaskType.ANOMALY_DETECTION);
+    jobSpec.setTaskType(TaskConstants.TaskType.DETECTION);
     jobSpec.setScheduleStartTime(System.currentTimeMillis());
     jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
     jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
