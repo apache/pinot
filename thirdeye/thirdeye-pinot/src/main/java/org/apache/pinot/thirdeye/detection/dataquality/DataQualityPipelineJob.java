@@ -41,9 +41,6 @@ import org.slf4j.LoggerFactory;
 public class DataQualityPipelineJob implements Job {
   private static final Logger LOG = LoggerFactory.getLogger(DataQualityPipelineJob.class);
 
-  private final TaskManager taskDAO = DAORegistry.getInstance().getTaskDAO();
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final long DATA_AVAILABILITY_TASK_TIMEOUT = TimeUnit.MINUTES.toMillis(15);
 
   @Override
@@ -58,16 +55,7 @@ public class DataQualityPipelineJob implements Job {
       return;
     }
 
-    String taskInfoJson = null;
-    try {
-      taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
-    } catch (JsonProcessingException e) {
-      LOG.error("Exception when converting DetectionPipelineTaskInfo {} to jsonString", taskInfo, e);
-    }
-
-    TaskDTO taskDTO = TaskUtils.buildTask(taskInfo.getConfigId(), taskInfoJson, TaskConstants.TaskType.DATA_QUALITY);
-    long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created {} task {} with taskId {}", TaskConstants.TaskType.DATA_QUALITY, taskDTO, taskId);
+    TaskUtils.createDataQualityTask(taskInfo);
   }
 }
 

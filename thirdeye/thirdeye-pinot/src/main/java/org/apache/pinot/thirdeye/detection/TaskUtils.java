@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
@@ -32,6 +33,8 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.util.ThirdEyeUtils.getDetectionExpectedDelay;
 
@@ -39,6 +42,7 @@ import static org.apache.pinot.thirdeye.util.ThirdEyeUtils.getDetectionExpectedD
  * Holds utility functions related to ThirdEye Tasks
  */
 public class TaskUtils {
+  private static final Logger LOG = LoggerFactory.getLogger(TaskUtils.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   /**
@@ -92,7 +96,32 @@ public class TaskUtils {
 
   public static DetectionPipelineTaskInfo buildTaskInfoFromDetectionConfig(DetectionConfigDTO configDTO, long end) {
     long delay = getDetectionExpectedDelay(configDTO);
-    long start = Math.max(configDTO.getLastTimestamp(), end  - ThirdEyeUtils.DETECTION_TASK_MAX_LOOKBACK_WINDOW - delay);
+    long start = Math.max(configDTO.getLastTimestamp(), end - ThirdEyeUtils.DETECTION_TASK_MAX_LOOKBACK_WINDOW - delay);
     return new DetectionPipelineTaskInfo(configDTO.getId(), start, end);
+  }
+
+  public static long createDetectionTask(DetectionPipelineTaskInfo taskInfo) {
+    return TaskUtils.createTask(TaskConstants.TaskType.DETECTION, taskInfo);
+  }
+
+  public static long createDataQualityTask(DetectionPipelineTaskInfo taskInfo) {
+    return TaskUtils.createTask(TaskConstants.TaskType.DATA_QUALITY, taskInfo);
+  }
+
+  /**
+   * Creates a generic task and saves it.
+   */
+  public static long createTask(TaskConstants.TaskType taskType, DetectionPipelineTaskInfo taskInfo) {
+    String taskInfoJson = null;
+    try {
+      taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
+    } catch (JsonProcessingException e) {
+      LOG.error("Exception when converting DetectionPipelineTaskInfo {} to jsonString", taskInfo, e);
+    }
+
+    TaskDTO taskDTO = TaskUtils.buildTask(taskInfo.getConfigId(), taskInfoJson, taskType);
+    long id = DAORegistry.getInstance().getTaskDAO().save(taskDTO);
+    LOG.info("Created {} task {} with taskId {}", taskType, taskDTO, id);
+    return id;
   }
 }
