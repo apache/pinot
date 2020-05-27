@@ -26,8 +26,8 @@ if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   echo "Current build version: $BUILD_VERSION${DEV_VERSION}"
   mvn versions:set -DnewVersion="$BUILD_VERSION${DEV_VERSION}" -q -B
   mvn versions:commit -q -B
-  # Deploy ThirdEye to bintray
-  mvn deploy -s ../.travis/.ci.settings.xml -DskipTests -q
+  # Deploy ThirdEye backend to bintray
+  mvn -pl '!thirdeye-frontend' deploy -s ../.travis/.ci.settings.xml -DskipTests -q
   # Deploy ThirdEye frontend to NPM
   cd thirdeye-frontend/
   npm version ${BUILD_VERSION}${DEV_VERSION}

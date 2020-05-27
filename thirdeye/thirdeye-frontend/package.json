@@ -8,7 +8,7 @@
     "doc": "doc",
     "test": "tests"
   },
-  "repository": "",
+  "repository": "http://registry.npmjs.org/",
   "scripts": {
     "build": "ember build",
     "lint:js": "eslint ./*.js app config lib server tests",
