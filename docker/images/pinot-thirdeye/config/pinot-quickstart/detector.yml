@@ -17,6 +17,7 @@ alert: false
 autoload: true
 classifier: false
 holidayEventsLoader: false
+mockEventsLoader: true
 monitor: true
 pinotProxy: false
 scheduler: true
@@ -82,3 +83,45 @@ holidayEventsLoaderConfiguration:
        - "en.vietnamese#holiday@group.v.calendar.google.com"
   holidayLoadRange: 2592000000
   runFrequency: 7
+mockEventsLoaderConfiguration:
+  generators:
+    - type: HOLIDAY
+      arrivalType: exponential
+      arrivalMean: 86400000
+      durationType: fixed
+      durationMean: 86400000
+      seed: 0
+      namePrefixes: [First, Second, Third, Last, Funky, Happy, Sad, Glorious, Jolly, Unity, Pinot's]
+      nameSuffixes: [day, day, days, celebration, rememberance, occurrence, moment]
+    - type: INFORMED
+      arrivalType: exponential
+      arrivalMean: 43200000
+      durationType: exponential
+      durationMean: 3600000
+      seed: 1
+      namePrefixes: [Login, Web, Search, Catalog, Integration, Network, Backup, Ingress, Proxy, Failure, Pinot, ThirdEye]
+      nameSuffixes: [backend, frontend, v1.1, v1.2, v1.3, v2.0, v3, v4, v5, storage, topic, container, database]
+    - type: CM
+      arrivalType: exponential
+      arrivalMean: 21600000
+      durationType: fixed
+      durationMean: 1800000
+      seed: 2
+      namePrefixes: [Database, Web, Search, Catalog, Integration, Network, Backup, Ingress, Proxy, Failure, Pinot, ThirdEye]
+    - type: CUSTOM
+      arrivalType: exponential
+      arrivalMean: 432000000
+      durationType: exponential
+      durationMean: 86400000
+      seed: 3
+      namePrefixes: [Marketing, Onboarding, Vaction, Outreach, InDay]
+      nameSuffixes: [integration, campaign, meeting]
+    - type: LIX
+      arrivalType: exponential
+      arrivalMean: 259200000
+      durationType: exponential
+      durationMean: 604800000
+      seed: 4
+      namePrefixes: [System, Model, Campaign, Welcome, Pinot, ThirdEye]
+      nameSuffixes: [tuning, bugfix, rollout, test]
+

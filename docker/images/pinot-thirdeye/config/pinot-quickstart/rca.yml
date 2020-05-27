@@ -31,7 +31,11 @@ frameworks:
     eventExperiment:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: org.apache.pinot.thirdeye.rootcause.impl.EmptyPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
+          properties:
+            strategy: COMPOUND
+            k: 500
+            eventType: LIX
 
     eventHoliday:
         - outputName: METRIC_RELATED
@@ -44,7 +48,7 @@ frameworks:
           properties:
               strategy: COMPOUND
               k: 500
-              eventType: holiday
+              eventType: HOLIDAY
 
     eventCustom:
         - outputName: OUTPUT
@@ -53,7 +57,7 @@ frameworks:
           properties:
               strategy: COMPOUND
               k: 500
-              eventType: custom
+              eventType: CUSTOM
 
     eventAnomaly:
         - outputName: OUTPUT
@@ -73,10 +77,22 @@ frameworks:
     eventChange:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: org.apache.pinot.thirdeye.rootcause.impl.EmptyPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
+          properties:
+            strategy: COMPOUND
+            k: 500
+            eventType: CM
 
     eventDeployment:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: org.apache.pinot.thirdeye.rootcause.impl.EmptyPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
+          properties:
+            strategy: COMPOUND
+            k: 500
+            eventType: INFORMED
 
+    eventAC:
+      - outputName: OUTPUT
+        inputNames: [INPUT]
+        className: org.apache.pinot.thirdeye.rootcause.impl.EmptyPipeline
