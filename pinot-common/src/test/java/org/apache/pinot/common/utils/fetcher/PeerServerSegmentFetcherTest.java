@@ -21,12 +21,9 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -48,10 +45,6 @@ import static org.testng.Assert.fail;
 
 
 public class PeerServerSegmentFetcherTest {
-  private static final String HTTP_PROTOCOL = "http";
-  private static final String HTTPS_PROTOCOL = "https";
-  private static final String PEER_2_PEER_PROTOCOL = "server";
-
   private static final String TABLE_NAME_WITH_TYPE = "testTable_REALTIME";
   private static final String SEGMENT_1 = "testTable__0__0__t11";
   private static final String SEGMENT_2 = "testTable__0__1__t11";
@@ -64,11 +57,6 @@ public class PeerServerSegmentFetcherTest {
   @BeforeClass
   public void initSegmentFetcherFactoryWithPeerServerSegmentFetcher()
       throws Exception {
-    Configuration config = new BaseConfiguration();
-    config.addProperty("protocols", Arrays.asList(HTTP_PROTOCOL, HTTPS_PROTOCOL, PEER_2_PEER_PROTOCOL));
-    config.addProperty(PEER_2_PEER_PROTOCOL + ".downloader.class",
-        FakeHttpSegmentFetcher.class.getName());
-
     HelixManager helixManager;
     HelixAdmin helixAdmin;
     {
