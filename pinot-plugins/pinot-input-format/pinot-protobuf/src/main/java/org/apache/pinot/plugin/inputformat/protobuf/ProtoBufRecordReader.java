@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.utils.ResourceFinder;
 
+
 public class ProtoBufRecordReader implements RecordReader {
   private File _dataFile;
   private ProtoBufRecordExtractor _recordExtractor;
@@ -43,6 +44,7 @@ public class ProtoBufRecordReader implements RecordReader {
   private InputStream _inputStream;
   private boolean _hasNext;
   private Descriptors.Descriptor _descriptor;
+  private DynamicMessage _dynamicMessage;
 
   private boolean hasMoreToRead()
       throws IOException {
@@ -72,6 +74,7 @@ public class ProtoBufRecordReader implements RecordReader {
     buildProtoBufDescriptor(fin);
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
+    _dynamicMessage = DynamicMessage.getDefaultInstance(_descriptor);
     init();
   }
 
@@ -109,8 +112,7 @@ public class ProtoBufRecordReader implements RecordReader {
       throws IOException {
     Message message = null;
     try {
-      DynamicMessage tempDynamicMessage = DynamicMessage.getDefaultInstance(_descriptor);
-      Message.Builder builder = tempDynamicMessage.newBuilderForType();
+      Message.Builder builder = _dynamicMessage.newBuilderForType();
       builder.mergeDelimitedFrom(_inputStream);
       message = builder.build();
     } catch (Exception e) {
