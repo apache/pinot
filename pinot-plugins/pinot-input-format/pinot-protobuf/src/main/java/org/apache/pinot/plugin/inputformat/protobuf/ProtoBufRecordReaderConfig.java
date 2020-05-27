@@ -16,8 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data.readers;
+package org.apache.pinot.plugin.inputformat.protobuf;
 
-public enum FileFormat {
-  AVRO, GZIPPED_AVRO, CSV, JSON, PINOT, THRIFT, PARQUET, ORC, PROTO, OTHER
+import java.net.URI;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+
+
+public class ProtoBufRecordReaderConfig implements RecordReaderConfig {
+  private URI _descriptorFile;
+
+  public URI getDescriptorFile() {
+    return _descriptorFile;
+  }
+
+  public void setDescriptorFile(URI descriptorFile) {
+    _descriptorFile = descriptorFile;
+  }
 }
