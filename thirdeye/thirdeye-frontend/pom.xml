@@ -21,7 +21,6 @@
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
         <version>1.9.1</version>
-
         <executions>
           <execution>
             <id>install node and npm</id>
@@ -31,7 +30,26 @@
             </goals>
             <configuration>
               <nodeVersion>v10.16.3</nodeVersion>
-              <yarnVersion>v1.12.0</yarnVersion>
+              <yarnVersion>v1.22.4</yarnVersion>
+            </configuration>
+          </execution>
+          <execution>
+            <id>yarn config</id>
+            <goals>
+              <goal>yarn</goal>
+            </goals>
+            <configuration>
+              <!-- ensure that it uses packages from open source NPM -->
+              <arguments>config set registry http://registry.npmjs.org/</arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>yarn list config</id>
+            <goals>
+              <goal>yarn</goal>
+            </goals>
+            <configuration>
+              <arguments>config list</arguments>
             </configuration>
           </execution>
           <execution>

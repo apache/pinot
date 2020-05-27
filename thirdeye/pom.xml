@@ -27,6 +27,7 @@
   <name>thirdeye</name>
 
   <modules>
+    <module>thirdeye-frontend</module>
     <module>thirdeye-pinot</module>
   </modules>
 
