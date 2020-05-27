@@ -43,6 +43,7 @@ public class GenericTransformFunction extends BaseTransformFunction {
   List<Integer> _nonLiteralArgIndices;
   List<FieldSpec.DataType> _nonLiteralArgType;
   List<TransformFunction> _nonLiteralTransformFunction;
+  TransformResultMetadata _transformResultMetadata;
   String[] _stringResult;
   int[] _integerResult;
   float[] _floatResult;
@@ -125,20 +126,31 @@ public class GenericTransformFunction extends BaseTransformFunction {
         }
       }
     }
+
+    Class returnType = _functionInvoker.getReturnType();
+    switch(returnType.getTypeName()) {
+      case "java.lang.Integer":
+        _transformResultMetadata =  INT_SV_NO_DICTIONARY_METADATA;
+        break;
+      case "java.lang.Long":
+        _transformResultMetadata =  LONG_SV_NO_DICTIONARY_METADATA;
+        break;
+      case "java.lang.Float":
+      case "java.lang.Double":
+        _transformResultMetadata =  DOUBLE_SV_NO_DICTIONARY_METADATA;
+        break;
+      case "java.lang.Boolean":
+      case "java.lang.String":
+        _transformResultMetadata =  STRING_SV_NO_DICTIONARY_METADATA;
+        break;
+      default:
+        throw new RuntimeException("Unsupported data type " + returnType.getTypeName() + "for transform function " + getName());
+    }
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    Class returnType = _functionInvoker.getReturnType();
-    switch(returnType.getTypeName()) {
-      case "java.lang.Integer": return INT_SV_NO_DICTIONARY_METADATA;
-      case "java.lang.Long": return LONG_SV_NO_DICTIONARY_METADATA;
-      case "java.lang.Float": return DOUBLE_SV_NO_DICTIONARY_METADATA;
-      case "java.lang.Double": return DOUBLE_SV_NO_DICTIONARY_METADATA;
-      case "java.lang.String": return STRING_SV_NO_DICTIONARY_METADATA;
-      default:
-        throw new RuntimeException("Unsupported data type " + returnType.getTypeName() + "for transform function " + getName());
-    }
+    return _transformResultMetadata;
   }
 
   @SuppressWarnings("Duplicates")
@@ -147,51 +159,6 @@ public class GenericTransformFunction extends BaseTransformFunction {
     if (_integerResult == null) {
       _integerResult = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-    transformValues(projectionBlock);
-    return _integerResult;
-  }
-
-  @SuppressWarnings("Duplicates")
-  @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_longResult == null) {
-      _longResult = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-    transformValues(projectionBlock);
-    return _longResult;
-  }
-
-  @SuppressWarnings("Duplicates")
-  @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_floatResult == null) {
-      _floatResult = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-    transformValues(projectionBlock);
-    return _floatResult;
-  }
-
-  @SuppressWarnings("Duplicates")
-  @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_doubleResult == null) {
-      _doubleResult = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-    transformValues(projectionBlock);
-    return _doubleResult;
-  }
-
-  @SuppressWarnings("Duplicates")
-  @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_stringResult == null) {
-      _stringResult = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-    transformValues(projectionBlock);
-    return _stringResult;
-  }
-
-  private void transformValues(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     int numNonLiteralArgs = _nonLiteralArgIndices.size();
     Object[][] nonLiteralBlockValues = new Object[numNonLiteralArgs][];
@@ -203,28 +170,99 @@ public class GenericTransformFunction extends BaseTransformFunction {
       for (int k = 0; k < numNonLiteralArgs; k++) {
         _args[_nonLiteralArgIndices.get(k)] = nonLiteralBlockValues[k][i];
       }
-
-      Class returnType = _functionInvoker.getReturnType();
-      switch(returnType.getTypeName()) {
-        case "java.lang.Integer":
-          _integerResult[i] = (Integer) _functionInvoker.process(_args);
-          break;
-        case "java.lang.Long":
-          _longResult[i] = (Long) _functionInvoker.process(_args);
-          break;
-        case "java.lang.Float":
-          _floatResult[i] = (Float) _functionInvoker.process(_args);
-          break;
-        case "java.lang.Double":
-          _doubleResult[i] = (Double) _functionInvoker.process(_args);
-          break;
-        case "java.lang.String":
-          _stringResult[i] = (String) _functionInvoker.process(_args);
-          break;
-        default:
-          throw new RuntimeException("Unsupported data type " + returnType.getTypeName() + "for transform function " + getName());
-      }
+      _integerResult[i] = (Integer) _functionInvoker.process(_args);
     }
+    return _integerResult;
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+    if (_longResult == null) {
+      _longResult = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    int length = projectionBlock.getNumDocs();
+    int numNonLiteralArgs = _nonLiteralArgIndices.size();
+    Object[][] nonLiteralBlockValues = new Object[numNonLiteralArgs][];
+
+    transformNonLiteralArgsToValues(projectionBlock, numNonLiteralArgs, nonLiteralBlockValues);
+
+    //now invoke the actual function
+    for (int i = 0; i < length; i++) {
+      for (int k = 0; k < numNonLiteralArgs; k++) {
+        _args[_nonLiteralArgIndices.get(k)] = nonLiteralBlockValues[k][i];
+      }
+      _longResult[i] = (Long) _functionInvoker.process(_args);
+    }
+    return _longResult;
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+    if (_floatResult == null) {
+      _floatResult = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    int length = projectionBlock.getNumDocs();
+    int numNonLiteralArgs = _nonLiteralArgIndices.size();
+    Object[][] nonLiteralBlockValues = new Object[numNonLiteralArgs][];
+
+    transformNonLiteralArgsToValues(projectionBlock, numNonLiteralArgs, nonLiteralBlockValues);
+
+    //now invoke the actual function
+    for (int i = 0; i < length; i++) {
+      for (int k = 0; k < numNonLiteralArgs; k++) {
+        _args[_nonLiteralArgIndices.get(k)] = nonLiteralBlockValues[k][i];
+      }
+      _floatResult[i] = (Float) _functionInvoker.process(_args);
+    }
+    return _floatResult;
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    if (_doubleResult == null) {
+      _doubleResult = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    int length = projectionBlock.getNumDocs();
+    int numNonLiteralArgs = _nonLiteralArgIndices.size();
+    Object[][] nonLiteralBlockValues = new Object[numNonLiteralArgs][];
+
+    transformNonLiteralArgsToValues(projectionBlock, numNonLiteralArgs, nonLiteralBlockValues);
+
+    //now invoke the actual function
+    for (int i = 0; i < length; i++) {
+      for (int k = 0; k < numNonLiteralArgs; k++) {
+        _args[_nonLiteralArgIndices.get(k)] = nonLiteralBlockValues[k][i];
+      }
+      _doubleResult[i] = (Double) _functionInvoker.process(_args);
+    }
+    return _doubleResult;
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+    if (_stringResult == null) {
+      _stringResult = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    int length = projectionBlock.getNumDocs();
+    int numNonLiteralArgs = _nonLiteralArgIndices.size();
+    Object[][] nonLiteralBlockValues = new Object[numNonLiteralArgs][];
+
+    transformNonLiteralArgsToValues(projectionBlock, numNonLiteralArgs, nonLiteralBlockValues);
+
+    //now invoke the actual function
+    for (int i = 0; i < length; i++) {
+      for (int k = 0; k < numNonLiteralArgs; k++) {
+        _args[_nonLiteralArgIndices.get(k)] = nonLiteralBlockValues[k][i];
+      }
+      _stringResult[i] = (String) _functionInvoker.process(_args);
+    }
+
+    return _stringResult;
   }
 
   private void transformNonLiteralArgsToValues(ProjectionBlock projectionBlock, int numNonLiteralArgs,
