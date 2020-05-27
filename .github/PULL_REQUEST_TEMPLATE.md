@@ -22,3 +22,7 @@ next release.
 If you have a series of commits adding or enabling a feature, then
 add this section only in final commit that marks the feature completed.
 Refer to earlier release notes to see examples of text
+
+## Documentation
+If you have introduced a new feature or configuration, please add it to the documentation as well.
+See https://docs.pinot.apache.org/developers/developers-and-contributors/update-document
