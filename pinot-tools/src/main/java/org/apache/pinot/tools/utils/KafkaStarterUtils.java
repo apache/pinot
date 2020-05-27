@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.tools.utils;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.ServiceLoader;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -66,7 +68,7 @@ public class KafkaStarterUtils {
     configuration.put(PORT, DEFAULT_KAFKA_PORT);
     configuration.put(BROKER_ID, DEFAULT_BROKER_ID);
     configuration.put(ZOOKEEPER_CONNECT, DEFAULT_ZK_STR);
-    configuration.put(LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
+    configuration.put(LOG_DIRS, new File(FileUtils.getTempDirectory(), "kafka-" + Double.toHexString(Math.random())).getAbsolutePath());
 
     return configuration;
   }
@@ -107,7 +109,8 @@ public class KafkaStarterUtils {
       configuration.put(KafkaStarterUtils.PORT, port);
       configuration.put(KafkaStarterUtils.BROKER_ID, brokerId);
       configuration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, zkStr);
-      configuration.put(KafkaStarterUtils.LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
+      configuration.put(KafkaStarterUtils.LOG_DIRS,
+          new File(FileUtils.getTempDirectory() + "kafka-" + Double.toHexString(Math.random())).getAbsolutePath());
       kafkaStarter = StreamDataProvider.getServerDataStartable(KAFKA_SERVER_STARTABLE_CLASS_NAME, configuration);
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
