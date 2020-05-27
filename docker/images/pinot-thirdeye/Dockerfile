@@ -50,6 +50,9 @@ RUN npm install -g phantomjs --unsafe-perm --ignore-scripts
 RUN git clone ${PINOT_GIT_URL} ${TE_BUILD_DIR} \
     && cd ${TE_BUILD_DIR}/thirdeye  \
     && git checkout ${PINOT_BRANCH} \
+    && cd thirdeye-frontend \
+    && mvn clean install -X -DskipTests || exit 1 \
+    && cd .. \
     && mvn clean install -X -DskipTests || exit 1 \
     && mkdir -p ${TE_HOME}/config/default \
     && mkdir -p ${TE_HOME}/bin \
