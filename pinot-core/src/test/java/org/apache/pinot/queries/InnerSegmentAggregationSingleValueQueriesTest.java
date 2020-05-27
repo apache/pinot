@@ -25,7 +25,7 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.query.aggregation.DistinctTable;
+import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -186,10 +186,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     DataSchema dataSchema = distinctTable.getDataSchema();
     Assert.assertEquals(dataSchema.getColumnNames(), new String[]{"column1"});
-    Assert.assertEquals(dataSchema.getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    Assert
+        .assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
-    Iterator<Record> iterator = distinctTable.iterator();
+    Iterator<Record> iterator = distinctTable.getFinalResult();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       Assert.assertNotNull(record);
@@ -221,7 +221,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(dataSchema.getColumnDataTypes(),
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
 
-    Iterator<Record> iterator = distinctTable.iterator();
+    Iterator<Record> iterator = distinctTable.getFinalResult();
     while (iterator.hasNext()) {
       Record record = iterator.next();
       Assert.assertNotNull(record);

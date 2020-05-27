@@ -49,7 +49,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.query.aggregation.DistinctTable;
+import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -91,7 +91,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
       .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES).build();
-  private static final TableConfig TABLE = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+  private static final TableConfig TABLE =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
   private IndexSegment _indexSegment;
   private List<SegmentDataManager> _segmentDataManagers;
@@ -202,7 +203,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           expectedValues.add(i);
         }
         Set<Integer> actualValues = new HashSet<>();
-        Iterator<Record> iterator = distinctTable.iterator();
+        Iterator<Record> iterator = distinctTable.getFinalResult();
         while (iterator.hasNext()) {
           Record record = iterator.next();
           Object[] values = record.getValues();
@@ -235,7 +236,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           expectedValues.add(i);
         }
         Set<Integer> actualValues = new HashSet<>();
-        Iterator<Record> iterator = distinctTable.iterator();
+        Iterator<Record> iterator = distinctTable.getFinalResult();
         while (iterator.hasNext()) {
           Record record = iterator.next();
           Object[] values = record.getValues();
@@ -256,24 +257,18 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(dataSchema.getColumnNames(), new String[]{"intColumn", "bytesColumn"});
         assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.BYTES});
 
-        // Check values, where all 100 unique values should be returned (limit won't take effect on server side)
-        // TODO: After optimizing the DistinctTable (only keep the limit number of records), only 5 values should be
-        //       returned
-        assertEquals(distinctTable.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
-        Set<Integer> expectedValues = new HashSet<>();
-        for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
-          expectedValues.add(i);
-        }
-        Set<Integer> actualValues = new HashSet<>();
-        Iterator<Record> iterator = distinctTable.iterator();
-        while (iterator.hasNext()) {
-          Record record = iterator.next();
-          Object[] values = record.getValues();
+        // Check values, where only 5 top values sorted in ByteArray format ascending order should be returned
+        assertEquals(distinctTable.size(), 5);
+        // ByteArray of "30", "31", "3130", "3131", "3132" (same as String order because all digits can be encoded with
+        // a single byte)
+        int[] expectedValues = new int[]{0, 1, 10, 11, 12};
+        Iterator<Record> iterator = distinctTable.getFinalResult();
+        for (int i = 0; i < 5; i++) {
+          Object[] values = iterator.next().getValues();
           int intValue = (int) values[0];
-          assertEquals(StringUtil.decodeUtf8(((ByteArray) values[1]).getBytes()), Integer.toString(intValue));
-          actualValues.add(intValue);
+          assertEquals(intValue, expectedValues[i]);
+          assertEquals(Integer.parseInt(StringUtil.decodeUtf8(((ByteArray) values[1]).getBytes())), intValue);
         }
-        assertEquals(actualValues, expectedValues);
       }
       {
         // Test selecting some columns with transform, filter, order-by and limit. Spaces in 'add' are intentional
@@ -288,24 +283,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(dataSchema.getColumnDataTypes(),
             new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.STRING});
 
-        // Check values, where 60 matched values should be returned (limit won't take effect on server side)
-        // TODO: After optimizing the DistinctTable (only keep the limit number of records), only 10 values should be
-        //       returned
-        assertEquals(distinctTable.size(), 60);
-        Set<Integer> expectedValues = new HashSet<>();
-        for (int i = 0; i < 60; i++) {
-          expectedValues.add(i);
-        }
-        Set<Integer> actualValues = new HashSet<>();
-        Iterator<Record> iterator = distinctTable.iterator();
-        while (iterator.hasNext()) {
-          Record record = iterator.next();
-          Object[] values = record.getValues();
+        // Check values, where only 10 top values sorted in string format descending order should be returned
+        assertEquals(distinctTable.size(), 10);
+        int[] expectedValues = new int[]{9, 8, 7, 6, 59, 58, 57, 56, 55, 54};
+        Iterator<Record> iterator = distinctTable.getFinalResult();
+        for (int i = 0; i < 10; i++) {
+          Object[] values = iterator.next().getValues();
           int intValue = ((Double) values[0]).intValue() / 2;
+          assertEquals(intValue, expectedValues[i]);
           assertEquals(Integer.parseInt((String) values[1]), intValue);
-          actualValues.add(intValue);
         }
-        assertEquals(actualValues, expectedValues);
       }
       {
         // Test selecting some columns with filter that does not match any record

@@ -46,7 +46,7 @@ public final class ResultReducerFactory {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
           // Distinct query
-          dataTableReducer = new DistinctDataTableReducer(brokerRequest, aggregationFunctions[0], queryOptions);
+          dataTableReducer = new DistinctDataTableReducer(brokerRequest, queryOptions);
         } else {
           dataTableReducer = new AggregationDataTableReducer(brokerRequest, aggregationFunctions, queryOptions);
         }

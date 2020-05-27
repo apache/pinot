@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.CollectionUtils;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -33,20 +33,20 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.util.GroupByUtils;
 
 
 /**
  * The DISTINCT clause in SQL is executed as the DISTINCT aggregation function.
- * // TODO: Support group-by
+ * TODO: Support group-by
  */
+@SuppressWarnings("rawtypes")
 public class DistinctAggregationFunction implements AggregationFunction<DistinctTable, Comparable> {
   private final String[] _columns;
   private final List<SelectionSort> _orderBy;
-  private final int _capacity;
+  private final int _limit;
   private final List<TransformExpressionTree> _inputExpressions;
 
   /**
@@ -56,14 +56,11 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
    * @param orderBy Order By clause
    * @param limit Limit clause
    */
-  public DistinctAggregationFunction(List<String> columns, List<SelectionSort> orderBy, int limit) {
+  public DistinctAggregationFunction(List<String> columns, @Nullable List<SelectionSort> orderBy, int limit) {
     int numColumns = columns.size();
     _columns = columns.toArray(new String[numColumns]);
     _orderBy = orderBy;
-    // NOTE: DISTINCT with order-by is similar to group-by with order-by, where we limit the maximum number of unique
-    //       records (groups) for each query to reduce the memory footprint. The result might not be 100% accurate in
-    //       certain scenarios, but should give a good enough approximation.
-    _capacity = CollectionUtils.isNotEmpty(_orderBy) ? GroupByUtils.getTableCapacity(limit) : limit;
+    _limit = limit;
 
     _inputExpressions = new ArrayList<>(numColumns);
     for (String column : columns) {
@@ -123,21 +120,30 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
         columnDataTypes[i] = ColumnDataType.fromDataTypeSV(blockValSetMap.get(_inputExpressions.get(i)).getValueType());
       }
       DataSchema dataSchema = new DataSchema(_columns, columnDataTypes);
-      distinctTable = new DistinctTable(dataSchema, _orderBy, _capacity);
+      distinctTable = new DistinctTable(dataSchema, _orderBy, _limit);
       aggregationResultHolder.setValue(distinctTable);
     }
 
-    // TODO: Follow up PR will make few changes to start using DictionaryBasedAggregationOperator
-    // for DISTINCT queries without filter.
-    RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+    // TODO: Follow up PR will make few changes to start using DictionaryBasedAggregationOperator for DISTINCT queries
+    //       without filter.
 
-    // TODO: Do early termination in the operator itself which should
-    // not call aggregate function at all if the limit has reached
-    // that will require the interface change since this function
-    // has to communicate back that required number of records have
-    // been collected
-    for (int i = 0; i < length; i++) {
-      distinctTable.upsert(new Record(blockValueFetcher.getRow(i)));
+    if (distinctTable.hasOrderBy()) {
+      // With order-by, no need to check whether the DistinctTable is already satisfied
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+      for (int i = 0; i < length; i++) {
+        distinctTable.addWithOrderBy(new Record(blockValueFetcher.getRow(i)));
+      }
+    } else {
+      // Without order-by, early-terminate when the DistinctTable is already satisfied
+      if (distinctTable.isSatisfied()) {
+        return;
+      }
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+      for (int i = 0; i < length; i++) {
+        if (distinctTable.addWithoutOrderBy(new Record(blockValueFetcher.getRow(i)))) {
+          return;
+        }
+      }
     }
   }
 
@@ -150,17 +156,22 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
       ColumnDataType[] columnDataTypes = new ColumnDataType[_columns.length];
       // NOTE: Use STRING for unknown type
       Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-      return new DistinctTable(new DataSchema(_columns, columnDataTypes), _orderBy, _capacity);
+      return new DistinctTable(new DataSchema(_columns, columnDataTypes), _orderBy, _limit);
     }
   }
 
+  /**
+   * NOTE: This method only handles merging of 2 main DistinctTables. It should not be used on Broker-side because it
+   *       does not support merging deserialized DistinctTables.
+   * <p>{@inheritDoc}
+   */
   @Override
   public DistinctTable merge(DistinctTable intermediateResult1, DistinctTable intermediateResult2) {
     if (intermediateResult1.size() == 0) {
       return intermediateResult2;
     }
     if (intermediateResult2.size() != 0) {
-      intermediateResult1.merge(intermediateResult2);
+      intermediateResult1.mergeMainDistinctTable(intermediateResult2);
     }
     return intermediateResult1;
   }
