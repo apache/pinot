@@ -43,7 +43,6 @@ public class ProtoBufRecordReader implements RecordReader {
 
   private InputStream _inputStream;
   private boolean _hasNext;
-  private Descriptors.Descriptor _descriptor;
   private DynamicMessage _dynamicMessage;
 
   private boolean hasMoreToRead()
@@ -71,20 +70,20 @@ public class ProtoBufRecordReader implements RecordReader {
     _dataFile = dataFile;
     ProtoBufRecordReaderConfig protoBufRecordReaderConfig = (ProtoBufRecordReaderConfig) recordReaderConfig;
     InputStream fin = getDescriptorFileInputStream(protoBufRecordReaderConfig);
-    buildProtoBufDescriptor(fin);
+    Descriptors.Descriptor descriptor = buildProtoBufDescriptor(fin);
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
-    _dynamicMessage = DynamicMessage.getDefaultInstance(_descriptor);
+    _dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
     init();
   }
 
-  private void buildProtoBufDescriptor(InputStream fin)
+  private Descriptors.Descriptor buildProtoBufDescriptor(InputStream fin)
       throws IOException {
     try {
       DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(fin);
       Descriptors.FileDescriptor fileDescriptor =
           Descriptors.FileDescriptor.buildFrom(set.getFile(0), new Descriptors.FileDescriptor[]{});
-      _descriptor = fileDescriptor.getMessageTypes().get(0);
+      return fileDescriptor.getMessageTypes().get(0);
     } catch (Descriptors.DescriptorValidationException e) {
       throw new IOException("Descriptor file validation failed", e);
     }
