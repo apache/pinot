@@ -43,6 +43,7 @@ import org.apache.pinot.tools.admin.command.RebalanceTableCommand;
 import org.apache.pinot.tools.admin.command.ShowClusterInfoCommand;
 import org.apache.pinot.tools.admin.command.StartBrokerCommand;
 import org.apache.pinot.tools.admin.command.StartControllerCommand;
+import org.apache.pinot.tools.admin.command.StartServiceManagerCommand;
 import org.apache.pinot.tools.admin.command.StreamGitHubEventsCommand;
 import org.apache.pinot.tools.admin.command.StartKafkaCommand;
 import org.apache.pinot.tools.admin.command.StartServerCommand;
@@ -101,6 +102,7 @@ public class PinotAdministrator {
       @SubCommand(name = "StartController", impl = StartControllerCommand.class),
       @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
       @SubCommand(name = "StartServer", impl = StartServerCommand.class),
+      @SubCommand(name = "StartServiceManager", impl = StartServiceManagerCommand.class),
       @SubCommand(name = "AddTable", impl = AddTableCommand.class),
       @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
       @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),

@@ -111,6 +111,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS = "pinot.server.flapping.timeWindowMs";
     public static final String CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS = "pinot.minion.flapping.timeWindowMs";
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
+
+    public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
   }
 
   public static class Broker {
@@ -242,6 +244,8 @@ public class CommonConstants {
     public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
 
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
+
+    public static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";

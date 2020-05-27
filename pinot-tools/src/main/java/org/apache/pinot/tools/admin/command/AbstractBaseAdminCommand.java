@@ -28,9 +28,11 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.tools.AbstractBaseCommand;
+import org.apache.pinot.tools.utils.PinotConfigUtils;
 
 
 /**
@@ -57,13 +59,6 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     return Integer.parseInt(processName.split("@")[0]);
   }
 
-  protected void savePID(String fileName)
-      throws IOException {
-    FileWriter pidFile = new FileWriter(fileName);
-    pidFile.write(getPID());
-    pidFile.close();
-  }
-
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
     return sendRequest("POST", urlString, payload);
@@ -82,7 +77,8 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     conn.setDoOutput(true);
     conn.setRequestMethod(requestMethod);
     if (payload != null) {
-      final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
+      final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(),
+          StandardCharsets.UTF_8));
       writer.write(payload, 0, payload.length());
       writer.flush();
     }
@@ -104,18 +100,15 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     return sb.toString();
   }
 
+  protected void savePID(String fileName)
+      throws IOException {
+    FileWriter pidFile = new FileWriter(fileName);
+    pidFile.write(getPID());
+    pidFile.close();
+  }
+
   PropertiesConfiguration readConfigFromFile(String configFileName)
       throws ConfigurationException {
-    if (configFileName != null) {
-      File configFile = new File(configFileName);
-
-      if (configFile.exists()) {
-        return new PropertiesConfiguration(configFile);
-      } else {
-        return null;
-      }
-    } else {
-      return null;
-    }
+    return PinotConfigUtils.readConfigFromFile(configFileName);
   }
 }

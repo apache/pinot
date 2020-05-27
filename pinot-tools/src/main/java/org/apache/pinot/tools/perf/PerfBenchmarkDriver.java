@@ -243,7 +243,8 @@ public class PerfBenchmarkDriver {
     }
     serverConfiguration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _serverInstanceName);
     LOGGER.info("Starting server instance: {}", _serverInstanceName);
-    new HelixServerStarter(_clusterName, _zkAddress, serverConfiguration);
+    HelixServerStarter helixServerStarter = new HelixServerStarter(_clusterName, _zkAddress, serverConfiguration);
+    helixServerStarter.start();
   }
 
   private void startHelixResourceManager()

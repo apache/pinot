@@ -135,7 +135,8 @@ public class ServerInstance {
     _queryExecutor.shutDown();
     LOGGER.info("Shutting down instance data manager");
     _instanceDataManager.shutDown();
-
+    LOGGER.info("Shutting down metrics registry");
+    _serverMetrics.getMetricsRegistry().shutdown();
     _started = false;
     LOGGER.info("Finish shutting down server instance");
   }

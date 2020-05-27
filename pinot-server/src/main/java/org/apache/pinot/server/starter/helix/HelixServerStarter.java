@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -66,6 +65,8 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,118 +94,38 @@ import static org.apache.pinot.common.utils.CommonConstants.Server.*;
  *   </li>
  * </ul>
  */
-public class HelixServerStarter {
+public class HelixServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
 
   private final String _helixClusterName;
   private final String _zkAddress;
   private final Configuration _serverConf;
+  private final String _host;
+  private final int _port;
   private final String _instanceId;
-  private final HelixManager _helixManager;
-  private final HelixAdmin _helixAdmin;
-  private final ServerInstance _serverInstance;
-  private final AdminApiApplication _adminApiApplication;
-  private final RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
+  private HelixManager _helixManager;
+  private HelixAdmin _helixAdmin;
+  private ServerInstance _serverInstance;
+  private AdminApiApplication _adminApiApplication;
+  private RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
 
   public HelixServerStarter(String helixClusterName, String zkAddress, Configuration serverConf)
       throws Exception {
-    LOGGER.info("Starting Pinot server");
-    long startTimeMs = System.currentTimeMillis();
-
     _helixClusterName = helixClusterName;
     _zkAddress = zkAddress;
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = ConfigurationUtils.cloneConfiguration(serverConf);
 
-    String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
+    _host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
         _serverConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
             .getHostnameOrAddress() : NetUtil.getHostAddress());
-    int port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
+    _port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
     if (_serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       _instanceId = _serverConf.getString(CONFIG_OF_INSTANCE_ID);
     } else {
-      _instanceId = PREFIX_OF_SERVER_INSTANCE + host + "_" + port;
+      _instanceId = PREFIX_OF_SERVER_INSTANCE + _host + "_" + _port;
       _serverConf.addProperty(CONFIG_OF_INSTANCE_ID, _instanceId);
     }
-
-    LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
-        _helixClusterName, _instanceId);
-    setupHelixSystemProperties();
-    _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
-
-    LOGGER.info("Initializing server instance and registering state model factory");
-    Utils.logVersions();
-    ServerSegmentCompletionProtocolHandler
-        .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
-    ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
-    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
-    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverConf, instanceDataManager);
-    StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
-    _helixManager.getStateMachineEngine()
-        .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
-    // Start the server instance as a pre-connect callback so that it starts after connecting to the ZK in order to
-    // access the property store, but before receiving state transitions
-    _helixManager.addPreConnectCallback(_serverInstance::start);
-
-    LOGGER.info("Connecting Helix manager");
-    _helixManager.connect();
-    _helixAdmin = _helixManager.getClusterManagmentTool();
-    updateInstanceConfigIfNeeded(host, port);
-
-    // Start restlet server for admin API endpoint
-    String accessControlFactoryClass =
-        _serverConf.getString(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
-    LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
-    final AccessControlFactory accessControlFactory;
-    try {
-      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
-              + "'", e);
-    }
-
-    int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
-    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory);
-    _adminApiApplication.start(adminApiPort);
-    setAdminApiPort(adminApiPort);
-
-    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
-    // Register message handler factory
-    SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(fetcherAndLoader, instanceDataManager, serverMetrics);
-    _helixManager.getMessagingService()
-        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
-
-    serverMetrics.addCallbackGauge(INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
-    _helixManager
-        .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
-
-    // Register the service status handler
-    registerServiceStatusHandler();
-
-    ControllerLeaderLocator.create(_helixManager);
-
-    if (_serverConf
-        .getBoolean(CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK, DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
-      long endTimeMs = startTimeMs + _serverConf.getLong(CONFIG_OF_STARTUP_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS);
-      startupServiceStatusCheck(endTimeMs);
-    }
-    setShuttingDownStatus(false);
-    LOGGER.info("Pinot server ready");
-
-    // Create metrics for mmap stuff
-    serverMetrics.addCallbackGauge("memory.directBufferCount", PinotDataBuffer::getDirectBufferCount);
-    serverMetrics.addCallbackGauge("memory.directBufferUsage", PinotDataBuffer::getDirectBufferUsage);
-    serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
-    serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
-    serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
-
-    _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
-    _realtimeLuceneIndexRefreshState.start();
   }
 
   /**
@@ -264,7 +185,7 @@ public class HelixServerStarter {
               _instanceId, realtimeConsumptionCatchupWaitMs));
     }
     LOGGER.info("Registering service status handler");
-    ServiceStatus.setServiceStatusCallback(
+    ServiceStatus.setServiceStatusCallback(_instanceId,
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
@@ -377,6 +298,98 @@ public class HelixServerStarter {
         ServiceStatus.getStatusDescription());
   }
 
+  @Override
+  public ServiceRole getServiceRole() {
+    return ServiceRole.SERVER;
+  }
+
+  @Override
+  public void start()
+      throws Exception {
+    LOGGER.info("Starting Pinot server");
+    long startTimeMs = System.currentTimeMillis();
+
+    LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
+        _helixClusterName, _instanceId);
+    setupHelixSystemProperties();
+    _helixManager =
+        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
+
+    LOGGER.info("Initializing server instance and registering state model factory");
+    Utils.logVersions();
+    ServerSegmentCompletionProtocolHandler
+        .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
+    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverConf, instanceDataManager);
+    StateModelFactory<?> stateModelFactory =
+        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
+    _helixManager.getStateMachineEngine()
+        .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
+    // Start the server instance as a pre-connect callback so that it starts after connecting to the ZK in order to
+    // access the property store, but before receiving state transitions
+    _helixManager.addPreConnectCallback(_serverInstance::start);
+
+    LOGGER.info("Connecting Helix manager");
+    _helixManager.connect();
+    _helixAdmin = _helixManager.getClusterManagmentTool();
+    updateInstanceConfigIfNeeded(_host, _port);
+
+    // Start restlet server for admin API endpoint
+    String accessControlFactoryClass =
+        _serverConf.getString(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+    LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
+    final AccessControlFactory accessControlFactory;
+    try {
+      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
+              + "'", e);
+    }
+
+    int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
+    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory);
+    _adminApiApplication.start(adminApiPort);
+    setAdminApiPort(adminApiPort);
+
+    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+    // Register message handler factory
+    SegmentMessageHandlerFactory messageHandlerFactory =
+        new SegmentMessageHandlerFactory(fetcherAndLoader, instanceDataManager, serverMetrics);
+    _helixManager.getMessagingService()
+        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
+
+    serverMetrics.addCallbackGauge(INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
+    _helixManager
+        .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+
+    // Register the service status handler
+    registerServiceStatusHandler();
+
+    ControllerLeaderLocator.create(_helixManager);
+
+    if (_serverConf
+        .getBoolean(CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK, DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
+      long endTimeMs = startTimeMs + _serverConf.getLong(CONFIG_OF_STARTUP_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS);
+      startupServiceStatusCheck(endTimeMs);
+    }
+    setShuttingDownStatus(false);
+    LOGGER.info("Pinot server ready");
+
+    // Create metrics for mmap stuff
+    serverMetrics.addCallbackGauge("memory.directBufferCount", PinotDataBuffer::getDirectBufferCount);
+    serverMetrics.addCallbackGauge("memory.directBufferUsage", PinotDataBuffer::getDirectBufferUsage);
+    serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
+    serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
+    serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
+
+    _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
+    _realtimeLuceneIndexRefreshState.start();
+  }
+
+  @Override
   public void stop() {
     LOGGER.info("Shutting down Pinot server");
     long startTimeMs = System.currentTimeMillis();
@@ -400,6 +413,9 @@ public class HelixServerStarter {
       shutdownResourceCheck(endTimeMs);
     }
     _realtimeLuceneIndexRefreshState.stop();
+    LOGGER.info("Deregistering service status handler");
+    ServiceStatus.removeServiceStatusCallback(_instanceId);
+    LOGGER.info("Finish shutting down Pinot server for {}", _instanceId);
   }
 
   /**
@@ -562,9 +578,14 @@ public class HelixServerStarter {
     return true;
   }
 
-  @VisibleForTesting
+  @Override
   public String getInstanceId() {
     return _instanceId;
+  }
+
+  @Override
+  public Configuration getConfig() {
+    return _serverConf;
   }
 
   /**
@@ -578,7 +599,9 @@ public class HelixServerStarter {
     serverConf.addProperty(KEY_OF_SERVER_NETTY_PORT, port);
     serverConf.addProperty(CONFIG_OF_INSTANCE_DATA_DIR, "/tmp/PinotServer/test" + port + "/index");
     serverConf.addProperty(CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, "/tmp/PinotServer/test" + port + "/segmentTar");
-    return new HelixServerStarter("quickstart", "localhost:2191", serverConf);
+    HelixServerStarter serverStarter = new HelixServerStarter("quickstart", "localhost:2191", serverConf);
+    serverStarter.start();
+    return serverStarter;
   }
 
   public static void main(String[] args)

@@ -47,6 +47,8 @@ import org.apache.pinot.minion.metrics.MinionMetrics;
 import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.services.ServiceRole;
+import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * The class <code>MinionStarter</code> provides methods to start and stop the Pinot Minion.
  * <p>Pinot Minion will automatically join the given Helix cluster as a participant.
  */
-public class MinionStarter {
+public class MinionStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionStarter.class);
 
   private static final String HTTPS_PROTOCOL = "https";
@@ -104,10 +106,26 @@ public class MinionStarter {
     _eventObserverFactoryRegistry.registerEventObserverFactory(taskType, eventObserverFactory);
   }
 
+  @Override
+  public ServiceRole getServiceRole() {
+    return ServiceRole.MINION;
+  }
+
+  @Override
+  public String getInstanceId() {
+    return _instanceId;
+  }
+
+  @Override
+  public Configuration getConfig() {
+    return _config;
+  }
+
   /**
    * Starts the Pinot Minion instance.
    * <p>Should be called after all classes of task executor get registered.
    */
+  @Override
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot minion: {}", _instanceId);
@@ -169,7 +187,7 @@ public class MinionStarter {
 
     // Initialize health check callback
     LOGGER.info("Initializing health check callback");
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.ServiceStatusCallback() {
+    ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.ServiceStatusCallback() {
       @Override
       public ServiceStatus.Status getServiceStatus() {
         // TODO: add health check here
@@ -189,6 +207,7 @@ public class MinionStarter {
   /**
    * Stops the Pinot Minion instance.
    */
+  @Override
   public void stop() {
     try {
       LOGGER.info("Closing PinotFS classes");
@@ -198,6 +217,8 @@ public class MinionStarter {
     }
     LOGGER.info("Stopping Pinot minion: " + _instanceId);
     _helixManager.disconnect();
+    LOGGER.info("Deregistering service status handler");
+    ServiceStatus.removeServiceStatusCallback(_instanceId);
     LOGGER.info("Pinot minion stopped");
   }
 

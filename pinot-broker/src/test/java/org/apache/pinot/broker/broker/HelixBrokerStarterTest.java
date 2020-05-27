@@ -212,7 +212,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     stopFakeInstances();
-    _brokerStarter.shutdown();
+    _brokerStarter.stop();
     stopController();
     stopZk();
   }

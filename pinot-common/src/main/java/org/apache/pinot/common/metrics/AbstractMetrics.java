@@ -55,6 +55,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     this(metricPrefix, metricsRegistry, clazz, false);
   }
 
+  public MetricsRegistry getMetricsRegistry() {
+    return _metricsRegistry;
+  }
+
   public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz, boolean global) {
     _metricPrefix = metricPrefix;
     _metricsRegistry = metricsRegistry;

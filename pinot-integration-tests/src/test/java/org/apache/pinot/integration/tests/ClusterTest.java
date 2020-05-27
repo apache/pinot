@@ -151,7 +151,9 @@ public abstract class ClusterTest extends ControllerTest {
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
-        _serverStarters.add(new HelixServerStarter(getHelixClusterName(), zkStr, configuration));
+        HelixServerStarter helixServerStarter = new HelixServerStarter(getHelixClusterName(), zkStr, configuration);
+        _serverStarters.add(helixServerStarter);
+        helixServerStarter.start();
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -196,7 +198,7 @@ public abstract class ClusterTest extends ControllerTest {
     assertNotNull(_brokerStarters, "Brokers are not started");
     for (HelixBrokerStarter brokerStarter : _brokerStarters) {
       try {
-        brokerStarter.shutdown();
+        brokerStarter.stop();
       } catch (Exception e) {
         LOGGER.error("Encountered exception while stopping broker {}", e.getMessage());
       }
