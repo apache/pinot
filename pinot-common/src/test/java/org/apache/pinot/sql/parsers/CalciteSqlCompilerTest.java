@@ -36,6 +36,7 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
@@ -290,6 +291,18 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(tempBrokerRequest.getFilterQuery().getValue().get(1), "13");
     Assert.assertEquals(tempBrokerRequest.getFilterQuery().getValue().get(2), "15.2");
     Assert.assertEquals(tempBrokerRequest.getFilterQuery().getValue().get(3), "17");
+  }
+
+  @Test
+  public void testBrokerConverterWithLiteral() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select now() from mytable");
+    Literal literal = pinotQuery.getSelectList().get(0).getLiteral();
+    Assert.assertNotNull(literal);
+    PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
+    BrokerRequest tempBrokerRequest = converter.convert(pinotQuery);
+    Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
+    Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
+        literal.getFieldValue().toString());
   }
 
   @Test

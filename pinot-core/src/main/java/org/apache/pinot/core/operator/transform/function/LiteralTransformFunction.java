@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -32,6 +34,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  */
 public class LiteralTransformFunction implements TransformFunction {
   private final String _literal;
+  private String[] _result;
 
   public LiteralTransformFunction(String literal) {
     _literal = literal;
@@ -48,12 +51,11 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    throw new UnsupportedOperationException();
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    throw new UnsupportedOperationException();
+    return BaseTransformFunction.STRING_SV_NO_DICTIONARY_METADATA;
   }
 
   @Override
@@ -93,7 +95,11 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    if (_result == null) {
+      _result = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      Arrays.fill(_result, _literal);
+    }
+    return _result;
   }
 
   @Override
