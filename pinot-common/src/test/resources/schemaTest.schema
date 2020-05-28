@@ -8,7 +8,8 @@
     {
       "name": "longMetric",
       "dataType": "LONG",
-      "singleValueField": true
+      "singleValueField": true,
+      "transformFunction": "Groovy({foo/1000}, foo)"
     },
     {
       "name": "floatMetric",
@@ -37,7 +38,8 @@
       "name": "longDimension",
       "dataType": "LONG",
       "singleValueField": false,
-      "delimiter": null
+      "delimiter": null,
+      "transformFunction": "trim(bar)"
     },
     {
       "name": "floatDimension",
@@ -69,7 +71,24 @@
       "timeType": "DAYS",
       "name": "outgoing"
     },
-    "defaultNullValue": 10000
+    "defaultNullValue": 10000,
+    "transformFunction": "toEpochDays(millis)"
   },
+  "dateTimeFieldSpecs": [
+    {
+      "name": "dateTime1",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "15:MINUTES",
+      "transformFunction": "fromDateTime(dt, 'yyyyMMdd')"
+    },
+    {
+      "name": "dateTime2",
+      "dataType": "STRING",
+      "format": "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd",
+      "granularity": "1:DAYS",
+      "defaultNullValue": "20200101"
+    }
+  ],
   "schemaName": "schemaTest"
 }
