@@ -31,7 +31,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.HashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,9 +153,9 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         String instance = instanceStateEntry.getKey();
         String state = instanceStateEntry.getValue();
         // Do not track instances in ERROR state
-        if (!state.equals(RealtimeSegmentOnlineOfflineStateModel.ERROR)) {
+        if (!state.equals(SegmentStateModel.ERROR)) {
           _instanceToSegmentsMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(segment);
-          if (state.equals(RealtimeSegmentOnlineOfflineStateModel.OFFLINE)) {
+          if (state.equals(SegmentStateModel.OFFLINE)) {
             offlineInstances.add(instance);
           } else {
             onlineInstances.add(instance);

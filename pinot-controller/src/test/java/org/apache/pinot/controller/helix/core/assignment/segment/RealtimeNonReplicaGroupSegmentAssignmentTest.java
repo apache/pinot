@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -145,7 +145,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     String offlineSegmentName = "offlineSegment";
     Map<String, String> offlineSegmentInstanceStateMap = SegmentAssignmentUtils
         .getInstanceStateMap(SegmentAssignmentTestUtils.getNameList("badInstance_", NUM_REPLICAS),
-            RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+            SegmentStateModel.OFFLINE);
     currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
 
     // Rebalance without COMPLETED instance partitions should not change the segment assignment
@@ -167,14 +167,14 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         Map<String, String> instanceStateMap = newAssignment.get(_segments.get(segmentId));
         for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
           assertTrue(entry.getKey().startsWith(COMPLETED_INSTANCE_NAME_PREFIX));
-          assertEquals(entry.getValue(), RealtimeSegmentOnlineOfflineStateModel.ONLINE);
+          assertEquals(entry.getValue(), SegmentStateModel.ONLINE);
         }
       } else {
         // CONSUMING segments
         Map<String, String> instanceStateMap = newAssignment.get(_segments.get(segmentId));
         for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
           assertTrue(entry.getKey().startsWith(CONSUMING_INSTANCE_NAME_PREFIX));
-          assertEquals(entry.getValue(), RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
+          assertEquals(entry.getValue(), SegmentStateModel.CONSUMING);
         }
       }
     }
@@ -215,10 +215,10 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> instanceStateMap = entry.getValue();
-      if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
         for (int i = 0; i < NUM_REPLICAS; i++) {
           String expectedInstance = COMPLETED_INSTANCES.get(index++ % NUM_COMPLETED_INSTANCES);
-          assertEquals(instanceStateMap.get(expectedInstance), RealtimeSegmentOnlineOfflineStateModel.ONLINE);
+          assertEquals(instanceStateMap.get(expectedInstance), SegmentStateModel.ONLINE);
         }
       } else {
         // CONSUMING and OFFLINE segments should not be reassigned
@@ -234,12 +234,11 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
       String lastSegmentInPartition = _segments.get(segmentId - NUM_PARTITIONS);
       Map<String, String> instanceStateMap = currentAssignment.get(lastSegmentInPartition);
       currentAssignment.put(lastSegmentInPartition, SegmentAssignmentUtils
-          .getInstanceStateMap(new ArrayList<>(instanceStateMap.keySet()),
-              RealtimeSegmentOnlineOfflineStateModel.ONLINE));
+          .getInstanceStateMap(new ArrayList<>(instanceStateMap.keySet()), SegmentStateModel.ONLINE));
     }
 
     // Add the new segment into the assignment as CONSUMING
-    currentAssignment.put(_segments.get(segmentId), SegmentAssignmentUtils
-        .getInstanceStateMap(instancesAssigned, RealtimeSegmentOnlineOfflineStateModel.CONSUMING));
+    currentAssignment.put(_segments.get(segmentId),
+        SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
   }
 }

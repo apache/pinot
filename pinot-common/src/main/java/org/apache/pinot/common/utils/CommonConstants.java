@@ -56,20 +56,14 @@ public class CommonConstants {
     public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
 
     public static class StateModel {
-      public static class SegmentOnlineOfflineStateModel {
-        public static final String ONLINE = "ONLINE";
-        public static final String OFFLINE = "OFFLINE";
-        public static final String ERROR = "ERROR";
-      }
-
-      public static class RealtimeSegmentOnlineOfflineStateModel {
+      public static class SegmentStateModel {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";
         public static final String CONSUMING = "CONSUMING";
       }
 
-      public static class BrokerOnlineOfflineStateModel {
+      public static class BrokerResourceStateModel {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";

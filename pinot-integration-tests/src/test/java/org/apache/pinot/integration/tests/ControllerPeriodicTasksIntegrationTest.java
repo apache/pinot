@@ -31,7 +31,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -229,7 +229,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         idealState -> {
           assertNotNull(idealState);
           Map<String, String> instanceStateMap = idealState.getRecord().getMapFields().values().iterator().next();
-          instanceStateMap.entrySet().iterator().next().setValue(RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+          instanceStateMap.entrySet().iterator().next().setValue(SegmentStateModel.OFFLINE);
           return idealState;
         }, RetryPolicies.fixedDelayRetryPolicy(2, 10));
 
@@ -324,9 +324,9 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       for (Map<String, String> instanceStateMap : idealState.getRecord().getMapFields().values()) {
         for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
           String state = entry.getValue();
-          if (state.equals(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+          if (state.equals(SegmentStateModel.CONSUMING)) {
             consumingServers.add(entry.getKey());
-          } else if (state.equals(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+          } else if (state.equals(SegmentStateModel.ONLINE)) {
             completedServers.add(entry.getKey());
           }
         }

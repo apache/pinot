@@ -38,7 +38,7 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -157,7 +157,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertNotNull(instanceStateMap);
       assertEquals(instanceStateMap.size(), numReplicas);
       for (String state : instanceStateMap.values()) {
-        assertEquals(state, RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
+        assertEquals(state, SegmentStateModel.CONSUMING);
       }
 
       LLCRealtimeSegmentZKMetadata segmentZKMetadata =
@@ -188,7 +188,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Commit a segment for partition 0
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(committingSegment, new StreamPartitionMsgOffset(PARTITION_OFFSET + NUM_DOCS), 0L);
+        new CommittingSegmentDescriptor(committingSegment, new StreamPartitionMsgOffset(PARTITION_OFFSET + NUM_DOCS),
+            0L);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
 
@@ -196,13 +197,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<String, String> committedSegmentInstanceStateMap = instanceStatesMap.get(committingSegment);
     assertNotNull(committedSegmentInstanceStateMap);
     assertEquals(new HashSet<>(committedSegmentInstanceStateMap.values()),
-        Collections.singleton(RealtimeSegmentOnlineOfflineStateModel.ONLINE));
+        Collections.singleton(SegmentStateModel.ONLINE));
 
     String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
     Map<String, String> consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
     assertNotNull(consumingSegmentInstanceStateMap);
     assertEquals(new HashSet<>(consumingSegmentInstanceStateMap.values()),
-        Collections.singleton(RealtimeSegmentOnlineOfflineStateModel.CONSUMING));
+        Collections.singleton(SegmentStateModel.CONSUMING));
 
     // Verify segment ZK metadata for committed segment and new consuming segment
     LLCRealtimeSegmentZKMetadata committedSegmentZKMetadata =
@@ -223,11 +224,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
 
     // Turn one instance of the consuming segment OFFLINE and commit the segment
-    consumingSegmentInstanceStateMap.entrySet().iterator().next()
-        .setValue(RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+    consumingSegmentInstanceStateMap.entrySet().iterator().next().setValue(SegmentStateModel.OFFLINE);
     committingSegment = consumingSegment;
-    committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(committingSegment, new StreamPartitionMsgOffset(PARTITION_OFFSET + NUM_DOCS + NUM_DOCS), 0L);
+    committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
+        new StreamPartitionMsgOffset(PARTITION_OFFSET + NUM_DOCS + NUM_DOCS), 0L);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
 
@@ -235,13 +235,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committedSegmentInstanceStateMap = instanceStatesMap.get(committingSegment);
     assertNotNull(committedSegmentInstanceStateMap);
     assertEquals(new HashSet<>(committedSegmentInstanceStateMap.values()),
-        Collections.singleton(RealtimeSegmentOnlineOfflineStateModel.ONLINE));
+        Collections.singleton(SegmentStateModel.ONLINE));
 
     consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 2, CURRENT_TIME_MS).getSegmentName();
     consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
     assertNotNull(consumingSegmentInstanceStateMap);
     assertEquals(new HashSet<>(consumingSegmentInstanceStateMap.values()),
-        Collections.singleton(RealtimeSegmentOnlineOfflineStateModel.CONSUMING));
+        Collections.singleton(SegmentStateModel.CONSUMING));
 
     // Illegal segment commit - commit the segment again
     try {
@@ -357,7 +357,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       Map<String, String> instanceStateMap = instanceStatesMap.get(segmentName);
       assertEquals(instanceStateMap.size(), segmentManager._numReplicas);
       for (String state : instanceStateMap.values()) {
-        assertEquals(state, RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
+        assertEquals(state, SegmentStateModel.CONSUMING);
       }
       // NOTE: Old segment ZK metadata might exist when previous round failed due to not enough instances
       assertTrue(segmentZKMetadataMap.containsKey(segmentName));
@@ -513,15 +513,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Map<String, String> consumingSegmentInstanceStateMap = instanceStatesMap.remove(consumingSegment);
     assertNotNull(consumingSegmentInstanceStateMap);
     assertEquals(new HashSet<>(consumingSegmentInstanceStateMap.values()),
-        Collections.singleton(RealtimeSegmentOnlineOfflineStateModel.CONSUMING));
+        Collections.singleton(SegmentStateModel.CONSUMING));
 
     if (latestCommittedSegment != null) {
       Map<String, String> latestCommittedSegmentInstanceStateMap = instanceStatesMap.get(latestCommittedSegment);
       assertNotNull(latestCommittedSegmentInstanceStateMap);
       for (Map.Entry<String, String> entry : latestCommittedSegmentInstanceStateMap.entrySet()) {
         // Latest committed segment should have all instances in ONLINE state
-        assertEquals(entry.getValue(), RealtimeSegmentOnlineOfflineStateModel.ONLINE);
-        entry.setValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
+        assertEquals(entry.getValue(), SegmentStateModel.ONLINE);
+        entry.setValue(SegmentStateModel.CONSUMING);
       }
     }
   }
@@ -535,8 +535,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertNotNull(consumingSegmentInstanceStateMap);
     for (Map.Entry<String, String> entry : consumingSegmentInstanceStateMap.entrySet()) {
       // Consuming segment should have all instances in CONSUMING state
-      assertEquals(entry.getValue(), RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
-      entry.setValue(RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+      assertEquals(entry.getValue(), SegmentStateModel.CONSUMING);
+      entry.setValue(SegmentStateModel.OFFLINE);
     }
   }
 
@@ -581,8 +581,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       Map<String, String> instanceStateMap = entry.getValue();
 
       // Skip segments with all instances OFFLINE
-      if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.ONLINE) || instanceStateMap
-          .containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
+          .containsValue(SegmentStateModel.CONSUMING)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
         int partitionsId = llcSegmentName.getPartitionId();
         Map<Integer, String> sequenceNumberToSegmentMap = partitionIdToSegmentsMap.get(partitionsId);
@@ -601,8 +601,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
       // Latest segment should have CONSUMING instance but no ONLINE instance in ideal state
       Map<String, String> instanceStateMap = instanceStatesMap.get(latestSegment);
-      assertTrue(instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING));
-      assertFalse(instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.ONLINE));
+      assertTrue(instanceStateMap.containsValue(SegmentStateModel.CONSUMING));
+      assertFalse(instanceStateMap.containsValue(SegmentStateModel.ONLINE));
 
       // Latest segment ZK metadata should be IN_PROGRESS
       assertEquals(segmentManager._segmentZKMetadataMap.get(latestSegment).getStatus(), Status.IN_PROGRESS);
@@ -612,8 +612,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
         // Committed segment should have all instances in ONLINE state
         instanceStateMap = instanceStatesMap.get(segmentName);
-        assertEquals(new HashSet<>(instanceStateMap.values()),
-            Collections.singleton(RealtimeSegmentOnlineOfflineStateModel.ONLINE));
+        assertEquals(new HashSet<>(instanceStateMap.values()), Collections.singleton(SegmentStateModel.ONLINE));
 
         // Committed segment ZK metadata should be DONE
         LLCRealtimeSegmentZKMetadata segmentZKMetadata = segmentManager._segmentZKMetadataMap.get(segmentName);
@@ -654,7 +653,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Commit a segment for partition 0
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(committingSegment, new StreamPartitionMsgOffset(PARTITION_OFFSET + NUM_DOCS), 0L);
+        new CommittingSegmentDescriptor(committingSegment, new StreamPartitionMsgOffset(PARTITION_OFFSET + NUM_DOCS),
+            0L);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
 
     try {
@@ -684,7 +684,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     String segmentLocation = SCHEME + tableDir + "/" + segmentFileName;
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(segmentName, new StreamPartitionMsgOffset(PARTITION_OFFSET), 0, segmentLocation);
+        new CommittingSegmentDescriptor(segmentName, new StreamPartitionMsgOffset(PARTITION_OFFSET), 0,
+            segmentLocation);
     segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     assertFalse(segmentFile.exists());
   }
@@ -709,7 +710,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     String segmentLocation = SCHEME + tableDir + "/" + segmentFileName;
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(segmentName, new StreamPartitionMsgOffset(PARTITION_OFFSET), 0, segmentLocation);
+        new CommittingSegmentDescriptor(segmentName, new StreamPartitionMsgOffset(PARTITION_OFFSET), 0,
+            segmentLocation);
     segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     assertFalse(segmentFile.exists());
     assertFalse(extraSegmentFile.exists());

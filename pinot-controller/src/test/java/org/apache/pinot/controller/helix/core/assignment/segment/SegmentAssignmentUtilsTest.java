@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -57,8 +57,8 @@ public class SegmentAssignmentUtilsTest {
         instancesAssigned.add(instances.get(assignedInstanceId));
         assignedInstanceId = (assignedInstanceId + 1) % numInstances;
       }
-      currentAssignment.put(segmentName,
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
+      currentAssignment
+          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // There should be 100 segments assigned
@@ -240,7 +240,7 @@ public class SegmentAssignmentUtilsTest {
         instancesAssigned.add(instances.get(assignedInstanceId));
       }
       currentAssignment.put(segments.get(segmentId),
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // There should be 90 segments assigned

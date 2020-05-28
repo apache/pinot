@@ -28,7 +28,7 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
@@ -90,7 +90,7 @@ public class RealtimeSegmentSelector implements SegmentSelector {
         HLCSegmentName hlcSegmentName = new HLCSegmentName(segment);
         groupIdToHLCSegmentsMap.computeIfAbsent(hlcSegmentName.getGroupId(), k -> new ArrayList<>()).add(segment);
       } else {
-        if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+        if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
           // Keep the first CONSUMING segment for each partition
           LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
           partitionIdToFirstConsumingLLCSegmentMap.compute(llcSegmentName.getPartitionId(), (k, consumingSegment) -> {

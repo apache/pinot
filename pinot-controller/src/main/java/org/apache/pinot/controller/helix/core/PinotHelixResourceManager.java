@@ -72,8 +72,8 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -95,15 +95,15 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
-import org.apache.pinot.spi.config.instance.Instance;
-import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -631,7 +631,7 @@ public class PinotHelixResourceManager {
           instanceStateMap.clear();
         }
         for (String brokerInstance : brokerInstances) {
-          idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerOnlineOfflineStateModel.ONLINE);
+          idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerResourceStateModel.ONLINE);
         }
         return idealState;
       }, DEFAULT_RETRY_POLICY);
@@ -651,7 +651,7 @@ public class PinotHelixResourceManager {
       Preconditions.checkNotNull(tableConfig);
       String brokerTag = TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig());
       if (brokerTag.equals(brokerTenantTag)) {
-        tableIdealState.setPartitionState(tableNameWithType, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
+        tableIdealState.setPartitionState(tableNameWithType, instanceName, BrokerResourceStateModel.ONLINE);
       }
     }
     _helixAdmin.setResourceIdealState(_helixClusterName, Helix.BROKER_RESOURCE_INSTANCE, tableIdealState);
@@ -1141,8 +1141,8 @@ public class PinotHelixResourceManager {
     List<String> brokers = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag);
     HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
       assert idealState != null;
-      idealState.getRecord().getMapFields().put(tableNameWithType,
-          SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerOnlineOfflineStateModel.ONLINE));
+      idealState.getRecord().getMapFields()
+          .put(tableNameWithType, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
       return idealState;
     });
   }
@@ -1563,7 +1563,7 @@ public class PinotHelixResourceManager {
           LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
               offlineTableName);
           currentAssignment.put(segmentName,
-              SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentOnlineOfflineStateModel.ONLINE));
+              SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
         }
         return idealState;
       });
@@ -2090,7 +2090,7 @@ public class PinotHelixResourceManager {
     _helixAdmin.enableInstance(_helixClusterName, instanceName, enableInstance);
     long intervalWaitTimeMs = 500L;
     long deadline = System.currentTimeMillis() + timeOutMs;
-    String offlineState = SegmentOnlineOfflineStateModel.OFFLINE;
+    String offlineState = SegmentStateModel.OFFLINE;
 
     while (System.currentTimeMillis() < deadline) {
       PropertyKey liveInstanceKey = _keyBuilder.liveInstance(instanceName);

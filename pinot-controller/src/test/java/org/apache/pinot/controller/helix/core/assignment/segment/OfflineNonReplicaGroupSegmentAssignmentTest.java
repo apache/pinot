@@ -27,7 +27,7 @@ import java.util.TreeMap;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -95,8 +95,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
         assertEquals(instancesAssigned.get(replicaId), INSTANCES.get(expectedAssignedInstanceId));
         expectedAssignedInstanceId = (expectedAssignedInstanceId + 1) % NUM_INSTANCES;
       }
-      currentAssignment.put(segmentName,
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
+      currentAssignment
+          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
   }
 
@@ -106,8 +106,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
-      currentAssignment.put(segmentName,
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
+      currentAssignment
+          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // There should be 100 segments assigned
@@ -134,8 +134,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
-      currentAssignment.put(segmentName,
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
+      currentAssignment
+          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // Bootstrap table should reassign all segments based on their alphabetical order
