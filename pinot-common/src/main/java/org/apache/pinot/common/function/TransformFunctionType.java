@@ -38,7 +38,15 @@ public enum TransformFunctionType {
   LN("ln"),
   SQRT("sqrt"),
 
+  EQUALS("equals"),
+  NOT_EQUALS("not_equals"),
+  GREATER_THAN("greater_than"),
+  GREATER_THAN_OR_EQUAL("greater_than_or_equal"),
+  LESS_THAN("less_than"),
+  LESS_THAN_OR_EQUAL("less_than_or_equal"),
+
   CAST("cast"),
+  CASE("case"),
   JSONEXTRACTSCALAR("jsonExtractScalar"),
   JSONEXTRACTKEY("jsonExtractKey"),
   TIMECONVERT("timeConvert"),

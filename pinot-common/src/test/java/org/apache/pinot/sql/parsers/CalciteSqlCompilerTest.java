@@ -52,13 +52,9 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testCaseWhenStatements() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SELECT OrderID, Quantity,\n"
-            + "CASE\n"
-            + "    WHEN Quantity > 30 THEN 'The quantity is greater than 30'\n"
-            + "    WHEN Quantity = 30 THEN 'The quantity is 30'\n"
-            + "    ELSE 'The quantity is under 30'\n"
-            + "END AS QuantityText\n"
-            + "FROM OrderDetails");
+        "SELECT OrderID, Quantity,\n" + "CASE\n" + "    WHEN Quantity > 30 THEN 'The quantity is greater than 30'\n"
+            + "    WHEN Quantity = 30 THEN 'The quantity is 30'\n" + "    ELSE 'The quantity is under 30'\n"
+            + "END AS QuantityText\n" + "FROM OrderDetails");
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "OrderID");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "Quantity");
     Function asFunc = pinotQuery.getSelectList().get(2).getFunctionCall();
@@ -79,14 +75,8 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), "The quantity is under 30");
 
     pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SELECT Quantity,\n"
-            + "SUM(CASE\n"
-            + "    WHEN Quantity > 30 THEN 3\n"
-            + "    WHEN Quantity > 20 THEN 2\n"
-            + "    WHEN Quantity > 10 THEN 1\n"
-            + "    ELSE 0\n"
-            + "END) AS new_sum_quant\n"
-            + "FROM OrderDetails");
+        "SELECT Quantity,\n" + "SUM(CASE\n" + "    WHEN Quantity > 30 THEN 3\n" + "    WHEN Quantity > 20 THEN 2\n"
+            + "    WHEN Quantity > 10 THEN 1\n" + "    ELSE 0\n" + "END) AS new_sum_quant\n" + "FROM OrderDetails");
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "Quantity");
     asFunc = pinotQuery.getSelectList().get(1).getFunctionCall();
     Assert.assertEquals(asFunc.getOperator(), SqlKind.AS.name());
