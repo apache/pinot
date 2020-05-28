@@ -22,12 +22,11 @@ package org.apache.pinot.thirdeye.anomaly.task;
 public class TaskConstants {
 
   public enum TaskType {
-    DATA_QUALITY,
-    DETECTION,
-    DETECTION_ALERT,
-    YAML_DETECTION_ONBOARD,
-    // TODO: deprecate ALERT task type
-    MONITOR
+    DATA_QUALITY,              // tasks to detect data quality anomalies
+    DETECTION,                 // tasks to detect anomalies
+    DETECTION_ALERT,           // tasks to send alerts to customers regarding anomalies
+    YAML_DETECTION_ONBOARD,    // tasks to onboard new YAML configured detection
+    MONITOR                    // tasks to clean up expired/invalid execution history
   }
 
   public enum TaskStatus {

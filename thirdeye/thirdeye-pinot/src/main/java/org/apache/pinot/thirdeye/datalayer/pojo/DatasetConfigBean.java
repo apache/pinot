@@ -242,15 +242,6 @@ public class DatasetConfigBean extends AbstractBean {
     this.realtime = realtime;
   }
 
-  public boolean isRequiresCompletenessCheck() {
-    return requiresCompletenessCheck;
-  }
-
-  public void setRequiresCompletenessCheck(boolean requiresCompletenessCheck) {
-    this.requiresCompletenessCheck = requiresCompletenessCheck;
-  }
-
-
   public TimeGranularity getExpectedDelay() {
     return expectedDelay;
   }
@@ -300,11 +291,11 @@ public class DatasetConfigBean extends AbstractBean {
       return false;
     }
     DatasetConfigBean that = (DatasetConfigBean) o;
-    return active == that.active && additive == that.additive && realtime == that.realtime
-        && requiresCompletenessCheck == that.requiresCompletenessCheck && Objects.equals(dataset, that.dataset)
-        && Objects.equals(displayName, that.displayName) && Objects.equals(dimensions, that.dimensions)
-        && Objects.equals(timeColumn, that.timeColumn) && timeUnit == that.timeUnit && Objects.equals(timeDuration,
-        that.timeDuration) && Objects.equals(timeFormat, that.timeFormat) && Objects.equals(timezone, that.timezone)
+    return active == that.active && additive == that.additive && realtime == that.realtime &&
+        Objects.equals(dataset, that.dataset) && Objects.equals(displayName, that.displayName)
+        && Objects.equals(dimensions, that.dimensions) && Objects.equals(timeColumn, that.timeColumn)
+        && timeUnit == that.timeUnit && Objects.equals(timeDuration, that.timeDuration)
+        && Objects.equals(timeFormat, that.timeFormat) && Objects.equals(timezone, that.timezone)
         && Objects.equals(dataSource, that.dataSource) && Objects.equals(owners, that.owners) && Objects.equals(
         dimensionsHaveNoPreAggregation, that.dimensionsHaveNoPreAggregation) && Objects.equals(preAggregatedKeyword,
         that.preAggregatedKeyword) && Objects.equals(nonAdditiveBucketSize, that.nonAdditiveBucketSize)
@@ -316,6 +307,6 @@ public class DatasetConfigBean extends AbstractBean {
   public int hashCode() {
     return Objects.hash(dataset, displayName, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
         dataSource, owners, active, additive, dimensionsHaveNoPreAggregation, preAggregatedKeyword,
-        nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime, requiresCompletenessCheck, expectedDelay, properties);
+        nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime, expectedDelay, properties);
   }
 }

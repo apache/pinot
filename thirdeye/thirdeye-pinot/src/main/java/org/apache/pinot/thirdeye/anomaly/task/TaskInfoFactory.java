@@ -58,7 +58,7 @@ public class TaskInfoFactory {
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, MonitorTaskInfo.class);
           break;
         default:
-          LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT, ALERT2, DATA_COMPLETENESS, CLASSIFICATION");
+          LOG.error("TaskType must be one of DATA_QUALITY, DETECTION, DETECTION_ALERT, YAML_DETECTION_ONBOARD, MONITOR");
           break;
       }
     } catch (Exception e) {

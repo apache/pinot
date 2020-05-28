@@ -50,13 +50,11 @@ public class TestDatasetConfigManager {
   public void testCreate() {
 
     DatasetConfigDTO datasetConfig1 = DaoTestUtils.getTestDatasetConfig(collection1);
-    datasetConfig1.setRequiresCompletenessCheck(true);
     datasetConfigId1 = datasetConfigDAO.save(datasetConfig1);
     Assert.assertNotNull(datasetConfigId1);
 
     DatasetConfigDTO datasetConfig2 = DaoTestUtils.getTestDatasetConfig(collection2);
     datasetConfig2.setActive(false);
-    datasetConfig2.setRequiresCompletenessCheck(true);
     datasetConfigId2 = datasetConfigDAO.save(datasetConfig2);
     Assert.assertNotNull(datasetConfigId2);
 
@@ -92,8 +90,4 @@ public class TestDatasetConfigManager {
     Assert.assertNull(datasetConfig);
   }
 
-  @Test(dependsOnMethods = {"testCreate"})
-  public void testActiveRequiresCompletenessCheck() {
-    Assert.assertEquals(datasetConfigDAO.findActiveRequiresCompletenessCheck().size(), 1);
-  }
 }

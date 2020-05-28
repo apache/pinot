@@ -23,11 +23,9 @@ import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameSerializer;
-import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
@@ -45,7 +43,6 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseThirdEyeApplication<T extends Configuration> extends Application<T> {
   protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
-  protected AnomalyFunctionManager anomalyFunctionDAO;
   protected MergedAnomalyResultManager mergedAnomalyResultDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
@@ -56,7 +53,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
     DaoProviderUtil.init(new File(persistenceConfig));
-    anomalyFunctionDAO = DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
     mergedAnomalyResultDAO = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     datasetConfigDAO = DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);
     metricConfigDAO = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
