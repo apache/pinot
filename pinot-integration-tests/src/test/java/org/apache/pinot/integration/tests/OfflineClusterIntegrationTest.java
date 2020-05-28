@@ -24,6 +24,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -306,6 +309,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
+  }
+
+  @Test
+  public void testTimeFunc()
+      throws Exception {
+    String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z') FROM mytable";
+    JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
+    String expectedTodayStr =
+        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    Assert.assertEquals(todayStr, expectedTodayStr);
   }
 
   @Test
