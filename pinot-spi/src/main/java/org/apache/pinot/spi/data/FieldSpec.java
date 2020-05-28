@@ -263,9 +263,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
       jsonObject.put("maxLength", _maxLength);
     }
     appendDefaultNullValue(jsonObject);
-    if (_transformFunction != null) {
-      jsonObject.put("transformFunction", _transformFunction);
-    }
+    appendTransformFunction(jsonObject);
     return jsonObject;
   }
 
@@ -277,6 +275,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
       } else {
         jsonNode.put("defaultNullValue", getStringValue(_defaultNullValue));
       }
+    }
+  }
+
+  protected void appendTransformFunction(ObjectNode jsonNode) {
+    if (_transformFunction != null) {
+      jsonNode.put("transformFunction", _transformFunction);
     }
   }
 

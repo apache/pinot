@@ -112,6 +112,7 @@ public final class TimeFieldSpec extends FieldSpec {
       jsonObject.set("outgoingGranularitySpec", _outgoingGranularitySpec.toJsonObject());
     }
     appendDefaultNullValue(jsonObject);
+    appendTransformFunction(jsonObject);
     return jsonObject;
   }
 
