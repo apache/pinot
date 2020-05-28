@@ -21,12 +21,11 @@ package org.apache.pinot.core.io.util;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public final class FixedBitIntReaderWriterV2 implements Closeable {
-  private volatile PinotDataBitSetV2 _dataBitSet;
+  private PinotDataBitSetV2 _dataBitSet;
 
   public FixedBitIntReaderWriterV2(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
     Preconditions
@@ -63,7 +62,7 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
    * they may not necessarily be contiguous. They can have gaps.
    *
    * {@link PinotDataBitSetV2} implements efficient bulk contiguous API
-   * {@link PinotDataBitSetV2#readInt(int, int, int[])}
+   * {@link PinotDataBitSetV2#readInt(long, int, int[])}
    * to read dictionaryIds for a contiguous range of docIds represented
    * by startDocId and length.
    *
@@ -145,7 +144,6 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
       throws IOException {
     if (_dataBitSet != null) {
       _dataBitSet.close();
-      _dataBitSet = null;
     }
   }
 }

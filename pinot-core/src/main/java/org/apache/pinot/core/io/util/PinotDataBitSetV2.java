@@ -35,37 +35,37 @@ public abstract class PinotDataBitSetV2 implements Closeable {
   protected int _numBitsPerValue;
 
   /**
-   * Unpack single dictId at the given docId. This is efficient
+   * Decode integers starting at a given index. This is efficient
    * because of simplified bitmath.
    * @param index docId
-   * @return unpacked dictId
+   * @return unpacked integer
    */
-  public abstract int readInt(int index);
+  public abstract int readInt(long index);
 
   /**
-   * Unpack dictIds for a contiguous range of docIds represented by startIndex
+   * Decode integers for a contiguous range of indexes represented by startIndex
    * and length. This uses vectorization as much as possible for all the aligned
    * reads and also takes care of the small byte-sized window of unaligned read.
    * @param startIndex start docId
    * @param length length
-   * @param out out array to store the unpacked dictIds
+   * @param out out array to store the unpacked integers
    */
-  public abstract void readInt(int startIndex, int length, int[] out);
+  public abstract void readInt(long startIndex, int length, int[] out);
 
   /**
-   * Unpack dictIds for an array of docIds[] which is not necessarily
+   * Decode integers for an array of indexes which is not necessarily
    * contiguous. So there could be gaps in the array:
    * e.g: [1, 3, 7, 9, 11, 12]
    * The actual read is done by the previous API since that is efficient
    * as it exploits contiguity and uses vectorization. However, since
-   * the out[] array has to be correctly populated with the unpacked dictId
-   * for each docId, a post-processing step is needed after the bulk contiguous
-   * read to correctly set the unpacked dictId into the out array throwing away
-   * the unnecessary dictIds unpacked as part of contiguous read
-   * @param docIds docIds array
+   * the out[] array has to be correctly populated with the unpacked integer
+   * for each index, a post-processing step is needed after the bulk contiguous
+   * read to correctly set the unpacked integer into the out array throwing away
+   * the unnecessary values decoded as part of contiguous read
+   * @param docIds index array
    * @param docIdsStartIndex starting index in the docIds array
    * @param length length to read (number of docIds to read in the array)
-   * @param out out array to store the unpacked dictIds
+   * @param out out array to store the decoded integers
    * @param outpos starting index in the out array
    */
   public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
@@ -75,8 +75,8 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     // do a contiguous bulk read
     readInt(startDocId, endDocId - startDocId + 1, dictIds);
     out[outpos] = dictIds[0];
-    // set the unpacked dictId correctly. this is needed since there could
-    // be gaps and some dictIds may have to be thrown/ignored.
+    // set the unpacked integer correctly. this is needed since there could
+    // be gaps and some decoded values may have to be thrown/ignored.
     for (int i = 1; i < length; i++) {
       out[outpos + i] = dictIds[docIds[docIdsStartIndex + i] - startDocId];
     }
@@ -84,6 +84,8 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
   public static PinotDataBitSetV2 createBitSet(PinotDataBuffer pinotDataBuffer, int numBitsPerValue) {
     switch (numBitsPerValue) {
+      case 1:
+        return new Bit1Encoded(pinotDataBuffer, numBitsPerValue);
       case 2:
         return new Bit2Encoded(pinotDataBuffer, numBitsPerValue);
       case 4:
@@ -99,6 +101,222 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     }
   }
 
+  public static class Bit1Encoded extends PinotDataBitSetV2 {
+    Bit1Encoded(PinotDataBuffer dataBuffer, int numBits) {
+      _dataBuffer = dataBuffer;
+      _numBitsPerValue = numBits;
+    }
+
+    @Override
+    public int readInt(long index) {
+      long bitOffset = index * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
+      int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+      bitOffset = bitOffset & 7;
+      return  (val >>> (7 - bitOffset)) & 1;
+    }
+
+    @Override
+    public void readInt(long startIndex, int length, int[] out) {
+      long bitOffset = startIndex * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
+      bitOffset = bitOffset & 7;
+      int packed = 0;
+      int i = 0;
+
+      // unaligned read within a byte
+      if (bitOffset != 0) {
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        if (bitOffset == 1) {
+          // unpack 7 integers from bits 1-7
+          out[0] = (packed >>> 6) & 1;
+          out[1] = (packed >>> 5) & 1;
+          out[2] = (packed >>> 4) & 1;
+          out[3] = (packed >>> 3) & 1;
+          out[4] = (packed >>> 2) & 1;
+          out[5] = (packed >>> 1) & 1;
+          out[6] = packed & 1;
+          i = 7;
+          length -= 7;
+        }
+        else if (bitOffset == 2) {
+          // unpack 6 integers from bits 2 to 7
+          out[0] = (packed >>> 5) & 1;
+          out[1] = (packed >>> 4) & 1;
+          out[2] = (packed >>> 3) & 1;
+          out[3] = (packed >>> 2) & 1;
+          out[4] = (packed >>> 1) & 1;
+          out[5] = packed & 1;
+          i = 6;
+          length -= 6;
+        } else if (bitOffset == 3) {
+          // unpack 5 integers from bits 3 to 7
+          out[0] = (packed >>> 4) & 1;
+          out[1] = (packed >>> 3) & 1;
+          out[2] = (packed >>> 2) & 1;
+          out[3] = (packed >>> 1) & 1;
+          out[4] = packed & 1;
+          i = 5;
+          length -= 5;
+        } else if (bitOffset == 4) {
+          // unpack 4 integers from bits 4 to 7
+          out[0] = (packed >>> 3) & 1;
+          out[1] = (packed >>> 2) & 1;
+          out[2] = (packed >>> 1) & 1;
+          out[3] = packed & 1;
+          i = 4;
+          length -= 4;
+        } else if (bitOffset == 5) {
+          // unpack 3 integers from bits 5 to 7
+          out[0] = (packed >>> 2) & 1;
+          out[1] = (packed >>> 1) & 1;
+          out[2] = packed & 1;
+          i = 3;
+          length -= 3;
+        } else if (bitOffset == 6) {
+          // unpack 2 integers from bits 6 to 7
+          out[0] = (packed >>> 1) & 1;
+          out[1] = packed & 1;
+          i = 2;
+          length -= 2;
+        }
+        else {
+          // unpack integer from bit 7
+          out[0] = packed & 1;
+          i = 1;
+          length -= 1;
+        }
+        byteOffset++;
+      }
+
+      // aligned reads at 4-byte boundary to unpack 32 integers
+      while (length >= 32) {
+        packed = _dataBuffer.getInt(byteOffset);
+        out[i] = packed >>> 31;
+        out[i + 1] = (packed >>> 30) & 1;
+        out[i + 2] = (packed >>> 29) & 1;
+        out[i + 3] = (packed >>> 28) & 1;
+        out[i + 4] = (packed >>> 27) & 1;
+        out[i + 5] = (packed >>> 26) & 1;
+        out[i + 6] = (packed >>> 25) & 1;
+        out[i + 7] = (packed >>> 24) & 1;
+        out[i + 8] = (packed >>> 23) & 1;
+        out[i + 9] = (packed >>> 22) & 1;
+        out[i + 10] = (packed >>> 21) & 1;
+        out[i + 11] = (packed >>> 20) & 1;
+        out[i + 12] = (packed >>> 19) & 1;
+        out[i + 13] = (packed >>> 18) & 1;
+        out[i + 14] = (packed >>> 17) & 1;
+        out[i + 15] = (packed >>> 16) & 1;
+        out[i + 16] = (packed >>> 15) & 1;
+        out[i + 17] = (packed >>> 14) & 1;
+        out[i + 18] = (packed >>> 13) & 1;
+        out[i + 19] = (packed >>> 12) & 1;
+        out[i + 20] = (packed >>> 11) & 1;
+        out[i + 21] = (packed >>> 10) & 1;
+        out[i + 22] = (packed >>> 9) & 1;
+        out[i + 23] = (packed >>> 8) & 1;
+        out[i + 24] = (packed >>> 7) & 1;
+        out[i + 25] = (packed >>> 6) & 1;
+        out[i + 26] = (packed >>> 5) & 1;
+        out[i + 27] = (packed >>> 4) & 1;
+        out[i + 28] = (packed >>> 3) & 1;
+        out[i + 29] = (packed >>> 2) & 1;
+        out[i + 30] = (packed >>> 1) & 1;
+        out[i + 31] = packed & 1;
+        length -= 32;
+        byteOffset += 4;
+        i += 32;
+      }
+
+      // aligned reads at 2-byte boundary to unpack 16 integers
+      if (length >= 16) {
+        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        out[i] = (packed >>> 15) & 1;
+        out[i + 1] = (packed >>> 14) & 1;
+        out[i + 2] = (packed >>> 13) & 1;
+        out[i + 3] = (packed >>> 12) & 1;
+        out[i + 4] = (packed >>> 11) & 1;
+        out[i + 5] = (packed >>> 10) & 1;
+        out[i + 6] = (packed >>> 9) & 1;
+        out[i + 7] = (packed >>> 8) & 1;
+        out[i + 8] = (packed >>> 7) & 1;
+        out[i + 9] = (packed >>> 6) & 1;
+        out[i + 10] = (packed >>> 5) & 1;
+        out[i + 11] = (packed >>> 4) & 1;
+        out[i + 12] = (packed >>> 3) & 1;
+        out[i + 13] = (packed >>> 2) & 1;
+        out[i + 14] = (packed >>> 1) & 1;
+        out[i + 15] = packed & 1;
+        length -= 16;
+        byteOffset += 2;
+        i += 16;
+      }
+
+      // aligned reads at byte boundary to unpack 8 integers
+      if (length >= 8) {
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[i] = (packed >>> 7) & 1;
+        out[i + 1] = (packed >>> 6) & 1;
+        out[i + 2] = (packed >>> 5) & 1;
+        out[i + 3] = (packed >>> 4) & 1;
+        out[i + 4] = (packed >>> 3) & 1;
+        out[i + 5] = (packed >>> 2) & 1;
+        out[i + 6] = (packed >>> 1) & 1;
+        out[i + 7] = packed & 1;
+        length -= 8;
+        byteOffset += 1;
+        i += 8;
+      }
+
+      // handle spill-over
+
+      if (length == 7) {
+        // unpack from bits 0-6
+        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[i] = (packed >>> 7) & 1;
+        out[i + 1] = (packed >>> 6) & 1;
+        out[i + 2] = (packed >>> 5) & 1;
+        out[i + 3] = (packed >>> 4) & 1;
+        out[i + 4] = (packed >>> 3) & 1;
+        out[i + 5] = (packed >>> 2) & 1;
+        out[i + 6] = (packed >>> 1) & 1;
+      } else if (length == 6) {
+        // unpack from bits 0-5
+        out[i] = (packed >>> 7) & 1;
+        out[i + 1] = (packed >>> 6) & 1;
+        out[i + 2] = (packed >>> 5) & 1;
+        out[i + 3] = (packed >>> 4) & 1;
+        out[i + 4] = (packed >>> 3) & 1;
+        out[i + 5] = (packed >>> 2) & 1;
+      } else if (length == 5) {
+        // unpack from bits 0-4
+        out[i] = (packed >>> 7) & 1;
+        out[i + 1] = (packed >>> 6) & 1;
+        out[i + 2] = (packed >>> 5) & 1;
+        out[i + 3] = (packed >>> 4) & 1;
+        out[i + 4] = (packed >>> 3) & 1;
+      } else if (length == 4) {
+        // unpack from bits 0-3
+        out[i] = (packed >>> 7) & 1;
+        out[i + 1] = (packed >>> 6) & 1;
+        out[i + 2] = (packed >>> 5) & 1;
+        out[i + 3] = (packed >>> 4) & 1;
+      } else if (length == 3) {
+        // unpack from bits 0-2
+        out[i] = (packed >>> 7) & 1;
+        out[i + 1] = (packed >>> 6) & 1;
+        out[i + 2] = (packed >>> 5) & 1;
+      } else if (length == 2) {
+        // unpack from bits 0-3
+        out[i] = (packed >>> 7) & 1;
+        out[i + 1] = (packed >>> 6) & 1;
+      } else {
+        out[i] = (packed >>> 7) & 1;
+      }
+    }
+  }
+
   public static class Bit2Encoded extends PinotDataBitSetV2 {
     Bit2Encoded(PinotDataBuffer dataBuffer, int numBits) {
       _dataBuffer = dataBuffer;
@@ -106,18 +324,18 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     }
 
     @Override
-    public int readInt(int index) {
-      long bitOffset = (long) index * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
+    public int readInt(long index) {
+      long bitOffset = index * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
       int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
       return  (val >>> (6 - bitOffset)) & 3;
     }
 
     @Override
-    public void readInt(int startIndex, int length, int[] out) {
-      long bitOffset = (long) startIndex * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
+    public void readInt(long startIndex, int length, int[] out) {
+      long bitOffset = startIndex * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
       bitOffset = bitOffset & 7;
       int packed = 0;
       int i = 0;
@@ -227,7 +445,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       if (length > 0) {
         // unpack from bits 4-5
         out[i + 2] = (packed >>> 2) & 3;
-        length--;
       }
     }
   }
@@ -239,18 +456,18 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     }
 
     @Override
-    public int readInt(int index) {
-      long bitOffset = (long) index * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
+    public int readInt(long index) {
+      long bitOffset = index * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
       int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
       return (bitOffset == 0) ? val >>> 4 : val & 0xf;
     }
 
     @Override
-    public void readInt(int startIndex, int length, int[] out) {
-      long bitOffset = (long) startIndex * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
+    public void readInt(long startIndex, int length, int[] out) {
+      long bitOffset = startIndex * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
       bitOffset = bitOffset & 7;
       int packed = 0;
       int i = 0;
@@ -315,7 +532,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       if (length > 0) {
         packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 4;
-        length--;
       }
     }
   }
@@ -327,16 +543,16 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     }
 
     @Override
-    public int readInt(int index) {
-      long bitOffset = (long) index * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
+    public int readInt(long index) {
+      long bitOffset = index * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
       return ((int)_dataBuffer.getByte(byteOffset)) & 0xff;
     }
 
     @Override
-    public void readInt(int startIndex, int length, int[] out) {
-      long bitOffset = (long) startIndex * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
+    public void readInt(long startIndex, int length, int[] out) {
+      long bitOffset = startIndex * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
       int i = 0;
       int packed = 0;
 
@@ -373,7 +589,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       // handle spill over at byte boundary to unpack 1 integer
       if (length > 0) {
         out[i] = (int)_dataBuffer.getByte(byteOffset) & 0xff;
-        length--;
       }
     }
   }
@@ -385,16 +600,16 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     }
 
     @Override
-    public int readInt(int index) {
-      long bitOffset = (long) index * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
+    public int readInt(long index) {
+      long bitOffset = index * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
       return ((int)_dataBuffer.getShort(byteOffset)) & 0xffff;
     }
 
     @Override
-    public void readInt(int startIndex, int length, int[] out) {
-      long bitOffset = (long) startIndex * _numBitsPerValue;
-      int byteOffset = (int) (bitOffset / Byte.SIZE);
+    public void readInt(long startIndex, int length, int[] out) {
+      long bitOffset = startIndex * _numBitsPerValue;
+      long byteOffset = bitOffset / Byte.SIZE;
       int i = 0;
       int packed;
 
@@ -418,7 +633,6 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       // handle spill over at 2-byte boundary to unpack 1 integer
       if (length > 0) {
         out[i] = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
-        length--;
       }
     }
   }
@@ -430,13 +644,13 @@ public abstract class PinotDataBitSetV2 implements Closeable {
     }
 
     @Override
-    public int readInt(int index) {
+    public int readInt(long index) {
       return _dataBuffer.getInt(index * Integer.BYTES);
     }
 
     @Override
-    public void readInt(int startIndex, int length, int[] out) {
-      int byteOffset = startIndex * Integer.BYTES;
+    public void readInt(long startIndex, int length, int[] out) {
+      long byteOffset = startIndex * Integer.BYTES;
       for (int i = 0; i < length; i++) {
         out[i] = _dataBuffer.getInt(byteOffset);
         byteOffset += 4;
@@ -511,6 +725,5 @@ public abstract class PinotDataBitSetV2 implements Closeable {
   @Override
   public void close()
       throws IOException {
-    _dataBuffer.close();
   }
 }
