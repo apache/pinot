@@ -86,7 +86,6 @@ public class DatasetConfigBean extends AbstractBean {
 
   private boolean realtime = false;
 
-  private boolean requiresCompletenessCheck = false;
   // delay expected for a dataset for data to arrive
   private TimeGranularity expectedDelay = DEFAULT_DAILY_EXPECTED_DELAY;
   // latest timestamp of the dataset updated by external events
