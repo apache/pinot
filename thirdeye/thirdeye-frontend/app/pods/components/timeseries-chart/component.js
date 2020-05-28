@@ -254,14 +254,14 @@ export default Component.extend({
             upperBoundVals = upperBoundVals.map(() => 2 * currentMax);
           }
         }
-        const area_main = d3.svg.area()
-          .interpolate('linear')
+        const area_main = d3.area()
+          .curve(d3.curveLinear)
           .x(d => xscale(xVals[d]))
           .y0(d => yscale(lowerBoundVals[d]))
           .y1(d => yscale(upperBoundVals[d]));
 
-        const area_sub = d3.svg.area()
-          .interpolate('linear')
+        const area_sub = d3.area()
+          .curve(d3.curveLinear)
           .x(d => xscaleSub(xVals[d]))
           .y0(d => yscaleSub(lowerBoundVals[d]))
           .y1(d => yscaleSub(upperBoundVals[d]));
