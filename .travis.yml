@@ -25,14 +25,14 @@ addons:
 install:
   - ./.travis/.travis_install.sh
 
-branches:
-  only:
-    - master
+#branches:
+#  only:
+#    - master
 
 stages:
   - test
   - name: deploy
-    if: branch = master
+#    if: branch = master
 
 jobs:
   include:
