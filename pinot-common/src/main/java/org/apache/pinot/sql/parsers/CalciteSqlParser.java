@@ -623,12 +623,27 @@ public class CalciteSqlParser {
         SqlNode elseOperand = caseSqlNode.getElseOperand();
         Expression caseFuncExpr = RequestUtils.getFunctionExpression(SqlKind.CASE.name());
         for (SqlNode whenSqlNode : whenOperands.getList()) {
-          caseFuncExpr.getFunctionCall().addToOperands(toExpression(whenSqlNode));
+          Expression whenExpression = toExpression(whenSqlNode);
+          if (isAggregateExpression(whenExpression)) {
+            throw new SqlCompilationException(
+                "Aggregation functions inside WHEN Clause is not supported - " + whenSqlNode);
+          }
+          caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
         }
         for (SqlNode thenSqlNode : thenOperands.getList()) {
-          caseFuncExpr.getFunctionCall().addToOperands(toExpression(thenSqlNode));
+          Expression thenExpression = toExpression(thenSqlNode);
+          if (isAggregateExpression(thenExpression)) {
+            throw new SqlCompilationException(
+                "Aggregation functions inside THEN Clause is not supported - " + thenSqlNode);
+          }
+          caseFuncExpr.getFunctionCall().addToOperands(thenExpression);
         }
-        caseFuncExpr.getFunctionCall().addToOperands(toExpression(elseOperand));
+        Expression elseExpression = toExpression(elseOperand);
+        if (isAggregateExpression(elseExpression)) {
+          throw new SqlCompilationException(
+              "Aggregation functions inside ELSE Clause is not supported - " + elseExpression);
+        }
+        caseFuncExpr.getFunctionCall().addToOperands(elseExpression);
         return caseFuncExpr;
       case OTHER:
         if (node instanceof SqlDataTypeSpec) {
