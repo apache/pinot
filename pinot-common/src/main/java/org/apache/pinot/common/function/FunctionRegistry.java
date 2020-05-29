@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Registry for inbuilt Pinot functions
+ * Registry for in-built Pinot functions
  */
 public class FunctionRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
@@ -61,26 +61,34 @@ public class FunctionRegistry {
   }
 
   public static void registerFunction(Method method) {
+    registerFunction(method, method.getName().toLowerCase());
+  }
+
+  public static void registerFunction(Method method, String name) {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
-    _functionInfoMap.put(method.getName().toLowerCase(), functionInfo);
+    _functionInfoMap.put(name, functionInfo);
   }
 
   public static boolean containsFunctionByName(String funcName) {
     return _functionInfoMap.containsKey(funcName.toLowerCase());
   }
 
-
   static {
     try {
 
-      Reflections reflections = new Reflections(new ConfigurationBuilder()
-          .setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-          .setScanners(new MethodAnnotationsScanner()));
+      Reflections reflections = new Reflections(
+          new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
+              .setScanners(new MethodAnnotationsScanner()));
 
       Set<Method> methodSet = reflections.getMethodsAnnotatedWith(ScalarFunction.class);
-      for(Method method : methodSet) {
-        if(method.getAnnotation(ScalarFunction.class).enabled()) {
-          FunctionRegistry.registerFunction(method);
+      for (Method method : methodSet) {
+        ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
+        if (scalarFunction.enabled()) {
+          if (!scalarFunction.name().isEmpty()) {
+            FunctionRegistry.registerFunction(method, scalarFunction.name());
+          } else {
+            FunctionRegistry.registerFunction(method);
+          }
         }
       }
 

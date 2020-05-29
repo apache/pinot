@@ -24,14 +24,14 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
+public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTest {
 
   @Test
   public void testStringLowerTransformFunction() {
     TransformExpressionTree expression =
         TransformExpressionTree.compileToExpressionTree(String.format("lower(%s)", STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "lower");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -45,7 +45,7 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
     TransformExpressionTree expression =
         TransformExpressionTree.compileToExpressionTree(String.format("upper(%s)", STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "upper");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -59,7 +59,7 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
     TransformExpressionTree expression =
         TransformExpressionTree.compileToExpressionTree(String.format("reverse(%s)", STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "reverse");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -73,7 +73,7 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
     TransformExpressionTree expression =
         TransformExpressionTree.compileToExpressionTree(String.format("substr(%s, 0, 2)", STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "substr");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -83,7 +83,7 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
 
     expression = TransformExpressionTree.compileToExpressionTree(String.format("substr(%s, 2, -1)", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "substr");
     expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -97,7 +97,7 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
     TransformExpressionTree expression = TransformExpressionTree
         .compileToExpressionTree(String.format("concat(%s, %s, '-')", STRING_SV_COLUMN, STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "concat");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -111,7 +111,7 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
     TransformExpressionTree expression =
         TransformExpressionTree.compileToExpressionTree(String.format("replace(%s, 'A', 'B')", STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "replace");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -127,7 +127,7 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
     TransformExpressionTree expression = TransformExpressionTree
         .compileToExpressionTree(String.format("lpad(%s, %d, '%s')", STRING_SV_COLUMN, padLength, padString));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "lpad");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -138,7 +138,7 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
     expression = TransformExpressionTree
         .compileToExpressionTree(String.format("rpad(%s, %d, '%s')", STRING_SV_COLUMN, padLength, padString));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "rpad");
     expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -152,21 +152,21 @@ public class GenericTransformFunctionTest extends BaseTransformFunctionTest {
     TransformExpressionTree expression =
         TransformExpressionTree.compileToExpressionTree(String.format("ltrim(lpad(%s, 50, ' '))", STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "ltrim");
     testTransformFunction(transformFunction, _stringSVValues);
 
     expression =
         TransformExpressionTree.compileToExpressionTree(String.format("rtrim(rpad(%s, 50, ' '))", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "rtrim");
     testTransformFunction(transformFunction, _stringSVValues);
 
     expression = TransformExpressionTree
         .compileToExpressionTree(String.format("trim(rpad(lpad(%s, 50, ' '), 100, ' '))", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof GenericTransformFunction);
+    Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "trim");
     testTransformFunction(transformFunction, _stringSVValues);
   }

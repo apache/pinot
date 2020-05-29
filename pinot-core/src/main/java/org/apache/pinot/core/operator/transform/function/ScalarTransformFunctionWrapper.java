@@ -34,9 +34,8 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class GenericTransformFunction extends BaseTransformFunction {
+public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
 
-  private FunctionInfo _info;
   FunctionInvoker _functionInvoker;
   String _name;
   Object[] _args;
@@ -50,7 +49,7 @@ public class GenericTransformFunction extends BaseTransformFunction {
   double[] _doubleResult;
   long[] _longResult;
 
-  public GenericTransformFunction() {
+  public ScalarTransformFunctionWrapper() {
     _nonLiteralArgIndices = new ArrayList<>();
     _nonLiteralArgType = new ArrayList<>();
     _nonLiteralTransformFunction = new ArrayList<>();
@@ -64,7 +63,6 @@ public class GenericTransformFunction extends BaseTransformFunction {
   public void setFunction(String functionName, FunctionInfo info)
       throws Exception {
     _name = functionName;
-    _info = info;
     _functionInvoker = new FunctionInvoker(info);
   }
 

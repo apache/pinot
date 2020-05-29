@@ -118,7 +118,7 @@ public class TransformFunctionFactory {
         Class<? extends TransformFunction> transformFunctionClass;
         FunctionInfo functionInfo = null;
         if (FunctionRegistry.containsFunctionByName(functionName)) {
-          transformFunctionClass = GenericTransformFunction.class;
+          transformFunctionClass = ScalarTransformFunctionWrapper.class;
           functionInfo = FunctionRegistry.getFunctionByName(functionName);
         } else {
           transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
@@ -130,7 +130,7 @@ public class TransformFunctionFactory {
         try {
           transformFunction = transformFunctionClass.newInstance();
           if (functionInfo != null) {
-            ((GenericTransformFunction) transformFunction).setFunction(functionName, functionInfo);
+            ((ScalarTransformFunctionWrapper) transformFunction).setFunction(functionName, functionInfo);
           }
         } catch (Exception e) {
           throw new RuntimeException("Caught exception while instantiating transform function: " + functionName, e);

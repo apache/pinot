@@ -24,8 +24,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
+/**
+ * Annotation Class for Scalar Functions
+ * Methods annotated using the interface are registered in the FunctionsRegistry
+ * and can be used as UDFs during Querying
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface ScalarFunction {
     boolean enabled() default true;
+    String name() default "";
 }
