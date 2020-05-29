@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.Random;
 import joptsimple.internal.Strings;
 import org.apache.commons.io.FileUtils;
+import org.apache.datasketches.memory.Memory;
+import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.theta.UpdateSketchBuilder;
 import org.apache.pinot.common.function.AggregationFunctionType;
@@ -50,6 +52,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -119,38 +122,63 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
   }
 
   private void testThetaSketches(boolean groupBy, boolean sql) {
-    List<String> predicates = Collections.singletonList("colA = 1");
-    String whereClause = Strings.join(predicates, " or ");
-    testQuery(whereClause, null, predicates, whereClause, groupBy, sql);
+    String tsQuery, distinctQuery;
+    String thetaSketchParams = "nominalEntries=1001";
+
+    List<String> predicateStrings = Collections.singletonList("colA = 1");
+    String whereClause = Strings.join(predicateStrings, " or ");
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, false);
+    distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, false);
+
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, true);
 
     // Test Intersection (AND)
-    predicates = Arrays.asList("colA = 1", "colB >= 2.0", "colC <> 'colC_1'");
-    whereClause = Strings.join(predicates, " and ");
-    testQuery(whereClause, "nominalEntries=1001", predicates, whereClause, groupBy, sql);
+    predicateStrings = Arrays.asList("colA = 1", "colB >= 2.0", "colC <> 'colC_1'");
+    whereClause = Strings.join(predicateStrings, " and ");
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, false);
+    distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, false);
+
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, true);
 
     // Test Union (OR)
-    predicates = Arrays.asList("colA = 1", "colB = 1.9");
-    whereClause = Strings.join(predicates, " or ");
-    testQuery(whereClause, " nominalEntries =1001 ", predicates, whereClause, groupBy, sql);
+    predicateStrings = Arrays.asList("colA = 1", "colB = 1.9");
+    whereClause = Strings.join(predicateStrings, " or ");
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, false);
+    distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, false);
+
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, true);
 
     // Test complex predicates
-    predicates =
-        Arrays.asList("colA in (1, 2)", "colB not in (3.0)", "colC between 'colC_1' and 'colC_5'");
+    predicateStrings = Arrays.asList("colA in (1, 2)", "colB not in (3.0)", "colC between 'colC_1' and 'colC_5'");
     whereClause =
-        predicates.get(0) + " and " + predicates.get(1) + " or " + predicates.get(0) + " and " + predicates.get(2);
-    testQuery(whereClause, "nominalEntries =  1001", predicates, whereClause, groupBy, sql);
+        predicateStrings.get(0) + " and " + predicateStrings.get(1) + " or " + predicateStrings.get(0) + " and "
+            + predicateStrings.get(2);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, false);
+    distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, false);
+
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, true);
 
     // Test without predicate arguments
     whereClause =
-        predicates.get(0) + " and " + predicates.get(1) + " or " + predicates.get(0) + " and " + predicates.get(2);
-    testQuery(whereClause, "nominalEntries =  1001", Collections.emptyList(), whereClause, groupBy, sql);
+        predicateStrings.get(0) + " and " + predicateStrings.get(1) + " or " + predicateStrings.get(0) + " and "
+            + predicateStrings.get(2);
+    tsQuery = buildQuery(whereClause, thetaSketchParams, Collections.emptyList(), whereClause, groupBy, false);
+    distinctQuery = buildQuery(whereClause, null, null, null, groupBy, false);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, false);
+
+    tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, whereClause, groupBy, true);
+    testQuery(tsQuery, distinctQuery, groupBy, sql, true);
   }
 
-  private void testQuery(String whereClause, String thetaSketchParams, List<String> predicateStrings,
-      String postAggregationExpression, boolean groupBy, boolean sql) {
-    String tsQuery = buildQuery(whereClause, thetaSketchParams, predicateStrings, postAggregationExpression, groupBy);
-    String distinctQuery = buildQuery(whereClause, null, null, null, groupBy);
-
+  private void testQuery(String tsQuery, String distinctQuery, boolean groupBy, boolean sql, boolean raw) {
     Map<String, String> queryOptions = Collections.emptyMap();
     BrokerResponseNative actualResponse =
         (sql) ? getBrokerResponseForSqlQuery(tsQuery) : getBrokerResponseForPqlQuery(tsQuery, queryOptions);
@@ -159,33 +187,35 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
         (sql) ? getBrokerResponseForSqlQuery(distinctQuery) : getBrokerResponseForPqlQuery(distinctQuery, queryOptions);
 
     if (groupBy) {
-      compareGroupBy(actualResponse, expectedResponse, sql);
+      compareGroupBy(actualResponse, expectedResponse, sql, raw);
     } else {
-      compareAggregation(actualResponse, expectedResponse, sql);
+      compareAggregation(actualResponse, expectedResponse, sql, raw);
     }
   }
 
   private void compareAggregation(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse,
-      boolean sql) {
+      boolean sql, boolean raw) {
     if (sql) {
-      compareSql(actualResponse, expectedResponse);
+      compareSql(actualResponse, expectedResponse, raw);
     } else {
-      compareAggregationPql(actualResponse, expectedResponse);
+      compareAggregationPql(actualResponse, expectedResponse, raw);
     }
   }
 
-  private void compareGroupBy(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse, boolean sql) {
+  private void compareGroupBy(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse, boolean sql,
+      boolean raw) {
     if (sql) {
-      compareSql(actualResponse, expectedResponse);
+      compareSql(actualResponse, expectedResponse, raw);
     } else {
-      compareGroupByPql(actualResponse, expectedResponse);
+      compareGroupByPql(actualResponse, expectedResponse, raw);
     }
   }
 
-  private void compareAggregationPql(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse) {
+  private void compareAggregationPql(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse,
+      boolean raw) {
     List<AggregationResult> actualResults = actualResponse.getAggregationResults();
     Assert.assertEquals(actualResults.size(), 1);
-    double actual = Double.parseDouble((String) actualResults.get(0).getValue());
+    double actual = getSketchValue((String) actualResults.get(0).getValue(), raw);
 
     List<AggregationResult> expectedResults = expectedResponse.getAggregationResults();
     double expected = Double.parseDouble((String) expectedResults.get(0).getValue());
@@ -194,18 +224,21 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
         "Distinct count mismatch: actual: " + actual + "expected: " + expected + "seed:" + RANDOM_SEED);
   }
 
-  private void compareSql(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse) {
+  private void compareSql(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse, boolean raw) {
     List<Object[]> actualRows = actualResponse.getResultTable().getRows();
     List<Object[]> expectedRows = expectedResponse.getResultTable().getRows();
 
     Assert.assertEquals(actualRows.size(), expectedRows.size());
 
     for (int i = 0; i < actualRows.size(); i++) {
-      Assert.assertEquals(actualRows.get(i), expectedRows.get(i));
+      double actual = getSketchValue(actualRows.get(i)[0].toString(), raw);
+      double expected = (Integer) expectedRows.get(i)[0];
+      Assert.assertEquals(actual, expected);
     }
   }
 
-  private void compareGroupByPql(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse) {
+  private void compareGroupByPql(BrokerResponseNative actualResponse, BrokerResponseNative expectedResponse,
+      boolean raw) {
     AggregationResult actualResult = actualResponse.getAggregationResults().get(0);
     List<GroupByResult> actualGroupBy = actualResult.getGroupByResult();
 
@@ -214,7 +247,7 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
 
     Assert.assertEquals(actualGroupBy.size(), expectedGroupBy.size());
     for (int i = 0; i < actualGroupBy.size(); i++) {
-      double actual = Double.parseDouble((String) actualGroupBy.get(i).getValue());
+      double actual = getSketchValue((String) actualGroupBy.get(i).getValue(), raw);
       double expected = Double.parseDouble((String) expectedGroupBy.get(i).getValue());
 
       Assert.assertEquals(actual, expected, (expected * 0.1), // Allow for 10 % error.
@@ -222,14 +255,24 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
     }
   }
 
+  private double getSketchValue(String value, boolean raw) {
+    if (!raw) {
+      return Double.parseDouble(value);
+    }
+
+    byte[] bytes = BytesUtils.toBytes(value);
+    return Sketch.wrap(Memory.wrap(bytes)).getEstimate();
+  }
+
   private String buildQuery(String whereClause, String thetaSketchParams, List<String> thetaSketchPredicates,
-      String postAggregationExpression, boolean groupBy) {
+      String postAggregationExpression, boolean groupBy, boolean raw) {
     String column;
     String aggrFunction;
     boolean thetaSketch = (postAggregationExpression != null);
 
     if (thetaSketch) {
-      aggrFunction = AggregationFunctionType.DISTINCTCOUNTTHETASKETCH.getName();
+      aggrFunction = (raw) ? AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH.getName()
+          : AggregationFunctionType.DISTINCTCOUNTTHETASKETCH.getName();
       column = THETA_SKETCH_COLUMN;
     } else {
       aggrFunction = AggregationFunctionType.DISTINCTCOUNT.getName();

@@ -619,10 +619,20 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
   }
 
   /**
-   * Returns the theta-sketch SetOperation builder properly configured.
-   * Currently, only setting of nominalEntries is supported.
-   * @return SetOperationBuilder
+   * Extracts the final sketch from the intermediate result by applying the postAggregation expression on it.
+   *
+   * @param intermediateResult Intermediate result
+   * @return Final Sketch obtained by computing the post aggregation expression on intermediate result
    */
+  protected Sketch extractFinalSketch(Map<String, Sketch> intermediateResult) {
+    return evalPostAggregationExpression(_postAggregationExpression, intermediateResult);
+  }
+
+    /**
+     * Returns the theta-sketch SetOperation builder properly configured.
+     * Currently, only setting of nominalEntries is supported.
+     * @return SetOperationBuilder
+     */
   private SetOperationBuilder getSetOperationBuilder() {
     return (_thetaSketchParams == null) ? SetOperation.builder()
         : SetOperation.builder().setNominalEntries(_thetaSketchParams.getNominalEntries());
