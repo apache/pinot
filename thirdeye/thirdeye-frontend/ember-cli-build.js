@@ -46,13 +46,13 @@ module.exports = function(defaults) {
     }
   });
 
-  const sourceSansProFontTree = new Funnel(app.bowerDirectory + '/source-sans-pro', {
+  const sourceSansProFontTree = new Funnel('node_modules/source-sans-pro', {
     srcDir: '/',
     include: ['**/*.woff2', '**/*.woff', '**/*.ttf'],
     destDir: '/assets'
   });
 
-  app.import(app.bowerDirectory + '/source-sans-pro/source-sans-pro.css');
+  app.import('node_modules/source-sans-pro/source-sans-pro.css');
   //ionRangeSlider assets - http://ionden.com/a/plugins/ion.rangeSlider/en.html
   app.import('node_modules/ion-rangeslider/css/ion.rangeSlider.skinHTML5.css');
   // app.import('node_modules/ion-rangeslider/img/sprite-skin-nice.png', {

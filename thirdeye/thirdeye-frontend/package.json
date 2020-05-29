@@ -26,8 +26,7 @@
     "ember-ace": "^2.0.1",
     "ember-ajax": "^5.0.0",
     "ember-bootstrap": "^3.0.0-rc.6",
-    "ember-c3": "^0.3.1",
-    "ember-c3-shim": "0.0.6",
+    "ember-c3": "^3.0.1",
     "ember-cli": "~3.13.1",
     "ember-cli-app-version": "^3.0.0",
     "ember-cli-babel": "^6.6.0",
@@ -54,7 +53,7 @@
     "ember-cli-update": "^0.43.3",
     "ember-composable-helpers": "^2.3.1",
     "ember-concurrency": "^1.1.0",
-    "ember-d3": "^0.2.0",
+    "ember-d3": "^0.5.1",
     "ember-data": "~2.18.0",
     "ember-export-application-global": "^2.0.0",
     "ember-faker": "^1.5.0",
@@ -90,12 +89,12 @@
     "node": ">=10.*"
   },
   "dependencies": {
-    "bower": "^1.8.8",
     "ember-cryptojs-shim": "^4.3.0",
     "ember-simple-tree": "^0.7.0",
     "ion-rangeslider": "^2.3.0",
     "js-yaml": "^3.13.1",
     "moment": "^2.24.0",
+    "source-sans-pro": "^3.6.0",
     "yamljs": "^0.3.0"
   }
 }

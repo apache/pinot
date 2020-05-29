@@ -63,12 +63,6 @@
             </configuration>
           </execution>
           <execution>
-            <id>bower install</id>
-            <goals>
-              <goal>bower</goal>
-            </goals>
-          </execution>
-          <execution>
             <id>build front end</id>
             <phase>generate-resources</phase>
             <goals>
@@ -118,9 +112,6 @@
                 </fileset>
                 <fileset>
                   <directory>node_modules</directory>
-                </fileset>
-                <fileset>
-                  <directory>bower_components</directory>
                 </fileset>
               </filesets>
             </configuration>
