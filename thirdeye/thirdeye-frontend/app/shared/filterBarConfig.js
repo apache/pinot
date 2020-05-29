@@ -100,28 +100,23 @@ export default [
     color: "blue",
     inputs: [
       {
+        label: "fabrics",
+        labelMapping: "fabric",
+        type: "dropdown"
+      },
+      {
         label: "services",
         labelMapping: "services",
         type: "dropdown"
       },
       {
-        label: "endpoints",
-        labelMapping: "endpoint",
+        label: "downstream services",
+        labelMapping: "downstreamservice",
         type: "dropdown"
       },
       {
-        label: "upstreams",
-        labelMapping: "upstream",
-        type: "dropdown"
-      },
-      {
-        label: "upstream endpoints",
-        labelMapping: "upstreamendpoint",
-        type: "dropdown"
-      },
-      {
-        label: "fabrics",
-        labelMapping: "fabric",
+        label: "downstream endpoints",
+        labelMapping: "downstreamendpoint",
         type: "dropdown"
       }
     ]
