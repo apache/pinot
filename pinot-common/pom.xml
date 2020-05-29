@@ -33,6 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <reflections.version>0.9.11</reflections.version>
   </properties>
   <build>
     <!-- Antlr stuff -->
@@ -251,7 +252,7 @@
     <dependency>
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
-      <version>0.9.11</version>
+      <version>${reflections.version}</version>
     </dependency>
   </dependencies>
   <profiles>
