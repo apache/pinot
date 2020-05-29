@@ -47,6 +47,12 @@
     {{/if}}
   </fieldset>
 
+  {{#if isReportFailure}}
+    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+      <strong>Error:</strong> Failed to save reported anomaly. Did you select dates and times?
+    {{/bs-alert}}
+  {{/if}}
+
   <fieldset class="te-form__section row">
     <div class="form-group col-xs-6">
       <legend class="te-report-title">Mark the Anomaly Region</legend>
