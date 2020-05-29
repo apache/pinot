@@ -2,7 +2,7 @@
  * This component displays an alert summary section for users to see alert properties at a glance.
  * Initially used for consistency in both alert index page and single alert details page.
  * We use slightly different sub class names for positioning based on use case.
- * @module components/self-serve-alert-details
+ * @module components/self-serve-alert-yaml-details
  * @property {Object} alertData    - alert properties
  * @property {Boolean} isLoadError - was there an error loading the data
  * @property {String} displayMode  - is the use case part of a list or standalone? 'list' || 'single'
