@@ -168,7 +168,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (stateMap != null) {
       for (Map.Entry<String, String> state : stateMap.entrySet()) {
         if (!_helixManager.getInstanceName().equals(state.getKey()) && state.getValue()
-            .equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+            .equals(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)) {
           otherOnlineBrokerCount++;
         }
       }
@@ -304,7 +304,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       int otherOnlineBrokerCount = 0;
       for (Map.Entry<String, String> state : stateMap.entrySet()) {
         if (!_helixManager.getInstanceName().equals(state.getKey()) && state.getValue()
-            .equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+            .equals(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)) {
           otherOnlineBrokerCount++;
         }
       }

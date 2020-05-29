@@ -161,7 +161,7 @@ public class HelixServerStarter implements ServiceStartable {
         }
         if (checkRealtime && !foundConsuming && TableNameBuilder.isRealtimeTableResource(resourceName)) {
           for (String partitionName : idealState.getPartitionSet()) {
-            if (StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING
+            if (StateModel.SegmentStateModel.CONSUMING
                 .equals(idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
               foundConsuming = true;
               break;
@@ -570,8 +570,7 @@ public class HelixServerStarter implements ServiceStartable {
     for (String partition : externalView.getPartitionSet()) {
       Map<String, String> instanceStateMap = externalView.getStateMap(partition);
       String state = instanceStateMap.get(_instanceId);
-      if (StateModel.SegmentOnlineOfflineStateModel.ONLINE.equals(state)
-          || StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(state)) {
+      if (StateModel.SegmentStateModel.ONLINE.equals(state) || StateModel.SegmentStateModel.CONSUMING.equals(state)) {
         return false;
       }
     }

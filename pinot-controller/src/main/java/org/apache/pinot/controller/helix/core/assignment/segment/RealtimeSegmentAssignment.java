@@ -29,7 +29,7 @@ import java.util.TreeMap;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -208,8 +208,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
         newAssignment = new TreeMap<>();
         for (String segment : completedSegmentAssignment.keySet()) {
           List<String> assignedInstances = assignCompletedSegment(segment, newAssignment, completedInstancePartitions);
-          newAssignment.put(segment, SegmentAssignmentUtils
-              .getInstanceStateMap(assignedInstances, RealtimeSegmentOnlineOfflineStateModel.ONLINE));
+          newAssignment
+              .put(segment, SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
         }
       } else {
         if (completedInstancePartitions.getNumReplicaGroups() == 1) {
@@ -252,8 +252,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       newAssignment = new TreeMap<>();
       for (String segmentName : completedSegmentAssignment.keySet()) {
         List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
-        Map<String, String> instanceStateMap = SegmentAssignmentUtils
-            .getInstanceStateMap(instancesAssigned, RealtimeSegmentOnlineOfflineStateModel.ONLINE);
+        Map<String, String> instanceStateMap =
+            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE);
         newAssignment.put(segmentName, instanceStateMap);
       }
     }
@@ -267,8 +267,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
 
       for (String segmentName : consumingSegmentAssignment.keySet()) {
         List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
-        Map<String, String> instanceStateMap = SegmentAssignmentUtils
-            .getInstanceStateMap(instancesAssigned, RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
+        Map<String, String> instanceStateMap =
+            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING);
         newAssignment.put(segmentName, instanceStateMap);
       }
     } else {

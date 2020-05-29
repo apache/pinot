@@ -30,8 +30,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.Pairs;
 
 
@@ -142,7 +141,7 @@ public class SegmentAssignmentUtils {
       Map<String, Map<String, String>> currentAssignment, List<String> instances, int replication) {
     // Use Helix AutoRebalanceStrategy to rebalance the table
     LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
-    states.put(SegmentOnlineOfflineStateModel.ONLINE, replication);
+    states.put(SegmentStateModel.ONLINE, replication);
     AutoRebalanceStrategy autoRebalanceStrategy =
         new AutoRebalanceStrategy(null, new ArrayList<>(currentAssignment.keySet()), states);
     // Make a copy of the current assignment because this step might change the passed in assignment
@@ -252,8 +251,8 @@ public class SegmentAssignmentUtils {
     Map<String, String> instanceStateMap = new TreeMap<>();
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-      instanceStateMap.put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId),
-          SegmentOnlineOfflineStateModel.ONLINE);
+      instanceStateMap
+          .put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId), SegmentStateModel.ONLINE);
     }
     return instanceStateMap;
   }
@@ -305,9 +304,9 @@ public class SegmentAssignmentUtils {
       for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> instanceStateMap = entry.getValue();
-        if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
           _completedSegmentAssignment.put(segmentName, instanceStateMap);
-        } else if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+        } else if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
           _consumingSegmentAssignment.put(segmentName, instanceStateMap);
         } else {
           _offlineSegmentAssignment.put(segmentName, instanceStateMap);

@@ -174,8 +174,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     } else {
       // Delete segment if all of its replicas are OFFLINE
       Set<String> states = new HashSet<>(stateMap.values());
-      return states.size() == 1 && states
-          .contains(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
+      return states.size() == 1 && states.contains(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE);
     }
   }
 }

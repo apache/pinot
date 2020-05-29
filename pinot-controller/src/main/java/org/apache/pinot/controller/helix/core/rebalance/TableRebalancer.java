@@ -35,7 +35,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
@@ -473,7 +473,7 @@ public class TableRebalancer {
       for (Map.Entry<String, String> instanceStateEntry : idealStateInstanceStateMap.entrySet()) {
         // Ignore OFFLINE state in IdealState
         String idealStateInstanceState = instanceStateEntry.getValue();
-        if (idealStateInstanceState.equals(RealtimeSegmentOnlineOfflineStateModel.OFFLINE)) {
+        if (idealStateInstanceState.equals(SegmentStateModel.OFFLINE)) {
           continue;
         }
 
@@ -486,7 +486,7 @@ public class TableRebalancer {
         String instanceName = instanceStateEntry.getKey();
         String externalViewInstanceState = externalViewInstanceStateMap.get(instanceName);
         if (!idealStateInstanceState.equals(externalViewInstanceState)) {
-          if (RealtimeSegmentOnlineOfflineStateModel.ERROR.equals(externalViewInstanceState)) {
+          if (SegmentStateModel.ERROR.equals(externalViewInstanceState)) {
             if (bestEfforts) {
               LOGGER
                   .warn("Found ERROR instance: {} for segment: {}, table: {}, counting it as good state (best-efforts)",

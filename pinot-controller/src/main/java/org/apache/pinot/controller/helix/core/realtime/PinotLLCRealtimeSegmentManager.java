@@ -49,7 +49,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
@@ -412,9 +412,9 @@ public class PinotLLCRealtimeSegmentManager {
     TableConfig tableConfig = getTableConfig(realtimeTableName);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     IdealState idealState = getIdealState(realtimeTableName);
-    Preconditions.checkState(idealState.getInstanceStateMap(committingSegmentName)
-            .containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING),
-        "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);
+    Preconditions
+        .checkState(idealState.getInstanceStateMap(committingSegmentName).containsValue(SegmentStateModel.CONSUMING),
+            "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);
     int numPartitions = getNumPartitionsFromIdealState(idealState);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
@@ -608,11 +608,11 @@ public class PinotLLCRealtimeSegmentManager {
         assert idealState != null;
         Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
         String state = stateMap.get(instanceName);
-        if (RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(state)) {
-          stateMap.put(instanceName, RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+        if (SegmentStateModel.CONSUMING.equals(state)) {
+          stateMap.put(instanceName, SegmentStateModel.OFFLINE);
         } else {
-          LOGGER.info("Segment {} in state {} when trying to register consumption stop from {}",
-              segmentName, state, instanceName);
+          LOGGER.info("Segment {} in state {} when trying to register consumption stop from {}", segmentName, state,
+              instanceName);
         }
         return idealState;
       }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f), true);
@@ -733,16 +733,16 @@ public class PinotLLCRealtimeSegmentManager {
     if (committingSegmentName != null) {
       // Change committing segment state to ONLINE
       Set<String> instances = instanceStatesMap.get(committingSegmentName).keySet();
-      instanceStatesMap.put(committingSegmentName,
-          SegmentAssignmentUtils.getInstanceStateMap(instances, RealtimeSegmentOnlineOfflineStateModel.ONLINE));
+      instanceStatesMap
+          .put(committingSegmentName, SegmentAssignmentUtils.getInstanceStateMap(instances, SegmentStateModel.ONLINE));
       LOGGER.info("Updating segment: {} to ONLINE state", committingSegmentName);
     }
 
     // Assign instances to the new segment and add instances as state CONSUMING
     List<String> instancesAssigned =
         segmentAssignment.assignSegment(newSegmentName, instanceStatesMap, instancePartitionsMap);
-    instanceStatesMap.put(newSegmentName, SegmentAssignmentUtils
-        .getInstanceStateMap(instancesAssigned, RealtimeSegmentOnlineOfflineStateModel.CONSUMING));
+    instanceStatesMap.put(newSegmentName,
+        SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
     LOGGER.info("Adding new CONSUMING segment: {} to instances: {}", newSegmentName, instancesAssigned);
   }
 
@@ -854,7 +854,7 @@ public class PinotLLCRealtimeSegmentManager {
       Map<String, String> instanceStateMap = instanceStatesMap.get(latestSegmentName);
       if (instanceStateMap != null) {
         // Latest segment of metadata is in idealstate.
-        if (instanceStateMap.values().contains(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+        if (instanceStateMap.values().contains(SegmentStateModel.CONSUMING)) {
           if (latestSegmentZKMetadata.getStatus() == Status.DONE) {
 
             // step-1 of commmitSegmentMetadata is done (i.e. marking old segment as DONE)
@@ -868,9 +868,8 @@ public class PinotLLCRealtimeSegmentManager {
 
             LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
             String newSegmentName = newLLCSegmentName.getSegmentName();
-            CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(latestSegmentName,
-                    new StreamPartitionMsgOffset(latestSegmentZKMetadata.getEndOffset()), 0);
+            CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(latestSegmentName,
+                new StreamPartitionMsgOffset(latestSegmentZKMetadata.getEndOffset()), 0);
             createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
                 committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
             updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, newSegmentName,
@@ -883,7 +882,7 @@ public class PinotLLCRealtimeSegmentManager {
           // 1. all replicas OFFLINE and metadata IN_PROGRESS/DONE - a segment marked itself OFFLINE during consumption for some reason
           // 2. all replicas ONLINE and metadata DONE - Resolved in https://github.com/linkedin/pinot/pull/2890
           // 3. we should never end up with some replicas ONLINE and some OFFLINE.
-          if (isAllInstancesInState(instanceStateMap, RealtimeSegmentOnlineOfflineStateModel.OFFLINE)) {
+          if (isAllInstancesInState(instanceStateMap, SegmentStateModel.OFFLINE)) {
             LOGGER.info("Repairing segment: {} which is OFFLINE for all instances in IdealState", latestSegmentName);
 
             // Create a new segment to re-consume from the previous start offset
@@ -932,7 +931,7 @@ public class PinotLLCRealtimeSegmentManager {
           for (Map.Entry<String, Map<String, String>> segmentEntry : instanceStatesMap.entrySet()) {
             LLCSegmentName llcSegmentName = new LLCSegmentName(segmentEntry.getKey());
             if (llcSegmentName.getPartitionId() == partitionId && segmentEntry.getValue()
-                .containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+                .containsValue(SegmentStateModel.CONSUMING)) {
               previousConsumingSegment = llcSegmentName.getSegmentName();
               break;
             }
@@ -985,8 +984,8 @@ public class PinotLLCRealtimeSegmentManager {
         new LLCSegmentName(rawTableName, partitionId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
     long startOffset = getPartitionOffset(streamConfig, streamConfig.getOffsetCriteria(), partitionId);
-    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null,
-        new StreamPartitionMsgOffset(startOffset), 0);
+    CommittingSegmentDescriptor committingSegmentDescriptor =
+        new CommittingSegmentDescriptor(null, new StreamPartitionMsgOffset(startOffset), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas);
 

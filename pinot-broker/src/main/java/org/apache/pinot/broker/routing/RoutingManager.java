@@ -51,7 +51,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -195,8 +195,8 @@ public class RoutingManager implements ClusterChangeHandler {
       Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
       for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
         Map<String, String> instanceStateMap = entry.getValue();
-        if (instanceStateMap.containsValue(RealtimeSegmentOnlineOfflineStateModel.ONLINE) || instanceStateMap
-            .containsValue(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+        if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap
+            .containsValue(SegmentStateModel.CONSUMING)) {
           onlineSegments.add(entry.getKey());
         }
       }
