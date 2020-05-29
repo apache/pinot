@@ -211,28 +211,32 @@ com.clearspring.analytics:stream:2.7.0
 com.fasterxml.jackson.core:jackson-annotations:2.9.8
 com.fasterxml.jackson.core:jackson-core:2.9.8
 com.fasterxml.jackson.core:jackson-databind:2.9.8
+com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.9.8
 com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.9.8
+com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.10.0
 com.fasterxml.jackson.jaxrs:jackson-jaxrs-base:2.9.8
 com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.9.8
 com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.9.8
 com.fasterxml.jackson.module:jackson-module-paranamer:2.6.5
 com.fasterxml.jackson.module:jackson-module-scala_2.11:2.6.5
+com.fasterxml.woodstox:woodstox-core:5.0.3
 com.github.jnr:jffi:1.2.9
 com.github.jnr:jnr-constants:0.8.7
 com.github.jnr:jnr-ffi:2.0.3
+com.google.api-client:google-api-client
 com.google.api.grpc:proto-google-common-protos:1.17.0
 com.google.api.grpc:proto-google-iam-v1:0.13.0
 com.google.api:api-common:1.8.1
 com.google.api:gax:1.49.1
 com.google.api:gax-httpjson:0.66.1
-com.google.api:google-api-client:1.30.4
-com.google.api:google-api-services-storage:v1-rev20190910-1.30.3.jar
+com.google.apis:google-api-services-storage:v1-rev20190910-1.30.3
 com.google.auth:google-auth-library-credentials:0.18.0
 com.google.auth:google-auth-library-oauth2-http:0.18.0
 com.google.auto.value:auto-value-annotations:1.6.6
 com.google.cloud:google-cloud-core:1.91.3
 com.google.cloud:google-cloud-core-http:1.91.3
-com.google.cloud:google-cloud-storage:1.101.0
+com.google.cloud:google-cloud-nio:0.120.0-alpha
+com.google.cloud:google-cloud-storage:1.102.0
 com.google.code.findbugs:jsr305:3.0.0
 com.google.code.gson:gson:2.2.4
 com.google.errorprone:error_prone_annotations:2.3.2
@@ -240,21 +244,20 @@ com.google.guava:guava:20.0
 com.google.http-client:google-http-client-appengine:1.32.1
 com.google.http-client:google-http-client-jackson2:1.32.1
 com.google.http-client:google-http-client:1.32.1
-com.google.inject.extensions:guice-servlet:3.0
-com.google.inject:guice:3.0
 com.google.j2objc:j2objc-annotations:1.3
 com.google.oauth-client:google-oauth-client:1.30.3
 com.google.protobuf:protobuf-java-util:3.10.0
 com.google.protobuf:protobuf-java:2.5.0
 com.google.protobuf:protobuf-java:3.10.0
 com.jamesmurty.utils:java-xmlbuilder:0.4
+com.jamesmurty.utils:java-xmlbuilder:1.0
+com.jayway.jsonpath:json-path:2.4.0
 com.lmax:disruptor:3.3.4
 com.ning:async-http-client:1.9.21
 com.ning:compress-lzf:1.0.3
 com.tdunning:t-digest:3.2
-com.twitter:chill-java:0.8.0
-com.twitter:chill_2.11:0.8.0
-com.typesafe:config:1.3.2
+com.typesafe.netty:netty-reactive-streams-http:2.0.4
+com.typesafe.netty:netty-reactive-streams:2.0.4
 com.typesafe.scala-logging:scala-logging_2.11:3.9.0
 com.yammer.metrics:metrics-core:2.2.0
 commons-beanutils:commons-beanutils:1.8.3
@@ -271,15 +274,35 @@ commons-lang:commons-lang:2.6
 commons-logging:commons-logging:1.2
 commons-net:commons-net:3.1
 io.airlift:aircompressor:0.10
+io.confluent:common-config:5.3.1
+io.confluent:common-utils:5.3.1
+io.confluent:kafka-avro-serializer:5.3.1
+io.confluent:kafka-schema-registry-client:5.3.1
 io.dropwizard.metrics:metrics-core:3.2.3
-io.dropwizard.metrics:metrics-graphite:3.1.2
-io.dropwizard.metrics:metrics-json:3.1.2
-io.dropwizard.metrics:metrics-jvm:3.1.2
+io.dropwizard.metrics:metrics-graphite:3.2.3
+io.dropwizard.metrics:metrics-json:3.2.3
+io.dropwizard.metrics:metrics-jvm:3.2.3
 io.grpc:grpc-context:1.22.1
+io.netty:netty-all:4.1.42.Final
+io.netty:netty-buffer:4.1.42.Final
+io.netty:netty-codec-http2:4.1.42.Final
+io.netty:netty-codec-http:4.1.42.Final
+io.netty:netty-codec-socks:4.1.42.Final
+io.netty:netty-codec:4.1.42.Final
+io.netty:netty-common:4.1.42.Final
+io.netty:netty-handler-proxy:4.1.42.Final
+io.netty:netty-handler:4.1.42.Final
+io.netty:netty-resolver:4.1.42.Final
+io.netty:netty-tcnative-boringssl-static:2.0.26.Final
+io.netty:netty-transport-native-epoll:linux-x86_64:4.1.42.Final
+io.netty:netty-transport-native-unix-common:4.1.42.Final
+io.netty:netty-transport:4.1.42.Final
 io.netty:netty:3.9.6.Final
-io.netty:netty-all:4.1.28.Final
 io.opencensus:opencensus-api:0.24.0
 io.opencensus:opencensus-contrib-http-util:0.24.0
+io.projectreactor.addons:reactor-pool:0.1.0.RELEASE
+io.projectreactor.netty:reactor-netty:0.9.0.RELEASE
+io.projectreactor:reactor-core:3.3.0.RELEASE
 io.swagger:swagger-annotations:1.5.16
 io.swagger:swagger-core:1.5.16
 io.swagger:swagger-jaxrs:1.5.16
@@ -290,14 +313,15 @@ javax.inject:javax.inject:1
 javax.servlet.jsp:jsp-api:2.1
 javax.servlet:servlet-api:2.5
 javax.validation:validation-api:2.0.1.Final
-joda-time:joda-time:2.0
+joda-time:joda-time:2.10.5
 me.lemire.integercompression:JavaFastPFOR:0.0.13
 mx4j:mx4j:3.0.2
-net.bytebuddy:byte-buddy-agent:1.7.4
-net.bytebuddy:byte-buddy:1.7.4
+net.java.dev.jets3t:jets3t:0.9.0
 net.java.dev.jets3t:jets3t:0.9.3
 net.jpountz.lz4:lz4:1.2.0
-nl.jqno.equalsverifier:equalsverifier:1.7.2
+net.jpountz.lz4:lz4:1.3.0
+net.minidev:accessors-smart:1.2
+net.minidev:json-smart:2.3
 org.apache.avro:avro:1.7.6
 org.apache.avro:avro-ipc:1.7.4
 org.apache.avro:avro-mapred:1.7.4
@@ -314,38 +338,38 @@ org.apache.commons:commons-math3:3.2
 org.apache.curator:curator-client:2.7.1
 org.apache.curator:curator-framework:2.7.1
 org.apache.curator:curator-recipes:2.7.1
+org.apache.datasketches:datasketches-java:1.2.0-incubating
+org.apache.datasketches:datasketches-memory:1.2.0-incubating
 org.apache.directory.api:api-asn1-api:1.0.0-M20
 org.apache.directory.api:api-util:1.0.0-M20
 org.apache.directory.server:apacheds-i18n:2.0.0-M15
 org.apache.directory.server:apacheds-kerberos-codec:2.0.0-M15
-org.apache.hadoop:hadoop-annotations:2.2.0
+org.apache.hadoop:hadoop-annotations:2.7.0
 org.apache.hadoop:hadoop-auth:2.7.0
-org.apache.hadoop:hadoop-aws:2.7.0
 org.apache.hadoop:hadoop-client:2.7.0
 org.apache.hadoop:hadoop-common:2.7.0
-org.apache.hadoop:hadoop-hdfs:2.2.0
+org.apache.hadoop:hadoop-hdfs:2.7.0
 org.apache.hadoop:hadoop-mapreduce-client-app:2.7.0
 org.apache.hadoop:hadoop-mapreduce-client-common:2.7.0
 org.apache.hadoop:hadoop-mapreduce-client-core:2.7.0
-org.apache.hadoop:hadoop-mapreduce-client-hs:2.7.0
 org.apache.hadoop:hadoop-mapreduce-client-jobclient:2.7.0
 org.apache.hadoop:hadoop-mapreduce-client-shuffle:2.7.0
-org.apache.hadoop:hadoop-minicluster:2.7.0
 org.apache.hadoop:hadoop-yarn-api:2.7.0
 org.apache.hadoop:hadoop-yarn-client:2.7.0
 org.apache.hadoop:hadoop-yarn-common:2.7.0
-org.apache.hadoop:hadoop-yarn-server-applicationhistoryservice:2.7.0
 org.apache.hadoop:hadoop-yarn-server-common:2.7.0
-org.apache.hadoop:hadoop-yarn-server-nodemanager:2.7.0
-org.apache.hadoop:hadoop-yarn-server-resourcemanager:2.7.0
-org.apache.hadoop:hadoop-yarn-server-web-proxy:2.7.0
-org.apache.helix:helix-core:0.9.4
-org.apache.hive:hive-storage-api:2.6.0
+org.apache.helix:helix-core:0.9.7
+org.apache.hive:hive-storage-api:2.7.1
 org.apache.htrace:htrace-core:3.1.0-incubating
 org.apache.httpcomponents:httpclient:4.5.3
+org.apache.httpcomponents:httpclient:4.5.5
 org.apache.httpcomponents:httpcore:4.4.6
+org.apache.httpcomponents:httpcore:4.4.9
 org.apache.httpcomponents:httpmime:4.5.3
+org.apache.ivy:ivy:2.4.0
+org.apache.kafka:kafka-clients:0.9.0.1
 org.apache.kafka:kafka-clients:2.0.0
+org.apache.kafka:kafka_2.10:0.9.0.1
 org.apache.kafka:kafka_2.11:2.0.0
 org.apache.logging.log4j:log4j-1.2-api:2.11.2
 org.apache.logging.log4j:log4j-api:2.11.2
@@ -356,9 +380,8 @@ org.apache.lucene:lucene-core:8.2.0
 org.apache.lucene:lucene-queries:8.2.0
 org.apache.lucene:lucene-queryparser:8.2.0
 org.apache.lucene:lucene-sandbox:8.2.0
-org.apache.orc:orc-core:1.5.2
-org.apache.orc:orc-mapreduce:1.5.2
-org.apache.orc:orc-shims:1.5.2
+org.apache.orc:orc-core:1.5.9
+org.apache.orc:orc-shims:1.5.9
 org.apache.parquet:parquet-avro:1.8.0
 org.apache.parquet:parquet-column:1.8.0
 org.apache.parquet:parquet-common:1.8.0
@@ -377,11 +400,11 @@ org.apache.velocity:velocity:1.7
 org.apache.xbean:xbean-asm5-shaded:4.4
 org.apache.yetus:audience-annotations:0.5.0
 org.apache.zookeeper:zookeeper:3.4.11
+org.codehaus.groovy:groovy-all:2.4.8
 org.codehaus.jackson:jackson-core-asl:1.9.13
 org.codehaus.jackson:jackson-jaxrs:1.9.13
 org.codehaus.jackson:jackson-mapper-asl:1.9.13
 org.codehaus.jackson:jackson-xc:1.9.13
-org.codehaus.jettison:jettison:1.1
 org.javassist:javassist:3.19.0-GA
 org.json4s:json4s-ast_2.11:3.2.11
 org.json4s:json4s-core_2.11:3.2.11
@@ -390,9 +413,16 @@ org.lz4:lz4-java:1.4.1
 org.mortbay.jetty:jetty:6.1.26
 org.mortbay.jetty:jetty-util:6.1.26
 org.mortbay.jetty:servlet-api:2.5-20081211
-org.objenesis:objenesis:2.1
+org.objenesis:objenesis:2.6
 org.roaringbitmap:RoaringBitmap:0.8.0
 org.roaringbitmap:shims:0.8.0
+org.scala-lang.modules:scala-parser-combinators_2.11:1.0.4
+org.scala-lang.modules:scala-xml_2.11:1.0.5
+org.scala-lang:scala-compiler:2.11.11
+org.scala-lang:scala-library:2.10.5
+org.scala-lang:scala-library:2.11.11
+org.scala-lang:scala-reflect:2.11.11
+org.scala-lang:scalap:2.11.0
 org.testng:testng:6.11
 org.webjars:swagger-ui:2.2.2
 org.xerial.java:xerial-core:2.1
@@ -403,6 +433,22 @@ org.xerial.snappy:snappy-java:1.1.1.7
 org.xerial:xerial-core:3.2.2
 org.yaml:snakeyaml:1.16
 oro:oro:2.0.8
+software.amazon.awssdk:annotations:2.11.12
+software.amazon.awssdk:apache-client:2.11.12
+software.amazon.awssdk:arns:2.11.12
+software.amazon.awssdk:auth:2.11.12
+software.amazon.awssdk:aws-core:2.11.12
+software.amazon.awssdk:aws-query-protocol:2.11.12
+software.amazon.awssdk:aws-xml-protocol:2.11.12
+software.amazon.awssdk:http-client-spi:2.11.12
+software.amazon.awssdk:netty-nio-client:2.11.12
+software.amazon.awssdk:profiles:2.11.12
+software.amazon.awssdk:protocol-core:2.11.12
+software.amazon.awssdk:regions:2.11.12
+software.amazon.awssdk:s3:2.11.12
+software.amazon.awssdk:sdk-core:2.11.12
+software.amazon.awssdk:utils:2.11.12
+software.amazon.eventstream:eventstream:1.0.1
 xerces:xercesImpl:2.9.1
 xml-apis:xml-apis:1.0.b2
 
@@ -416,10 +462,16 @@ of these licenses.
 MIT License
 -----------
 args4j:args4j:2.32
+com.azure:azure-core-http-netty:1.3.0
+com.azure:azure-core:1.2.0
+com.azure:azure-storage-blob:12.4.0
+com.azure:azure-storage-common:12.4.0
+com.azure:azure-storage-file-datalake:12.0.0-beta.12
 com.github.jnr:jnr-x86asm:1.0.2
 com.microsoft.azure:azure-data-lake-store-sdk:2.1.5
 net.razorvine:pyrolite:4.13
 net.sf.jopt-simple:jopt-simple:4.6
+org.bouncycastle:bcprov-jdk15on:1.51
 org.mockito:mockito-core:2.10.0
 org.slf4j:jcl-over-slf4j:1.7.16
 org.slf4j:jul-to-slf4j:1.7.16
@@ -443,27 +495,25 @@ BSD 2-Clause
 ------------
 jline:jline:0.9.94
 net.sf.py4j:py4j:0.10.4
+org.codehaus.woodstox:stax2-api:3.1.4
 org.reflections:reflections:0.9.11
 
 
 BSD 3-Clause
 ------------
-asm:asm:3.1
-com.esotericsoftware:kryo-shaded:3.0.3
-com.esotericsoftware:minlog:1.3.0
 com.google.protobuf:protobuf-java:2.5.0
 com.jcabi:jcabi-aspects:0.22
 com.jcabi:jcabi-log:0.17.1
 com.jcraft:jsch:0.1.42
-com.thoughtworks.paranamer:paranamer:2.3
+com.thoughtworks.paranamer:paranamer:2.6
 org.antlr:antlr4-runtime:4.6
 org.fusesource.leveldbjni:leveldbjni-all:1.8
-org.ow2.asm:asm:5.0.3
+org.ow2.asm:asm:5.0.4
 org.ow2.asm:asm-analysis:5.0.3
 org.ow2.asm:asm-commons:5.0.3
 org.ow2.asm:asm-tree:5.0.3
 org.ow2.asm:asm-util:5.0.3
-org.scala-lang:scala-library:2.10.5
+org.threeten:threeten-extra:1.5.0
 org.threeten:threetenbp:1.3.3
 xmlenc:xmlenc:0.52
 
@@ -472,21 +522,17 @@ pinot-controller/src/main/resources/*/js/lib/jquery.dataTables.min.js
 
 Common Development and Distribution License (CDDL) 1.0
 ------------------------------------------------------
-(see license/LICENSE-cddl-1.0.txt)
+(see license-binary/LICENSE-cddl-1.0.txt)
 
 javax.activation:activation:1.1.1
 javax.servlet:javax.servlet-api:3.0.1
-javax.ws.rs:jsr311-api:1.1.1
+javax.servlet:javax.servlet-api:3.1.0
 
 
 Common Development and Distribution License (CDDL) 1.1
 ------------------------------------------------------
-(see license/LICENSE-cddl-1.1.txt)
+(see license-binary/LICENSE-cddl-1.1.txt)
 
-com.sun.jersey:jersey-core:1.9
-com.sun.jersey:jersey-json:1.9
-com.sun.jersey:jersey-server:1.9
-com.sun.jersey.contribs:jersey-guice:1.9
 com.sun.xml.bind:jaxb-core:2.3.0
 com.sun.xml.bind:jaxb-impl:2.3.0
 javax.annotation:javax.annotation-api:1.3.2
@@ -495,14 +541,17 @@ javax.servlet:javax.servlet-api:3.0.1
 javax.ws.rs:javax.ws.rs-api:2.0.1
 javax.ws.rs:jsr311-api:1.1.1
 javax.xml.bind:jaxb-api:2.3.0
+org.glassfish.hk2.external:javax.inject:2.4.0-b34
 org.glassfish.hk2:osgi-resource-locator:1.0.1
+org.glassfish.jersey.containers:jersey-container-servlet-core:2.22.2
 org.glassfish.jersey.containers:jersey-container-servlet-core:2.25.1
+org.glassfish.jersey.containers:jersey-container-servlet:2.22.2
 org.glassfish.tyrus.bundles:tyrus-standalone-client:1.5
 
 
 Common Public License (CPL) 1.0
 -------------------------------
-(see license/LICENSE-cpl-1.0.txt)
+(see license-binary/LICENSE-cpl-1.0.txt)
 
 com.github.jnr:jnr-posix:3.0.12
 junit:junit:3.8.1
@@ -510,7 +559,7 @@ junit:junit:3.8.1
 
 Eclipse Public License (EPL) 1.0
 --------------------------------
-(see license/LICENSE-epl-1.0.txt)
+(see license-binary/LICENSE-epl-1.0.txt)
 
 org.aspectj:aspectjrt:1.8.4
 com.h2database:h2:1.4.193
@@ -518,7 +567,7 @@ com.h2database:h2:1.4.193
 
 Eclipse Public License (EPL) 2.0
 -------------------------------
-(see license/LICENSE-epl-2.0.txt)
+(see license-binary/LICENSE-epl-2.0.txt)
 
 jakarta.annotation:jakarta.annotation-api:1.3.4
 jakarta.ws.rs:jakarta.ws.rs-api:2.1.5
@@ -544,9 +593,15 @@ Eclipse Distribution License (EDL) 1.0
 --------------------------------------
 org.jvnet.mimepull:mimepull:1.9.11
 
+GNU General Public License, version 2 (GPL 2.0)
+-----------------------------------------------
+(see license-binary/LICENSE-gpl-2.0.txt)
+
+org.openjdk.jmh:jmh-core:1.21
+org.openjdk.jmh:jmh-generator-annprocess:1.21
+
 Public Domain
 -------------
-
-aopalliance:aopalliance:1.0
 net.iharder:base64:2.3.8
+
 
