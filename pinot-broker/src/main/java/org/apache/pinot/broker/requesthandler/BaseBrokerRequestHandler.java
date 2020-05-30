@@ -715,6 +715,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             // TODO: Explore if DISTINCT should be supported with GROUP BY
             throw new UnsupportedOperationException("DISTINCT with GROUP BY is currently not supported");
           }
+          if (brokerRequest.getLimit() == 0) {
+            // TODO: Consider changing it to SELECTION query for LIMIT 0
+            throw new UnsupportedOperationException("DISTINCT must have positive LIMIT");
+          }
           if (brokerRequest.isSetOrderBy()) {
             Set<String> expressionSet = new HashSet<>(AggregationFunctionUtils.getArguments(aggregationInfo));
             List<SelectionSort> orderByColumns = brokerRequest.getOrderBy();

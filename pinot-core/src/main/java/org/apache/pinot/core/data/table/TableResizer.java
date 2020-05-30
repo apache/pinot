@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,7 +28,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.Set;
 import java.util.function.Function;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -39,12 +37,11 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 /**
  * Helper class for trimming and sorting records in the IndexedTable, based on the order by information
  */
+@SuppressWarnings("rawtypes")
 public class TableResizer {
-
-  private OrderByValueExtractor[] _orderByValueExtractors;
-  private Comparator<IntermediateRecord> _intermediateRecordComparator;
-  private Comparator<Record> _recordComparator;
-  protected int _numOrderBy;
+  private final OrderByValueExtractor[] _orderByValueExtractors;
+  private final Comparator<IntermediateRecord> _intermediateRecordComparator;
+  private final int _numOrderBy;
 
   TableResizer(DataSchema dataSchema, AggregationFunction[] aggregationFunctions, List<SelectionSort> orderBy) {
 
@@ -69,56 +66,38 @@ public class TableResizer {
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderBy];
     Comparator[] comparators = new Comparator[_numOrderBy];
 
-    if (numKeyColumns < numColumns) {
-      for (int orderByIdx = 0; orderByIdx < _numOrderBy; orderByIdx++) {
-        SelectionSort selectionSort = orderBy.get(orderByIdx);
-        String column = selectionSort.getColumn();
+    for (int orderByIdx = 0; orderByIdx < _numOrderBy; orderByIdx++) {
+      SelectionSort selectionSort = orderBy.get(orderByIdx);
+      String column = selectionSort.getColumn();
 
-        if (columnIndexMap.containsKey(column)) {
-          int index = columnIndexMap.get(column);
-          if (index < numKeyColumns) {
-            _orderByValueExtractors[orderByIdx] = new KeyColumnExtractor(index);
-          } else {
-            AggregationFunction aggregationFunction = aggregationColumnToFunction.get(column);
-            _orderByValueExtractors[orderByIdx] = new AggregationColumnExtractor(index, aggregationFunction);
-          }
+      if (columnIndexMap.containsKey(column)) {
+        int index = columnIndexMap.get(column);
+        if (index < numKeyColumns) {
+          _orderByValueExtractors[orderByIdx] = new KeyColumnExtractor(index);
         } else {
-          throw new IllegalStateException("Could not find column " + column + " in data schema");
+          AggregationFunction aggregationFunction = aggregationColumnToFunction.get(column);
+          _orderByValueExtractors[orderByIdx] = new AggregationColumnExtractor(index, aggregationFunction);
         }
-
-        comparators[orderByIdx] = Comparator.naturalOrder();
-        if (!selectionSort.isIsAsc()) {
-          comparators[orderByIdx] = comparators[orderByIdx].reversed();
-        }
+      } else {
+        throw new IllegalStateException("Could not find column " + column + " in data schema");
       }
 
-      _intermediateRecordComparator = (o1, o2) -> {
-
-        for (int i = 0; i < _numOrderBy; i++) {
-          int result = comparators[i].compare(o1._values[i], o2._values[i]);
-          if (result != 0) {
-            return result;
-          }
-        }
-        return 0;
-      };
-    } else {
-      // For cases where the entire Record is unique and is treated as a key
-      Preconditions
-          .checkState(numKeyColumns == numColumns, "number of key columns should be equal to total number of columns");
-      int[] orderByIndexes = new int[_numOrderBy];
-      boolean[] orderByAsc = new boolean[_numOrderBy];
-      for (int i = 0; i < _numOrderBy; i++) {
-        SelectionSort selectionSort = orderBy.get(i);
-        String column = selectionSort.getColumn();
-        int orderByColIndex = columnIndexMap.get(column);
-        orderByIndexes[i] = orderByColIndex;
-        if (selectionSort.isIsAsc()) {
-          orderByAsc[i] = true;
-        }
+      comparators[orderByIdx] = Comparator.naturalOrder();
+      if (!selectionSort.isIsAsc()) {
+        comparators[orderByIdx] = comparators[orderByIdx].reversed();
       }
-      _recordComparator = new RecordComparator(orderByIndexes, orderByAsc);
     }
+
+    _intermediateRecordComparator = (o1, o2) -> {
+
+      for (int i = 0; i < _numOrderBy; i++) {
+        int result = comparators[i].compare(o1._values[i], o2._values[i]);
+        if (result != 0) {
+          return result;
+        }
+      }
+      return 0;
+    };
   }
 
   /**
@@ -314,122 +293,6 @@ public class TableResizer {
     Comparable extract(Record record) {
       Object aggregationColumn = record.getValues()[_index];
       return _convertorFunction.apply(aggregationColumn);
-    }
-  }
-
-  /********************************************************
-   *                                                      *
-   * Resize functions for Set based table implementation  *
-   *                                                      *
-   ********************************************************/
-
-  private class RecordComparator implements Comparator<Record> {
-    final int[] _orderByColumnIndexes;
-    final boolean[] _orderByAsc;
-
-    RecordComparator(int[] orderByColumnIndexes, boolean[] orderByAsc) {
-      _orderByColumnIndexes = orderByColumnIndexes;
-      _orderByAsc = orderByAsc;
-    }
-
-    @Override
-    public int compare(Record record1, Record record2) {
-      Object[] values1 = record1.getValues();
-      Object[] values2 = record2.getValues();
-      for (int i = 0; i < _numOrderBy; i++) {
-        Comparable valueToCompare1 = (Comparable) values1[_orderByColumnIndexes[i]];
-        Comparable valueToCompare2 = (Comparable) values2[_orderByColumnIndexes[i]];
-        int result =
-            _orderByAsc[i] ? valueToCompare1.compareTo(valueToCompare2) : valueToCompare2.compareTo(valueToCompare1);
-        if (result != 0) {
-          return result;
-        }
-      }
-      return 0;
-    }
-  }
-
-  public void resizeRecordsSet(Set<Record> recordSet, int trimToSize) {
-    int numRecordsToEvict = recordSet.size() - trimToSize;
-    if (numRecordsToEvict > 0) {
-      if (numRecordsToEvict < trimToSize) {
-        // num records to evict is smaller than num records to retain
-        // make PQ of records to evict
-        PriorityQueue<Record> priorityQueue =
-            buildPriorityQueueFromRecordSet(numRecordsToEvict, recordSet, _recordComparator);
-        for (Record recordToEvict : priorityQueue) {
-          recordSet.remove(recordToEvict);
-        }
-      } else {
-        // num records to retain is smaller than num records to evict
-        // make PQ of records to retain
-        PriorityQueue<Record> priorityQueue =
-            buildPriorityQueueFromRecordSet(trimToSize, recordSet, _recordComparator.reversed());
-        ObjectOpenHashSet<Record> recordsToRetain = new ObjectOpenHashSet<>(priorityQueue.size());
-        for (Record recordToRetain : priorityQueue) {
-          recordsToRetain.add(recordToRetain);
-        }
-        recordSet.retainAll(recordsToRetain);
-      }
-    }
-  }
-
-  private PriorityQueue<Record> buildPriorityQueueFromRecordSet(int size, Set<Record> recordSet,
-      Comparator<Record> comparator) {
-    PriorityQueue<Record> priorityQueue = new PriorityQueue<>(size, comparator);
-    for (Record record : recordSet) {
-      if (priorityQueue.size() < size) {
-        priorityQueue.offer(record);
-      } else {
-        Record peek = priorityQueue.peek();
-        if (comparator.compare(peek, record) < 0) {
-          priorityQueue.poll();
-          priorityQueue.offer(record);
-        }
-      }
-    }
-    return priorityQueue;
-  }
-
-  private List<Record> sortRecordSet(Set<Record> recordSet) {
-    int numRecords = recordSet.size();
-    List<Record> sortedRecords = new ArrayList<>(numRecords);
-    sortedRecords.addAll(recordSet);
-    sortedRecords.sort(_recordComparator);
-    return sortedRecords;
-  }
-
-  public List<Record> resizeAndSortRecordSet(Set<Record> recordSet, int trimToSize) {
-    int numRecords = recordSet.size();
-    if (numRecords == 0) {
-      return Collections.emptyList();
-    }
-
-    int numRecordsToRetain = Math.min(numRecords, trimToSize);
-    int numRecordsToEvict = numRecords - numRecordsToRetain;
-
-    if (numRecordsToEvict < numRecordsToRetain) {
-      // num records to evict is smaller than num records to retain
-      if (numRecordsToEvict > 0) {
-        // make PQ of records to evict
-        PriorityQueue<Record> priorityQueue =
-            buildPriorityQueueFromRecordSet(numRecordsToEvict, recordSet, _recordComparator);
-        for (Record recordToEvict : priorityQueue) {
-          recordSet.remove(recordToEvict);
-        }
-      }
-      return sortRecordSet(recordSet);
-    } else {
-      // make PQ of records to retain
-      PriorityQueue<Record> priorityQueue =
-          buildPriorityQueueFromRecordSet(numRecordsToRetain, recordSet, _recordComparator.reversed());
-      // use PQ to get sorted list
-      Record[] sortedArray = new Record[numRecordsToRetain];
-      while (!priorityQueue.isEmpty()) {
-        Record record = priorityQueue.poll();
-        sortedArray[--numRecordsToRetain] = record;
-      }
-      return Arrays.asList(sortedArray);
     }
   }
 }
