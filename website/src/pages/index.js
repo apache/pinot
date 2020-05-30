@@ -18,6 +18,7 @@ import Tabs from '@theme/Tabs';
 
 import classnames from 'classnames';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+// import PinotOverview from '@site/static/img/pinot-overview.svg';
 
 import styles from './index.module.css';
 import './index.css';
@@ -283,9 +284,9 @@ function Home() {
           <h1 className="hero__title">{siteConfig.title}</h1>
           <p className="hero__subtitle">{siteConfig.tagline}, designed to answer OLAP queries with low latency
           {/* <Diagram className={styles.indexHeroDiagram} width="100%" /> */}
-          
-          {/* <img className="image-overview figure" src="img/pinot-overview-light.png" alt="Components overview" /> */}
+          {/* <PinotOverview title="PinotOverview" className="svg image-overview figure" /> */}
           <SVG src="/img/pinot-overview.svg" className="svg image-overview figure" />
+
           </p>
           <div className="hero--buttons">
             <Link to="https://docs.pinot.apache.org/getting-started" className="button button--primary button--highlight">Getting Started</Link>
