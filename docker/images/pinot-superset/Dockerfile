@@ -33,11 +33,12 @@ RUN mkdir /app \
 
 # Superset version to build
 ARG SUPERSET_VERSION=master
+ARG SUPERSET_REPO=https://github.com/apache/incubator-superset
 ENV SUPERSET_SRC=/app/superset-src
 
 # Download source
 WORKDIR ${SUPERSET_SRC}
-RUN wget -qO /tmp/superset.tar.gz https://github.com/apache/incubator-superset/archive/${SUPERSET_VERSION}.tar.gz \
+RUN wget -qO /tmp/superset.tar.gz ${SUPERSET_REPO}/archive/${SUPERSET_VERSION}.tar.gz \
       && tar xzf /tmp/superset.tar.gz -C ${SUPERSET_SRC} --strip-components=1
 
 # First, we just wanna install requirements, which will allow us to utilize the cache
