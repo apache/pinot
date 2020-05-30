@@ -102,34 +102,4 @@ public class AnomalyResourceTest {
     testDAOProvider.cleanup();
   }
 
-  @Test
-  public void testDeleteAnomalyFunctions() {
-    AnomalyResource anomalyResource = new AnomalyResource(null, null);
-    anomalyResource.deleteAnomalyFunctions(func2 + "," + func3 + ", 9999");
-
-    // Anomaly functions and the associated anomalies are cleaned up correctly
-    Assert.assertEquals(daoRegistry.getAnomalyFunctionDAO().findAll().size(), 2);
-    Assert.assertTrue(Arrays.asList(func1, func4).contains(daoRegistry.getAnomalyFunctionDAO().findAll().get(0).getId()));
-    Assert.assertTrue(Arrays.asList(func1, func4).contains(daoRegistry.getAnomalyFunctionDAO().findAll().get(1).getId()));
-    Assert.assertEquals(daoRegistry.getMergedAnomalyResultDAO().findAll().size(), 1);
-    Assert.assertEquals(daoRegistry.getMergedAnomalyResultDAO().findAll().get(0).getFunctionId().longValue(), func4);
-
-    // Subscription alert groups cleaned up correctly
-    Assert.assertEquals(daoRegistry.getAlertConfigDAO().findAll().size(), 2);
-    Assert.assertEquals(daoRegistry.getAlertConfigDAO().findAll().get(0).getEmailConfig().getFunctionIds().size(), 1);
-    Assert.assertEquals(daoRegistry.getAlertConfigDAO().findAll().get(0).getEmailConfig().getFunctionIds().get(0).longValue(), func1);
-    Assert.assertEquals(daoRegistry.getAlertConfigDAO().findAll().get(1).getEmailConfig().getFunctionIds().size(), 0);
-  }
-
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testDeleteAnomalyFunctionsNullArguments() {
-    AnomalyResource anomalyResource = new AnomalyResource(null, null);
-    anomalyResource.deleteAnomalyFunctions(null);
-  }
-
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testDeleteAnomalyFunctionsEmptyArguments() {
-    AnomalyResource anomalyResource = new AnomalyResource(null, null);
-    anomalyResource.deleteAnomalyFunctions("");
-  }
 }

@@ -160,15 +160,15 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DatasetAutoOnboardResource());
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
-    env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
+    env.jersey().register(new AnomalyResource(alertFilterFactory));
     env.jersey().register(new EntityManagerResource(config));
     env.jersey().register(new MetricConfigResource());
     env.jersey().register(new DatasetConfigResource());
     env.jersey().register(new AdminResource());
     env.jersey().register(new SummaryResource());
     env.jersey().register(new ThirdEyeResource());
-    env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
+    env.jersey().register(new DataResource());
+    env.jersey().register(new AnomaliesResource(anomalyFunctionFactory));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
     env.jersey().register(new AutoOnboardResource(config));

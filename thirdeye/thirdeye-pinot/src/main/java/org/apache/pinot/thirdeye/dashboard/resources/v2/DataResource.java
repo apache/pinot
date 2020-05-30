@@ -74,8 +74,6 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
-import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
-import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 /**
@@ -109,7 +107,7 @@ public class DataResource {
 
   private final QueryCache queryCache;
 
-  public DataResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
+  public DataResource() {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();

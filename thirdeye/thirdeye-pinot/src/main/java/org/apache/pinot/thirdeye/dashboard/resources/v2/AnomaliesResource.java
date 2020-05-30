@@ -24,16 +24,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -41,10 +37,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
-import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -52,9 +46,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
-import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
@@ -64,15 +56,11 @@ import org.apache.pinot.thirdeye.common.metric.MetricTimeSeries;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeRange;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
-import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
-import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
 import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
-import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -82,17 +70,13 @@ import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
-import org.apache.pinot.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -138,7 +122,6 @@ public class AnomaliesResource {
   private static final String START_END_DATE_FORMAT_DAYS = "MMM d yyyy";
   private static final String START_END_DATE_FORMAT_HOURS = "MMM d yyyy HH:mm";
   private static final String TIME_SERIES_DATE_FORMAT = "yyyy-MM-dd HH:mm";
-  private static final String COMMA_SEPARATOR = ",";
   private static final int DEFAULT_PAGE_SIZE = 10;
   private static final int NUM_EXECS = 40;
   private static final DateTimeZone DEFAULT_DASHBOARD_TIMEZONE = DateTimeZone.forID("America/Los_Angeles");
@@ -151,7 +134,6 @@ public class AnomaliesResource {
 
   private final MetricConfigManager metricConfigDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private final GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DatasetConfigManager datasetConfigDAO;
   private final DetectionConfigManager detectionDAO;
@@ -160,7 +142,6 @@ public class AnomaliesResource {
   private final EvaluationManager evaluationDAO;
 
   private final ExecutorService threadPool;
-  private final AlertFilterFactory alertFilterFactory;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
 
   private final TimeSeriesLoader timeSeriesLoader;
@@ -168,15 +149,13 @@ public class AnomaliesResource {
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
 
-  public AnomaliesResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
+  public AnomaliesResource(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    this.groupedAnomalyResultsDAO = DAO_REGISTRY.getGroupedAnomalyResultsDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.detectionDAO = DAO_REGISTRY.getDetectionConfigManager();
     this.threadPool = Executors.newFixedThreadPool(NUM_EXECS);
-    this.alertFilterFactory = alertFilterFactory;
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
@@ -193,98 +172,6 @@ public class AnomaliesResource {
         this.evaluationDAO, this.timeSeriesLoader, this.aggregationLoader, this.loader,
         TimeSeriesCacheBuilder.getInstance(), AnomaliesCacheBuilder.getInstance());
   }
-
-  @GET
-  @Path("/{anomalyId}")
-  public AnomalyDataCompare.Response getAnomalyDataCompareResults(
-      @PathParam("anomalyId") Long anomalyId) {
-    MergedAnomalyResultDTO anomaly = mergedAnomalyResultDAO.findById(anomalyId);
-    if (anomaly == null) {
-      LOG.error("Anomaly not found with id " + anomalyId);
-      throw new IllegalArgumentException("Anomaly not found with id " + anomalyId);
-    }
-    AnomalyDataCompare.Response response = new AnomalyDataCompare.Response();
-    response = getAnomalyDataComparisonResponseForFunction(anomaly.getFunction(), anomaly.getStartTime(),
-        anomaly.getEndTime(), anomaly.getDimensions());
-    return response;
-  }
-
-  public AnomalyDataCompare.Response getAnomalyDataComparisonResponseForFunction(AnomalyFunctionDTO anomalyFunction,
-      long start, long end, DimensionMap dimensions) {
-
-    AnomalyDataCompare.Response response = new AnomalyDataCompare.Response();
-    response.setCurrentStart(start);
-    response.setCurrenEnd(end);
-    try {
-      DatasetConfigDTO dataset = datasetConfigDAO.findByDataset(anomalyFunction.getCollection());
-      DateTimeZone dateTimeZone = Utils.getDataTimeZone(anomalyFunction.getCollection());
-
-      // Lets compute currentTimeRange
-      Pair<Long, Long> currentTimeRange = new Pair<>(start, end);
-      AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
-          new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-      anomalyDetectionInputContextBuilder.setFunction(anomalyFunction)
-          .fetchTimeSeriesDataByDimension(Arrays.asList(currentTimeRange), dimensions, false);
-
-      MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
-          .getDimensionMapMetricTimeSeriesMap().get(dimensions);
-      String metricName = anomalyFunction.getMetric();
-      double currentVal = 0d;
-      if (currentTimeSeries != null) {
-        currentVal = getAverageFromTimeSeries(currentTimeSeries, metricName);
-      }
-      response.setCurrentVal(currentVal);
-
-      for (AlertConfigBean.COMPARE_MODE compareMode : AlertConfigBean.COMPARE_MODE.values()) {
-        Period baselineOffsetPeriod = ThirdEyeUtils.getbaselineOffsetPeriodByMode(compareMode);
-        DateTime anomalyStartTimeOffset = new DateTime(start, dateTimeZone).minus(baselineOffsetPeriod);
-        DateTime anomalyEndTimeOffset = new DateTime(end, dateTimeZone).minus(baselineOffsetPeriod);
-        Pair<Long, Long> baselineTimeRange =
-            new Pair<>(anomalyStartTimeOffset.getMillis(), anomalyEndTimeOffset.getMillis());
-        anomalyDetectionInputContextBuilder
-            .fetchTimeSeriesDataByDimension(Arrays.asList(baselineTimeRange), dimensions, false);
-        MetricTimeSeries baselineTimeSeries = anomalyDetectionInputContextBuilder.build()
-            .getDimensionMapMetricTimeSeriesMap().get(dimensions);
-        AnomalyDataCompare.CompareResult compareResult = new AnomalyDataCompare.CompareResult();
-        double baseLineval = 0d;
-        if (baselineTimeSeries != null) {
-          baseLineval = getAverageFromTimeSeries(baselineTimeSeries, metricName);
-        }
-        compareResult.setBaselineValue(baseLineval);
-        compareResult.setCompareMode(compareMode);
-        compareResult.setChange(calculateChange(currentVal, baseLineval));
-        response.getCompareResults().add(compareResult);
-      }
-    } catch (Exception e) {
-      LOG.error("Error fetching the timeseries data from pinot", e);
-      throw new RuntimeException(e);
-    }
-    return response;
-  }
-
-  private double calculateChange(double currentValue, double baselineValue) {
-    if (baselineValue == 0.0) {
-      if (currentValue != 0) {
-        return 1;  // 100 % change
-      }
-      if (currentValue == 0) {
-        return 0;  // No change
-      }
-    }
-    return (currentValue - baselineValue) / baselineValue;
-  }
-
-  double getAverageFromTimeSeries(MetricTimeSeries metricTimeSeries, String metricName) {
-    // MetricTimeSeries will have multiple values in case of derived/multimetric
-    Double[] metricAverages = metricTimeSeries.getMetricAvgs(0d);
-    Integer metricIndex = metricTimeSeries.getSchema().getMetricIndex(metricName);
-    if (metricIndex != null) {
-      return metricAverages[metricIndex];
-    } else {
-      return metricAverages[0];
-    }
-  }
-
 
   /**
    * Search anomalies only by time
@@ -309,280 +196,7 @@ public class AnomaliesResource {
     return anomaliesWrapper;
   }
 
-  /**
-   * Find anomalies by anomaly ids
-   * @param startTime
-   * @param endTime
-   * @param anomalyIdsString
-   * @return
-   * @throws Exception
-   */
-  @GET
-  @Path("search/anomalyIds/{startTime}/{endTime}/{pageNumber}")
-  public AnomaliesWrapper getAnomaliesByAnomalyIds(
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime,
-      @PathParam("pageNumber") int pageNumber,
-      @QueryParam("anomalyIds") String anomalyIdsString,
-      @QueryParam("searchFilters") String searchFiltersJSON,
-      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
-
-    String[] anomalyIds = anomalyIdsString.split(COMMA_SEPARATOR);
-    List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
-    for (String id : anomalyIds) {
-      Long anomalyId = Long.valueOf(id);
-      MergedAnomalyResultDTO anomaly = mergedAnomalyResultDAO.findById(anomalyId);
-      if (anomaly != null) {
-        mergedAnomalies.add(anomaly);
-      }
-    }
-    AnomaliesWrapper
-        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
-    return anomaliesWrapper;
-  }
-
-
-  /**
-   * Find anomalies by metric ids
-   * @param startTime
-   * @param endTime
-   * @param metricIdsString
-   * @param functionName
-   * @return
-   * @throws Exception
-   */
-  @GET
-  @Path("search/metricIds/{startTime}/{endTime}/{pageNumber}")
-  public AnomaliesWrapper getAnomaliesByMetricIds(
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime,
-      @PathParam("pageNumber") int pageNumber,
-      @QueryParam("metricIds") String metricIdsString,
-      @QueryParam("functionName") String functionName,
-      @QueryParam("searchFilters") String searchFiltersJSON,
-      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
-
-    String[] metricIdsList = metricIdsString.split(COMMA_SEPARATOR);
-    List<Long> metricIds = new ArrayList<>();
-    for (String metricId : metricIdsList) {
-      metricIds.add(Long.valueOf(metricId));
-    }
-    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdsInRange(metricIds, startTime, endTime);
-    AnomaliesWrapper
-        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(removeChildren(mergedAnomalies), searchFiltersJSON, pageNumber, filterOnly);
-    return anomaliesWrapper;
-  }
-
-  /**
-   * Find anomalies by anomaly group ids.
-   *
-   * @param startTime not used.
-   * @param endTime not used.
-   * @param anomalyGroupIdsString a list of anomaly group ids that are separated by commas.
-   * @param functionName not used.
-   *
-   * @return A list of detailed anomalies in the specified page.
-   * @throws Exception
-   */
-  @GET
-  @Path("search/anomalyGroupIds/{startTime}/{endTime}/{pageNumber}")
-  public AnomaliesWrapper getAnomaliesByGroupIds(
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime,
-      @PathParam("pageNumber") int pageNumber,
-      @QueryParam("anomalyGroupIds") String anomalyGroupIdsString,
-      @QueryParam("functionName") String functionName,
-      @QueryParam("searchFilters") String searchFiltersJSON,
-      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
-    String[] anomalyGroupIdsStrings = anomalyGroupIdsString.split(COMMA_SEPARATOR);
-    Set<Long> anomalyIdSet = new HashSet<>();
-    List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
-    for (String idString : anomalyGroupIdsStrings) {
-      Long groupId = null;
-      try {
-        groupId = Long.parseLong(idString);
-      } catch (Exception e) {
-        LOG.info("Skipping group id {} due to parsing error: {}", idString, e);
-      }
-      if (groupId != null) {
-        GroupedAnomalyResultsDTO groupedAnomalyDTO = groupedAnomalyResultsDAO.findById(groupId);
-        if (groupedAnomalyDTO != null) {
-          List<MergedAnomalyResultDTO> mergedAnomalyOfGroup = groupedAnomalyDTO.getAnomalyResults();
-          for (MergedAnomalyResultDTO mergedAnomalyDTO : mergedAnomalyOfGroup) {
-            if (!anomalyIdSet.contains(mergedAnomalyDTO.getId())) {
-              mergedAnomalies.add(mergedAnomalyDTO);
-              anomalyIdSet.add(mergedAnomalyDTO.getId());
-            }
-          }
-        }
-      }
-    }
-
-    AnomaliesWrapper
-        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(removeChildren(mergedAnomalies), searchFiltersJSON, pageNumber, filterOnly);
-    return anomaliesWrapper;
-  }
-
-  /**
-   * Update anomaly feedback
-   * @param mergedAnomalyId : mergedAnomalyId
-   * @param payload         : Json payload containing feedback @see org.apache.pinot.thirdeye.constant.AnomalyFeedbackType
-   *                        eg. payload
-   *                        <p/>
-   *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
-   */
-  @POST
-  @Path(value = "/updateFeedback/{mergedAnomalyId}")
-  public void updateAnomalyMergedResultFeedback(@PathParam("mergedAnomalyId") long mergedAnomalyId, String payload) {
-    try {
-      MergedAnomalyResultDTO result = mergedAnomalyResultDAO.findById(mergedAnomalyId);
-      if (result == null) {
-        throw new IllegalArgumentException("AnomalyResult not found with id " + mergedAnomalyId);
-      }
-      AnomalyFeedback feedback = result.getFeedback();
-      if (feedback == null) {
-        feedback = new AnomalyFeedbackDTO();
-        result.setFeedback(feedback);
-      }
-      AnomalyFeedbackDTO feedbackRequest = new ObjectMapper().readValue(payload, AnomalyFeedbackDTO.class);
-      feedback.setComment(feedbackRequest.getComment());
-      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
-      mergedAnomalyResultDAO.updateAnomalyFeedback(result);
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Invalid payload " + payload, e);
-    }
-  }
-
-  /**
-   * Create a user-reported anomaly
-   *
-   * @param anomalyFunctionId anomaly function id (must exist)
-   * @param startTime start time utc (in millis)
-   * @param endTime end time utc (in millis)
-   * @param feedbackType anomaly feedback type
-   * @param comment anomaly feedback comment (optional)
-   * @param dimensionsJson dimension map json string (optional)
-   * @throws IllegalArgumentException if the anomaly function id cannot be found
-   * @throws IllegalArgumentException if the anomaly cannot be stored
-   */
-  @POST
-  @Path(value = "/reportAnomaly/{anomalyFunctionId}")
-  public void createUserAnomaly(@PathParam("anomalyFunctionId") long anomalyFunctionId,
-      @QueryParam("startTime") Long startTime,
-      @QueryParam("endTime") Long endTime,
-      @QueryParam("feedbackType") AnomalyFeedbackType feedbackType,
-      @QueryParam("comment") String comment,
-      @QueryParam("dimensionsJson") String dimensionsJson) {
-
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(anomalyFunctionId);
-    if (anomalyFunction == null) {
-      throw new IllegalArgumentException(String.format("Could not resolve anomaly function id %d", anomalyFunctionId));
-    }
-
-    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
-    anomaly.setFunction(anomalyFunction);
-    anomaly.setFunctionId(anomalyFunction.getId());
-    anomaly.setStartTime(startTime);
-    anomaly.setEndTime(endTime);
-    anomaly.setDimensions(new DimensionMap(dimensionsJson != null ? dimensionsJson : "{}"));
-    anomaly.setAnomalyResultSource(AnomalyResultSource.USER_LABELED_ANOMALY);
-    anomaly.setMetric(anomalyFunction.getTopicMetric());
-    anomaly.setCollection(anomalyFunction.getCollection());
-    anomaly.setProperties(Collections.<String, String>emptyMap());
-
-    if (mergedAnomalyResultDAO.save(anomaly) == null) {
-      throw new IllegalArgumentException(String.format("Could not store user reported anomaly: '%s'", anomaly));
-    }
-
-    // TODO fix feedback not being saved on create by DAO
-    AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
-    feedback.setFeedbackType(feedbackType);
-    feedback.setComment(comment);
-
-    anomaly.setFeedback(feedback);
-
-    mergedAnomalyResultDAO.updateAnomalyFeedback(anomaly);
-  }
-
-  /**
-   * Update anomaly feedback for all anomalies of a specific anomaly function within a time range.
-   *
-   * @param startTime start time utc (in millis)
-   * @param endTime end time utc (in millis)
-   * @param functionId anomaly function id
-   * @param dimensionMapJSONString if specified, only update feedback of the anomalies on the same dimension
-   * @param feedbackType feedback type
-   */
-  @POST
-  @Path(value = "/updateFeedbackRange/{startTime}/{endTime}/{functionId}")
-  public void updateFeedbackForAnomalyFunctionAndTimeRange(
-      @PathParam("startTime") @NotNull Long startTime,
-      @PathParam("endTime") @NotNull Long endTime,
-      @PathParam("functionId") @NotNull Long functionId,
-      @QueryParam("dimensionMap") @DefaultValue("") String dimensionMapJSONString,
-      @QueryParam("feedbackType") @NotNull String feedbackType) {
-
-    DimensionMap dimension = new DimensionMap();
-    if (StringUtils.isNotEmpty(dimensionMapJSONString)) {
-      dimension = new DimensionMap(dimensionMapJSONString);
-    }
-    // fetch anomalies
-    List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
-
-    // apply feedback
-    for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (anomaly.getStartTime() < endTime && startTime < anomaly.getEndTime()
-          && anomaly.getDimensions().equals(dimension)) {
-        LOG.info("Updating feedback for anomaly id {}", anomaly.getId());
-
-        AnomalyFeedback feedback = anomaly.getFeedback();
-        if (feedback == null) {
-          feedback = new AnomalyFeedbackDTO();
-        }
-
-        feedback.setFeedbackType(AnomalyFeedbackType.valueOf(feedbackType));
-        anomaly.setFeedback(feedback);
-
-        mergedAnomalyResultDAO.updateAnomalyFeedback(anomaly);
-      }
-    }
-  }
-
   // ----------- HELPER FUNCTIONS
-
-  /**
-   * Get anomalies for metric id in a time range
-   * @param metricId
-   * @param startTime
-   * @param endTime
-   * @return
-   */
-  private List<MergedAnomalyResultDTO> getAnomaliesForMetricIdInRange(Long metricId, Long startTime, Long endTime) {
-    MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
-    String dataset = metricConfig.getDataset();
-    String metric = metricConfig.getName();
-    List<MergedAnomalyResultDTO> mergedAnomalies =
-        mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime, endTime);
-    try {
-      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies, alertFilterFactory);
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to apply alert filters on anomalies for metricid:{}, start:{}, end:{}, exception:{}",
-          metricId, new DateTime(startTime), new DateTime(endTime), e);
-    }
-    return mergedAnomalies;
-  }
-
-  private List<MergedAnomalyResultDTO> getAnomaliesForMetricIdsInRange(List<Long> metricIds, Long startTime, Long endTime) {
-    List<MergedAnomalyResultDTO> mergedAnomaliesForMetricIdsInRange = new ArrayList<>();
-    for (Long metricId : metricIds) {
-      List<MergedAnomalyResultDTO> filteredMergedAnomalies =
-          getAnomaliesForMetricIdInRange(metricId, startTime, endTime);
-      mergedAnomaliesForMetricIdsInRange.addAll(filteredMergedAnomalies);
-    }
-    return mergedAnomaliesForMetricIdsInRange;
-  }
-
 
   /**
    * Extract data values form timeseries object
@@ -749,7 +363,6 @@ public class AnomaliesResource {
         public AnomalyDetails call() throws Exception {
           String dataset = mergedAnomaly.getCollection();
           DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
-
           return getAnomalyDetails(mergedAnomaly, datasetConfig, getExternalURL(mergedAnomaly));
         }
       };
@@ -1156,13 +769,6 @@ public class AnomaliesResource {
     return details;
   }
 
-  private static DataFrame fixTimestamp(DataFrame df, long start) {
-    if (df.isEmpty()) {
-      return DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(start, DoubleSeries.NULL).build();
-    }
-    return df.set(COL_TIME, BooleanSeries.fillValues(1, true), LongSeries.fillValues(1, start));
-  }
-
   private static String makeStringValue(DataFrame aggregate) {
     if (aggregate.isEmpty()) {
       return String.valueOf(Double.NaN);
@@ -1292,32 +898,5 @@ public class AnomaliesResource {
     return range;
 
   }
-
-  private TimeRange getAnomalyTimeRangeWithOffsets(AnomalyOffset offset, MergedAnomalyResultDTO mergedAnomaly,
-      DatasetConfigDTO datasetConfig) {
-    long anomalyStartTime = mergedAnomaly.getStartTime();
-    long anomalyEndTime = mergedAnomaly.getEndTime();
-    Period preOffsetPeriod = offset.getPreOffsetPeriod();
-    Period postOffsetPeriod = offset.getPostOffsetPeriod();
-
-    DateTimeZone dateTimeZone = DateTimeZone.forID(datasetConfig.getTimezone());
-    DateTime anomalyStartDateTime = new DateTime(anomalyStartTime, dateTimeZone);
-    DateTime anomalyEndDateTime = new DateTime(anomalyEndTime, dateTimeZone);
-    anomalyStartDateTime = anomalyStartDateTime.minus(preOffsetPeriod);
-    anomalyEndDateTime = anomalyEndDateTime.plus(postOffsetPeriod);
-    anomalyStartTime = anomalyStartDateTime.getMillis();
-    anomalyEndTime = anomalyEndDateTime.getMillis();
-    try {
-      Long maxDataTime = CACHE_REGISTRY.getDatasetMaxDataTimeCache().get(datasetConfig.getDataset());
-      if (anomalyEndTime > maxDataTime) {
-        anomalyEndTime = maxDataTime;
-      }
-    } catch (ExecutionException e) {
-      LOG.error("Exception when reading max time for {}", datasetConfig.getDataset(), e);
-    }
-    TimeRange range = new TimeRange(anomalyStartTime, anomalyEndTime);
-    return range;
-  }
-
 
 }
