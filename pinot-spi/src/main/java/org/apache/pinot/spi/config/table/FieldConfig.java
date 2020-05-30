@@ -36,6 +36,7 @@ public class FieldConfig extends BaseJsonConfig {
   public static String BLOOM_FILTER_COLUMN_KEY = "bloom.filter";
   public static String ON_HEAP_DICTIONARY_COLUMN_KEY = "onheap.dictionary";
   public static String VAR_LENGTH_DICTIONARY_COLUMN_KEY = "var.length.dictionary";
+  public static String DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY = "derive.num.docs.per.chunk.raw.index";
 
   public static String TEXT_INDEX_REALTIME_READER_REFRESH_KEY = "text.index.realtime.reader.refresh";
   // Lucene creates a query result cache if this option is enabled

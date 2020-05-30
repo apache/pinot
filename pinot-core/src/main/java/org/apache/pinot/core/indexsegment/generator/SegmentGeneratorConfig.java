@@ -102,6 +102,9 @@ public class SegmentGeneratorConfig {
   private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
 
+  // constructed from FieldConfig
+  private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
+
   @Deprecated
   public SegmentGeneratorConfig() {
   }
@@ -174,10 +177,22 @@ public class SegmentGeneratorConfig {
         _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
       }
 
+      List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+      if (fieldConfigList != null) {
+        for (FieldConfig fieldConfig : fieldConfigList) {
+          _columnProperties.put(fieldConfig.getName(), fieldConfig.getProperties());
+        }
+      }
+
       extractTextIndexColumnsFromTableConfig(tableConfig);
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
     }
+  }
+
+  @Nonnull
+  public Map<String, Map<String, String>> getColumnProperties() {
+    return _columnProperties;
   }
 
   /**
