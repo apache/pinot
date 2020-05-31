@@ -137,6 +137,8 @@ public class AggregationFunctionFactory {
             return new FastHLLAggregationFunction(column);
           case DISTINCTCOUNTTHETASKETCH:
             return new DistinctCountThetaSketchAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWTHETASKETCH:
+            return new DistinctCountRawThetaSketchAggregationFunction(arguments);
           case COUNTMV:
             return new CountMVAggregationFunction(column);
           case MINMV:
