@@ -100,10 +100,13 @@
 .svg {
   display: block;
   margin: var(--ifm-heading-margin-bottom) auto;
-  max-height: 720px;
-  max-width: 1600px;
+  max-height: 100%;
+  max-width: 100%;
   display: flex; 
   justify-content: center;
+  width: auto ;
+  height: auto ;
+  display: block; 
  }
 
  /* fallback */
