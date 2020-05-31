@@ -171,6 +171,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionFunction = config.getPartitionFunction();
     _partitionId = config.getPartitionId();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
+    _aggregateMetrics = config.aggregateMetrics();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -344,7 +345,8 @@ public class MutableSegmentImpl implements MutableSegment {
       // if the column is part of noDictionary set from table config
       if (fieldSpec instanceof DimensionFieldSpec && _aggregateMetrics && (dataType == FieldSpec.DataType.STRING ||
           dataType == FieldSpec.DataType.BYTES)) {
-        _logger.info("Not creating dictionary in consuming segment for column {} of type {}", column, dataType.toString());
+        _logger.info("Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
+            column, dataType.toString());
         return false;
       }
       // So don't create dictionary if the column is member of noDictionary, is single-value
@@ -857,7 +859,6 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   private IdMap<FixedIntArray> enableMetricsAggregationIfPossible(RealtimeSegmentConfig config,
       Set<String> noDictionaryColumns) {
-    _aggregateMetrics = config.aggregateMetrics();
     if (!_aggregateMetrics) {
       _logger.info("Metrics aggregation is disabled.");
       return null;
