@@ -53,6 +53,7 @@ import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndex
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -193,9 +194,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             getColumnCompressionType(segmentCreationSpec, fieldSpec);
 
         // Initialize forward index creator
+        boolean deriveNumDocsPerChunk = shouldDeriveNumDocsPerChunk(columnName, segmentCreationSpec.getColumnProperties());
         _forwardIndexCreatorMap.put(columnName,
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
-                indexCreationInfo.getLengthOfLongestEntry()));
+                indexCreationInfo.getLengthOfLongestEntry(), deriveNumDocsPerChunk));
 
         // Initialize text index creator
         if (_textIndexColumns.contains(columnName)) {
@@ -211,6 +213,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
     }
+  }
+
+  public static boolean shouldDeriveNumDocsPerChunk(String columnName, Map<String, Map<String, String>> columnProperties) {
+    if (columnProperties != null) {
+      Map<String, String> properties = columnProperties.get(columnName);
+      return properties != null && Boolean.parseBoolean(properties.get(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY));
+    }
+    return false;
   }
 
   /**
@@ -539,6 +549,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ChunkCompressorFactory.CompressionType compressionType, String column, FieldSpec.DataType dataType, int totalDocs,
       int lengthOfLongestEntry)
       throws IOException {
+    return getRawIndexCreatorForColumn(file, compressionType, column, dataType, totalDocs, lengthOfLongestEntry, false);
+  }
+
+  public static SingleValueRawIndexCreator getRawIndexCreatorForColumn(File file,
+      ChunkCompressorFactory.CompressionType compressionType, String column, FieldSpec.DataType dataType, int totalDocs,
+      int lengthOfLongestEntry, boolean deriveNumDocsPerChunk)
+      throws IOException {
 
     SingleValueRawIndexCreator indexCreator;
     switch (dataType) {
@@ -561,7 +578,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       case STRING:
       case BYTES:
         indexCreator =
-            new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, lengthOfLongestEntry);
+            new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, lengthOfLongestEntry,
+                deriveNumDocsPerChunk);
         break;
 
       default:
