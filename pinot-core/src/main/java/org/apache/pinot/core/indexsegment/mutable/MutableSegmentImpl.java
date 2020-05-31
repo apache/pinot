@@ -219,7 +219,7 @@ public class MutableSegmentImpl implements MutableSegment {
       FieldSpec.DataType dataType = fieldSpec.getDataType();
       boolean isFixedWidthColumn = dataType.isFixedWidth();
       int forwardIndexColumnSize = -1;
-      if (isNoDictionaryColumn(noDictionaryColumns, invertedIndexColumns, textIndexColumns, fieldSpec, column)) {
+      if (isNoDictionaryColumn(noDictionaryColumns, invertedIndexColumns, fieldSpec, column)) {
         // no dictionary
         // each forward index entry will be equal to size of data for that row
         // For INT, LONG, FLOAT, DOUBLE it is equal to the number of fixed bytes used to store the value,
@@ -329,9 +329,30 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return true if column is no-dictionary, false if dictionary encoded
    */
   private boolean isNoDictionaryColumn(Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
-      Set<String> textIndexColumns, FieldSpec fieldSpec, String column) {
-    return textIndexColumns.contains(column) || (noDictionaryColumns.contains(column) && fieldSpec.isSingleValueField()
-        && !invertedIndexColumns.contains(column));
+      FieldSpec fieldSpec, String column) {
+    FieldSpec.DataType dataType = fieldSpec.getDataType();
+    if (noDictionaryColumns.contains(column)) {
+      // Earlier we didn't support noDict in consuming segments for STRING and BYTES columns.
+      // So even if the user had the column in noDictionaryColumns set in table config, we still
+      // created dictionary in consuming segments.
+      // Later on we added this support. There is a particular impact of this change on the use cases
+      // that have set noDict on their STRING dimension columns for other performance
+      // reasons and also want metricsAggregation. These use cases don't get to
+      // aggregateMetrics because the new implementation is able to honor their table config setting
+      // of noDict on STRING/BYTES. Without metrics aggregation, memory pressure increases.
+      // So to continue aggregating metrics for such cases, we will create dictionary even
+      // if the column is part of noDictionary set from table config
+      if (fieldSpec instanceof DimensionFieldSpec && _aggregateMetrics && (dataType == FieldSpec.DataType.STRING ||
+          dataType == FieldSpec.DataType.BYTES)) {
+        _logger.info("Not creating dictionary in consuming segment for column {} of type {}", column, dataType.toString());
+        return false;
+      }
+      // So don't create dictionary if the column is member of noDictionary, is single-value
+      // and doesn't have an inverted index
+      return fieldSpec.isSingleValueField() && !invertedIndexColumns.contains(column);
+    }
+    // column is not a part of noDictionary set, so create dictionary
+    return false;
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {

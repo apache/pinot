@@ -28,6 +28,7 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCreator {
+  private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
   private final VarByteChunkSingleValueWriter _indexWriter;
@@ -35,8 +36,15 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
       String column, int totalDocs, int maxLength)
       throws IOException {
+    this(baseIndexDir, compressionType, column, totalDocs, maxLength, false);
+  }
+
+  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
+      String column, int totalDocs, int maxLength, boolean deriveNumDocsPerChunk)
+      throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, getNumDocsPerChunk(maxLength), maxLength);
+    int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
+    _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength);
   }
 
   @VisibleForTesting
