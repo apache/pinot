@@ -235,7 +235,7 @@ Example payload could be:
 	    "recipients": "owner-of-this-application@company.com"
 	}
 
-2.From admin page
+2.From admin page (only if there are existing applications)
 
 a. Navigate to admin page: http://localhost:1426/thirdeye-admin
 b. Select an existing application from "Entity Editor".
