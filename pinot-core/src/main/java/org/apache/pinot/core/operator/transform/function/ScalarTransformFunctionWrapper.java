@@ -36,18 +36,18 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
 
-  FunctionInvoker _functionInvoker;
-  String _name;
-  Object[] _args;
-  List<Integer> _nonLiteralArgIndices;
-  List<FieldSpec.DataType> _nonLiteralArgType;
-  List<TransformFunction> _nonLiteralTransformFunction;
-  TransformResultMetadata _transformResultMetadata;
-  String[] _stringResult;
-  int[] _integerResult;
-  float[] _floatResult;
-  double[] _doubleResult;
-  long[] _longResult;
+  private FunctionInvoker _functionInvoker;
+  private String _name;
+  private Object[] _args;
+  private List<Integer> _nonLiteralArgIndices;
+  private List<FieldSpec.DataType> _nonLiteralArgType;
+  private List<TransformFunction> _nonLiteralTransformFunction;
+  private TransformResultMetadata _transformResultMetadata;
+  private String[] _stringResult;
+  private int[] _integerResult;
+  private float[] _floatResult;
+  private double[] _doubleResult;
+  private long[] _longResult;
 
   public ScalarTransformFunctionWrapper() {
     _nonLiteralArgIndices = new ArrayList<>();
@@ -68,11 +68,12 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    Preconditions.checkArgument(arguments.size() == _functionInvoker.getParameterTypes().length,
+    Integer numArguments = arguments.size();
+    Preconditions.checkArgument(numArguments == _functionInvoker.getParameterTypes().length,
         "The number of arguments are not same for scalar function and transform function: %s", getName());
 
-    _args = new Object[arguments.size()];
-    for (int i = 0; i < arguments.size(); i++) {
+    _args = new Object[numArguments];
+    for (int i = 0; i < numArguments; i++) {
       TransformFunction function = arguments.get(i);
       if (function instanceof LiteralTransformFunction) {
         String literal = ((LiteralTransformFunction) function).getLiteral();
@@ -81,17 +82,17 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           case "java.lang.Integer":
             _args[i] = Integer.parseInt(literal);
             break;
-          case "java.lang.String":
-            _args[i] = literal;
-            break;
-          case "java.lang.Double":
-            _args[i] = Double.valueOf(literal);
+          case "java.lang.Long":
+            _args[i] = Long.valueOf(literal);
             break;
           case "java.lang.Float":
             _args[i] = Float.valueOf(literal);
             break;
-          case "java.lang.Long":
-            _args[i] = Long.valueOf(literal);
+          case "java.lang.Double":
+            _args[i] = Double.valueOf(literal);
+            break;
+          case "java.lang.String":
+            _args[i] = literal;
             break;
           default:
             throw new RuntimeException(
@@ -106,17 +107,17 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           case "java.lang.Integer":
             _nonLiteralArgType.add(FieldSpec.DataType.INT);
             break;
-          case "java.lang.String":
-            _nonLiteralArgType.add(FieldSpec.DataType.STRING);
-            break;
-          case "java.lang.Double":
-            _nonLiteralArgType.add(FieldSpec.DataType.DOUBLE);
+          case "java.lang.Long":
+            _nonLiteralArgType.add(FieldSpec.DataType.LONG);
             break;
           case "java.lang.Float":
             _nonLiteralArgType.add(FieldSpec.DataType.FLOAT);
             break;
-          case "java.lang.Long":
-            _nonLiteralArgType.add(FieldSpec.DataType.LONG);
+          case "java.lang.Double":
+            _nonLiteralArgType.add(FieldSpec.DataType.DOUBLE);
+            break;
+          case "java.lang.String":
+            _nonLiteralArgType.add(FieldSpec.DataType.STRING);
             break;
           default:
             throw new RuntimeException(
