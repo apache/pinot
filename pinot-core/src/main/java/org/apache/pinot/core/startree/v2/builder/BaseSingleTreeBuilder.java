@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.function.AggregationFunctionType;
@@ -150,7 +151,11 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();
-        _metricDataTypes[index] = schema.getFieldSpecFor(column).getDataType();
+        FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+        if (fieldSpec == null) {
+          throw new NullPointerException("Invalid column: " + column);
+        }
+        _metricDataTypes[index] = fieldSpec.getDataType();
         _metricReaders[index] = new PinotSegmentColumnReader(segment, column);
       }
 
