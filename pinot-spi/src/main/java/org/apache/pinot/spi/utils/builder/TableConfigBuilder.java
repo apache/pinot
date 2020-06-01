@@ -64,6 +64,7 @@ public class TableConfigBuilder {
   private String _segmentPushFrequency;
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _segmentAssignmentStrategy = DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY;
+  private String _peerSegmentDownloadScheme;
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
 
@@ -287,6 +288,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setPeerSegmentDownloadScheme(String peerSegmentDownloadScheme) {
+    _peerSegmentDownloadScheme = peerSegmentDownloadScheme;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -301,6 +307,7 @@ public class TableConfigBuilder {
     validationConfig.setCompletionConfig(_completionConfig);
     validationConfig.setSchemaName(_schemaName);
     validationConfig.setReplication(_numReplicas);
+    validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
     if (_isLLC) {
       validationConfig.setReplicasPerPartition(_numReplicas);
     }
