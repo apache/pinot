@@ -50,6 +50,7 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.table.TableType;
@@ -332,6 +333,16 @@ public class PinotSegmentRestletResource {
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
     }
   }
+
+//  @GET
+//  @Path("segments/{tableName}/{segmentName}/status")
+//  @Produces(MediaType.APPLICATION_JSON)
+//  @ApiOperation(value = "Status of segment reload", notes = "Status of segment reload")
+//  public SegmentStatus getSegmentStatus(@ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+//      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName) {
+//
+//  }
+
 
   @Deprecated
   @POST
