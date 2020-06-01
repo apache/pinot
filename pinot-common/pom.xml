@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <reflections.version>0.9.11</reflections.version>
   </properties>
   <build>
     <!-- Antlr stuff -->

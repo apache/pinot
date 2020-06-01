@@ -61,10 +61,10 @@ public class FunctionRegistry {
   }
 
   public static void registerFunction(Method method) {
-    registerFunction(method, method.getName().toLowerCase());
+    registerFunction(method.getName().toLowerCase(), method);
   }
 
-  public static void registerFunction(Method method, String name) {
+  public static void registerFunction(String name, Method method) {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
     _functionInfoMap.put(name, functionInfo);
   }
@@ -85,7 +85,7 @@ public class FunctionRegistry {
         ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
         if (scalarFunction.enabled()) {
           if (!scalarFunction.name().isEmpty()) {
-            FunctionRegistry.registerFunction(method, scalarFunction.name());
+            FunctionRegistry.registerFunction(scalarFunction.name(), method);
           } else {
             FunctionRegistry.registerFunction(method);
           }
