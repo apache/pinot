@@ -72,9 +72,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=pinot_build_env ${PINOT_HOME} ${PINOT_HOME}
-COPY ingestion-job-specs ${PINOT_HOME}/examples/docker/ingestion-job-specs
-COPY table-configs ${PINOT_HOME}/examples/docker/table-configs
 COPY bin ${PINOT_HOME}/bin
+COPY etc ${PINOT_HOME}/etc
+COPY examples ${PINOT_HOME}/examples
 
 # expose ports for controller/broker/server/admin
 EXPOSE 9000 8099 8098 8097 8096
