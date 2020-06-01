@@ -128,9 +128,10 @@ public class TransformFunctionFactory {
           throw new BadQueryRequestException("Unsupported transform function: " + functionName);
         }
         try {
-          transformFunction = transformFunctionClass.newInstance();
           if (functionInfo != null) {
-            ((ScalarTransformFunctionWrapper) transformFunction).setFunction(functionName, functionInfo);
+            transformFunction = new ScalarTransformFunctionWrapper(functionName, functionInfo);
+          } else {
+            transformFunction = transformFunctionClass.newInstance();
           }
         } catch (Exception e) {
           throw new RuntimeException("Caught exception while instantiating transform function: " + functionName, e);

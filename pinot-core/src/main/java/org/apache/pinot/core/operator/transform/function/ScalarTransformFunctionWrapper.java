@@ -49,21 +49,18 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private double[] _doubleResult;
   private long[] _longResult;
 
-  public ScalarTransformFunctionWrapper() {
+  public ScalarTransformFunctionWrapper(String functionName, FunctionInfo info)
+      throws Exception {
     _nonLiteralArgIndices = new ArrayList<>();
     _nonLiteralArgType = new ArrayList<>();
     _nonLiteralTransformFunction = new ArrayList<>();
+    _name = functionName;
+    _functionInvoker = new FunctionInvoker(info);
   }
 
   @Override
   public String getName() {
     return _name;
-  }
-
-  public void setFunction(String functionName, FunctionInfo info)
-      throws Exception {
-    _name = functionName;
-    _functionInvoker = new FunctionInvoker(info);
   }
 
   @Override
@@ -127,23 +124,24 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
     }
 
     Class returnType = _functionInvoker.getReturnType();
-    switch(returnType.getTypeName()) {
+    switch (returnType.getTypeName()) {
       case "java.lang.Integer":
-        _transformResultMetadata =  INT_SV_NO_DICTIONARY_METADATA;
+        _transformResultMetadata = INT_SV_NO_DICTIONARY_METADATA;
         break;
       case "java.lang.Long":
-        _transformResultMetadata =  LONG_SV_NO_DICTIONARY_METADATA;
+        _transformResultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
         break;
       case "java.lang.Float":
       case "java.lang.Double":
-        _transformResultMetadata =  DOUBLE_SV_NO_DICTIONARY_METADATA;
+        _transformResultMetadata = DOUBLE_SV_NO_DICTIONARY_METADATA;
         break;
       case "java.lang.Boolean":
       case "java.lang.String":
-        _transformResultMetadata =  STRING_SV_NO_DICTIONARY_METADATA;
+        _transformResultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
         break;
       default:
-        throw new RuntimeException("Unsupported data type " + returnType.getTypeName() + "for transform function " + getName());
+        throw new RuntimeException(
+            "Unsupported data type " + returnType.getTypeName() + "for transform function " + getName());
     }
   }
 
@@ -258,7 +256,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int k = 0; k < numNonLiteralArgs; k++) {
         _args[_nonLiteralArgIndices.get(k)] = nonLiteralBlockValues[k][i];
       }
-      _stringResult[i] = (String) _functionInvoker.process(_args);
+      _stringResult[i] = String.valueOf(_functionInvoker.process(_args));
     }
 
     return _stringResult;
