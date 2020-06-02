@@ -47,7 +47,7 @@ public class SegmentCompletionProtocolDeserTest {
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
     assertEquals(response.getBuildTimeSeconds(), BUILD_TIME_MILLIS);
-    assertEquals(response.getStreamPartitionMsgOffset().compareTo(OFFSET), 0);
+    assertEquals(new StreamPartitionMsgOffset(response.getStreamPartitionMsgOffset()).compareTo(OFFSET), 0);
     assertEquals(response.getSegmentLocation(), SEGMENT_LOCATION);
     assertTrue(response.isSplitCommit());
     assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
@@ -63,7 +63,7 @@ public class SegmentCompletionProtocolDeserTest {
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
     assertEquals(response.getBuildTimeSeconds(), BUILD_TIME_MILLIS);
-    assertEquals(response.getStreamPartitionMsgOffset().compareTo(OFFSET), 0);
+    assertEquals(new StreamPartitionMsgOffset(response.getStreamPartitionMsgOffset()).compareTo(OFFSET), 0);
     assertNull(response.getSegmentLocation());
     assertFalse(response.isSplitCommit());
     assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);

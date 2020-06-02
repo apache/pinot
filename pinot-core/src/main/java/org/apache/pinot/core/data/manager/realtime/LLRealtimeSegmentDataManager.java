@@ -536,7 +536,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _state = State.HOLDING;
           SegmentCompletionProtocol.Response response = postSegmentConsumedMsg();
           SegmentCompletionProtocol.ControllerResponseStatus status = response.getStatus();
-          StreamPartitionMsgOffset rspOffset = new StreamPartitionMsgOffset(response.getOffset());
+          StreamPartitionMsgOffset rspOffset = response.extractOffset();
           boolean success;
           switch (status) {
             case NOT_LEADER:
