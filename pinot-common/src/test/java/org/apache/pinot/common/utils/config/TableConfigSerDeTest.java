@@ -243,6 +243,17 @@ public class TableConfigSerDeTest {
       checkTableConfigWithUpsertConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
       checkTableConfigWithUpsertConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
+    {
+      // with SegmentsValidationAndRetentionConfig
+      TableConfig tableConfig = tableConfigBuilder.setPeerSegmentDownloadScheme("http").build();
+      checkSegmentsValidationAndRetentionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkSegmentsValidationAndRetentionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+    }
+  }
+
+  private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
+    // TODO validate other fields of SegmentsValidationAndRetentionConfig.
+    assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), "http");
   }
 
   private void checkDefaultTableConfig(TableConfig tableConfig) {

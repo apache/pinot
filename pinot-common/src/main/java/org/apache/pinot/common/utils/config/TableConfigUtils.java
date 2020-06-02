@@ -181,9 +181,15 @@ public class TableConfigUtils {
    * Validates the table config with the following rules:
    * <ul>
    *   <li>Text index column must be raw</li>
+   *   <li>peerSegmentDownloadScheme in ValidationConfig must be http or https</li>
    * </ul>
    */
   public static void validate(TableConfig tableConfig) {
+    validateFieldConfigList(tableConfig);
+    validateValidationConfig(tableConfig);
+  }
+
+  private static void validateFieldConfigList(TableConfig tableConfig) {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       List<String> noDictionaryColumns = tableConfig.getIndexingConfig().getNoDictionaryColumns();
@@ -197,6 +203,18 @@ public class TableConfigUtils {
             throw new IllegalStateException(
                 "Text index column: " + column + " must be raw (no-dictionary) in both FieldConfig and IndexingConfig");
           }
+        }
+      }
+    }
+  }
+
+  private static void validateValidationConfig(TableConfig tableConfig) {
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig != null) {
+      String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
+      if (peerSegmentDownloadScheme != null) {
+        if (!"http".equalsIgnoreCase(peerSegmentDownloadScheme) && !"https".equalsIgnoreCase(peerSegmentDownloadScheme)) {
+          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme + "' for peerSegmentDownloadScheme. Must be one of http nor https" );
         }
       }
     }
