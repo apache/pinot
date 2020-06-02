@@ -1134,6 +1134,11 @@
         <artifactId>commons-net</artifactId>
         <version>${commons-net.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.reflections</groupId>
+        <artifactId>reflections</artifactId>
+        <version>${reflections.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
