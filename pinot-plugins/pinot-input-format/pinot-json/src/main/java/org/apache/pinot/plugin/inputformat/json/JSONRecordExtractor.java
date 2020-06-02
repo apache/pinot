@@ -42,19 +42,28 @@ public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>>
 
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
-    for (String fieldName : _fields) {
-      Object value = from.get(fieldName);
-      // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
-      // DataTypeTransformer fixes it.
-      Object convertedValue;
-      if (value instanceof Collection) {
-        convertedValue = convertMultiValue((Collection) value);
-      } else {
-        convertedValue = convertSingleValue(value);
+    if (_fields == null || _fields.isEmpty()) { // extract all
+      from.forEach((fieldName, value) -> to.putValue(fieldName, convertValue(value)));
+    } else {
+      for (String fieldName : _fields) {
+        Object value = from.get(fieldName);
+        // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
+        // DataTypeTransformer fixes it.
+        Object convertedValue = convertValue(value);
+        to.putValue(fieldName, convertedValue);
       }
-      to.putValue(fieldName, convertedValue);
     }
     return to;
+  }
+
+  private Object convertValue(Object value) {
+    Object convertedValue;
+    if (value instanceof Collection) {
+      convertedValue = convertMultiValue((Collection) value);
+    } else {
+      convertedValue = convertSingleValue(value);
+    }
+    return convertedValue;
   }
 
   /**

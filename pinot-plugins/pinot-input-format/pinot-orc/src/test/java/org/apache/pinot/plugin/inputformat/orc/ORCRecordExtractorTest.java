@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
@@ -47,10 +48,10 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create an ORCRecordReader
    */
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
-    orcRecordReader.init(_dataFile, _sourceFieldNames, null);
+    orcRecordReader.init(_dataFile, fieldsToRead, null);
     return orcRecordReader;
   }
 

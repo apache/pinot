@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
@@ -37,19 +38,19 @@ import org.testng.Assert;
  * Tests the {@link CSVRecordExtractor} using a schema containing groovy transform functions
  */
 public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
-  private static char CSV_MULTI_VALUE_DELIMITER = ';';
+  private static final char CSV_MULTI_VALUE_DELIMITER = ';';
   private final File _dataFile = new File(_tempDir, "events.csv");
 
   /**
    * Create a CSVRecordReader
    */
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, _sourceFieldNames, csvRecordReaderConfig);
+    csvRecordReader.init(_dataFile, fieldsToRead, csvRecordReaderConfig);
     return csvRecordReader;
   }
 

@@ -73,14 +73,6 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
   }
 
   @Override
-  protected org.apache.pinot.spi.data.Schema getPinotSchema()
-      throws IOException {
-    InputStream schemaInputStream = AbstractRecordExtractorTest.class.getClassLoader()
-        .getResourceAsStream("groovy_map_transform_functions_schema.json");
-    return org.apache.pinot.spi.data.Schema.fromInputSteam(schemaInputStream);
-  }
-
-  @Override
   protected Set<String> getSourceFields() {
     return Sets.newHashSet("map1", "map2");
   }
@@ -89,10 +81,10 @@ public class AvroRecordExtractorMapTypeTest extends AbstractRecordExtractorTest 
    * Create an AvroRecordReader
    */
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _sourceFieldNames, null);
+    avroRecordReader.init(_dataFile, fieldsToRead, null);
     return avroRecordReader;
   }
 
