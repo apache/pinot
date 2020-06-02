@@ -188,6 +188,9 @@ public class JsonUtils {
     }
   }
 
+  /**
+   * Converts from a GenericRecord to a json map
+   */
   public static Map<String, Object> genericRecordToJson(GenericRecord genericRecord) {
     try {
       String jsonString = genericRecord.toString();

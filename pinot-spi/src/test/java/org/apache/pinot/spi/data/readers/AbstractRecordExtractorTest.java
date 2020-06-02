@@ -90,6 +90,9 @@ public abstract class AbstractRecordExtractorTest {
     return Sets.newHashSet("user_id", "firstName", "lastName", "bids", "campaignInfo", "cost", "timestamp");
   }
 
+  /**
+   * Set to true if the extractor handles extracting all fields if fieldsToRead is null
+   */
   protected boolean testExtractAll() {
     return false;
   }
