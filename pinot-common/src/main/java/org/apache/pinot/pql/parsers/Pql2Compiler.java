@@ -70,6 +70,7 @@ public class Pql2Compiler implements AbstractCompiler {
       Boolean.valueOf(System.getProperty("pinot.query.converter.validate", "false"));
   public static boolean FAIL_ON_CONVERSION_ERROR =
       Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
+
   private static class ErrorListener extends BaseErrorListener {
 
     @Override
@@ -149,7 +150,7 @@ public class Pql2Compiler implements AbstractCompiler {
     }
   }
 
-  public TransformExpressionTree compileToExpressionTree(String expression) {
+  public AstNode parseToAstNode(String expression) {
     CharStream charStream = new ANTLRInputStream(expression);
     PQL2Lexer lexer = new PQL2Lexer(charStream);
     lexer.setTokenFactory(new CommonTokenFactory(true));
@@ -158,13 +159,13 @@ public class Pql2Compiler implements AbstractCompiler {
     parser.setErrorHandler(new BailErrorStrategy());
 
     // Parse
-    ParseTree parseTree = parser.expression();
-
-    ParseTreeWalker walker = new ParseTreeWalker();
     Pql2AstListener listener = new Pql2AstListener(expression);
-    walker.walk(listener, parseTree);
+    new ParseTreeWalker().walk(listener, parser.expression());
+    return listener.getRootNode();
+  }
 
-    return new TransformExpressionTree(listener.getRootNode());
+  public TransformExpressionTree compileToExpressionTree(String expression) {
+    return new TransformExpressionTree(parseToAstNode(expression));
   }
 
   private void validateHavingClause(AstNode rootNode) {
