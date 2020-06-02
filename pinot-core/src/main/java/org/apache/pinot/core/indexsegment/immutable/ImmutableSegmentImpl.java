@@ -60,7 +60,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public Dictionary getDictionary(String column) {
-    return _indexContainerMap.get(column).getDictionary();
+    ColumnIndexContainer container = _indexContainerMap.get(column);
+    if (container == null) {
+      throw new NullPointerException("Invalid column: " + column);
+    }
+    return container.getDictionary();
   }
 
   @Override
