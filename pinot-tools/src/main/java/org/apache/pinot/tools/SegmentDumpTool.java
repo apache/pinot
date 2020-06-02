@@ -24,9 +24,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.core.common.BlockValIterator;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -39,13 +42,17 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 
 
-public class SegmentDumpTool {
+public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @Argument
+  @Option(name = "-path", required = true, metaVar = "<string>", usage = "Path of the folder containing the segment"
+      + " file")
   private String segmentPath;
 
   @Argument(index = 1, multiValued = true)
+  @Option(name = "-columns", handler = StringArrayOptionHandler.class, usage = "Columns to dump")
   private List<String> columnNames;
 
   @Option(name = "-dumpStarTree")
@@ -55,7 +62,11 @@ public class SegmentDumpTool {
       throws Exception {
     CmdLineParser parser = new CmdLineParser(this);
     parser.parseArgument(args);
+    dump();
+  }
 
+  private void dump()
+      throws Exception {
     File segmentDir = new File(segmentPath);
 
     SegmentMetadata metadata = new SegmentMetadataImpl(segmentDir);
@@ -69,13 +80,13 @@ public class SegmentDumpTool {
     IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
 
     Map<String, Dictionary> dictionaries = new HashMap<>();
-    Map<String, BlockSingleValIterator> iterators = new HashMap<>();
+    Map<String, BlockValIterator> iterators = new HashMap<>();
 
     for (String columnName : columnNames) {
       DataSource dataSource = indexSegment.getDataSource(columnName);
       Block block = dataSource.nextBlock();
       BlockValSet blockValSet = block.getBlockValueSet();
-      BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+      BlockValIterator itr = (BlockValIterator) blockValSet.iterator();
       iterators.put(columnName, itr);
       dictionaries.put(columnName, dataSource.getDictionary());
     }
@@ -91,11 +102,27 @@ public class SegmentDumpTool {
       System.out.print(i);
       System.out.print("\t");
       for (String columnName : columnNames) {
-        BlockSingleValIterator itr = iterators.get(columnName);
-        int encodedValue = itr.nextIntVal();
-        Object value = dictionaries.get(columnName).get(encodedValue);
-        System.out.print(value);
-        System.out.print("\t");
+        BlockValIterator itr = iterators.get(columnName);
+        if (itr instanceof BlockSingleValIterator) {
+          int encodedValue = ((BlockSingleValIterator) itr).nextIntVal();
+          Object value = dictionaries.get(columnName).get(encodedValue);
+          System.out.print(value);
+          System.out.print("\t");
+        } else {
+          BlockMultiValIterator mItr = (BlockMultiValIterator) itr;
+          int maxNumValuesPerMVEntry =
+              indexSegment.getDataSource(columnName).getDataSourceMetadata().getMaxNumValuesPerMVEntry();
+          int[] intArray = new int[maxNumValuesPerMVEntry];
+          int length = mItr.nextIntVal(intArray);
+          System.out.print("[");
+          for (int j = 0; j < length; j++) {
+            System.out.print(dictionaries.get(columnName).get(intArray[j]));
+            if (j != length - 1) {
+              System.out.print(",");
+            }
+          }
+          System.out.print("]");
+        }
       }
       System.out.println();
     }
@@ -116,5 +143,26 @@ public class SegmentDumpTool {
   public static void main(String[] args)
       throws Exception {
     new SegmentDumpTool().doMain(args);
+  }
+
+  public String getName() {
+    return getClass().getSimpleName();
+  }
+
+  @Override
+  public boolean execute()
+      throws Exception {
+    dump();
+    return true;
+  }
+
+  @Override
+  public String description() {
+    return "Dump the segment content of the given path.";
+  }
+
+  @Override
+  public boolean getHelp() {
+    return false;
   }
 }

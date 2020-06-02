@@ -45,7 +45,8 @@ public class PinotToolLauncher {
       @SubCommand(name = "ValidateTableRetention", impl = ValidateTableRetention.class),
       @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class),
       @SubCommand(name = "QueryRunner", impl = QueryRunner.class),
-      @SubCommand(name = "PinotFSBenchmarkRunner", impl = PinotFSBenchmarkRunner.class)
+      @SubCommand(name = "PinotFSBenchmarkRunner", impl = PinotFSBenchmarkRunner.class),
+      @SubCommand(name = "SegmentDump", impl = SegmentDumpTool.class)
   })
   Command _subCommand;
   // @formatter:on
