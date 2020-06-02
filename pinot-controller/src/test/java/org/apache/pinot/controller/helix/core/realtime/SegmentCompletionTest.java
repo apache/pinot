@@ -306,7 +306,13 @@ public class SegmentCompletionTest {
   @Test
   public void testHappyPathSplitCommit()
       throws Exception {
-    testHappyPathSplitCommit(5L);
+    testHappyPathSplitCommit(5L, "location");
+  }
+
+  @Test
+  public void testHappyPathSplitCommitWithPeerDownloadScheme()
+      throws Exception {
+    testHappyPathSplitCommit(5L, "peer:///segment1");
   }
 
   @Test
@@ -426,7 +432,7 @@ public class SegmentCompletionTest {
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
   }
 
-  public void testHappyPathSplitCommit(long startTime)
+  private void testHappyPathSplitCommit(long startTime, String segmentLocation)
       throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
@@ -477,9 +483,8 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
 
     segmentCompletionMgr._seconds += 5;
-    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).
-        withSegmentName(segmentNameStr)
-        .withSegmentLocation("location");
+    params = new Request.Params().withInstanceId(s2).withStreamPartitionMsgOffset(s2Offset.toString()).withSegmentName(segmentNameStr)
+        .withSegmentLocation(segmentLocation);
     response = segmentCompletionMgr
         .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -1230,8 +1235,9 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    public void commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    public String commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       Preconditions.checkState(!committingSegmentDescriptor.getSegmentLocation().equals("doNotCommitMe"));
+      return "final_segment_uri";
     }
 
     @Override

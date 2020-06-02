@@ -1068,9 +1068,14 @@ public class SegmentCompletionManager {
       _state = State.COMMITTING;
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
-      if (isSplitCommit) {
+      // The committingSegmentDescriptor is then updated with the permanent segment location to be saved in metadata
+      // store.
+      // The exception is when the server uses the Peer segment download scheme, in such case, there is no need to
+      // move the segment.
+      if (isSplitCommit && isPeerSegmentDownloadScheme(committingSegmentDescriptor)) {
         try {
-          _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
+          committingSegmentDescriptor.setSegmentLocation(
+              _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor));
         } catch (Exception e) {
           LOGGER.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
               e);
@@ -1089,6 +1094,11 @@ public class SegmentCompletionManager {
       _state = State.COMMITTED;
       LOGGER.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
       return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
+    }
+
+    private boolean isPeerSegmentDownloadScheme(CommittingSegmentDescriptor committingSegmentDescriptor) {
+      return !(committingSegmentDescriptor == null) && !(committingSegmentDescriptor.getSegmentLocation() == null) &&
+          !committingSegmentDescriptor.getSegmentLocation().startsWith("peer");
     }
 
     private SegmentCompletionProtocol.Response processCommitWhileUploading(String instanceId,
