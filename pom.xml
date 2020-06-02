@@ -1241,6 +1241,8 @@
           <configuration>
             <archive>
               <manifestEntries>
+                <Build-Time>${maven.build.timestamp}</Build-Time>
+                <Implementation-Branch>${scmBranch}</Implementation-Branch>
                 <Implementation-Title>${project.artifactId}</Implementation-Title>
                 <Implementation-Version>${project.version}-${buildNumber}</Implementation-Version>
                 <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
