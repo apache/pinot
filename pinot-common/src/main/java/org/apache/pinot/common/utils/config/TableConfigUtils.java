@@ -213,7 +213,7 @@ public class TableConfigUtils {
     if (validationConfig != null) {
       String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
       if (peerSegmentDownloadScheme != null) {
-        if (!"http".equals(peerSegmentDownloadScheme) && !"https".equals(peerSegmentDownloadScheme)) {
+        if (!"http".equalsIgnoreCase(peerSegmentDownloadScheme) && !"https".equalsIgnoreCase(peerSegmentDownloadScheme)) {
           throw new IllegalStateException("peerSegmentDownloadScheme: " + peerSegmentDownloadScheme + " is not http nor https" );
         }
       }
