@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -44,43 +45,18 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exact 2 arguments
-    if (arguments.size() != 2) {
-      throw new IllegalArgumentException("Exact 2 arguments are required for binary operator transform function");
-    }
+    Preconditions
+        .checkArgument(arguments.size() == 2, "Exact 2 arguments are required for binary operator transform function");
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     _leftDataType = _leftTransformFunction.getResultMetadata().getDataType();
     _rightDataType = _rightTransformFunction.getResultMetadata().getDataType();
-    switch (_leftDataType) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-      case STRING:
-        switch (_rightDataType) {
-          case INT:
-          case LONG:
-          case FLOAT:
-          case DOUBLE:
-          case STRING:
-            break;
-          default:
-            throw new IllegalStateException(String.format(
-                "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
-                _leftTransformFunction.getName(), _leftDataType, _rightTransformFunction.getName(), _rightDataType));
-        }
-        break;
-      case BYTES:
-        if (_rightDataType != FieldSpec.DataType.BYTES) {
-          throw new IllegalStateException(String.format(
+    // Data type check: left and right types should be compatible.
+    if (_leftDataType == FieldSpec.DataType.BYTES || _rightDataType == FieldSpec.DataType.BYTES) {
+      Preconditions.checkState(_leftDataType == FieldSpec.DataType.BYTES && _rightDataType == FieldSpec.DataType.BYTES,
+          String.format(
               "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
               _leftTransformFunction.getName(), _leftDataType, _rightTransformFunction.getName(), _rightDataType));
-        }
-        break;
-      default:
-        throw new IllegalStateException(String.format(
-            "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform Function [%s] result type is [%s]]",
-            _leftTransformFunction.getName(), _leftDataType, _rightTransformFunction.getName(), _rightDataType));
     }
   }
 
@@ -125,8 +101,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           case STRING:
             String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(
-                  BigDecimal.valueOf(leftIntValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+              try {
+                _results[i] = getBinaryFuncResult(
+                    BigDecimal.valueOf(leftIntValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
             }
             break;
           default:
@@ -167,8 +147,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           case STRING:
             String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(
-                  BigDecimal.valueOf(leftLongValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+              try {
+                _results[i] = getBinaryFuncResult(
+                    BigDecimal.valueOf(leftLongValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
             }
             break;
           default:
@@ -208,8 +192,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           case STRING:
             String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(
-                  BigDecimal.valueOf(leftFloatValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+              try {
+                _results[i] = getBinaryFuncResult(
+                    BigDecimal.valueOf(leftFloatValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
             }
             break;
           default:
@@ -249,8 +237,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           case STRING:
             String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(
-                  BigDecimal.valueOf(leftDoubleValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+              try {
+                _results[i] = getBinaryFuncResult(
+                    BigDecimal.valueOf(leftDoubleValues[i]).compareTo(new BigDecimal(rightStringValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
             }
             break;
           default:
@@ -265,29 +257,45 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           case INT:
             int[] rightIntValues = _rightTransformFunction.transformToIntValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(
-                  new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightIntValues[i])));
+              try {
+                _results[i] = getBinaryFuncResult(
+                    new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightIntValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
             }
             break;
           case LONG:
             long[] rightLongValues = _rightTransformFunction.transformToLongValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(
-                  new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightLongValues[i])));
+              try {
+                _results[i] = getBinaryFuncResult(
+                    new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightLongValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
             }
             break;
           case FLOAT:
             float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(
-                  new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightFloatValues[i])));
+              try {
+                _results[i] = getBinaryFuncResult(
+                    new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightFloatValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
             }
             break;
           case DOUBLE:
             double[] rightDoubleValues = _rightTransformFunction.transformToDoubleValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(
-                  new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightDoubleValues[i])));
+              try {
+                _results[i] = getBinaryFuncResult(
+                    new BigDecimal(leftStringValues[i]).compareTo(BigDecimal.valueOf(rightDoubleValues[i])));
+              } catch (NumberFormatException e) {
+                _results[i] = 0;
+              }
             }
             break;
           case STRING:
