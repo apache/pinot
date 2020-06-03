@@ -486,11 +486,6 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testName() {
-
-  }
-
-  @Test
   public void testEndCriteriaChecking()
       throws Exception {
     // test reaching max row limit
