@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -406,8 +407,8 @@ public class ObjectSerDeUtils {
 
     private ByteBuffer sliceByteBuffer(ByteBuffer byteBuffer, int size) {
       ByteBuffer slice = byteBuffer.slice();
-      slice.limit(size);
-      byteBuffer.position(byteBuffer.position() + size);
+      ((Buffer) slice).limit(size);
+      ((Buffer) byteBuffer).position(byteBuffer.position() + size);
       return slice;
     }
   };

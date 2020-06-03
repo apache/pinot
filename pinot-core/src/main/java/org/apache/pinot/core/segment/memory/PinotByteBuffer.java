@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.memory;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
@@ -231,7 +232,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
       }
     } else {
       ByteBuffer duplicate = _buffer.duplicate();
-      duplicate.position(intOffset);
+      ((Buffer) duplicate).position(intOffset);
       duplicate.get(buffer, destOffset, size);
     }
   }
@@ -243,7 +244,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     int start = (int) offset;
     int end = start + (int) size;
     ByteBuffer duplicate = _buffer.duplicate();
-    duplicate.position(start).limit(end);
+    ((Buffer) duplicate).position(start).limit(end);
     buffer.readFrom(destOffset, duplicate);
   }
 
@@ -258,7 +259,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
       }
     } else {
       ByteBuffer duplicate = _buffer.duplicate();
-      duplicate.position(intOffset);
+      ((Buffer) duplicate).position(intOffset);
       duplicate.put(buffer, srcOffset, size);
     }
   }
@@ -267,7 +268,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   public void readFrom(long offset, ByteBuffer buffer) {
     assert offset <= Integer.MAX_VALUE;
     ByteBuffer duplicate = _buffer.duplicate();
-    duplicate.position((int) offset);
+    ((Buffer) duplicate).position((int) offset);
     duplicate.put(buffer);
   }
 
@@ -280,7 +281,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
       ByteBuffer duplicate = _buffer.duplicate();
       int start = (int) offset;
       int end = start + (int) size;
-      duplicate.position(start).limit(end);
+      ((Buffer) duplicate).position(start).limit(end);
       randomAccessFile.getChannel().read(duplicate, srcOffset);
     }
   }
@@ -300,7 +301,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     assert start <= end;
     assert end <= Integer.MAX_VALUE;
     ByteBuffer duplicate = _buffer.duplicate();
-    duplicate.position((int) start).limit((int) end);
+    ((Buffer) duplicate).position((int) start).limit((int) end);
     ByteBuffer buffer = duplicate.slice();
     buffer.order(byteOrder);
     return new PinotByteBuffer(buffer, false, false);
@@ -312,7 +313,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     int start = (int) offset;
     int end = start + size;
     ByteBuffer duplicate = _buffer.duplicate();
-    duplicate.position(start).limit(end);
+    ((Buffer) duplicate).position(start).limit(end);
     ByteBuffer buffer = duplicate.slice();
     buffer.order(byteOrder);
     return buffer;

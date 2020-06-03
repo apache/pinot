@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -119,7 +120,7 @@ public class DataTableImplV2 implements DataTable {
     // Read dictionary.
     if (dictionaryMapLength != 0) {
       byte[] dictionaryMapBytes = new byte[dictionaryMapLength];
-      byteBuffer.position(dictionaryMapStart);
+      ((Buffer) byteBuffer).position(dictionaryMapStart);
       byteBuffer.get(dictionaryMapBytes);
       _dictionaryMap = deserializeDictionaryMap(dictionaryMapBytes);
     } else {
@@ -128,14 +129,14 @@ public class DataTableImplV2 implements DataTable {
 
     // Read metadata.
     byte[] metadataBytes = new byte[metadataLength];
-    byteBuffer.position(metadataStart);
+    ((Buffer) byteBuffer).position(metadataStart);
     byteBuffer.get(metadataBytes);
     _metadata = deserializeMetadata(metadataBytes);
 
     // Read data schema.
     if (dataSchemaLength != 0) {
       byte[] schemaBytes = new byte[dataSchemaLength];
-      byteBuffer.position(dataSchemaStart);
+      ((Buffer) byteBuffer).position(dataSchemaStart);
       byteBuffer.get(schemaBytes);
       _dataSchema = DataSchema.fromBytes(schemaBytes);
       _columnOffsets = new int[_dataSchema.size()];
@@ -149,7 +150,7 @@ public class DataTableImplV2 implements DataTable {
     // Read fixed size data.
     if (fixedSizeDataLength != 0) {
       _fixedSizeDataBytes = new byte[fixedSizeDataLength];
-      byteBuffer.position(fixedSizeDataStart);
+      ((Buffer) byteBuffer).position(fixedSizeDataStart);
       byteBuffer.get(_fixedSizeDataBytes);
       _fixedSizeData = ByteBuffer.wrap(_fixedSizeDataBytes);
     } else {
@@ -160,7 +161,7 @@ public class DataTableImplV2 implements DataTable {
     // Read variable size data.
     if (variableSizeDataLength != 0) {
       _variableSizeDataBytes = new byte[variableSizeDataLength];
-      byteBuffer.position(variableSizeDataStart);
+      ((Buffer) byteBuffer).position(variableSizeDataStart);
       byteBuffer.get(_variableSizeDataBytes);
       _variableSizeData = ByteBuffer.wrap(_variableSizeDataBytes);
     } else {
@@ -361,31 +362,31 @@ public class DataTableImplV2 implements DataTable {
 
   @Override
   public int getInt(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
+    ((Buffer) _fixedSizeData).position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getInt();
   }
 
   @Override
   public long getLong(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
+    ((Buffer) _fixedSizeData).position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getLong();
   }
 
   @Override
   public float getFloat(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
+    ((Buffer) _fixedSizeData).position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getFloat();
   }
 
   @Override
   public double getDouble(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
+    ((Buffer) _fixedSizeData).position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getDouble();
   }
 
   @Override
   public String getString(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
+    ((Buffer) _fixedSizeData).position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     int dictId = _fixedSizeData.getInt();
     return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
   }
@@ -401,7 +402,7 @@ public class DataTableImplV2 implements DataTable {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
     ByteBuffer byteBuffer = _variableSizeData.slice();
-    byteBuffer.limit(size);
+    ((Buffer) byteBuffer).limit(size);
     return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
   }
 
@@ -457,8 +458,8 @@ public class DataTableImplV2 implements DataTable {
   }
 
   private int positionCursorInVariableBuffer(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    _variableSizeData.position(_fixedSizeData.getInt());
+    ((Buffer) _fixedSizeData).position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
+    ((Buffer) _variableSizeData).position(_fixedSizeData.getInt());
     return _fixedSizeData.getInt();
   }
 
@@ -472,7 +473,7 @@ public class DataTableImplV2 implements DataTable {
     stringBuilder.append(_dataSchema.toString()).append('\n');
     stringBuilder.append("numRows: ").append(_numRows).append('\n');
 
-    _fixedSizeData.position(0);
+    ((Buffer) _fixedSizeData).position(0);
     for (int rowId = 0; rowId < _numRows; rowId++) {
       for (int colId = 0; colId < _numColumns; colId++) {
         switch (_dataSchema.getColumnDataType(colId)) {

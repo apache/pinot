@@ -22,6 +22,7 @@ import com.google.common.primitives.Ints;
 import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -300,7 +301,7 @@ public class SegmentGenerationWithBytesTypeTest {
         tDigest.asBytes(buffer);
         _fixedExpected.add(buffer.array());
 
-        buffer.flip();
+        ((Buffer) buffer).flip();
         record.put(FIXED_BYTES_UNSORTED_COLUMN, buffer);
 
         if (i % 2 == 0) {
@@ -311,7 +312,7 @@ public class SegmentGenerationWithBytesTypeTest {
         tDigest.asBytes(buffer);
         _varExpected.add(buffer.array());
 
-        buffer.flip();
+        ((Buffer) buffer).flip();
         record.put(VARIABLE_BYTES_COLUMN, buffer);
 
         recordWriter.append(record);

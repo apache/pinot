@@ -19,6 +19,7 @@
 package org.apache.pinot.core.io.reader.impl.v1;
 
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.compression.ChunkDecompressor;
@@ -123,7 +124,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     }
 
     ByteBuffer decompressedBuffer = context.getChunkBuffer();
-    decompressedBuffer.clear();
+    ((Buffer) decompressedBuffer).clear();
 
     try {
       _chunkDecompressor.decompress(_dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize), decompressedBuffer);

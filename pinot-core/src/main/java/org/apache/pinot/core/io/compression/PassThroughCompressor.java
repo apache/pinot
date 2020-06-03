@@ -19,6 +19,7 @@
 package org.apache.pinot.core.io.compression;
 
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 
@@ -35,7 +36,7 @@ public class PassThroughCompressor implements ChunkCompressor {
     outCompressed.put(inUncompressed);
 
     // Make the output ByteBuffer read for read.
-    outCompressed.flip();
+    ((Buffer) outCompressed).flip();
     return outCompressed.limit();
   }
 }
