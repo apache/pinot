@@ -34,15 +34,19 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
   private Set<String> _fields;
+  private boolean _extractAll = false;
 
   @Override
   public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
+    if (fields == null || fields.isEmpty()) {
+      _extractAll = true;
+    }
   }
 
   @Override
   public GenericRow extract(GenericRecord from, GenericRow to) {
-    if (_fields == null || _fields.isEmpty()) { // extract all
+    if (_extractAll) {
       Map<String, Object> jsonMap = JsonUtils.genericRecordToJson(from);
       jsonMap.forEach((fieldName, value) -> to.putValue(fieldName, RecordReaderUtils.convert(value)));
     } else {
