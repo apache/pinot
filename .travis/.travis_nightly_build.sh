@@ -27,5 +27,5 @@ if [ -n "${DEPLOY_BUILD_OPTS}" ]; then
   mvn versions:commit -q -B
 
   # Deploy to bintray
-  mvn deploy -s .travis/.ci.settings.xml -DskipTests -q -DretryFailedDeploymentCount=5
+  mvn deploy -s .travis/.ci.settings.xml -DskipTests -q -DretryFailedDeploymentCount=5 -DaltDeploymentRepository=bintray-linkedin-maven::default::'https://api.bintray.com/maven/linkedin/maven/pinot/;publish=1;override=1'
 fi
