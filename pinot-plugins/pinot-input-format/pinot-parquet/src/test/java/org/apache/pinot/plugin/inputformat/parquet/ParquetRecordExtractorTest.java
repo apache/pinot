@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -47,10 +48,10 @@ public class ParquetRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create a ParquetRecordReader
    */
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     ParquetRecordReader recordReader = new ParquetRecordReader();
-    recordReader.init(_dataFile, _sourceFieldNames, null);
+    recordReader.init(_dataFile, fieldsToRead, null);
     return recordReader;
   }
 

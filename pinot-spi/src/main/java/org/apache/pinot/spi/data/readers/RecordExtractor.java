@@ -30,7 +30,7 @@ public interface RecordExtractor<T> {
   /**
    * Initialize the record extractor with its config
    *
-   * @param fields List of field names to extract from the provided input record
+   * @param fields List of field names to extract from the provided input record. If blank, extracts all fields (only for AVRO/JSON currently)
    * @param recordExtractorConfig The record extractor config
    */
   void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig);

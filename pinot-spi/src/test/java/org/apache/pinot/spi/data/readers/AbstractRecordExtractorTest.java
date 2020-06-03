@@ -43,28 +43,23 @@ import org.testng.annotations.Test;
  */
 public abstract class AbstractRecordExtractorTest {
 
-  protected Schema _pinotSchema;
   protected Set<String> _sourceFieldNames;
   protected List<Map<String, Object>> _inputRecords;
   private RecordReader _recordReader;
+  private RecordReader _recordReaderNoIncludeList;
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordTransformationTest");
 
   @BeforeClass
   public void setup()
       throws IOException {
     FileUtils.forceMkdir(_tempDir);
-    _pinotSchema = getPinotSchema();
     _sourceFieldNames = getSourceFields();
     _inputRecords = getInputRecords();
     createInputFile();
-    _recordReader = createRecordReader();
-  }
-
-  protected Schema getPinotSchema()
-      throws IOException {
-    InputStream schemaInputStream = AbstractRecordExtractorTest.class.getClassLoader()
-        .getResourceAsStream("groovy_transform_functions_schema.json");
-    return Schema.fromInputSteam(schemaInputStream);
+    _recordReader = createRecordReader(_sourceFieldNames);
+    if (testExtractAll()) {
+      _recordReaderNoIncludeList = createRecordReader(null);
+    }
   }
 
   protected List<Map<String, Object>> getInputRecords() {
@@ -95,13 +90,20 @@ public abstract class AbstractRecordExtractorTest {
     return Sets.newHashSet("user_id", "firstName", "lastName", "bids", "campaignInfo", "cost", "timestamp");
   }
 
+  /**
+   * Set to true if the extractor handles extracting all fields if fieldsToRead is null
+   */
+  protected boolean testExtractAll() {
+    return false;
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
     FileUtils.forceDelete(_tempDir);
   }
 
-  protected abstract RecordReader createRecordReader()
+  protected abstract RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException;
 
   protected abstract void createInputFile()
@@ -149,6 +151,15 @@ public abstract class AbstractRecordExtractorTest {
       _recordReader.next(genericRow);
       Map<String, Object> inputRecord = _inputRecords.get(i++);
       checkValue(inputRecord, genericRow);
+    }
+    if (_recordReaderNoIncludeList != null) {
+      _recordReaderNoIncludeList.rewind();
+      i = 0;
+      while (_recordReaderNoIncludeList.hasNext()) {
+        _recordReaderNoIncludeList.next(genericRow);
+        Map<String, Object> inputRecord = _inputRecords.get(i++);
+        checkValue(inputRecord, genericRow);
+      }
     }
   }
 }

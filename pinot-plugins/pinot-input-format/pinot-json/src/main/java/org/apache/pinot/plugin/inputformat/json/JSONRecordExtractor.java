@@ -34,27 +34,40 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>> {
 
   private Set<String> _fields;
+  private boolean _extractAll = false;
 
   @Override
   public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
+    if (fields == null || fields.isEmpty()) {
+      _extractAll = true;
+    }
   }
 
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
-    for (String fieldName : _fields) {
-      Object value = from.get(fieldName);
-      // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
-      // DataTypeTransformer fixes it.
-      Object convertedValue;
-      if (value instanceof Collection) {
-        convertedValue = convertMultiValue((Collection) value);
-      } else {
-        convertedValue = convertSingleValue(value);
+    if (_extractAll) {
+      from.forEach((fieldName, value) -> to.putValue(fieldName, convertValue(value)));
+    } else {
+      for (String fieldName : _fields) {
+        Object value = from.get(fieldName);
+        // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
+        // DataTypeTransformer fixes it.
+        Object convertedValue = convertValue(value);
+        to.putValue(fieldName, convertedValue);
       }
-      to.putValue(fieldName, convertedValue);
     }
     return to;
+  }
+
+  private Object convertValue(Object value) {
+    Object convertedValue;
+    if (value instanceof Collection) {
+      convertedValue = convertMultiValue((Collection) value);
+    } else {
+      convertedValue = convertSingleValue(value);
+    }
+    return convertedValue;
   }
 
   /**

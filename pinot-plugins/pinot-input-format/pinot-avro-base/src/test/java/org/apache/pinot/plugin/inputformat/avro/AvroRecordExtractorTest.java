@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -45,10 +46,10 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create an AvroRecordReader
    */
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _sourceFieldNames, null);
+    avroRecordReader.init(_dataFile, fieldsToRead, null);
     return avroRecordReader;
   }
 
@@ -80,5 +81,10 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
         fileWriter.append(record);
       }
     }
+  }
+
+  @Override
+  protected boolean testExtractAll() {
+    return true;
   }
 }

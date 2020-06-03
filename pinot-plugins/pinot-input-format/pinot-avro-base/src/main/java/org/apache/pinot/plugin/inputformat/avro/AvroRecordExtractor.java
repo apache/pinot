@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -31,18 +34,27 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
  */
 public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
   private Set<String> _fields;
+  private boolean _extractAll = false;
 
   @Override
   public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     _fields = fields;
+    if (fields == null || fields.isEmpty()) {
+      _extractAll = true;
+    }
   }
 
   @Override
   public GenericRow extract(GenericRecord from, GenericRow to) {
-    for (String fieldName : _fields) {
-      Object value = from.get(fieldName);
-      Object convertedValue = AvroUtils.convert(value);
-      to.putValue(fieldName, convertedValue);
+    if (_extractAll) {
+      Map<String, Object> jsonMap = JsonUtils.genericRecordToJson(from);
+      jsonMap.forEach((fieldName, value) -> to.putValue(fieldName, RecordReaderUtils.convert(value)));
+    } else {
+      for (String fieldName : _fields) {
+        Object value = from.get(fieldName);
+        Object convertedValue = AvroUtils.convert(value);
+        to.putValue(fieldName, convertedValue);
+      }
     }
     return to;
   }

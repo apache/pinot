@@ -23,13 +23,14 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * Tests the {@link JSONRecordExtractor} using a schema containing groovy transform functions
+ * Tests the {@link JSONRecordExtractor}
  */
 public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
 
@@ -39,10 +40,10 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create a JSONRecordReader
    */
   @Override
-  protected RecordReader createRecordReader()
+  protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dataFile, _sourceFieldNames, null);
+    recordReader.init(_dataFile, fieldsToRead, null);
     return recordReader;
   }
 
@@ -61,5 +62,10 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
         fileWriter.write(jsonRecord.toString());
       }
     }
+  }
+
+  @Override
+  protected boolean testExtractAll() {
+    return true;
   }
 }
