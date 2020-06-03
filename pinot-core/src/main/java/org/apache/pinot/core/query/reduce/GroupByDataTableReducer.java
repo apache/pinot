@@ -193,7 +193,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       int index = _numGroupBy;
       int aggNum = 0;
       while (index < _numColumns) {
-        values[index] = _aggregationFunctions[aggNum++].extractFinalResult(values[index]);
+        values[index] = AggregationFunctionUtils.getSerializableValue(_aggregationFunctions[aggNum++].extractFinalResult(values[index]));
         index++;
       }
       if (_sqlSelectionList != null) {

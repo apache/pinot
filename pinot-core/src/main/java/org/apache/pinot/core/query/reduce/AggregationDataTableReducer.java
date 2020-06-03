@@ -112,7 +112,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     int numAggregationFunctions = _aggregationFunctions.length;
     Object[] row = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      row[i] = _aggregationFunctions[i].extractFinalResult(intermediateResults[i]);
+      row[i] = AggregationFunctionUtils.getSerializableValue(_aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
     }
     rows.add(row);
 
