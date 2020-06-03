@@ -44,6 +44,7 @@ import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -142,8 +143,8 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
     ServerSegmentCompletionProtocolHandler protocolHandler =
         new ServerSegmentCompletionProtocolHandler(new ServerMetrics(new MetricsRegistry()), realtimeTableName);
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withOffset(45688L).withSegmentName(_currentSegment).withReason("RandomReason")
-        .withInstanceId(_serverInstance);
+    params.withStreamPartitionMsgOffset(new StreamPartitionMsgOffset(45688L)).withSegmentName(_currentSegment)
+        .withReason("RandomReason") .withInstanceId(_serverInstance);
     SegmentCompletionProtocol.Response response = protocolHandler.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
 

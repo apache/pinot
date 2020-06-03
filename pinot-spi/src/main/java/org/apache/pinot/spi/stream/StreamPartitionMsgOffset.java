@@ -42,6 +42,15 @@ public class StreamPartitionMsgOffset implements Comparable {
     _offset = offset;
   }
 
+  /**
+   * This constructor will go away when this class becomes an interface
+   * @param offsetStr
+   */
+  @Deprecated
+  public StreamPartitionMsgOffset(String offsetStr) {
+    _offset = Long.parseLong(offsetStr);
+  }
+
   @Deprecated
   public void setOffset(long offset) {
     _offset = offset;
