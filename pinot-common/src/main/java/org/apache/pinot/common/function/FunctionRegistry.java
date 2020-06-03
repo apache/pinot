@@ -22,12 +22,20 @@ import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.common.function.annotations.ScalarFunction;
+import org.reflections.Reflections;
+import org.reflections.scanners.MethodAnnotationsScanner;
+import org.reflections.scanners.SubTypesScanner;
+import org.reflections.scanners.TypeAnnotationsScanner;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Registry for inbuilt Pinot functions
+ * Registry for in-built Pinot functions
  */
 public class FunctionRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
@@ -53,8 +61,12 @@ public class FunctionRegistry {
   }
 
   public static void registerFunction(Method method) {
+    registerFunction(method.getName().toLowerCase(), method);
+  }
+
+  public static void registerFunction(String name, Method method) {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
-    _functionInfoMap.put(method.getName().toLowerCase(), functionInfo);
+    _functionInfoMap.put(name, functionInfo);
   }
 
   public static boolean containsFunctionByName(String funcName) {
@@ -63,34 +75,24 @@ public class FunctionRegistry {
 
   static {
     try {
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochSeconds", Long.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutes", Long.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHours", Long.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDays", Long.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochSecondsRounded", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutesRounded", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHoursRounded", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDaysRounded", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochSecondsBucket", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochMinutesBucket", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochHoursBucket", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toEpochDaysBucket", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochSeconds", Long.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochMinutes", Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochHours", Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochDays", Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochSecondsBucket", Long.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochMinutesBucket", Number.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochHoursBucket", Number.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromEpochDaysBucket", Number.class, Number.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("toDateTime", Long.class, String.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("fromDateTime", String.class, String.class));
-      FunctionRegistry.registerFunction(DateTimeFunctions.class.getDeclaredMethod("now"));
 
-      FunctionRegistry.registerFunction(JsonFunctions.class.getDeclaredMethod("toJsonMapStr", Map.class));
+      Reflections reflections = new Reflections(
+          new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
+              .setScanners(new MethodAnnotationsScanner()));
 
-      FunctionRegistry.registerFunction(StringFunctions.class.getDeclaredMethod("reverse", String.class));
-    } catch (NoSuchMethodException e) {
+      Set<Method> methodSet = reflections.getMethodsAnnotatedWith(ScalarFunction.class);
+      for (Method method : methodSet) {
+        ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
+        if (scalarFunction.enabled()) {
+          if (!scalarFunction.name().isEmpty()) {
+            FunctionRegistry.registerFunction(scalarFunction.name(), method);
+          } else {
+            FunctionRegistry.registerFunction(method);
+          }
+        }
+      }
+
+    } catch (Exception e) {
       LOGGER.error("Caught exception when registering function", e);
       throw new IllegalStateException(e);
     }

@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
@@ -65,7 +67,8 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.SQRT.getName().toLowerCase(), SqrtTransformFunction.class);
 
           put(TransformFunctionType.CAST.getName().toLowerCase(), CastTransformFunction.class);
-          put(TransformFunctionType.JSONEXTRACTSCALAR.getName().toLowerCase(), JsonExtractScalarTransformFunction.class);
+          put(TransformFunctionType.JSONEXTRACTSCALAR.getName().toLowerCase(),
+              JsonExtractScalarTransformFunction.class);
           put(TransformFunctionType.JSONEXTRACTKEY.getName().toLowerCase(), JsonExtractKeyTransformFunction.class);
           put(TransformFunctionType.TIMECONVERT.getName().toLowerCase(), TimeConversionTransformFunction.class);
           put(TransformFunctionType.DATETIMECONVERT.getName().toLowerCase(), DateTimeConversionTransformFunction.class);
@@ -112,13 +115,25 @@ public class TransformFunctionFactory {
     switch (expression.getExpressionType()) {
       case FUNCTION:
         String functionName = expression.getValue();
-        Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
+        Class<? extends TransformFunction> transformFunctionClass;
+        FunctionInfo functionInfo = null;
+        if (FunctionRegistry.containsFunctionByName(functionName)) {
+          transformFunctionClass = ScalarTransformFunctionWrapper.class;
+          functionInfo = FunctionRegistry.getFunctionByName(functionName);
+        } else {
+          transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
+        }
+
         if (transformFunctionClass == null) {
           throw new BadQueryRequestException("Unsupported transform function: " + functionName);
         }
         try {
-          transformFunction = transformFunctionClass.newInstance();
-        } catch (InstantiationException | IllegalAccessException e) {
+          if (functionInfo != null) {
+            transformFunction = new ScalarTransformFunctionWrapper(functionName, functionInfo);
+          } else {
+            transformFunction = transformFunctionClass.newInstance();
+          }
+        } catch (Exception e) {
           throw new RuntimeException("Caught exception while instantiating transform function: " + functionName, e);
         }
         List<TransformExpressionTree> children = expression.getChildren();

@@ -16,34 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function;
+package org.apache.pinot.common.function.annotations;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import java.util.Map;
-import org.apache.pinot.common.function.annotations.ScalarFunction;
-import org.apache.pinot.spi.utils.JsonUtils;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 
 /**
- * Inbuilt json related transform functions
- *   An example DimFieldSpec that needs the toJsonMapStr function:
- *   <code>
- *     "dimFieldSpecs": [{
- *       "name": "jsonMapStr",
- *       "dataType": "STRING",
- *       "transformFunction": "toJsonMapStr(jsonMap)"
- *     }]
- *   </code>
+ * Annotation Class for Scalar Functions
+ * Methods annotated using the interface are registered in the FunctionsRegistry
+ * and can be used as UDFs during Querying
  */
-public class JsonFunctions {
-
-  /**
-   * Convert Map to Json String
-   */
-  @ScalarFunction
-  static String toJsonMapStr(Map map)
-      throws JsonProcessingException {
-    return JsonUtils.objectToString(map);
-  }
-
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface ScalarFunction {
+    boolean enabled() default true;
+    String name() default "";
 }

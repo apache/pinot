@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
@@ -69,6 +70,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String FLOAT_SV_COLUMN = "floatSV";
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
+  protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
   protected static final String INT_MV_COLUMN = "intMV";
   protected static final String TIME_COLUMN = "time";
   protected static final String JSON_COLUMN = "json";
@@ -77,6 +79,7 @@ public abstract class BaseTransformFunctionTest {
   protected final float[] _floatSVValues = new float[NUM_ROWS];
   protected final double[] _doubleSVValues = new double[NUM_ROWS];
   protected final String[] _stringSVValues = new String[NUM_ROWS];
+  protected final String[] _stringAlphaNumericSVValues = new String[NUM_ROWS];
   protected final int[][] _intMVValues = new int[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
   protected final String[] _jsonValues = new String[NUM_ROWS];
@@ -97,6 +100,7 @@ public abstract class BaseTransformFunctionTest {
       _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
+      _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
 
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];
@@ -116,6 +120,7 @@ public abstract class BaseTransformFunctionTest {
       map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
+      map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
@@ -130,6 +135,7 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT)
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
