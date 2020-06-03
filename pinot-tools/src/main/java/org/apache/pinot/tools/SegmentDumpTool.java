@@ -121,7 +121,7 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
               System.out.print(",");
             }
           }
-          System.out.print("]");
+          System.out.print("]\t");
         }
       }
       System.out.println();
