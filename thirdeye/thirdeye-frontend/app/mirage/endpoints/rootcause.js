@@ -97,6 +97,17 @@ export default function(server) {
   });
 
   /**
+   * Retrieves the options for autocomplete for 'dimension' dropdown
+   */
+  server.get('/data/autocomplete/dimensions/metric/1', () => {
+    return [
+      'all',
+      'android',
+      'ios',
+    ];
+  });
+
+  /**
    * Retrieves information about a metric
    */
   server.get('/data/metric/1', () => {

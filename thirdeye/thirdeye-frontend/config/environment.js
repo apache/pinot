@@ -36,6 +36,10 @@ module.exports = function(environment) {
       url: 'https://your-piwik.endpoint.com'
     },
 
+    'ember-d3': {
+      bundle: true
+    },
+
     docs: {
       createAlert: "/link/to/create/alert/wiki",
       detectionConfig: "/link/to/DetectionConfiguration/wiki",

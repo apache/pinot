@@ -109,9 +109,14 @@ export default Component.extend({
       const domElem = $(dimensionPlaceHolderId);
       const height = domElem.height();
       const width = domElem.width();
-      const treeMap = d3.layout.treemap()
-        .size([width, height])
-        .sort((a, b) => b.index - a.index);
+
+      // initialize treemap
+      const treeMap = data => d3.treemap()
+        // with given size
+        .size([width, height])(d3.hierarchy(data)
+          // sorted by index
+          .sum(d => d.value)
+          .sort((a, b) => b.index - a.index));
 
       const div = d3.select(dimensionPlaceHolderId)
         .attr('class', 'heatmap')
@@ -121,10 +126,12 @@ export default Component.extend({
         .append('svg:g')
         .attr('transform', 'translate(.5,.5)');
 
-      const nodes = treeMap
-        .nodes({ name: '0', children: children })
+      // Pass root with children
+      const nodes = treeMap({name: '0', children: children})
+        // specify children of treemap
+        .children
+        // only nodes which don't have children 
         .filter((node) => !node.children);
-
       this._createCell(div, nodes, tooltipId);
     });
   },
@@ -138,11 +145,11 @@ export default Component.extend({
       .enter()
       .append('svg:g')
       .attr('class', 'heatmap-chart__cell')
-      .attr('transform', d => `translate(${d.x},${d.y})`);
+      .attr('transform', d => `translate(${d.x0},${d.y0})`);
 
     // tooltip
     cell.on('mousemove', (d) => {
-      if (d && d.role !== 'value') {
+      if (d && d.data && d.data.role !== 'value') {
         return;
       }
 
@@ -154,8 +161,8 @@ export default Component.extend({
         .style('left', xPosition + 'px')
         .style('top', yPosition + 'px');
 
-      Object.keys(d).forEach(key => {
-        d3.select(`${tooltipId} #${key}`).text(d[key]);
+      Object.keys(d.data).forEach(key => {
+        d3.select(`${tooltipId} #${key}`).text(d.data[key]);
       });
 
       d3.select(`${tooltipId}`).classed('hidden', false);
@@ -167,33 +174,33 @@ export default Component.extend({
 
     // colored background
     cell.append('svg:rect')
-      .attr('width', d => Math.max(d.dx - 1, 0))
-      .attr('height', d => Math.max(d.dy - 1, 0))
-      .style('fill', d => getBackgroundColor(d.actualValue, d.inverse));
+      .attr('width', d => Math.max(d.x1 - d.x0 - 1, 0))
+      .attr('height', d => Math.max(d.y1 - d.y0 - 1, 0))
+      .style('fill', d => getBackgroundColor(d.data.actualValue, d.data.inverse));
 
     // colored text
     cell.append('svg:text')
-      .attr('x', d => (d.dx / 2))
-      .attr('y', d => (d.dy / 2))
+      .attr('x', d => ((d.x1 - d.x0) / 2))
+      .attr('y', d => ((d.y1 - d.y0) / 2))
       .attr('dy', '.35em')
       .attr('text-anchor', 'middle')
       .text((d) => {
-        const text = d.label || '';
+        const text = d.data.label || '';
 
         //each character takes up 7 pixels on an average
         const estimatedTextLength = text.length * 7;
-        if (estimatedTextLength > d.dx) {
-          return text.substring(0, d.dx / 7) + '..';
+        if (estimatedTextLength > (d.x1 - d.x0)) {
+          return text.substring(0, (d.x1 - d.x0) / 7) + '..';
         } else {
           return text;
         }
       })
       .style('fill', (d) => {
         // return default color for icons
-        if (d.role !== 'value') {
+        if (d.data.role !== 'value') {
           return 'rgba(0,0,0,0.45)';
         }
-        return getTextColor(d.actualValue, d.inverse);
+        return getTextColor(d.data.actualValue, d.data.inverse);
       });
 
     cell.on('click', get(this, 'includeHandler').bind(this));

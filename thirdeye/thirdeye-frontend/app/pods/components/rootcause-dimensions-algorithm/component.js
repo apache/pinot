@@ -223,13 +223,16 @@ export default Component.extend({
 
       // Build new dimension array for display as table rows
       if (dimensionRows.length) {
+        let totalCost = 0;
+        dimensionRows.map(record => totalCost += record.cost);
         dimensionRows.forEach((record, index) => {
           let {
             dimensionArr, // Generate array of cell-specific objects for each dimension
             dimensionUrn // Generate URN for each record from dimension names/values
           } = this._generateDimensionMeta(dimensionNames, record);
           let nodeSize = (record.sizeFactor || 0) * 100;
-          nodeSize = `${nodeSize.toFixed(4)}%`;
+          let cost = (totalCost !== 0) ? (record.cost || 0) / totalCost : (record.cost || 0);
+          cost = cost * 100;
           // New records of template-ready data
           newDimensionRows.push({
             id: index + 1,
@@ -239,10 +242,15 @@ export default Component.extend({
             dimensions: dimensionNames,
             isSelected: selectedUrns.has(dimensionUrn),
             percentageChange: record.percentageChange,
-            nodeSize,
-            cost: record.cost.toFixed(4),
+            percentageChangeNum: parseFloat(record.percentageChange),
+            nodeSize: `${nodeSize.toFixed(4)}%`,
+            nodeSizeNum: parseFloat(nodeSize),
+            cost: `${cost.toFixed(4)}%`,
+            costNum: parseFloat(cost),
             baseline: `${toFixedIfDecimal(record.baselineValue) || 0}`,
+            baselineNum: parseFloat(record.baselineValue),
             current: `${toFixedIfDecimal(record.currentValue) || 0}`,
+            currentNum: parseFloat(record.currentValue),
             elementWidth: this._calculateContributionBarWidth(dimensionRows, record)
           });
         });
@@ -275,9 +283,9 @@ export default Component.extend({
             disableSorting: true,
             isFirstColumn: index === 0,
             disableFiltering: isLastDimension, // currently overridden by headerFilteringRowTemplate
-            propertyName: dimension,
+            propertyName: 'dimensionValue',
+            dimensionCategory: dimension,
             title: dimension.capitalize(),
-            isGrouped: !isLastDimension, // no label grouping logic on last dimension
             component: 'custom/dimensions-table/dimension',
             className: `${tableBaseClass} ${tableBaseClass}--med-width ${tableBaseClass}--custom`
           });
@@ -495,7 +503,7 @@ export default Component.extend({
     }));
 
     // Generate a scale mapping the change value span to a specific range
-    const widthScale = d3.scale.linear()
+    const widthScale = d3.scaleLinear()
       .domain([0, maxChange])
       .range([0, 100]);
 

@@ -93,22 +93,18 @@ module('Acceptance | rootcause', async function(hooks) {
 
     assert.equal(
       $tabLinks.get(0).innerText.trim(),
-      'Metrics',
+      'Dimensions',
       'default tab is correct');
     assert.ok(
-      $(rcEl.METRICS_TABLE).get(0),
-      'metrics table exist');
+      $(rcEl.DIMENSIONS_TABLE).get(0),
+      'dimensions table exist');
 
-    // Click on Dimensions tab
+    // Click on Metrics tab
     await click($tabLinks.get(1));
 
     assert.ok(
-      $(rcEl.HEATMAP_DROPDOWN).get(0),
-      'heatmap dropdown exists');
-    assert.equal(
-      $(rcEl.SELECTED_HEATMAP_MODE).get(4).innerText.trim(),
-      'Change in Contribution',
-      'default heatmap mode is correct');
+      $(rcEl.METRICS_TABLE).get(0),
+      'metrics table exist');
 
     // Click on Events tab
     await click($tabLinks.get(2));

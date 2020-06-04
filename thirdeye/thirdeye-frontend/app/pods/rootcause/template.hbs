@@ -170,19 +170,19 @@
           <div class="col-xs-12 rootcause-tabs card-container__row--bg-color">
             {{#shared/common-tabs selection=activeTab activeTab=activeTab as |tabs|}}
               {{#tabs.tablist as |tablist|}}
-                {{#tablist.tab name="metrics"}}Metrics{{/tablist.tab}}
                 {{#tablist.tab name="dimensions"}}Dimensions{{/tablist.tab}}
+                {{#tablist.tab name="metrics"}}Metrics{{/tablist.tab}}
                 {{#tablist.tab name="events"}}Events{{/tablist.tab}}
                 {{#tablist.tab name="trend"}}Trend{{/tablist.tab}}
                 {{#tablist.tab name="callgraph"}}CallGraph{{/tablist.tab}}
               {{/tabs.tablist}}
-              {{!-- metrics --}}
-              {{#tabs.tabpanel name="metrics"}}
-                {{partial 'partials/rootcause/metrics'}}
-              {{/tabs.tabpanel}}
               {{!-- dimensions --}}
               {{#tabs.tabpanel name="dimensions"}}
                 {{partial 'partials/rootcause/dimensions'}}
+              {{/tabs.tabpanel}}
+              {{!-- metrics --}}
+              {{#tabs.tabpanel name="metrics"}}
+                {{partial 'partials/rootcause/metrics'}}
               {{/tabs.tabpanel}}
               {{!-- events --}}
               {{#tabs.tabpanel name="events"}}
