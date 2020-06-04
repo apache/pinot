@@ -54,14 +54,6 @@ public class DatasetConfigManagerImpl extends AbstractManagerImpl<DatasetConfigD
   }
 
   @Override
-  public List<DatasetConfigDTO> findActiveRequiresCompletenessCheck() {
-    Predicate activePredicate = Predicate.EQ("active", true);
-    Predicate completenessPredicate = Predicate.EQ("requiresCompletenessCheck", true);
-    Predicate predicate = Predicate.AND(activePredicate, completenessPredicate);
-    return findByPredicate(predicate);
-  }
-
-  @Override
   public void updateLastRefreshTime(String dataset, long refreshTime, long eventTime) {
     DatasetConfigDTO datasetConfigDTO = findByDataset(dataset);
     datasetConfigDTO.setLastRefreshTime(refreshTime);

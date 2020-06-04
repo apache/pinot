@@ -40,7 +40,5 @@ public interface JobManager extends AbstractManager<JobDTO> {
 
   String getJobNameByJobId(long id);
 
-  JobDTO findLatestBackfillScheduledJobByFunctionId(long functionId, long backfillWindowStart, long backfillWindowEnd);
-
   List<JobDTO> findRecentScheduledJobByTypeAndConfigId(TaskConstants.TaskType taskType, long configId, long minScheduledTime);
 }

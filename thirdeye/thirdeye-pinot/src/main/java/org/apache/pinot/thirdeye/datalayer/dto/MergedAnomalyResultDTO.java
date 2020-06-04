@@ -35,6 +35,7 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements AnomalyResult, Serializable {
+  public static final String ISSUE_TYPE_KEY = "issue_type";
 
   private AnomalyFeedbackDTO feedback;
 

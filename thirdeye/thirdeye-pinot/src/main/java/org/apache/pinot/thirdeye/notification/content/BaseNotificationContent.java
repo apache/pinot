@@ -42,7 +42,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.DataReportHelper;
-import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
 import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
@@ -305,8 +304,8 @@ public abstract class BaseNotificationContent implements NotificationContent {
    */
   protected static String getIssueType(MergedAnomalyResultDTO anomalyResultDTO) {
     Map<String, String> properties = anomalyResultDTO.getProperties();
-    if (MapUtils.isNotEmpty(properties) && properties.containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
-      return properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
+    if (MapUtils.isNotEmpty(properties) && properties.containsKey(MergedAnomalyResultDTO.ISSUE_TYPE_KEY)) {
+      return properties.get(MergedAnomalyResultDTO.ISSUE_TYPE_KEY);
     }
     return null;
   }

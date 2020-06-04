@@ -20,13 +20,11 @@
 package org.apache.pinot.thirdeye.anomaly.alert.util;
 
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dashboard.Utils;
@@ -68,10 +66,6 @@ import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.S
 public abstract class EmailHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(EmailHelper.class);
-
-  private static final long HOUR_MILLIS = TimeUnit.HOURS.toMillis(1);
-  private static final long DAY_MILLIS = TimeUnit.DAYS.toMillis(1);
-  private static final long WEEK_MILLIS = TimeUnit.DAYS.toMillis(7);
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -129,51 +123,6 @@ public abstract class EmailHelper {
       LOG.error("No email config provided for email with subject [{}]!", subject);
     }
   }
-
-  public static ContributorViewResponse getContributorDataForDataReport(String collection,
-      String metric, List<String> dimensions, AlertConfigBean.COMPARE_MODE compareMode,
-      long offsetDelayMillis, boolean intraday)
-      throws Exception {
-
-    return getContributorDataForDataReport(collection, metric, dimensions, HashMultimap.<String, String>create(),
-        compareMode, offsetDelayMillis, intraday);
-  }
-
-
-  public static ContributorViewResponse getContributorDataForDataReport(String collection,
-      String metric, List<String> dimensions, Multimap<String, String> filters, AlertConfigBean.COMPARE_MODE compareMode,
-      long offsetDelayMillis, boolean intraday)
-      throws Exception {
-    long currentEnd = System.currentTimeMillis();
-    long maxDataTime = collectionMaxDataTimeCache.get(collection);
-    if (currentEnd > maxDataTime) {
-      currentEnd = maxDataTime;
-    }
-
-    // align to nearest hour
-    currentEnd = (currentEnd - (currentEnd % HOUR_MILLIS)) - offsetDelayMillis;
-
-    long currentStart = currentEnd - DAY_MILLIS;
-
-    // intraday option
-    if (intraday) {
-      DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
-      DateTime endDate = new DateTime(currentEnd, timeZone);
-      DateTime intraDayStartTime = new DateTime(endDate.toString().split("T")[0], timeZone);
-      if (intraDayStartTime.getMillis() != currentEnd) {
-        currentStart = intraDayStartTime.getMillis();
-      }
-    }
-
-    DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
-    if (datasetConfigDTO != null && TimeUnit.DAYS.equals(datasetConfigDTO.bucketTimeGranularity().getUnit())) {
-      currentEnd = currentEnd - (currentEnd % DAY_MILLIS);
-      currentStart = currentEnd - WEEK_MILLIS;
-    }
-    return getContributorDataForDataReport(collection, metric, dimensions, filters, compareMode, MetricAggFunction.SUM,
-        currentStart, currentEnd);
-  }
-
 
   public static ContributorViewResponse getContributorDataForDataReport(String collection, String metric,
       List<String> dimensions, Multimap<String, String> filters, AlertConfigBean.COMPARE_MODE compareMode, MetricAggFunction metricAggFunction,

@@ -23,8 +23,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.cache.CacheBuilder;
 import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.auth.Authenticator;
-import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
-import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import org.apache.pinot.thirdeye.api.application.ApplicationResource;
 import org.apache.pinot.thirdeye.auth.ThirdEyeCredentials;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
@@ -45,8 +43,6 @@ import org.apache.pinot.thirdeye.dashboard.resources.CustomizedEventResource;
 import org.apache.pinot.thirdeye.dashboard.resources.DashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.DatasetConfigResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
-import org.apache.pinot.thirdeye.dashboard.resources.DetectionJobResource;
-import org.apache.pinot.thirdeye.dashboard.resources.EmailResource;
 import org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResource;
 import org.apache.pinot.thirdeye.dashboard.resources.EntityMappingResource;
 import org.apache.pinot.thirdeye.dashboard.resources.MetricConfigResource;
@@ -62,7 +58,6 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseMetricResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
@@ -160,28 +155,25 @@ public class ThirdEyeDashboardApplication
 
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
-    AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
 
     env.jersey().register(new DetectionConfigurationResource());
     env.jersey().register(new DatasetAutoOnboardResource());
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
-    env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory, alertFilterAutotuneFactory));
-    env.jersey().register(new EmailResource(config));
+    env.jersey().register(new AnomalyResource(alertFilterFactory));
     env.jersey().register(new EntityManagerResource(config));
     env.jersey().register(new MetricConfigResource());
     env.jersey().register(new DatasetConfigResource());
     env.jersey().register(new AdminResource());
     env.jersey().register(new SummaryResource());
     env.jersey().register(new ThirdEyeResource());
-    env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
+    env.jersey().register(new DataResource());
+    env.jersey().register(new AnomaliesResource(anomalyFunctionFactory));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
     env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
-    env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new AnomalyFlattenResource(DAO_REGISTRY.getMergedAnomalyResultDAO(),
         DAO_REGISTRY.getDatasetConfigDAO(), DAO_REGISTRY.getMetricConfigDAO()));
     env.jersey().register(new UserDashboardResource(
@@ -212,14 +204,6 @@ public class ThirdEyeDashboardApplication
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     env.getObjectMapper().registerModule(makeMapperModule());
-
-    /*
-      Adding DetectionJobResource in Dashboard to allow replay/autotune from ui.
-      creating a lightweight detection scheduler instance
-      Do not call start() as this instance is only meant to run replay/autotune
-     */
-    DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
-    env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
 
     try {
       // root cause resource

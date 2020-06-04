@@ -34,7 +34,6 @@ import org.apache.pinot.thirdeye.datalayer.entity.AlertSnapshotIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ApplicationIndex;
-import org.apache.pinot.thirdeye.datalayer.entity.AutotuneConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ClassificationConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
@@ -62,7 +61,6 @@ import org.apache.pinot.thirdeye.datalayer.pojo.AlertSnapshotBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.ApplicationBean;
-import org.apache.pinot.thirdeye.datalayer.pojo.AutotuneConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.ClassificationConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.ConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
@@ -141,8 +139,6 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DataCompletenessConfigIndex.class));
     pojoInfoMap.put(DetectionStatusBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DetectionStatusIndex.class));
-    pojoInfoMap.put(AutotuneConfigBean.class,
-        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AutotuneConfigIndex.class));
     pojoInfoMap.put(ClassificationConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, ClassificationConfigIndex.class));
     pojoInfoMap.put(EntityToEntityMappingBean.class,

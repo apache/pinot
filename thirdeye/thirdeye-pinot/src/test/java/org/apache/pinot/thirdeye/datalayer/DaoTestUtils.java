@@ -31,14 +31,12 @@ import org.apache.pinot.thirdeye.anomaly.job.JobConstants;
 import org.apache.pinot.thirdeye.anomaly.override.OverrideConfigHelper;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
-import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.ConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
@@ -197,7 +195,7 @@ public class DaoTestUtils {
     JobDTO jobSpec = new JobDTO();
     jobSpec.setJobName("Test_Anomaly_Job");
     jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
-    jobSpec.setTaskType(TaskConstants.TaskType.ANOMALY_DETECTION);
+    jobSpec.setTaskType(TaskConstants.TaskType.DETECTION);
     jobSpec.setScheduleStartTime(System.currentTimeMillis());
     jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
     jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
@@ -213,7 +211,6 @@ public class DaoTestUtils {
     datasetConfigDTO.setTimeDuration(1);
     datasetConfigDTO.setTimeUnit(TimeUnit.HOURS);
     datasetConfigDTO.setActive(true);
-    datasetConfigDTO.setRequiresCompletenessCheck(false);
     datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
     datasetConfigDTO.setLastRefreshTime(System.currentTimeMillis());
     return datasetConfigDTO;
@@ -273,22 +270,6 @@ public class DaoTestUtils {
     detectionStatusDTO.setDateToCheckInSDF(dateToCheckInSDF);
     detectionStatusDTO.setDetectionRun(detectionRun);
     return detectionStatusDTO;
-  }
-
-  public static AutotuneConfigDTO getTestAutotuneConfig(long functionId, long start, long end) {
-    AutotuneConfigDTO autotuneConfigDTO = new AutotuneConfigDTO();
-    autotuneConfigDTO.setFunctionId(functionId);
-    autotuneConfigDTO.setStartTime(start);
-    autotuneConfigDTO.setEndTime(end);
-    autotuneConfigDTO.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.ANOMALY_PERCENTAGE);
-    autotuneConfigDTO.setLastUpdateTimestamp(DateTime.now().getMillis());
-    Map<String, String> config = new HashMap<>();
-    config.put("ConfigKey", "ConfigValue");
-    autotuneConfigDTO.setConfiguration(config);
-    Map<String, Double> performance = new HashMap<>();
-    performance.put(autotuneConfigDTO.getPerformanceEvaluationMethod().name(), 0.5);
-    autotuneConfigDTO.setPerformance(performance);
-    return autotuneConfigDTO;
   }
 
   public static ClassificationConfigDTO getTestClassificationConfig(String name, List<Long> mainFunctionIdList,

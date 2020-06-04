@@ -20,12 +20,8 @@
 package org.apache.pinot.thirdeye.anomaly.task;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.pinot.thirdeye.anomaly.alert.AlertTaskInfo;
-import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskInfo;
-import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
-import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskInfo;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskInfo;
 import java.io.IOException;
@@ -58,27 +54,11 @@ public class TaskInfoFactory {
         case YAML_DETECTION_ONBOARD:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, YamlOnboardingTaskInfo.class);
           break;
-        case ANOMALY_DETECTION:
-          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionTaskInfo.class);
-          break;
-        case MERGE:
-          LOG.error("TaskType MERGE not supported");
-          break;
         case MONITOR:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, MonitorTaskInfo.class);
           break;
-        case ALERT:
-        case ALERT2:
-          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, AlertTaskInfo.class);
-          break;
-        case DATA_COMPLETENESS:
-          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DataCompletenessTaskInfo.class);
-          break;
-        case CLASSIFICATION:
-          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, ClassificationTaskInfo.class);
-          break;
         default:
-          LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT, ALERT2, DATA_COMPLETENESS, CLASSIFICATION");
+          LOG.error("TaskType must be one of DATA_QUALITY, DETECTION, DETECTION_ALERT, YAML_DETECTION_ONBOARD, MONITOR");
           break;
       }
     } catch (Exception e) {

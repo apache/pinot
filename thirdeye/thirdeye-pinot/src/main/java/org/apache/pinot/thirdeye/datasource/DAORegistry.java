@@ -23,7 +23,6 @@ import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertSnapshotManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
-import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ClassificationConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DataCompletenessConfigManager;
@@ -48,7 +47,6 @@ import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AlertSnapshotManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ApplicationManagerImpl;
-import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
@@ -142,10 +140,6 @@ public class DAORegistry {
 
   public DetectionStatusManager getDetectionStatusDAO() {
     return DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
-  }
-
-  public AutotuneConfigManager getAutotuneConfigDAO() {
-    return DaoProviderUtil.getInstance(AutotuneConfigManagerImpl.class);
   }
 
   public ClassificationConfigManager getClassificationConfigDAO() {

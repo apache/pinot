@@ -19,17 +19,12 @@
 
 package org.apache.pinot.thirdeye.anomaly.task;
 
-import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
-import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
-import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
-import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskRunner;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskRunner;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskRunner;
 import org.apache.pinot.thirdeye.detection.dataquality.DataQualityPipelineTaskRunner;
 import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskRunner;
-
 
 /**
  * This class returns an instance of the task runner depending on the task type
@@ -51,23 +46,8 @@ public class TaskRunnerFactory {
       case YAML_DETECTION_ONBOARD:
         taskRunner = new YamlOnboardingTaskRunner();
         break;
-      case ANOMALY_DETECTION:
-        taskRunner = new DetectionTaskRunner();
-        break;
-      case MERGE:
-        break;
       case MONITOR:
         taskRunner = new MonitorTaskRunner();
-        break;
-      case DATA_COMPLETENESS:
-        taskRunner = new DataCompletenessTaskRunner();
-        break;
-      case ALERT:
-      case ALERT2:
-        taskRunner = new AlertTaskRunnerV2();
-        break;
-      case CLASSIFICATION:
-        taskRunner = new ClassificationTaskRunner();
         break;
       default:
     }

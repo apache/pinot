@@ -70,13 +70,6 @@ public class DatasetConfigResource {
     return list;
   }
 
-  private void toggleRequiresCompletenessCheck(String dataset, boolean state) {
-    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
-    Preconditions.checkNotNull(datasetConfig, "dataset config spec not found");
-    datasetConfig.setRequiresCompletenessCheck(state);
-    datasetConfigDAO.update(datasetConfig);
-  }
-
   @GET
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)

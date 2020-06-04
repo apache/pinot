@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -30,8 +31,6 @@ import org.testng.annotations.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
-import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
 import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
@@ -171,7 +170,7 @@ public class TestAnomalyTaskManager {
     TaskDTO jobSpec = new TaskDTO();
     jobSpec.setJobName("Test_Anomaly_Task");
     jobSpec.setStatus(TaskStatus.WAITING);
-    jobSpec.setTaskType(TaskType.ANOMALY_DETECTION);
+    jobSpec.setTaskType(TaskType.DETECTION);
     jobSpec.setStartTime(new DateTime().minusDays(20).getMillis());
     jobSpec.setEndTime(new DateTime().minusDays(10).getMillis());
     jobSpec.setTaskInfo(new ObjectMapper().writeValueAsString(getTestDetectionTaskInfo()));
@@ -179,10 +178,10 @@ public class TestAnomalyTaskManager {
     return jobSpec;
   }
 
-  static DetectionTaskInfo getTestDetectionTaskInfo() {
-    DetectionTaskInfo taskInfo = new DetectionTaskInfo();
-    taskInfo.setWindowStartTime(Lists.newArrayList(new DateTime(), new DateTime().minusHours(1)));
-    taskInfo.setWindowEndTime(Lists.newArrayList(new DateTime(), new DateTime().minusHours(1)));
+  static DetectionPipelineTaskInfo getTestDetectionTaskInfo() {
+    DetectionPipelineTaskInfo taskInfo = new DetectionPipelineTaskInfo();
+    taskInfo.setStart((new DateTime().minusHours(1)).getMillis());
+    taskInfo.setEnd((new DateTime().minusHours(1)).getMillis());
     return taskInfo;
   }
 }

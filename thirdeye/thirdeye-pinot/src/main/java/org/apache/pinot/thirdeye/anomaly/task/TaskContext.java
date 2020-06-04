@@ -20,16 +20,10 @@
 package org.apache.pinot.thirdeye.anomaly.task;
 
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
-import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
-import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskContext {
 
   private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration;
-  private AnomalyFunctionFactory anomalyFunctionFactory;
-  private AlertFilterFactory alertFilterFactory;
-  private AnomalyClassifierFactory anomalyClassifierFactory;
 
   public ThirdEyeAnomalyConfiguration getThirdEyeAnomalyConfiguration() {
     return thirdEyeAnomalyConfiguration;
@@ -38,27 +32,5 @@ public class TaskContext {
   public void setThirdEyeAnomalyConfiguration(
       ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration) {
     this.thirdEyeAnomalyConfiguration = thirdEyeAnomalyConfiguration;
-  }
-
-  public AnomalyFunctionFactory getAnomalyFunctionFactory() {
-    return anomalyFunctionFactory;
-  }
-
-  public void setAnomalyFunctionFactory(AnomalyFunctionFactory anomalyFunctionFactory) {
-    this.anomalyFunctionFactory = anomalyFunctionFactory;
-  }
-
-  public AlertFilterFactory getAlertFilterFactory(){ return  alertFilterFactory; }
-
-  public void setAlertFilterFactory(AlertFilterFactory alertFilterFactory){
-    this.alertFilterFactory = alertFilterFactory;
-  }
-
-  public AnomalyClassifierFactory getAnomalyClassifierFactory() {
-    return anomalyClassifierFactory;
-  }
-
-  public void setAnomalyClassifierFactory(AnomalyClassifierFactory anomalyClassifierFactory) {
-    this.anomalyClassifierFactory = anomalyClassifierFactory;
   }
 }

@@ -31,7 +31,6 @@ import org.apache.pinot.thirdeye.datalayer.entity.AlertSnapshotIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ApplicationIndex;
-import org.apache.pinot.thirdeye.datalayer.entity.AutotuneConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ClassificationConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.ConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
@@ -180,8 +179,6 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(EventIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, DetectionStatusIndex.class,
             convertCamelCaseToUnderscore(DetectionStatusIndex.class.getSimpleName()));
-        entityMappingHolder.register(conn, AutotuneConfigIndex.class,
-            convertCamelCaseToUnderscore(AutotuneConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, ClassificationConfigIndex.class,
             convertCamelCaseToUnderscore(ClassificationConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, EntityToEntityMappingIndex.class,

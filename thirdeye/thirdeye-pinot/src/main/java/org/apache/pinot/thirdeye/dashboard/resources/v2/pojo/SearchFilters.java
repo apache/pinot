@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.collections4.MapUtils;
-import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
@@ -193,8 +192,8 @@ public class SearchFilters {
       }
       // check issue type
       Map<String, String> properties = mergedAnomalyResultDTO.getProperties();
-      if (MapUtils.isNotEmpty(properties) && properties.containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
-        String issueType = properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
+      if (MapUtils.isNotEmpty(properties) && properties.containsKey(MergedAnomalyResultDTO.ISSUE_TYPE_KEY)) {
+        String issueType = properties.get(MergedAnomalyResultDTO.ISSUE_TYPE_KEY);
         passed = passed && checkFilter(issueTypeFilterMap, issueType);
       }
 
@@ -267,8 +266,8 @@ public class SearchFilters {
       }
       // update issue type
       Map<String, String> properties = mergedAnomalyResultDTO.getProperties();
-      if (MapUtils.isNotEmpty(properties) && properties.containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
-        String issueType = properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
+      if (MapUtils.isNotEmpty(properties) && properties.containsKey(MergedAnomalyResultDTO.ISSUE_TYPE_KEY)) {
+        String issueType = properties.get(MergedAnomalyResultDTO.ISSUE_TYPE_KEY);
         update(issueTypeFilterMap, issueType, mergedAnomalyResultDTO.getId());
       }
     }
