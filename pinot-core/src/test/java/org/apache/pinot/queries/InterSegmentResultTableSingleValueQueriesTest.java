@@ -18,7 +18,14 @@
  */
 package org.apache.pinot.queries;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.collect.Lists;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -416,69 +423,159 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
   }
 
   @Test
-  public void testDistinctCountRawHLL() {
+  public void testDistinctCountRawHLL() throws Exception {
+    String rawHllResults = "data" + File.separator + "rawhllresults.txt";
+    URL resource = getClass().getClassLoader().getResource(rawHllResults);
+    File resultFile = new File(resource.getFile());
+    String[] results = new String[100];
+    int count = 0;
+    try (InputStream inputStream = new FileInputStream(resultFile);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        results[count++] = line;
+      }
+    }
+
     DataSchema dataSchema;
-    List<Object[]> rows;
     int expectedResultsSize;
+
+    // 1. test aggregation only query with SQL response format
     String query = "SELECT DISTINCTCOUNTRAWHLL(column1), DISTINCTCOUNTRAWHLL(column3) FROM testTable";
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
+    String[] columnNames = {"distinctcountrawhll(column1)", "distinctcountrawhll(column3)"};
+    DataSchema.ColumnDataType columnDataTypes[] = {DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING};
+    dataSchema = new DataSchema(columnNames, columnDataTypes);
+
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
-    dataSchema = new DataSchema(new String[]{"distinctcountrawhll(column1)", "distinctcountrawhll(column3)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
-    rows = new ArrayList<>();
-    Object[] expectedRow0 = new Object[]{5977L, 23825L};
-    expectedResultsSize = 1;
+    List<Object[]> expectedRows = new ArrayList<>();
+    String hexStringHll1 = results[0];
+    String hexStringHll2 = results[1];
+    expectedRows.add(new Object[]{hexStringHll1, hexStringHll2});
+    expectedResultsSize = expectedRows.size();
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedRows, expectedResultsSize,
             dataSchema);
-    Object[] row0 = brokerResponse.getResultTable().getRows().get(0);
-    Assert.assertEquals(
-        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[0].toString())).cardinality(),
-        expectedRow0[0]);
-    Assert.assertEquals(
-        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
-        expectedRow0[1]);
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
-    expectedRow0 = new Object[]{1886L, 4492L};
+    // verify cardinality
+    Object[] row = brokerResponse.getResultTable().getRows().get(0);
+    HyperLogLog hll1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[0]));
+    HyperLogLog hll2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[1]));
+    Long[] expectedCardinalities = new Long []{5977L, 23825L};
+    Assert.assertEquals(hll1.cardinality(), expectedCardinalities[0].longValue());
+    Assert.assertEquals(hll2.cardinality(), expectedCardinalities[1].longValue());
+
+    // 2. test aggregation only query with SQL exec + response format
+    brokerResponse = getBrokerResponseForSqlQuery(query);
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedRows, expectedResultsSize,
             dataSchema);
-    row0 = brokerResponse.getResultTable().getRows().get(0);
-    Assert.assertEquals(
-        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[0].toString())).cardinality(),
-        expectedRow0[0]);
-    Assert.assertEquals(
-        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
-        expectedRow0[1]);
 
-    query = "SELECT DISTINCTCOUNTRAWHLL(column1) FROM testTable";
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
+    // 3. test aggregation-only query with filter
+    String filter = " WHERE column1 > 100000000 AND column3 BETWEEN 20000000 AND 1000000000";
+    brokerResponse = getBrokerResponseForPqlQuery(query + filter, queryOptions);
+    hexStringHll1 = results[2];
+    hexStringHll2 = results[3];
+    expectedRows = new ArrayList<>();
+    expectedRows.add(new Object[]{hexStringHll1, hexStringHll2});
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows, expectedResultsSize,
+            dataSchema);
+
+    // verify cardinality
+    row = brokerResponse.getResultTable().getRows().get(0);
+    hll1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[0]));
+    hll2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[1]));
+    expectedCardinalities = new Long[]{3790L, 10535L};
+    Assert.assertEquals(hll1.cardinality(), expectedCardinalities[0].longValue());
+    Assert.assertEquals(hll2.cardinality(), expectedCardinalities[1].longValue());
+
+    // 4. test aggregation-only query with filter with SQL exec and response format
+    brokerResponse = getBrokerResponseForSqlQuery(query + filter);
+    System.out.println(query + getFilter());
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows, expectedResultsSize,
+            dataSchema);
+
+    // 5. test aggregation + group by query
+    query = "SELECT DISTINCTCOUNTRAWHLL(column1) FROM testTable GROUP BY column9 TOP 2";
+    dataSchema = new DataSchema(new String[]{"column9", "distinctcountrawhll(column1)"}, columnDataTypes);
+    expectedRows = new ArrayList<>();
+    expectedCardinalities = new Long[2];
+    int c = 0;
+    for (int i = 4; i <= 5; i++) {
+      String[] s = results[i].split(" ");
+      expectedRows.add(new Object[]{s[0], s[1]});
+      expectedCardinalities[c++] = Long.valueOf(s[2]);
+    }
+    expectedResultsSize = expectedRows.size();
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedRows, expectedResultsSize,
+            dataSchema);
+    // verify cardinality
+    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    for (int i = 0; i < rows.size(); i++) {
+      row = rows.get(i);
+      Assert.assertEquals((long)expectedCardinalities[i], ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[1])).cardinality());
+    }
+
+    // 6. test aggregation + group by query with sql exec and response format
+    // GROUP BY column is returned with actual type INT
+    query = "SELECT column9, DISTINCTCOUNTRAWHLL(column1) FROM testTable GROUP BY column9 ORDER BY DISTINCTCOUNTRAWHLL(column1) DESC LIMIT 2";
+    dataSchema = new DataSchema(new String[]{"column9", "distinctcountrawhll(column1)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    for (Object[] r : expectedRows) {
+      Object val = r[0];
+      r[0] = Integer.valueOf((String)val);
+    }
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, expectedRows, expectedResultsSize,
+            dataSchema);
+
+    // 7. test aggregation + filter + group by query
+    query = "SELECT DISTINCTCOUNTRAWHLL(column1) FROM testTable " + filter + " GROUP BY column9 TOP 2";
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
+    expectedRows = new ArrayList<>();
+    expectedCardinalities = new Long[5];
+    c = 0;
+    for (int i = 6; i <= 7; i++) {
+      String[] s = results[i].split(" ");
+      expectedRows.add(new Object[]{s[0], s[1]});
+      expectedCardinalities[c++] = Long.valueOf(s[2]);
+    }
     dataSchema = new DataSchema(new String[]{"column9", "distinctcountrawhll(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
-    expectedRow0 = new Object[]{"296467636", 3592L};
-    expectedResultsSize = 10;
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows, expectedRows.size(),
             dataSchema);
-    row0 = brokerResponse.getResultTable().getRows().get(0);
-    Assert.assertEquals(row0[0], expectedRow0[0]);
-    Assert.assertEquals(
-        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
-        expectedRow0[1]);
+    // verify cardinality
+    rows = brokerResponse.getResultTable().getRows();
+    for (int i = 0; i < rows.size(); i++) {
+      row = rows.get(i);
+      long cardinality = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)row[1])).cardinality();
+      Assert.assertEquals((long)expectedCardinalities[i], cardinality);
+    }
 
-    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
-    expectedRow0 = new Object[]{"296467636", 1324L};
+    // 8. test aggregation + filter + group by query
+    query = "SELECT column9, DISTINCTCOUNTRAWHLL(column1) FROM testTable" + filter + " GROUP BY column9 ORDER BY DISTINCTCOUNTRAWHLL(column1) DESC LIMIT 2";
+    brokerResponse = getBrokerResponseForSqlQuery(query);
+    for (Object[] r : expectedRows) {
+      Object val = r[0];
+      r[0] = Integer.valueOf((String)val);
+    }
+    rows = brokerResponse.getResultTable().getRows();
+    for (Object[] r : rows) {
+      System.out.println(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes((String)r[1])).cardinality());
+    }
+    dataSchema = new DataSchema(new String[]{"column9", "distinctcountrawhll(column1)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 51796L, 193884L, 103592L, 120000L, expectedRows, expectedRows.size(),
             dataSchema);
-    row0 = brokerResponse.getResultTable().getRows().get(0);
-    Assert.assertEquals(row0[0], expectedRow0[0]);
-    Assert.assertEquals(
-        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(BytesUtils.toBytes(row0[1].toString())).cardinality(),
-        expectedRow0[1]);
   }
 
   @Test
