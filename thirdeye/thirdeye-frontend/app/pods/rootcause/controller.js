@@ -154,14 +154,14 @@ export default Controller.extend({
    * displayed investigation tab ('metrics', 'dimensions', ...)
    * @type {string}
    */
-  activeTab: ROOTCAUSE_TAB_METRICS,
+  activeTab: ROOTCAUSE_TAB_DIMENSIONS,
 
   /**
    * displayed investigation sub-tabs
    * @type {Object}
    */
   activeSubTabs: {
-    dimensions: 'heatmap'
+    dimensions: 'algorithm'
   },
 
   /**

@@ -91,6 +91,7 @@ export const rootCauseConst = {
   ANOMALY_VALUE: '.rootcause-anomaly__props-value',
   ANOMALY_STATUS: '.ember-radio-button.checked',
   SAVE_BTN: '.te-button',
+  DIMENSIONS_TABLE: '.rootcause-dimensions',
   METRICS_TABLE: '.rootcause-metrics',
   HEATMAP_DROPDOWN: '#select-heatmap-mode',
   SELECTED_HEATMAP_MODE: '.ember-power-select-selected-item',

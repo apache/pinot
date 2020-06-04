@@ -9,7 +9,6 @@
  *    component: 'custom/dimensions-table/change-bars',
  *    title: 'Contribution to Overall Change',
  *    className: 'rootcause-dimensions-table__column rootcause-dimensions-table__column--bar-cell',
- *    disableSorting: true,
  *    disableFiltering: true
  *  }
  */
@@ -42,7 +41,7 @@ export default Component.extend({
     const positiveMax = d3.max(this.data.map(row => toWidthNumber(row.elementWidth.positive)));
 
     // Map the max values to a slightly larger scale
-    const containerWidthScale = d3.scale.linear()
+    const containerWidthScale = d3.scaleLinear()
       .domain([0, 100])
       .range([0, 120]);
 
@@ -51,12 +50,12 @@ export default Component.extend({
     const containerWidthPositive = Math.round(containerWidthScale(positiveMax));
 
     // Map the negative bar width to the largest negative value as 100%
-    const negativeBarScale = d3.scale.linear()
+    const negativeBarScale = d3.scaleLinear()
       .domain([0, negativeMax])
       .range([0, 100]);
 
     // Map the positive bar width to the largest positive value as 100%
-    const positiveBarScale = d3.scale.linear()
+    const positiveBarScale = d3.scaleLinear()
       .domain([0, positiveMax])
       .range([0, 100]);
 

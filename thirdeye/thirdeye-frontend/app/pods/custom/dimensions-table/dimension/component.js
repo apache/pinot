@@ -6,7 +6,6 @@
  *
  * @example for usage in models table columns definitions
  * {
- *   disableSorting: true,
  *   isFirstColumn: index === 0,
  *   propertyName: dimension.camelize(),
  *   title: dimension.capitalize(),
@@ -89,7 +88,7 @@ export default Component.extend({
    */
   _formatDimensionLabel(dimensionArr, column) {
     // This is the cell data for this column component to render: find the index
-    const filteredDimensionIndex = dimensionArr.findIndex(dimObj => dimObj.label === column.propertyName);
+    const filteredDimensionIndex = dimensionArr.findIndex(dimObj => dimObj.label === column.dimensionCategory);
     // This is the cell data for this column component to render: find the object
     const filteredDimensionObj = dimensionArr[filteredDimensionIndex];
     // Look at the previous object.

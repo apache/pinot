@@ -1,9 +1,26 @@
 {{#shared/common-tabs selection=activeSubTabs.dimensions activeTab=activeSubTabs.dimensions as |subtab|}}
   {{#subtab.tablist as |subtablist|}}
+    {{#subtablist.tab name="algorithm"}}Algorithm{{/subtablist.tab}}
     {{#subtablist.tab name="heatmap"}}Heatmap{{/subtablist.tab}}
     {{#subtablist.tab name="table"}}Table{{/subtablist.tab}}
-    {{#subtablist.tab name="algorithm"}}Algorithm{{/subtablist.tab}}
   {{/subtab.tablist}}
+
+  {{#subtab.tabpanel name="algorithm"}}
+    {{rootcause-dimensions-algorithm
+      entities=entities
+      metricUrn=metricUrn
+      metricId=metricId
+      filters=filteredUrns
+      range=context.anomalyRange
+      mode=context.compareMode
+      selectedUrns=selectedUrns
+      enableSubTotals=false
+      onSelection=(action "onSelection")
+      sendTableSettings=(action "saveTableSettings")
+      sessionTableSettings=sessionTableSettings
+      sessionUserCustomized=sessionUserCustomized
+    }}
+  {{/subtab.tabpanel}}
 
   {{#subtab.tabpanel name="heatmap"}}
     {{#if isLoadingBreakdowns}}
@@ -34,23 +51,6 @@
       metricUrn=metricUrn
       selectedUrns=selectedUrns
       onSelection=(action "onSelection")
-    }}
-  {{/subtab.tabpanel}}
-
-  {{#subtab.tabpanel name="algorithm"}}
-    {{rootcause-dimensions-algorithm
-      entities=entities
-      metricUrn=metricUrn
-      metricId=metricId
-      filters=filteredUrns
-      range=context.anomalyRange
-      mode=context.compareMode
-      selectedUrns=selectedUrns
-      enableSubTotals=false
-      onSelection=(action "onSelection")
-      sendTableSettings=(action "saveTableSettings")
-      sessionTableSettings=sessionTableSettings
-      sessionUserCustomized=sessionUserCustomized
     }}
   {{/subtab.tabpanel}}
 
