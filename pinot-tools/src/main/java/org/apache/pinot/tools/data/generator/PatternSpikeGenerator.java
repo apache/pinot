@@ -19,7 +19,11 @@
 package org.apache.pinot.tools.data.generator;
 
 import org.apache.commons.configuration.PropertyConverter;
+import org.apache.commons.math3.distribution.AbstractRealDistribution;
+import org.apache.commons.math3.distribution.ExponentialDistribution;
 import org.apache.commons.math3.distribution.LogNormalDistribution;
+import org.apache.commons.math3.distribution.UniformRealDistribution;
+import org.apache.commons.math3.random.Well19937c;
 
 import java.util.Map;
 
@@ -46,32 +50,58 @@ public class PatternSpikeGenerator implements Generator {
     private final double baseline;
     private final double smoothing;
 
-    private final LogNormalDistribution arrivalGenerator;
-    private final LogNormalDistribution magnitudeGenerator;
+    private final AbstractRealDistribution arrivalGenerator;
+    private final AbstractRealDistribution magnitudeGenerator;
 
     private long step = -1;
 
     private long nextArrival;
     private double lastValue;
 
-    public PatternSpikeGenerator(Map<String, Object> templateConfig) {
-        this(PropertyConverter.toDouble(templateConfig.getOrDefault("baseline", 0)),
-                PropertyConverter.toDouble(templateConfig.getOrDefault("arrivalMean", 2)),
-                PropertyConverter.toDouble(templateConfig.getOrDefault("arrivalSigma", 1)),
-                PropertyConverter.toDouble(templateConfig.getOrDefault("magnitudeMean", 2)),
-                PropertyConverter.toDouble(templateConfig.getOrDefault("magnitudeSigma", 1)),
-                PropertyConverter.toDouble(templateConfig.getOrDefault("smoothing", 0)));
+    enum DistributionType {
+        LOGNORMAL,
+        EXPONENTIAL,
+        UNIFORM,
+        FIXED
     }
 
-    public PatternSpikeGenerator(double baseline, double arrivalMean, double arrivalSigma, double magnitudeMean, double magnitudeSigma, double smoothing) {
+    public PatternSpikeGenerator(Map<String, Object> templateConfig) {
+        this(PropertyConverter.toDouble(templateConfig.getOrDefault("baseline", 0)),
+                DistributionType.valueOf(templateConfig.getOrDefault("arrivalType", "lognormal").toString().toUpperCase()),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("arrivalMean", 2)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("arrivalSigma", 1)),
+                DistributionType.valueOf(templateConfig.getOrDefault("magnitudeType", "lognormal").toString().toUpperCase()),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("magnitudeMean", 2)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("magnitudeSigma", 1)),
+                PropertyConverter.toDouble(templateConfig.getOrDefault("smoothing", 0)),
+                PropertyConverter.toInteger(templateConfig.getOrDefault("seed", 0)));
+    }
+
+    public PatternSpikeGenerator(double baseline, DistributionType arrivalType, double arrivalMean, double arrivalSigma,
+                                 DistributionType magnitudeType, double magnitudeMean, double magnitudeSigma, double smoothing, int seed) {
         this.baseline = baseline;
         this.smoothing = smoothing;
 
-        this.arrivalGenerator = new LogNormalDistribution(arrivalMean, arrivalSigma);
-        this.magnitudeGenerator = new LogNormalDistribution(magnitudeMean, magnitudeSigma);
+        this.arrivalGenerator = makeDist(arrivalType, arrivalMean, arrivalSigma, seed);
+        this.magnitudeGenerator = makeDist(magnitudeType, magnitudeMean, magnitudeSigma, seed);
 
         this.nextArrival = (long) arrivalGenerator.sample();
         this.lastValue = baseline;
+    }
+
+    private static AbstractRealDistribution makeDist(DistributionType type, double mean, double sigma, int seed) {
+        switch (type) {
+            case LOGNORMAL:
+                return new LogNormalDistribution(new Well19937c(seed), mean, sigma, 1.0E-9D);
+            case EXPONENTIAL:
+                return new ExponentialDistribution(new Well19937c(seed), mean, 1.0E-9D);
+            case UNIFORM:
+                return new UniformRealDistribution(new Well19937c(seed), mean - sigma, mean + sigma);
+            case FIXED:
+                return new UniformRealDistribution(new Well19937c(seed), mean, mean + 1.0E-9D);
+            default:
+                throw new IllegalArgumentException(String.format("Unsupported distribution type '%s", type));
+        }
     }
 
     @Override
