@@ -125,7 +125,7 @@ public abstract class AbstractRecordExtractorTest {
           actualValue instanceof List ? (ArrayList) actualValue : Arrays.asList((Object[]) actualValue);
       List expectedArray = (List) expectedValue;
       for (int j = 0; j < actualArray.size(); j++) {
-        Assert.assertEquals(actualArray.get(j), expectedArray.get(j));
+        checkValue(expectedArray.get(j), actualArray.get(j));
       }
     } else if (expectedValue instanceof Map) {
       Map<Object, Object> actualMap = (HashMap) actualValue;

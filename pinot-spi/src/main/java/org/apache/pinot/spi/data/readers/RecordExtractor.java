@@ -23,6 +23,9 @@ import java.util.Set;
 
 /**
  * Extracts fields from input records
+ * 1) Number/String/ByteBuffer become single-value column
+ * 2) Collections become Object[] i.e. multi-value column
+ * 3) Nested/Complex fields (e.g. json maps, avro maps, avro records) become Map<Object, Object>
  * @param <T> The format of the input record
  */
 public interface RecordExtractor<T> {

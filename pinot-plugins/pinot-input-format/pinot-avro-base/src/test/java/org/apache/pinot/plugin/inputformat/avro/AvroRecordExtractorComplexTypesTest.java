@@ -22,7 +22,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -46,53 +45,136 @@ import static org.apache.avro.Schema.*;
 public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractorTest {
 
   private final File _dataFile = new File(_tempDir, "complex.avro");
+  Schema avroSchema;
+  Schema intStringMapAvroSchema;
+  Schema stringIntMapAvroSchema;
+  Schema simpleRecordSchema;
+  Schema complexRecordSchema;
+  Schema complexFieldSchema;
+  Schema complexListSchema;
 
   @Override
   protected List<Map<String, Object>> getInputRecords() {
 
-    Schema complexRecord = createRecord("complexRecord", null, null, false);
-    complexRecord.setFields(Lists.newArrayList(new Field("field1", create(Type.STRING), null, null),
-        new Field("field2", create(Type.LONG), null, null),
-        new Field("list", createArray(create(Type.DOUBLE)), null, null)));
+    // map with int keys
+    intStringMapAvroSchema = createMap(create(Type.STRING));
+
+    // map with string keys
+    stringIntMapAvroSchema = createMap(create(Type.INT));
+
+    // simple record - contains a string, long and double array
+    simpleRecordSchema = createRecord("simpleRecord", null, null, false);
+    simpleRecordSchema.setFields(Lists.newArrayList(new Field("simpleField1", create(Type.STRING), null, null),
+        new Field("simpleField2", create(Type.LONG), null, null),
+        new Field("simpleList", createArray(create(Type.DOUBLE)), null, null)));
+
+    // complex record - contains a string, a complex field (contains int and long)
+    complexRecordSchema = createRecord("complexRecord", null, null, false);
+    complexFieldSchema = createRecord("complexField", null, null, false);
+    complexFieldSchema.setFields(Lists.newArrayList(new Field("field1", create(Type.INT), null, null),
+        new Field("field2", create(Type.LONG), null, null)));
+    complexRecordSchema.setFields(Lists.newArrayList(new Field("simpleField", create(Type.STRING), null, null),
+        new Field("complexField", complexFieldSchema, null, null)));
+
+    // complex list element - each element contains a record of int and long
+    complexListSchema = createRecord("complexList", null, null, false);
+    complexListSchema.setFields(Lists.newArrayList(new Field("field1", create(Type.INT), null, null),
+        new Field("field2", create(Type.LONG), null, null)));
+
+    Field map1Field = new Field("map1", intStringMapAvroSchema, null, null);
+    Field map2Field = new Field("map2", stringIntMapAvroSchema, null, null);
+    Field simpleRecordField = new Field("simpleRecord", simpleRecordSchema, null, null);
+    Field complexRecordField = new Field("complexRecord", complexRecordSchema, null, null);
+    Field complexListField = new Field("complexList", createArray(complexListSchema), null, null);
+
+    avroSchema = createRecord("manyComplexTypes", null, null, false);
+    avroSchema
+        .setFields(Lists.newArrayList(map1Field, map2Field, simpleRecordField, complexRecordField, complexListField));
+
     List<Map<String, Object>> inputRecords = new ArrayList<>(2);
+    inputRecords.add(getRecord1());
+    inputRecords.add(getRecord2());
+    return inputRecords;
+  }
+
+  private Map<String, Object> getRecord1() {
     Map<String, Object> record1 = new HashMap<>();
+
     Map<Integer, String> map1 = new HashMap<>();
     map1.put(30, "foo");
     map1.put(200, "bar");
+    record1.put("map1", map1);
+
     Map<String, Integer> map2 = new HashMap<>();
     map2.put("k1", 10000);
     map2.put("k2", 20000);
-    record1.put("map1", map1);
     record1.put("map2", map2);
-    GenericRecord genericRecord1 = new GenericData.Record(complexRecord);
-    genericRecord1.put("field1", "foo");
-    genericRecord1.put("field2", 1588469340000L);
-    genericRecord1.put("list", Arrays.asList(1.1, 2.2));
-    record1.put("complexField", genericRecord1);
-    inputRecords.add(record1);
 
+    GenericRecord simpleRecord = new GenericData.Record(simpleRecordSchema);
+    simpleRecord.put("simpleField1", "foo");
+    simpleRecord.put("simpleField2", 1588469340000L);
+    simpleRecord.put("simpleList", Arrays.asList(1.1, 2.2));
+    record1.put("simpleRecord", simpleRecord);
+
+    GenericRecord complexRecord = new GenericData.Record(complexRecordSchema);
+    GenericRecord subComplexRecord = new GenericData.Record(complexFieldSchema);
+    subComplexRecord.put("field1", 100);
+    subComplexRecord.put("field2", 1588469340000L);
+    complexRecord.put("simpleField", "foo");
+    complexRecord.put("complexField", subComplexRecord);
+    record1.put("complexRecord", complexRecord);
+
+    GenericRecord listElem1 = new GenericData.Record(complexListSchema);
+    listElem1.put("field1", 20);
+    listElem1.put("field2", 2000200020002000L);
+    GenericRecord listElem2 = new GenericData.Record(complexListSchema);
+    listElem2.put("field1", 280);
+    listElem2.put("field2", 8000200020002000L);
+    record1.put("complexList", Arrays.asList(listElem1, listElem2));
+
+    return record1;
+  }
+
+  private Map<String, Object> getRecord2() {
     Map<String, Object> record2 = new HashMap<>();
-    map1 = new HashMap<>();
+    Map<Integer, String> map1 = new HashMap<>();
     map1.put(30, "moo");
     map1.put(200, "baz");
-    map2 = new HashMap<>();
+    record2.put("map1", map1);
+
+    Map<String, Integer> map2 = new HashMap<>();
     map2.put("k1", 100);
     map2.put("k2", 200);
-    record2.put("map1", map1);
     record2.put("map2", map2);
-    GenericRecord genericRecord2 = new GenericData.Record(complexRecord);
-    genericRecord2.put("field1", "bar");
-    genericRecord2.put("field2", 1588450000000L);
-    genericRecord2.put("list", Arrays.asList(3.3, 4.4));
-    record2.put("complexField", genericRecord2);
-    inputRecords.add(record2);
 
-    return inputRecords;
+    GenericRecord simpleRecord2 = new GenericData.Record(simpleRecordSchema);
+    simpleRecord2.put("simpleField1", "foo");
+    simpleRecord2.put("simpleField2", 1588469340000L);
+    simpleRecord2.put("simpleList", Arrays.asList(1.1, 2.2));
+    record2.put("simpleRecord", simpleRecord2);
+
+    GenericRecord complexRecord2 = new GenericData.Record(complexRecordSchema);
+    GenericRecord subComplexRecord2 = new GenericData.Record(complexFieldSchema);
+    subComplexRecord2.put("field1", 100);
+    subComplexRecord2.put("field2", 1588469340000L);
+    complexRecord2.put("simpleField", "foo");
+    complexRecord2.put("complexField", subComplexRecord2);
+    record2.put("complexRecord", complexRecord2);
+
+    GenericRecord listElem12 = new GenericData.Record(complexListSchema);
+    listElem12.put("field1", 20);
+    listElem12.put("field2", 2000200020002000L);
+    GenericRecord listElem22 = new GenericData.Record(complexListSchema);
+    listElem22.put("field1", 280);
+    listElem22.put("field2", 8000200020002000L);
+    record2.put("complexList", Arrays.asList(listElem12, listElem22));
+
+    return record2;
   }
 
   @Override
   protected Set<String> getSourceFields() {
-    return Sets.newHashSet("map1", "map2", "complexField");
+    return Sets.newHashSet("map1", "map2", "simpleRecord", "complexRecord", "complexList");
   }
 
   /**
@@ -112,16 +194,6 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
   @Override
   protected void createInputFile()
       throws IOException {
-    Schema avroSchema = createRecord("mapRecord", null, null, false);
-    Schema intStringMapAvroSchema = createMap(create(Type.STRING));
-    Schema stringIntMapAvroSchema = createMap(create(Type.INT));
-    Schema complexRecord = createRecord("complexRecord", null, null, false);
-    complexRecord.setFields(Lists.newArrayList(new Field("field1", create(Type.STRING), null, null),
-        new Field("field2", create(Type.LONG), null, null),
-        new Field("list", createArray(create(Type.DOUBLE)), null, null)));
-    List<Field> fields = Arrays.asList(new Field("map1", intStringMapAvroSchema, null, null),
-        new Field("map2", stringIntMapAvroSchema, null, null), new Field("complexField", complexRecord, null, null));
-    avroSchema.setFields(fields);
 
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, _dataFile);
