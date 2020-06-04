@@ -20,7 +20,6 @@ package org.apache.pinot.tools.data.generator;
 
 import org.apache.commons.configuration.PropertyConverter;
 import org.apache.commons.math3.distribution.NormalDistribution;
-import org.apache.commons.math3.random.Well19937c;
 
 import java.util.Arrays;
 import java.util.List;
@@ -65,19 +64,18 @@ public class PatternSeasonalGenerator implements Generator {
                 PropertyConverter.toDouble(templateConfig.getOrDefault("wavelength", 0)),
                 PropertyConverter. toDouble(templateConfig.getOrDefault("amplitude", 0)),
                 PropertyConverter. toDouble(templateConfig.getOrDefault("offset", 0)),
-                PropertyConverter. toInteger(templateConfig.getOrDefault("seed", 0)),
                 toDoubleArray(templateConfig.get("scalingFactors"), 1));
     }
 
     public PatternSeasonalGenerator(double mean, double sigma, double trend, double wavelength, double amplitude,
-                                    double offset, int seed, double[] scalingFactors) {
+                                    double offset, double[] scalingFactors) {
         this.trend = trend;
         this.wavelength = wavelength;
         this.amplitude = amplitude;
         this.offset = offset;
         this.scalingFactors = scalingFactors;
 
-        this.generator = new NormalDistribution(new Well19937c(seed), mean, sigma, 1.0E-9D);
+        this.generator = new NormalDistribution(mean, sigma);
     }
 
     @Override
