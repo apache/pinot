@@ -18,33 +18,32 @@
 # under the License.
 #
 
-JAR_PATH="$(find /opt/pinot/lib/pinot-all-*-jar-with-dependencies.jar)"
-ADMIN_PATH="/opt/pinot/bin/pinot-admin.sh"
-TEMPLATE_BASEDIR="/tmp/pinotGenerator/generator"
+
+#ADMIN_PATH="/opt/pinot/bin/pinot-admin.sh"
+ADMIN_PATH="./pinot-tools/target/pinot-tools-pkg/bin/pinot-admin.sh"
+#PATTERN_BASEDIR="/opt/pinot/examples/docker/generators"
+PATTERN_BASEDIR="./pinot-tools/src/main/resources/generator"
 TEMP_DIR="/tmp/pinotGenerator"
 
 if [ -z "$1" ]; then
-  echo "No template name specified. Aborting."
+  echo "No PATTERN name specified. Aborting."
   exit 1
 fi
 
-TEMPLATE_NAME="$1"
-DATA_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}"
-SEGMENT_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}Segment"
+PATTERN_NAME="$1"
+DATA_DIR="${TEMP_DIR:?}/${PATTERN_NAME}"
+SEGMENT_DIR="${TEMP_DIR:?}/${PATTERN_NAME}Segment"
 
-echo "Preparing temp directory for ${TEMPLATE_NAME}"
+echo "Preparing temp directory for ${PATTERN_NAME}"
 rm -rf "${DATA_DIR}"
 rm -rf "${SEGMENT_DIR}"
 mkdir -p "${TEMP_DIR}"
 
-echo "Extracting template files"
-/bin/sh -c "cd \"${TEMP_DIR}\" && jar -xf \"${JAR_PATH}\" \"generator/${TEMPLATE_NAME}_schema.json\" \"generator/${TEMPLATE_NAME}_config.json\" \"generator/${TEMPLATE_NAME}_generator.json\""
-
-echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
+echo "Generating data for ${PATTERN_NAME} in ${DATA_DIR}"
 ${ADMIN_PATH} GenerateData \
 -numFiles 1 -numRecords 354780  -format csv \
--schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
--schemaAnnotationFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_generator.json" \
+-schemaFile "${PATTERN_BASEDIR}/${PATTERN_NAME}_schema.json" \
+-schemaAnnotationFile "${PATTERN_BASEDIR}/${PATTERN_NAME}_generator.json" \
 -outDir "$DATA_DIR"
 
 if [ ! -d "${DATA_DIR}" ]; then
@@ -52,11 +51,10 @@ if [ ! -d "${DATA_DIR}" ]; then
   exit 1
 fi
 
-echo "Creating segment for ${TEMPLATE_NAME} in ${SEGMENT_DIR}"
+echo "Creating segment for ${PATTERN_NAME} in ${SEGMENT_DIR}"
 ${ADMIN_PATH} CreateSegment \
--format csv \
--tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
--schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
+-tableName "${PATTERN_NAME}" -segmentName "${PATTERN_NAME}" -format CSV -overwrite \
+-schemaFile "${PATTERN_BASEDIR}/${PATTERN_NAME}_schema.json" \
 -dataDir "${DATA_DIR}" \
 -outDir "${SEGMENT_DIR}" || exit 1
 
@@ -65,14 +63,14 @@ if [ ! -d "${SEGMENT_DIR}" ]; then
   exit 1
 fi
 
-echo "Adding table ${TEMPLATE_NAME}"
+echo "Adding table ${PATTERN_NAME}"
 ${ADMIN_PATH} AddTable -exec \
--tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
--schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" || exit 1
+-tableConfigFile "${PATTERN_BASEDIR}/${PATTERN_NAME}_config.json" \
+-schemaFile "${PATTERN_BASEDIR}/${PATTERN_NAME}_schema.json" || exit 1
 
-echo "Uploading segment for ${TEMPLATE_NAME}"
+echo "Uploading segment for ${PATTERN_NAME}"
 ${ADMIN_PATH} UploadSegment \
--tableName "${TEMPLATE_NAME}" \
+-tableName "${PATTERN_NAME}" \
 -segmentDir "${SEGMENT_DIR}" || exit 1
 
-echo "Succesfully applied template ${TEMPLATE_NAME}"
+echo "Succesfully applied PATTERN ${PATTERN_NAME}"
