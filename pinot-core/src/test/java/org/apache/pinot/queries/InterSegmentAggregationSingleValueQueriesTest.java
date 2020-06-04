@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
