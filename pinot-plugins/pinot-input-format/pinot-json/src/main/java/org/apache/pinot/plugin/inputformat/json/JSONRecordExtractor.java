@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -47,66 +45,18 @@ public class JSONRecordExtractor implements RecordExtractor<Map<String, Object>>
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
     if (_extractAll) {
-      from.forEach((fieldName, value) -> to.putValue(fieldName, convertValue(value)));
+      from.forEach((fieldName, value) -> to.putValue(fieldName, JSONRecordExtractorUtils.convertValue(value)));
     } else {
       for (String fieldName : _fields) {
         Object value = from.get(fieldName);
         // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
         // DataTypeTransformer fixes it.
-        Object convertedValue = convertValue(value);
+        Object convertedValue = JSONRecordExtractorUtils.convertValue(value);
         to.putValue(fieldName, convertedValue);
       }
     }
     return to;
   }
 
-  private Object convertValue(Object value) {
-    Object convertedValue;
-    if (value instanceof Collection) {
-      convertedValue = convertMultiValue((Collection) value);
-    } else {
-      convertedValue = convertSingleValue(value);
-    }
-    return convertedValue;
-  }
 
-  /**
-   * Converts the value to a single-valued value
-   */
-  @Nullable
-  private Object convertSingleValue(@Nullable Object value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Number) {
-      return value;
-    }
-    return value.toString();
-  }
-
-  /**
-   * Converts the value to a multi-valued value
-   */
-  @Nullable
-  private Object convertMultiValue(@Nullable Collection values) {
-    if (values == null || values.isEmpty()) {
-      return null;
-    }
-    int numValues = values.size();
-    Object[] array = new Object[numValues];
-    int index = 0;
-    for (Object value : values) {
-      Object convertedValue = convertSingleValue(value);
-      if (convertedValue != null && !convertedValue.toString().equals("")) {
-        array[index++] = convertedValue;
-      }
-    }
-    if (index == numValues) {
-      return array;
-    } else if (index == 0) {
-      return null;
-    } else {
-      return Arrays.copyOf(array, index);
-    }
-  }
 }
