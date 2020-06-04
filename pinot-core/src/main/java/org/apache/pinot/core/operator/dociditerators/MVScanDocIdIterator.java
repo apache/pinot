@@ -23,6 +23,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -32,7 +33,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * matching document ids.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
+public final class MVScanDocIdIterator implements ValueBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
   private final ForwardIndexReader _reader;
   // TODO: Figure out a way to close the reader context
@@ -69,6 +70,21 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   public int advance(int targetDocId) {
     _nextDocId = targetDocId;
     return next();
+  }
+
+  @Override
+  public int fastAdvance(PeekableIntIterator bitmapIterator) {
+    while (bitmapIterator.hasNext()) {
+      int nextDocId = bitmapIterator.peekNext();
+      _nextDocId = nextDocId+1;
+      int length = _reader.getDictIdMV(nextDocId, _dictIdBuffer, _readerContext);
+      _numEntriesScanned += length;
+      if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
+        return nextDocId;
+      }
+      bitmapIterator.next();
+    }
+    return Constants.EOF;
   }
 
   @Override

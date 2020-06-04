@@ -36,7 +36,7 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(new TestFilterOperator(docIds1));
     operators.add(new TestFilterOperator(docIds2));
-    AndFilterOperator andOperator = new AndFilterOperator(operators);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 30);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -54,7 +54,7 @@ public class AndFilterOperatorTest {
     operators.add(new TestFilterOperator(docIds1));
     operators.add(new TestFilterOperator(docIds2));
     operators.add(new TestFilterOperator(docIds3));
-    AndFilterOperator andOperator = new AndFilterOperator(operators);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 30);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -71,12 +71,12 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> childOperators = new ArrayList<>();
     childOperators.add(new TestFilterOperator(docIds1));
     childOperators.add(new TestFilterOperator(docIds2));
-    AndFilterOperator childAndOperator = new AndFilterOperator(childOperators);
+    AndFilterOperator childAndOperator = new AndFilterOperator(childOperators, 30);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childAndOperator);
     operators.add(new TestFilterOperator(docIds3));
-    AndFilterOperator andOperator = new AndFilterOperator(operators);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 30);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -98,7 +98,7 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);
     operators.add(new TestFilterOperator(docIds1));
-    AndFilterOperator andOperator = new AndFilterOperator(operators);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, 30);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 2);

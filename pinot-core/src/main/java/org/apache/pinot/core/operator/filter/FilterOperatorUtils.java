@@ -94,7 +94,7 @@ public class FilterOperatorUtils {
     } else {
       // Return the AND filter operator with re-ordered child filter operators
       FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, debugOptions);
-      return new AndFilterOperator(childFilterOperators);
+      return new AndFilterOperator(childFilterOperators, numDocs);
     }
   }
 

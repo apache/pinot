@@ -29,9 +29,11 @@ public class AndFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "AndFilterOperator";
 
   private final List<BaseFilterOperator> _filterOperators;
+  private final int _numDocs;
 
-  public AndFilterOperator(List<BaseFilterOperator> filterOperators) {
+  public AndFilterOperator(List<BaseFilterOperator> filterOperators, int numDocs) {
     _filterOperators = filterOperators;
+    _numDocs=numDocs;
   }
 
   @Override
@@ -40,7 +42,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     for (BaseFilterOperator filterOperator : _filterOperators) {
       filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
     }
-    return new FilterBlock(new AndDocIdSet(filterBlockDocIdSets));
+    return new FilterBlock(new AndDocIdSet(filterBlockDocIdSets, _numDocs));
   }
 
   @Override

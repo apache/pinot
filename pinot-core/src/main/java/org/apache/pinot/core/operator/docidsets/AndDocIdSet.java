@@ -24,9 +24,11 @@ import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.ValueBasedDocIdIterator;
 import org.apache.pinot.core.util.SortedRangeIntersection;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -51,9 +53,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public final class AndDocIdSet implements FilterBlockDocIdSet {
   private final List<FilterBlockDocIdSet> _docIdSets;
+  private final int _numDocs;
+  private final float FAST_SCANNING_MIN_THRESHOLD =0.1f;
 
-  public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets) {
+  public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, int numDocs) {
     _docIdSets = docIdSets;
+    _numDocs = numDocs;
   }
 
   @Override
@@ -64,7 +69,8 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
     BlockDocIdIterator[] allDocIdIterators = new BlockDocIdIterator[numDocIdSets];
     List<SortedDocIdIterator> sortedDocIdIterators = new ArrayList<>();
     List<BitmapBasedDocIdIterator> bitmapBasedDocIdIterators = new ArrayList<>();
-    List<ScanBasedDocIdIterator> scanBasedDocIdIterators = new ArrayList<>();
+    List<ExpressionScanDocIdIterator> expressionScanDocIdIterators = new ArrayList<>();
+    List<ValueBasedDocIdIterator> valueBasedDocIdIterators = new ArrayList<>();
     List<BlockDocIdIterator> remainingDocIdIterators = new ArrayList<>();
     for (int i = 0; i < numDocIdSets; i++) {
       BlockDocIdIterator docIdIterator = _docIdSets.get(i).iterator();
@@ -73,15 +79,18 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
         sortedDocIdIterators.add((SortedDocIdIterator) docIdIterator);
       } else if (docIdIterator instanceof BitmapBasedDocIdIterator) {
         bitmapBasedDocIdIterators.add((BitmapBasedDocIdIterator) docIdIterator);
-      } else if (docIdIterator instanceof ScanBasedDocIdIterator) {
-        scanBasedDocIdIterators.add((ScanBasedDocIdIterator) docIdIterator);
+      } else if (docIdIterator instanceof ExpressionScanDocIdIterator){
+        expressionScanDocIdIterators.add((ExpressionScanDocIdIterator) docIdIterator);
+      } else if (docIdIterator instanceof ValueBasedDocIdIterator) {
+        valueBasedDocIdIterators.add((ValueBasedDocIdIterator) docIdIterator);
       } else {
         remainingDocIdIterators.add(docIdIterator);
       }
     }
     int numSortedDocIdIterators = sortedDocIdIterators.size();
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
-    int numScanBasedDocIdIterators = scanBasedDocIdIterators.size();
+    int numScanBasedDocIdIterators = valueBasedDocIdIterators.size() + expressionScanDocIdIterators.size();
+    int numValueBasedDocIdIterators = valueBasedDocIdIterators.size();
     int numRemainingDocIdIterators = remainingDocIdIterators.size();
     int numIndexBasedDocIdIterators = numSortedDocIdIterators + numBitmapBasedDocIdIterators;
     if ((numIndexBasedDocIdIterators > 0 && numScanBasedDocIdIterators > 0) || numIndexBasedDocIdIterators > 1) {
@@ -124,8 +133,20 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
           docIds = mutableDocIds;
         }
       }
-      for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
-        docIds = scanBasedDocIdIterator.applyAnd(docIds);
+
+      if (numValueBasedDocIdIterators > 1 && ((float)docIds.getCardinality() / _numDocs > FAST_SCANNING_MIN_THRESHOLD)){
+        docIds=ValueBasedDocIdIterator.applyAnd(docIds,valueBasedDocIdIterators);
+        for (ExpressionScanDocIdIterator expressionScanDocIdIterator : expressionScanDocIdIterators) {
+          docIds = expressionScanDocIdIterator.applyAnd(docIds);
+        }
+      }
+      else {
+        for (ScanBasedDocIdIterator scanBasedDocIdIterator : valueBasedDocIdIterators) {
+          docIds = scanBasedDocIdIterator.applyAnd(docIds);
+        }
+        for (ExpressionScanDocIdIterator expressionScanDocIdIterator : expressionScanDocIdIterators) {
+          docIds = expressionScanDocIdIterator.applyAnd(docIds);
+        }
       }
       RangelessBitmapDocIdIterator rangelessBitmapDocIdIterator = new RangelessBitmapDocIdIterator(docIds);
       if (numRemainingDocIdIterators == 0) {
