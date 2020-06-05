@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -77,8 +78,10 @@ public class VarByteChunkSingleValueReaderWriteTest {
     String[] expected = new String[NUM_ENTRIES];
     Random random = new Random();
 
-    File outFile = new File(TEST_FILE);
-    FileUtils.deleteQuietly(outFile);
+    File outFileFourByte = new File(TEST_FILE);
+    File outFileEightByte = new File(TEST_FILE + "8byte");
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
 
     int maxStringLengthInBytes = 0;
     for (int i = 0; i < NUM_ENTRIES; i++) {
@@ -86,35 +89,49 @@ public class VarByteChunkSingleValueReaderWriteTest {
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, expected[i].getBytes(UTF_8).length);
     }
 
-    VarByteChunkSingleValueWriter writer =
-        new VarByteChunkSingleValueWriter(outFile, compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK,
-            maxStringLengthInBytes);
+    // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
+    VarByteChunkSingleValueWriter fourByteOffsetWriter =
+        new VarByteChunkSingleValueWriter(outFileFourByte, compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK,
+            maxStringLengthInBytes, BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    VarByteChunkSingleValueWriter eightByteOffsetWriter =
+        new VarByteChunkSingleValueWriter(outFileEightByte, compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK,
+            maxStringLengthInBytes, BaseChunkSingleValueWriter.CURRENT_VERSION);
 
     for (int i = 0; i < NUM_ENTRIES; i += 2) {
-      writer.setString(i, expected[i]);
-      writer.setBytes(i + 1, expected[i].getBytes(UTF_8));
+      fourByteOffsetWriter.setString(i, expected[i]);
+      fourByteOffsetWriter.setBytes(i + 1, expected[i].getBytes(UTF_8));
+      eightByteOffsetWriter.setString(i, expected[i]);
+      eightByteOffsetWriter.setBytes(i + 1, expected[i].getBytes(UTF_8));
     }
 
-    writer.close();
+    fourByteOffsetWriter.close();
+    eightByteOffsetWriter.close();
 
-    try (VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
-      ChunkReaderContext context = reader.createContext();
+    try (VarByteChunkSingleValueReader fourByteOffsetReader = new VarByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte));
+        VarByteChunkSingleValueReader eightByteOffsetReader = new VarByteChunkSingleValueReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte))) {
+
+      ChunkReaderContext context1 = fourByteOffsetReader.createContext();
+      ChunkReaderContext context2 = eightByteOffsetReader.createContext();
 
       for (int i = 0; i < NUM_ENTRIES; i += 2) {
-        String actual = reader.getString(i, context);
+        String actual = fourByteOffsetReader.getString(i, context1);
         Assert.assertEquals(actual, expected[i]);
         Assert.assertEquals(actual.getBytes(UTF_8), expected[i].getBytes(UTF_8));
-        Assert.assertEquals(reader.getBytes(i + 1), expected[i].getBytes(UTF_8));
+        Assert.assertEquals(fourByteOffsetReader.getBytes(i + 1, context1), expected[i].getBytes(UTF_8));
+        actual = eightByteOffsetReader.getString(i, context2);
+        Assert.assertEquals(actual.getBytes(UTF_8), expected[i].getBytes(UTF_8));
+        Assert.assertEquals(eightByteOffsetReader.getBytes(i + 1, context2), expected[i].getBytes(UTF_8));
       }
     }
 
-    FileUtils.deleteQuietly(outFile);
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
   }
 
   /**
    * This test ensures that the reader can read in an data file from version 1.
-   * @throws IOException
    */
   @Test
   public void testBackwardCompatibilityV1()
@@ -193,7 +210,7 @@ public class VarByteChunkSingleValueReaderWriteTest {
     int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes);
     VarByteChunkSingleValueWriter writer =
         new VarByteChunkSingleValueWriter(outFile, compressionType, numDocs, numDocsPerChunk,
-            maxStringLengthInBytes);
+            maxStringLengthInBytes, BaseChunkSingleValueWriter.CURRENT_VERSION);
 
     for (int i = 0; i < numDocs; i += 2) {
       writer.setString(i, expected[i]);

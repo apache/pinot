@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.io.writer.impl.v1;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -36,6 +37,9 @@ import org.slf4j.LoggerFactory;
  * Base class for fixed and variable byte writer implementations.
  */
 public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleValueWriter {
+  public static final int DEFAULT_VERSION = 2;
+  public static final int CURRENT_VERSION = 3;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSingleValueWriter.class);
   private static final int FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2 = Integer.BYTES;
   private static final int FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V3 = Long.BYTES;
@@ -60,12 +64,13 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
    * @param numDocsPerChunk Number of docs per data chunk
    * @param chunkSize Size of chunk
    * @param sizeOfEntry Size of entry (in bytes), max size for variable byte implementation.
-   * @param version Version of file
+   * @param version format version used to determine whether to use 8 or 4 byte chunk offsets
    * @throws FileNotFoundException
    */
   protected BaseChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
       int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version)
       throws FileNotFoundException {
+    Preconditions.checkArgument(version == DEFAULT_VERSION || version == CURRENT_VERSION);
     _chunkSize = chunkSize;
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
     _headerEntryChunkOffsetSize = getHeaderEntryChunkOffsetSize(version);

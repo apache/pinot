@@ -53,8 +53,6 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
  */
 @NotThreadSafe
 public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
-
-  private static final int CURRENT_VERSION = 3;
   private int _chunkDataOffset;
 
   /**
@@ -64,15 +62,15 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
    * @param compressionType Type of compression to use.
    * @param totalDocs Total number of docs to write.
    * @param numDocsPerChunk Number of documents per chunk.
-   * @param sizeOfEntry Size of entry (in bytes).
+   * @param sizeOfEntry Size of entry (in bytes)
+   * @param writerVersion writer version used to determine whether to use 8 or 4 byte chunk offsets
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
   public FixedByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int sizeOfEntry)
+      int totalDocs, int numDocsPerChunk, int sizeOfEntry, int writerVersion)
       throws FileNotFoundException {
-
     super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
-        CURRENT_VERSION);
+        writerVersion);
     _chunkDataOffset = 0;
   }
 

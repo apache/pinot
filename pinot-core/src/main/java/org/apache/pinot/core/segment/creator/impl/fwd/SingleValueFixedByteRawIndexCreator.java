@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
 import org.apache.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -52,9 +53,26 @@ public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndex
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
       String column, int totalDocs, int sizeOfEntry)
       throws IOException {
+    this(baseIndexDir, compressionType, column, totalDocs, sizeOfEntry, BaseChunkSingleValueWriter.DEFAULT_VERSION);
+  }
+
+  /**
+   * Constructor for the class
+   *
+   * @param baseIndexDir Index directory
+   * @param compressionType Type of compression to use
+   * @param column Name of column to index
+   * @param totalDocs Total number of documents to index
+   * @param sizeOfEntry Size of entry (in bytes)
+   * @param writerVersion writer format version
+   * @throws IOException
+   */
+  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
+      String column, int totalDocs, int sizeOfEntry, int writerVersion)
+      throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     _indexWriter =
-        new FixedByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, sizeOfEntry);
+        new FixedByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, sizeOfEntry, writerVersion);
   }
 
   @Override

@@ -36,6 +36,7 @@ import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -307,7 +308,8 @@ public class DictionaryToRawIndexConverter {
     ChunkCompressorFactory.CompressionType compressionType =
         ChunkCompressorFactory.CompressionType.valueOf(_compressionType);
     SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
-        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, totalDocs, lengthOfLongestEntry);
+        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, totalDocs, lengthOfLongestEntry, false,
+            BaseChunkSingleValueWriter.DEFAULT_VERSION);
 
     int docId = 0;
     bvIter.reset();
