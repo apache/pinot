@@ -37,7 +37,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -190,8 +189,10 @@ public class PinotInstanceRestletResource {
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
       Instance instance) {
     LOGGER.info("Instance update request received for instance: {}", instanceName);
-    if (!pinotHelixResourceManager.updateInstance(instanceName, instance).isSuccessful()) {
-      throw new ControllerApplicationException(LOGGER, "Failure to update instance", Response.Status.INTERNAL_SERVER_ERROR);
+    PinotResourceManagerResponse response = pinotHelixResourceManager.updateInstance(instanceName, instance);
+    if (!response.isSuccessful()) {
+      throw new ControllerApplicationException(LOGGER, "Failure to update instance. Reason: " + response.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
     return new SuccessResponse("Instance successfully updated");
   }

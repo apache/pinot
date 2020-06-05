@@ -130,7 +130,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          String getResponse = sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation(instanceName));
+          String getResponse = sendGetRequest(_controllerRequestURLBuilder.forInstance(instanceName));
           JsonNode instance = JsonUtils.stringToJsonNode(getResponse);
           boolean result =
               (instance.get("instanceName") != null) && (instance.get("instanceName").asText().equals(instanceName))
@@ -196,13 +196,15 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Create untagged broker and server instances
     String createInstanceUrl = _controllerRequestURLBuilder.forInstanceCreate();
+    String brokerInstanceId = "Broker_a.b.c.d_1234";
     Instance brokerInstance = new Instance("a.b.c.d", 1234, InstanceType.BROKER, null, null);
     sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
-    String brokerInstanceUrl = _controllerRequestURLBuilder.forInstance(brokerInstance.getInstanceId());
+    String brokerInstanceUrl = _controllerRequestURLBuilder.forInstance(brokerInstanceId);
 
+    String serverInstanceId = "Server_e.f.g.h_2345";
     Instance serverInstance = new Instance("e.f.g.h", 2345, InstanceType.SERVER, Arrays.asList(UNTAGGED_SERVER_INSTANCE), null);
     sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
-    String serverInstanceUrl = _controllerRequestURLBuilder.forInstance(serverInstance.getInstanceId());
+    String serverInstanceUrl = _controllerRequestURLBuilder.forInstance(serverInstanceId);
 
     String newBrokerTag = "new-broker-tag";
     Instance newBrokerInstance = new Instance("a.b.c.d", 1234, InstanceType.BROKER, Arrays.asList(newBrokerTag), null);
@@ -212,8 +214,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     Instance newServerInstance = new Instance("e.f.g.h", 2345, InstanceType.SERVER, Arrays.asList(newServerTag), null);
     sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
 
-    checkInstanceInfo("Broker_a.b.c.d_1234", "Broker_a.b.c.d", 1234, new String[]{newBrokerTag}, null, null);
-    checkInstanceInfo("Server_e.f.g.h_2345", "Server_e.f.g.h", 2345, new String[]{newServerTag}, null, null);
+    checkInstanceInfo(brokerInstanceId, "Broker_a.b.c.d", 1234, new String[]{newBrokerTag}, null, null);
+    checkInstanceInfo(serverInstanceId, "Server_e.f.g.h", 2345, new String[]{newServerTag}, null, null);
   }
 
   @AfterClass
