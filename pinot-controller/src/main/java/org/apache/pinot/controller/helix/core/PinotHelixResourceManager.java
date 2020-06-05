@@ -369,7 +369,10 @@ public class PinotHelixResourceManager {
     if (!instances.contains(instanceIdToUpdate)) {
       return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
     } else {
-      _helixAdmin.setInstanceConfig(_helixClusterName, instanceIdToUpdate, newInstance.toInstanceConfig());
+      if(!_helixZkManager.getHelixDataAccessor().setProperty(
+          _helixZkManager.getHelixDataAccessor().keyBuilder().instanceConfig(instanceIdToUpdate), newInstance.toInstanceConfig())) {
+        return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
+      }
       return PinotResourceManagerResponse.SUCCESS;
     }
   }
