@@ -32,6 +32,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -43,6 +44,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -56,6 +58,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 
 @ThreadSafe
@@ -89,7 +92,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // the minimum interval between updates to RealtimeSegmentStatsHistory as 30 minutes. This way it is
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
-
+  private static final int RETRY_COUNT = 3;
+  private static final long RETRY_WAIT_MS = 100;
+  private static final double RETRY_DELAY_SCALE_FACTOR = 2.0;
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
   }
@@ -249,7 +254,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         LLCRealtimeSegmentZKMetadata llcSegmentMetadata = (LLCRealtimeSegmentZKMetadata) realtimeSegmentZKMetadata;
         if (realtimeSegmentZKMetadata.getStatus().equals(Status.DONE)) {
           // TODO Remove code duplication here and in LLRealtimeSegmentDataManager
-          downloadAndReplaceSegment(segmentName, llcSegmentMetadata, indexLoadingConfig);
+          downloadAndReplaceSegment(segmentName, llcSegmentMetadata, indexLoadingConfig, tableConfig);
           return;
         }
 
@@ -268,20 +273,81 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public void downloadAndReplaceSegment(String segmentName, LLCRealtimeSegmentZKMetadata llcSegmentMetadata,
-      IndexLoadingConfig indexLoadingConfig) {
+      IndexLoadingConfig indexLoadingConfig, TableConfig tableConfig) {
     final String uri = llcSegmentMetadata.getDownloadUrl();
+    if (!"PEER".equalsIgnoreCase(uri)) {
+      try {
+        downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, uri);
+      } catch (Exception e) {
+        // Download from deep store failed; try to download from peer if peer download is setup for the table.
+        if (isPeerSegmentDownloadEnabled(tableConfig)) {
+          downloadSegmentFromPeer(segmentName, tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), indexLoadingConfig);
+        } else {
+          throw e;
+        }
+      }
+    } else {
+      if (isPeerSegmentDownloadEnabled(tableConfig)) {
+        downloadSegmentFromPeer(segmentName, tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), indexLoadingConfig);
+      } else {
+        throw new RuntimeException("Peer segment download not enabled for segment " + segmentName);
+      }
+    }
+  }
+
+  private void downloadSegmentFromDeepStore(String segmentName, IndexLoadingConfig indexLoadingConfig, String uri) {
     File tempSegmentFolder = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
     File tempFile = new File(_indexDir, segmentName + ".tar.gz");
-    final File segmentFolder = new File(_indexDir, segmentName);
-    FileUtils.deleteQuietly(segmentFolder);
     try {
       SegmentFetcherFactory.fetchSegmentToLocal(uri, tempFile);
       _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
-      TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
-      _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
-      FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], segmentFolder);
-      _logger.info("Replacing LLC Segment {}", segmentName);
-      replaceLLSegment(segmentName, indexLoadingConfig);
+      untarAndMoveSegment(segmentName, indexLoadingConfig, tempSegmentFolder, tempFile);
+    } catch (Exception e) {
+      _logger.warn("Failed to download segment {} from deep store: ", segmentName, e);
+      throw new RuntimeException(e);
+    } finally {
+      FileUtils.deleteQuietly(tempFile);
+      FileUtils.deleteQuietly(tempSegmentFolder);
+    }
+  }
+
+  private void untarAndMoveSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, File tempSegmentFolder,
+      File tempFile)
+      throws IOException, ArchiveException {
+    TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
+    _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
+    final File segmentFolder = new File(_indexDir, segmentName);
+    FileUtils.deleteQuietly(segmentFolder);
+    FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], segmentFolder);
+    _logger.info("Replacing LLC Segment {}", segmentName);
+    replaceLLSegment(segmentName, indexLoadingConfig);
+  }
+
+  private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
+    return SegmentFetcherFactory.HTTP_PROTOCOL
+        .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())
+        || SegmentFetcherFactory.HTTPS_PROTOCOL
+        .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
+  }
+
+  private void downloadSegmentFromPeer(String segmentName, String downloadScheme, IndexLoadingConfig indexLoadingConfig) {
+    File tempSegmentFolder = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
+    File tempFile = new File(_indexDir, segmentName + ".tar.gz");
+    try {
+      RetryPolicies.exponentialBackoffRetryPolicy(RETRY_COUNT, RETRY_WAIT_MS, RETRY_DELAY_SCALE_FACTOR).attempt(() -> {
+        try {
+          // First found a server hosting the segment.
+          String peerSegmentURI = PeerServerSegmentFinder.getPeerServerURI(segmentName, downloadScheme, _helixManager);
+          // Next download the segment from the server using configured scheme.
+          SegmentFetcherFactory.fetchSegmentToLocal(peerSegmentURI, tempFile);
+          _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURI, tempFile, tempFile.length());
+          return true;
+        } catch (Exception e) {
+          _logger.warn("Caught exception while downloading segment {} from peer with scheme {}", segmentName, downloadScheme);
+          return false;
+        }
+      });
+      untarAndMoveSegment(segmentName, indexLoadingConfig, tempSegmentFolder, tempFile);
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {

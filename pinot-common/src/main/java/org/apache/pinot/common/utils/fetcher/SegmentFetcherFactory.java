@@ -35,11 +35,11 @@ public class SegmentFetcherFactory {
 
   public static final String PROTOCOLS_KEY = "protocols";
   public static final String SEGMENT_FETCHER_CLASS_KEY_SUFFIX = ".class";
+  public static final String HTTP_PROTOCOL = "http";
+  public static final String HTTPS_PROTOCOL = "https";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
   private static final Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new HashMap<>();
-  private static final String HTTP_PROTOCOL = "http";
-  private static final String HTTPS_PROTOCOL = "https";
   private static final SegmentFetcher DEFAULT_HTTP_SEGMENT_FETCHER = new HttpSegmentFetcher();
   private static final SegmentFetcher DEFAULT_PINOT_FS_SEGMENT_FETCHER = new PinotFSSegmentFetcher();
 
