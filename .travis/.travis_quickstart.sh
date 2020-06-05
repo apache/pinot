@@ -41,9 +41,11 @@ sleep 30
 for i in $(seq 1 200)
 do
   COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  if [ "${COUNT_STAR_RES}" -eq 97889 ]; then
-    PASS=1
-    break
+  if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]]; then
+    if [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+      PASS=1
+      break
+    fi
   fi
   sleep 1
 done
@@ -67,10 +69,12 @@ sleep 30
 for i in $(seq 1 200)
 do
   COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  if [ "${COUNT_STAR_RES}" -gt 0 ]; then
-    if [ "${RES_1}" -eq 0 ]; then
-      RES_1=${COUNT_STAR_RES}
-      continue
+ if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]]; then
+    if [ "${COUNT_STAR_RES}" -gt 0 ]; then
+      if [ "${RES_1}" -eq 0 ]; then
+        RES_1=${COUNT_STAR_RES}
+        continue
+      fi
     fi
     if [ "${COUNT_STAR_RES}" -gt "${RES_1}" ]; then
       PASS=1
@@ -103,10 +107,12 @@ sleep 30
 for i in $(seq 1 200)
 do
   COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  if [ "${COUNT_STAR_RES}" -gt 0 ]; then
-    if [ "${RES_1}" -eq 0 ]; then
-      RES_1=${COUNT_STAR_RES}
-      continue
+  if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]]; then
+    if [ "${COUNT_STAR_RES}" -gt 0 ]; then
+      if [ "${RES_1}" -eq 0 ]; then
+        RES_1=${COUNT_STAR_RES}
+        continue
+      fi
     fi
     if [ "${COUNT_STAR_RES}" -gt "${RES_1}" ]; then
       PASS=1
