@@ -51,6 +51,7 @@ public class StreamConfig {
 
   public static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
       "org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory";
+  public static final String DEFAULT_PARTITION_OFFSET_FACTORY_CLASS_NAME_STRING = LongMsgOffsetFactory.class.getName();
 
   public static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
@@ -65,6 +66,7 @@ public class StreamConfig {
   private final OffsetCriteria _offsetCriteria;
   private final String _decoderClass;
   private final Map<String, String> _decoderProperties = new HashMap<>();
+  private final String _partitionOffsetFactoryClassName;
 
   private final long _connectionTimeoutMillis;
   private final int _fetchTimeoutMillis;
@@ -118,6 +120,12 @@ public class StreamConfig {
     } else {
       _offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest();
     }
+
+    String partitionOffsetClassKey = StreamConfigProperties.constructStreamProperty(_type,
+        StreamConfigProperties.PARTITION_MSG_OFFSET_FACTORY_CLASS);
+    // For backward compatibility, the offset factory class is for handling kafka offsets (long type)
+    _partitionOffsetFactoryClassName = streamConfigMap.getOrDefault(partitionOffsetClassKey,
+        DEFAULT_PARTITION_OFFSET_FACTORY_CLASS_NAME_STRING);
 
     String decoderClassKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_DECODER_CLASS);
@@ -259,6 +267,10 @@ public class StreamConfig {
 
   public String getConsumerFactoryClassName() {
     return _consumerFactoryClassName;
+  }
+
+  public String getPartitionOffsetFactoryClassName() {
+    return _partitionOffsetFactoryClassName;
   }
 
   public OffsetCriteria getOffsetCriteria() {

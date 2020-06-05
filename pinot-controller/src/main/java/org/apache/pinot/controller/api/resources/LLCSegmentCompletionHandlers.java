@@ -50,7 +50,6 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.slf4j.Logger;
@@ -108,15 +107,14 @@ public class LLCSegmentCompletionHandlers {
   }
 
   private void extractOffsetFromParams(SegmentCompletionProtocol.Request.Params requestParams,
-      @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset) {
+      String streamPartitionMsgOffset, long offset) {
     // If the sender sent us a stream partition message offset, use it. If not, the sender is still old
     // version, so pick up the old offset from it.
-    // TODO Remove this backup use of offset when server and controller are upgraded.
+    // TODO Issue 5359 Remove this backup use of offset when server and controller are upgraded.
     if (streamPartitionMsgOffset != null) {
-      requestParams.withStreamPartitionMsgOffset(new StreamPartitionMsgOffset(streamPartitionMsgOffset));
+      requestParams.withStreamPartitionMsgOffset(streamPartitionMsgOffset);
     } else {
-      requestParams.withOffset(offset);
+      requestParams.withStreamPartitionMsgOffset(Long.toString(offset));
     }
   }
 
@@ -330,8 +328,9 @@ public class LLCSegmentCompletionHandlers {
     }
 
     response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false, committingSegmentDescriptor);
-    LOGGER.info("Response to segmentCommit: instance={}  segment={} status={} offset={}", requestParams.getInstanceId(),
-        requestParams.getSegmentName(), response.getStatus(), response.extractOffset());
+    LOGGER.info("Response to segmentCommit: instance={}  segment={} status={} offset={}, streamMsgOffset={}",
+        requestParams.getInstanceId(), requestParams.getSegmentName(), response.getStatus(), response.getOffset(),
+        response.getStreamPartitionMsgOffset());
 
     return response.toJsonString();
   }

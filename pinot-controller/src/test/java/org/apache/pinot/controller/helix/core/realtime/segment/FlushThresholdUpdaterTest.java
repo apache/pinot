@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 import java.util.Arrays;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -162,7 +163,7 @@ public class FlushThresholdUpdaterTest {
   }
 
   private CommittingSegmentDescriptor getCommittingSegmentDescriptor(long segmentSizeBytes) {
-    return new CommittingSegmentDescriptor(null, new StreamPartitionMsgOffset(0), segmentSizeBytes);
+    return new CommittingSegmentDescriptor(null, new LongMsgOffset(0).toString(), segmentSizeBytes);
   }
 
   private LLCRealtimeSegmentZKMetadata getCommittingSegmentZKMetadata(long creationTime,

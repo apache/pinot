@@ -18,25 +18,28 @@
  */
 package org.apache.pinot.spi.stream;
 
-import org.apache.pinot.spi.annotations.InterfaceStability;
+public class LongMsgOffsetFactory implements StreamPartitionMsgOffsetFactory {
+  @Override
+  public void init(StreamConfig streamConfig) {
+  }
 
-/**
- * This is a class for now (so we can make one round of changes to the code)
- * It will evolve to an interface later with different implementations for the
- * streams. Each stream needs to provide its own serde of an offset.
- *
- * For now, we will take toString as a serializer.
- * Must be thread-safe for multiple readers and one writer. Readers could get the offset
- * and the writer can update it.
- */
-@InterfaceStability.Evolving
-public interface StreamPartitionMsgOffset extends Comparable {
+  @Override
+  public StreamPartitionMsgOffset create(String offsetStr) {
+    return new LongMsgOffset(offsetStr);
+  }
 
-  int compareTo(Object other);
+  @Override
+  public StreamPartitionMsgOffset create(StreamPartitionMsgOffset other) {
+    return new LongMsgOffset(other);
+  }
 
-  /**
-   *  A serialized representation of the offset object as a String
-   * @return
-   */
-  String toString();
+  @Override
+  public StreamPartitionMsgOffset createMaxOffset() {
+    return new LongMsgOffset(Long.MAX_VALUE);
+  }
+
+  @Override
+  public StreamPartitionMsgOffset createMinOffset() {
+    return new LongMsgOffset(-1L);
+  }
 }

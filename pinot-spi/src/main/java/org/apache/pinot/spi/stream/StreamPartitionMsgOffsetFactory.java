@@ -20,23 +20,18 @@ package org.apache.pinot.spi.stream;
 
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
+
 /**
- * This is a class for now (so we can make one round of changes to the code)
- * It will evolve to an interface later with different implementations for the
- * streams. Each stream needs to provide its own serde of an offset.
- *
- * For now, we will take toString as a serializer.
- * Must be thread-safe for multiple readers and one writer. Readers could get the offset
- * and the writer can update it.
+ * An interface to be implemented by streams if the offset of message in a stream partition
+ * is NOT a Long (or int) type.
+ * TODO Document the methods after finalizing the interface (Issue 5359)
+ * TODO Try to avoid createMaxOffset and createMinOffset methods. (Issue 5359)
  */
 @InterfaceStability.Evolving
-public interface StreamPartitionMsgOffset extends Comparable {
-
-  int compareTo(Object other);
-
-  /**
-   *  A serialized representation of the offset object as a String
-   * @return
-   */
-  String toString();
+public interface StreamPartitionMsgOffsetFactory {
+  void init(StreamConfig streamConfig);
+  StreamPartitionMsgOffset create(String offsetStr);
+  StreamPartitionMsgOffset create(StreamPartitionMsgOffset other);
+  StreamPartitionMsgOffset createMaxOffset(); // Create an offset that compares highest with all others
+  StreamPartitionMsgOffset createMinOffset(); // Create an offset that compares lowest with all others
 }

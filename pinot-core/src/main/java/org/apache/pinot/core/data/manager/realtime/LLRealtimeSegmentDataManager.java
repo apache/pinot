@@ -65,6 +65,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -76,6 +77,7 @@ import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.apache.pinot.core.util.SchemaUtils;
 import org.joda.time.DateTime;
@@ -153,7 +155,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         String segmentDirPath, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes) {
       _segmentTarFilePath = segmentTarFilePath;
       _metadataFileMap = metadataFileMap;
-      _offset = new StreamPartitionMsgOffset(offset.getOffset());
+      _offset = _streamPartitionMsgOffsetFactory.create(offset);
       _buildTimeMillis = buildTimeMillis;
       _waitTimeMillis = waitTimeMillis;
       _segmentDirPath = segmentDirPath;
@@ -218,7 +220,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
   private final MutableSegmentImpl _realtimeSegment;
-  private final StreamPartitionMsgOffset _currentOffset;
+  private StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
@@ -230,6 +232,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
   private SegmentBuildDescriptor _segmentBuildDescriptor;
   private StreamConsumerFactory _streamConsumerFactory;
+  private StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -361,13 +364,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final long idlePipeSleepTimeMillis = 100;
     final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000) / (idlePipeSleepTimeMillis + _partitionLevelStreamConfig
         .getFetchTimeoutMillis());  // 3 minute count
-    StreamPartitionMsgOffset lastUpdatedOffset = new StreamPartitionMsgOffset(_currentOffset.getOffset());  // so that we always update the metric when we enter this method.
+    StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);  // so that we always update the metric when we enter this method.
     long consecutiveIdleCount = 0;
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
     // anymore. Remove the file if it exists.
     removeSegmentFile();
 
-    final StreamPartitionMsgOffset endOffset = new StreamPartitionMsgOffset(Long.MAX_VALUE); // No upper limit on stream offset
+    final StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.createMaxOffset();
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while (!_shouldStop && !endCriteriaReached()) {
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
@@ -375,7 +378,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       MessageBatch messageBatch;
       try {
         messageBatch = _partitionLevelConsumer
-            .fetchMessages(_currentOffset.getOffset(), endOffset.getOffset(), _partitionLevelStreamConfig.getFetchTimeoutMillis());
+            .fetchMessages(_currentOffset, endOffset, _partitionLevelStreamConfig.getFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
@@ -398,11 +401,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
         consecutiveIdleCount = 0;
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
-        // TODO Need to find a way to bump metrics without getting actual offset value.
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset.getOffset());
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, _currentOffset.getOffset());
+        // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
+//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset.getOffset());
+//        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, _currentOffset.getOffset());
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
-        lastUpdatedOffset.setOffset(_currentOffset.getOffset());
+        lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else {
         // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long time.
         // Create a new stream consumer wrapper, in case we are stuck on something.
@@ -489,7 +492,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 realtimeRowsDroppedMeter);
       }
 
-      _currentOffset.setOffset(messagesAndOffsets.getNextStreamMessageOffsetAtIndex(index));
+      // TODO Issue 5359 fix when we have streams returning offsets as StreamPartitionMsgOffset instead of long
+      _currentOffset = _streamPartitionMsgOffsetFactory.create(Long.toString(messagesAndOffsets.getNextStreamMessageOffsetAtIndex(index)));
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       streamMessageCount++;
@@ -536,7 +540,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _state = State.HOLDING;
           SegmentCompletionProtocol.Response response = postSegmentConsumedMsg();
           SegmentCompletionProtocol.ControllerResponseStatus status = response.getStatus();
-          StreamPartitionMsgOffset rspOffset = response.extractOffset();
+          StreamPartitionMsgOffset rspOffset = extractOffset(response);
           boolean success;
           switch (status) {
             case NOT_LEADER:
@@ -639,6 +643,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     return CompletionMode.DEFAULT;
+  }
+
+  private StreamPartitionMsgOffset extractOffset(SegmentCompletionProtocol.Response response) {
+    if (response.getStreamPartitionMsgOffset() != null) {
+      return _streamPartitionMsgOffsetFactory.create(response.getStreamPartitionMsgOffset());
+    } else {
+      // TODO Issue 5359 Remove this once the protocol is upgraded on server and controller
+      return _streamPartitionMsgOffsetFactory.create(Long.toString(response.getOffset()));
+    }
   }
 
   private File makeSegmentDirPath() {
@@ -806,8 +819,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
-    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset).withNumRows(_numRowsConsumed)
-        .withInstanceId(_instanceId).withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
+        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId)
+        .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
     if (_isOffHeap) {
@@ -882,7 +896,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected void postStopConsumedMsg(String reason) {
     do {
       SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-      params.withStreamPartitionMsgOffset(_currentOffset).withReason(reason).withSegmentName(_segmentNameStr).withInstanceId(_instanceId);
+      params.withStreamPartitionMsgOffset(_currentOffset.toString()).withReason(reason)
+          .withSegmentName(_segmentNameStr).withInstanceId(_instanceId);
 
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
@@ -898,8 +913,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withStreamPartitionMsgOffset(_currentOffset).withSegmentName(_segmentNameStr).withReason(_stopReason)
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
+    params.withStreamPartitionMsgOffset(_currentOffset.toString()).withSegmentName(_segmentNameStr)
+        .withReason(_stopReason) .withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -921,7 +936,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
       _leaseExtender.removeSegment(_segmentNameStr);
-      final StreamPartitionMsgOffset endOffset = new StreamPartitionMsgOffset(llcMetadata.getEndOffset());
+      // TODO Issue 5359 fix when we move metadata to have string offsets in it
+      final StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.create(Long.toString(llcMetadata.getEndOffset()));
       segmentLogger
           .info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state.toString(),
               _startOffset, endOffset);
@@ -1078,7 +1094,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _partitionLevelStreamConfig = new PartitionLevelStreamConfig(_tableNameWithType, indexingConfig.getStreamConfigs());
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
+    _streamConsumerFactory = StreamConsumerFactoryProvider.createConsumerFactory(_partitionLevelStreamConfig);
+    _streamPartitionMsgOffsetFactory = StreamConsumerFactoryProvider.createOffsetFactory(_partitionLevelStreamConfig);
     _streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
@@ -1207,8 +1224,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
-    _startOffset = new StreamPartitionMsgOffset(_segmentZKMetadata.getStartOffset());
-    _currentOffset = new StreamPartitionMsgOffset(_startOffset.getOffset());
+    // TODO Issue 5359 fix when the segment metadata has string offsets in it
+    _startOffset = _streamPartitionMsgOffsetFactory.create(Long.toString(_segmentZKMetadata.getStartOffset()));
+    _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
     if (!_resourceTmpDir.exists()) {
       _resourceTmpDir.mkdirs();

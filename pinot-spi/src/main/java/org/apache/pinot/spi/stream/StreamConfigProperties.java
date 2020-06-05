@@ -43,6 +43,7 @@ public class StreamConfigProperties {
   public static final String STREAM_DECODER_CLASS = "decoder.class.name";
   public static final String DECODER_PROPS_PREFIX = "decoder.prop";
   public static final String GROUP_ID = "hlc.group.id";
+  public static final String PARTITION_MSG_OFFSET_FACTORY_CLASS = "partition.offset.factory.class.name";
 
   /**
    * Time threshold that will keep the realtime segment open for before we complete the segment

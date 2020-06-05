@@ -50,7 +50,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -168,7 +167,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _resourceTmpDir.mkdirs();
     }
     // create and init stream level consumer
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.createConsumerFactory(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
     _streamLevelConsumer = streamConsumerFactory
         .createStreamLevelConsumer(clientId, _tableNameWithType, SchemaUtils.extractSourceFields(schema),
