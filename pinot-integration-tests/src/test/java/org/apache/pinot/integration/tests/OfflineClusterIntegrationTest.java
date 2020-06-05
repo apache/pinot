@@ -46,15 +46,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 /**
@@ -319,7 +315,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
     String expectedTodayStr =
         Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
-    Assert.assertEquals(todayStr, expectedTodayStr);
+    assertEquals(todayStr, expectedTodayStr);
   }
 
   @Test
@@ -677,26 +673,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String pqlQuery = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable";
     JsonNode response = postQuery(pqlQuery);
     ArrayNode selectionResults = (ArrayNode) response.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    assertNotNull(selectionResults);
+    assertTrue(selectionResults.size() > 0);
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
       long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
-      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+      assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
     }
 
     pqlQuery =
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000";
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    assertNotNull(selectionResults);
+    assertTrue(selectionResults.size() > 0);
     long prevValue = -1;
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
       long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
-      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
-      Assert.assertTrue(daysSinceEpoch >= prevValue);
+      assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+      assertTrue(daysSinceEpoch >= prevValue);
       prevValue = daysSinceEpoch;
     }
 
@@ -704,14 +700,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
     response = postQuery(pqlQuery);
     selectionResults = (ArrayNode) response.get("selectionResults").get("results");
-    Assert.assertNotNull(selectionResults);
-    Assert.assertTrue(selectionResults.size() > 0);
+    assertNotNull(selectionResults);
+    assertTrue(selectionResults.size() > 0);
     prevValue = Long.MAX_VALUE;
     for (int i = 0; i < selectionResults.size(); i++) {
       long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
       long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
-      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
-      Assert.assertTrue(secondsSinceEpoch <= prevValue);
+      assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+      assertTrue(secondsSinceEpoch <= prevValue);
       prevValue = secondsSinceEpoch;
     }
   }
@@ -724,32 +720,33 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     String pqlQuery;
     pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch;
-    JsonNode response1 = postQuery(pqlQuery);
+    long expectedResult = postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong();
+    System.out.println(expectedResult);
 
     pqlQuery = "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
-    JsonNode response2 = postQuery(pqlQuery);
+    assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
     pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch
         + " OR timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
-    JsonNode response3 = postQuery(pqlQuery);
+    assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
     pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch
         + " AND timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
-    JsonNode response4 = postQuery(pqlQuery);
+    assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
     pqlQuery =
         "SELECT count(*) FROM mytable WHERE DIV(timeConvert(DaysSinceEpoch,'DAYS','SECONDS'),1) = " + secondsSinceEpoch;
-    JsonNode response5 = postQuery(pqlQuery);
+    assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
 
-    double val1 = response1.get("aggregationResults").get(0).get("value").asDouble();
-    double val2 = response2.get("aggregationResults").get(0).get("value").asDouble();
-    double val3 = response3.get("aggregationResults").get(0).get("value").asDouble();
-    double val4 = response4.get("aggregationResults").get(0).get("value").asDouble();
-    double val5 = response5.get("aggregationResults").get(0).get("value").asDouble();
-    Assert.assertEquals(val1, val2);
-    Assert.assertEquals(val1, val3);
-    Assert.assertEquals(val1, val4);
-    Assert.assertEquals(val1, val5);
+    pqlQuery = String
+        .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') IN (%d, %d)",
+            secondsSinceEpoch - 100, secondsSinceEpoch);
+    assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
+
+    pqlQuery = String
+        .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') BETWEEN %d AND %d",
+            secondsSinceEpoch - 100, secondsSinceEpoch);
+    assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
   }
 
   @Test
@@ -772,7 +769,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       //System.out.println(response2);
       double val1 = response1.get("aggregationResults").get(0).get("value").asDouble();
       double val2 = response2.get("aggregationResults").get(0).get("value").asDouble();
-      Assert.assertEquals(val1, val2);
+      assertEquals(val1, val2);
     }
   }
 

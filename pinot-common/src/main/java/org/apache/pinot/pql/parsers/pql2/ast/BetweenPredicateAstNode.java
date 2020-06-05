@@ -22,6 +22,7 @@ import java.util.Collections;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -39,6 +40,7 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
       _identifier = node.getName();
     } else if (childNode instanceof FunctionCallAstNode) {
       _function = (FunctionCallAstNode) childNode;
+      _identifier = TransformExpressionTree.getStandardExpression(childNode);
     } else {
       super.addChild(childNode);
     }
@@ -102,8 +104,7 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
         rangeFuncCall.addToOperands(RequestUtils.createLiteralExpression(right));
         return betweenExpr;
       } catch (ClassCastException e) {
-        throw new Pql2CompilationException(
-            "BETWEEN clause was expecting two literal AST nodes, got " + getChildren());
+        throw new Pql2CompilationException("BETWEEN clause was expecting two literal AST nodes, got " + getChildren());
       }
     } else {
       throw new Pql2CompilationException("BETWEEN clause does not have two children nodes");
@@ -123,8 +124,7 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
             Collections.singletonList("[" + left.getValueAsString() + "\t\t" + right.getValueAsString() + "]"),
             FilterOperator.RANGE, null);
       } catch (ClassCastException e) {
-        throw new Pql2CompilationException(
-            "BETWEEN clause was expecting two literal AST nodes, got " + getChildren());
+        throw new Pql2CompilationException("BETWEEN clause was expecting two literal AST nodes, got " + getChildren());
       }
     } else {
       throw new Pql2CompilationException("BETWEEN clause does not have two children nodes");
