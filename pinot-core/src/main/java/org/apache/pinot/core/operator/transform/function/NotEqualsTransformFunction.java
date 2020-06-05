@@ -47,12 +47,6 @@ public class NotEqualsTransformFunction extends BinaryOperatorTransformFunction 
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    fillResultArray(projectionBlock);
-    return _results;
-  }
-
-  @Override
   int getBinaryFuncResult(int result) {
     return (result != 0) ? 1 : 0;
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -78,6 +79,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
     for (int i = _numberWhenStatements; i < _numberWhenStatements * 2; i++) {
       _elseThenStatements.add(arguments.get(i));
     }
+    Preconditions.checkState(_elseThenStatements.size() == _numberWhenStatements + 1, "Missing THEN/ELSE clause in CASE statement");
     _resultMetadata = getResultMetadata(_elseThenStatements);
   }
 

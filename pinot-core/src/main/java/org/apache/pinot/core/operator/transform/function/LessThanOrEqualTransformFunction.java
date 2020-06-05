@@ -58,10 +58,4 @@ public class LessThanOrEqualTransformFunction extends BinaryOperatorTransformFun
   public String getName() {
     return TransformFunctionType.LESS_THAN_OR_EQUAL.getName();
   }
-
-  @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    fillResultArray(projectionBlock);
-    return _results;
-  }
 }

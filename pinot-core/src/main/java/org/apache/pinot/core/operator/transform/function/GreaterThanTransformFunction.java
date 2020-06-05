@@ -58,10 +58,4 @@ public class GreaterThanTransformFunction extends BinaryOperatorTransformFunctio
   public String getName() {
     return TransformFunctionType.GREATER_THAN.getName();
   }
-
-  @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    fillResultArray(projectionBlock);
-    return _results;
-  }
 }

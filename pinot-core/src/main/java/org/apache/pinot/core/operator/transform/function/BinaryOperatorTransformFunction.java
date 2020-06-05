@@ -65,6 +65,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     return INT_SV_NO_DICTIONARY_METADATA;
   }
 
+  @Override
+  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    fillResultArray(projectionBlock);
+    return _results;
+  }
+
   protected void fillResultArray(ProjectionBlock projectionBlock) {
     if (_results == null) {
       _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
