@@ -22,23 +22,18 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
+import java.util.Set;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockMultiValIterator;
-import org.apache.pinot.core.common.BlockSingleValIterator;
-import org.apache.pinot.core.common.BlockValIterator;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -49,14 +44,14 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @Argument
   @Option(name = "-path", required = true, metaVar = "<string>", usage = "Path of the folder containing the segment"
       + " file")
-  private String segmentPath;
+  private String _segmentDir = null;
 
   @Argument(index = 1, multiValued = true)
   @Option(name = "-columns", handler = StringArrayOptionHandler.class, usage = "Columns to dump")
-  private List<String> columnNames;
+  private List<String> _columnNames;
 
   @Option(name = "-dumpStarTree")
-  private boolean dumpStarTree;
+  private boolean _dumpStarTree = false;
 
   public void doMain(String[] args)
       throws Exception {
@@ -67,58 +62,62 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
 
   private void dump()
       throws Exception {
-    File segmentDir = new File(segmentPath);
-
-    SegmentMetadata metadata = new SegmentMetadataImpl(segmentDir);
+    PinotSegmentRecordReader reader = new PinotSegmentRecordReader(new File(_segmentDir));
+    Schema schema = reader.getSchema();
+    GenericRow reuse = new GenericRow();
 
     // All columns by default
-    if (columnNames == null) {
-      columnNames = new ArrayList<>(metadata.getSchema().getColumnNames());
-      Collections.sort(columnNames);
+    if (_columnNames == null) {
+      _columnNames = new ArrayList<>(schema.getColumnNames());
+      Collections.sort(_columnNames);
     }
 
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
-
-    Map<String, Dictionary> dictionaries = new HashMap<>();
-    Map<String, BlockValIterator> iterators = new HashMap<>();
-
-    for (String columnName : columnNames) {
-      DataSource dataSource = indexSegment.getDataSource(columnName);
-      Block block = dataSource.nextBlock();
-      BlockValSet blockValSet = block.getBlockValueSet();
-      BlockValIterator itr = (BlockValIterator) blockValSet.iterator();
-      iterators.put(columnName, itr);
-      dictionaries.put(columnName, dataSource.getDictionary());
+    // Collect MV columns.
+    Set<String> mvColumns = new HashSet<>();
+    for (String columnName : _columnNames) {
+      if (!schema.getFieldSpecFor(columnName).isSingleValueField()) {
+        mvColumns.add(columnName);
+      }
     }
 
+    dumpHeader(schema);
+    dumpRows(reader, reuse, mvColumns);
+    if (_dumpStarTree) {
+      dumpStarTree();
+    }
+
+    reader.close();
+  }
+
+  private void dumpHeader(Schema schema) {
+    System.out.println("Schema: " + schema);
     System.out.print("Doc\t");
-    for (String columnName : columnNames) {
+
+    for (String columnName : _columnNames) {
       System.out.print(columnName);
       System.out.print("\t");
     }
-    System.out.println();
+  }
 
-    for (int i = 0; i < indexSegment.getSegmentMetadata().getTotalDocs(); i++) {
-      System.out.print(i);
-      System.out.print("\t");
-      for (String columnName : columnNames) {
-        BlockValIterator itr = iterators.get(columnName);
-        if (itr instanceof BlockSingleValIterator) {
-          int encodedValue = ((BlockSingleValIterator) itr).nextIntVal();
-          Object value = dictionaries.get(columnName).get(encodedValue);
-          System.out.print(value);
+  private void dumpRows(PinotSegmentRecordReader reader, GenericRow reuse, Set<String> mvColumns) {
+    int docId = 0;
+
+    while (reader.hasNext()) {
+      System.out.print(docId++ + "\t");
+      GenericRow row = reader.next(reuse);
+
+      for (String columnName : _columnNames) {
+        if (!mvColumns.contains(columnName)) {
+          System.out.print(row.getValue(columnName));
           System.out.print("\t");
         } else {
-          BlockMultiValIterator mItr = (BlockMultiValIterator) itr;
-          int maxNumValuesPerMVEntry =
-              indexSegment.getDataSource(columnName).getDataSourceMetadata().getMaxNumValuesPerMVEntry();
-          int[] intArray = new int[maxNumValuesPerMVEntry];
-          int length = mItr.nextIntVal(intArray);
+          Object[] values = (Object[]) row.getValue(columnName);
           System.out.print("[");
-          for (int j = 0; j < length; j++) {
-            System.out.print(dictionaries.get(columnName).get(intArray[j]));
-            if (j != length - 1) {
-              System.out.print(",");
+
+          for (int i = 0; i < values.length; i++) {
+            System.out.print(values[i]);
+            if (i < values.length - 1) {
+              System.out.print(", ");
             }
           }
           System.out.print("]\t");
@@ -126,14 +125,23 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
       }
       System.out.println();
     }
+  }
 
-    if (dumpStarTree) {
-      List<StarTreeV2> starTrees = indexSegment.getStarTrees();
-      if (starTrees != null) {
-        for (StarTreeV2 starTree : starTrees) {
-          System.out.println();
-          starTree.getStarTree().printTree(dictionaries);
-        }
+  private void dumpStarTree()
+      throws Exception {
+    File segmentDir = new File(_segmentDir);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
+
+    Map<String, Dictionary> dictionaries = new HashMap<>();
+    for (String columnName : _columnNames) {
+      dictionaries.put(columnName, indexSegment.getDataSource(columnName).getDictionary());
+    }
+
+    List<StarTreeV2> starTrees = indexSegment.getStarTrees();
+    if (starTrees != null) {
+      for (StarTreeV2 starTree : starTrees) {
+        System.out.println();
+        starTree.getStarTree().printTree(dictionaries);
       }
     }
 
