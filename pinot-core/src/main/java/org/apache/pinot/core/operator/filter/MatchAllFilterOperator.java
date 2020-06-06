@@ -19,16 +19,16 @@
 package org.apache.pinot.core.operator.filter;
 
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.SizeBasedDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 
 
 public class MatchAllFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "MatchEntireSegmentOperator";
 
-  private int _maxDocId;
+  private final int _numDocs;
 
-  public MatchAllFilterOperator(int totalDocs) {
-    _maxDocId = totalDocs - 1;
+  public MatchAllFilterOperator(int numDocs) {
+    _numDocs = numDocs;
   }
 
   @Override
@@ -38,7 +38,7 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(new SizeBasedDocIdSet(_maxDocId));
+    return new FilterBlock(new MatchAllDocIdSet(_numDocs));
   }
 
   @Override

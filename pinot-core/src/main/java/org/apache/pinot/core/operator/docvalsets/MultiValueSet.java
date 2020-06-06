@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.BaseBlockValSet;
-import org.apache.pinot.core.common.BlockValIterator;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.operator.docvaliterators.MultiValueIterator;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public final class MultiValueSet extends BaseBlockValSet {
@@ -37,7 +36,7 @@ public final class MultiValueSet extends BaseBlockValSet {
   }
 
   @Override
-  public BlockValIterator iterator() {
+  public MultiValueIterator iterator() {
     return new MultiValueIterator(_reader, _numDocs);
   }
 

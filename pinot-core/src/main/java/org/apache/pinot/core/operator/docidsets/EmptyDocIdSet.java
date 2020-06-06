@@ -18,53 +18,29 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.EmptyBlockDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 
 
 /**
  * Singleton class which extends {@link FilterBlockDocIdSet} that is empty, i.e. does not contain any document.
  */
-public final class EmptyFilterBlockDocIdSet implements FilterBlockDocIdSet {
-  private EmptyFilterBlockDocIdSet() {
+public final class EmptyDocIdSet implements FilterBlockDocIdSet {
+  private EmptyDocIdSet() {
   }
 
-  private static final EmptyFilterBlockDocIdSet INSTANCE = new EmptyFilterBlockDocIdSet();
+  private static final EmptyDocIdSet INSTANCE = new EmptyDocIdSet();
 
-  public static EmptyFilterBlockDocIdSet getInstance() {
+  public static EmptyDocIdSet getInstance() {
     return INSTANCE;
   }
 
   @Override
-  public int getMinDocId() {
-    return Integer.MAX_VALUE;
-  }
-
-  @Override
-  public int getMaxDocId() {
-    return Integer.MIN_VALUE;
-  }
-
-  @Override
-  public void setStartDocId(int startDocId) {
-  }
-
-  @Override
-  public void setEndDocId(int endDocId) {
+  public EmptyDocIdIterator iterator() {
+    return EmptyDocIdIterator.getInstance();
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
-  }
-
-  @Override
-  public BlockDocIdIterator iterator() {
-    return EmptyBlockDocIdIterator.getInstance();
-  }
-
-  @Override
-  public <T> T getRaw() {
-    return null;
   }
 }

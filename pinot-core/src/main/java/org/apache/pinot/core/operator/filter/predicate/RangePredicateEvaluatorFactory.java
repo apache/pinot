@@ -283,6 +283,11 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.INT;
+    }
+
+    @Override
     public boolean applySV(int value) {
       boolean result;
       if (_includeLowerBoundary) {
@@ -317,6 +322,11 @@ public class RangePredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.LONG;
     }
 
     @Override
@@ -357,6 +367,11 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.FLOAT;
+    }
+
+    @Override
     public boolean applySV(float value) {
       boolean result;
       if (_includeLowerBoundary) {
@@ -394,6 +409,11 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.DOUBLE;
+    }
+
+    @Override
     public boolean applySV(double value) {
       boolean result;
       if (_includeLowerBoundary) {
@@ -426,6 +446,11 @@ public class RangePredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.STRING;
     }
 
     @Override
@@ -473,6 +498,11 @@ public class RangePredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BYTES;
     }
 
     @Override

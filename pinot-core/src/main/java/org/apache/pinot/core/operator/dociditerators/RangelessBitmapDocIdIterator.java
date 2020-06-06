@@ -18,55 +18,42 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
-import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public class RangelessBitmapDocIdIterator implements IndexBasedDocIdIterator {
+/**
+ * The {@code RangelessBitmapDocIdIterator} is the bitmap-based iterator to iterate on a bitmap of matching document
+ * ids. Comparing to the BitmapDocIdIterator, it does not have an explicit bound {@code [0, numDocs)} for the iteration,
+ * but purely rely on the document ids stored in the bitmap.
+ */
+public final class RangelessBitmapDocIdIterator implements BitmapBasedDocIdIterator {
+  private final ImmutableRoaringBitmap _docIds;
+  private final PeekableIntIterator _docIdIterator;
 
-  private IntIterator iterator;
-  int currentDocId = -1;
-
-  public RangelessBitmapDocIdIterator(IntIterator iterator) {
-    this.iterator = iterator;
+  public RangelessBitmapDocIdIterator(ImmutableRoaringBitmap docIds) {
+    _docIds = docIds;
+    _docIdIterator = docIds.getIntIterator();
   }
 
   @Override
-  public int currentDocId() {
-    return currentDocId;
+  public ImmutableRoaringBitmap getDocIds() {
+    return _docIds;
   }
 
   @Override
   public int next() {
-    // Empty?
-    if (currentDocId == Constants.EOF || !iterator.hasNext()) {
-      currentDocId = Constants.EOF;
+    if (_docIdIterator.hasNext()) {
+      return _docIdIterator.next();
+    } else {
       return Constants.EOF;
     }
-
-    currentDocId = iterator.next();
-
-    return currentDocId;
   }
 
   @Override
   public int advance(int targetDocId) {
-    if (targetDocId < currentDocId) {
-      throw new IllegalArgumentException(
-          "Trying to move backwards to docId " + targetDocId + ", current position " + currentDocId);
-    }
-
-    if (currentDocId == targetDocId) {
-      return currentDocId;
-    } else {
-      int curr = next();
-
-      while (curr < targetDocId && curr != Constants.EOF) {
-        curr = next();
-      }
-
-      return curr;
-    }
+    _docIdIterator.advanceIfNeeded(targetDocId);
+    return next();
   }
 }

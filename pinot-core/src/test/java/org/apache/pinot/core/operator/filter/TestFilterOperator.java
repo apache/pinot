@@ -19,13 +19,13 @@
 package org.apache.pinot.core.operator.filter;
 
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 
 public class TestFilterOperator extends BaseFilterOperator {
-  private int[] _docIds;
+  private final int[] _docIds;
 
   public TestFilterOperator(int[] docIds) {
     _docIds = docIds;
@@ -34,42 +34,37 @@ public class TestFilterOperator extends BaseFilterOperator {
   @Override
   protected FilterBlock getNextBlock() {
     return new FilterBlock(new FilterBlockDocIdSet() {
-      private int _minDocId = _docIds[0];
-      private int _maxDocId = _docIds[_docIds.length - 1];
-
       @Override
-      public int getMinDocId() {
-        return _minDocId;
-      }
+      public BlockDocIdIterator iterator() {
+        return new BlockDocIdIterator() {
+          private final int _numDocIds = _docIds.length;
+          private int _nextIndex = 0;
 
-      @Override
-      public int getMaxDocId() {
-        return _maxDocId;
-      }
+          @Override
+          public int next() {
+            if (_nextIndex < _numDocIds) {
+              return _docIds[_nextIndex++];
+            } else {
+              return Constants.EOF;
+            }
+          }
 
-      @Override
-      public void setStartDocId(int startDocId) {
-        _minDocId = Math.max(_minDocId, startDocId);
-      }
-
-      @Override
-      public void setEndDocId(int endDocId) {
-        _maxDocId = Math.min(_maxDocId, endDocId);
+          @Override
+          public int advance(int targetDocId) {
+            while (_nextIndex < _numDocIds) {
+              int docId = _docIds[_nextIndex++];
+              if (docId >= targetDocId) {
+                return docId;
+              }
+            }
+            return Constants.EOF;
+          }
+        };
       }
 
       @Override
       public long getNumEntriesScannedInFilter() {
-        return 0;
-      }
-
-      @Override
-      public BlockDocIdIterator iterator() {
-        return new ArrayBasedDocIdIterator(_docIds, _docIds.length);
-      }
-
-      @Override
-      public <T> T getRaw() {
-        throw new UnsupportedOperationException();
+        return 0L;
       }
     });
   }

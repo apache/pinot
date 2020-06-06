@@ -19,11 +19,33 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
 
 
 /**
- * Marker interface to say that the doc id iteration is based on an index.
+ * The {@code MatchAllDocIdIterator} is the iterator for MatchAllDocIdSet where all documents are matching.
  */
-public interface IndexBasedDocIdIterator extends BlockDocIdIterator {
+public final class MatchAllDocIdIterator implements BlockDocIdIterator {
+  private final int _numDocs;
 
+  private int _nextDocId = 0;
+
+  public MatchAllDocIdIterator(int numDocs) {
+    _numDocs = numDocs;
+  }
+
+  @Override
+  public int next() {
+    if (_nextDocId < _numDocs) {
+      return _nextDocId++;
+    } else {
+      return Constants.EOF;
+    }
+  }
+
+  @Override
+  public int advance(int targetDocId) {
+    _nextDocId = targetDocId;
+    return next();
+  }
 }

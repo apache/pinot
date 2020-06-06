@@ -22,12 +22,15 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
 
 
+/**
+ * The {@code ArrayBasedDocIdIterator} is the iterator for ArrayBasedDocIdSet. It iterates on an array of matching
+ * document ids.
+ */
 public final class ArrayBasedDocIdIterator implements BlockDocIdIterator {
   private final int[] _docIds;
   private final int _searchableLength;
 
-  private int _currentIndex = -1;
-  private int _currentDocId = -1;
+  private int _nextIndex = 0;
 
   public ArrayBasedDocIdIterator(int[] docIds, int searchableLength) {
     _docIds = docIds;
@@ -36,37 +39,15 @@ public final class ArrayBasedDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int next() {
-    if (_currentDocId == Constants.EOF) {
+    if (_nextIndex < _searchableLength) {
+      return _docIds[_nextIndex++];
+    } else {
       return Constants.EOF;
     }
-    if (++_currentIndex == _searchableLength) {
-      _currentDocId = Constants.EOF;
-    } else {
-      _currentDocId = _docIds[_currentIndex];
-    }
-    return _currentDocId;
   }
 
   @Override
   public int advance(int targetDocId) {
-    if (_currentDocId == Constants.EOF) {
-      return Constants.EOF;
-    }
-    if (targetDocId <= _currentDocId) {
-      return _currentDocId;
-    }
-    while (++_currentIndex < _searchableLength) {
-      if (_docIds[_currentIndex] >= targetDocId) {
-        _currentDocId = _docIds[_currentIndex];
-        return _currentDocId;
-      }
-    }
-    _currentDocId = Constants.EOF;
-    return Constants.EOF;
-  }
-
-  @Override
-  public int currentDocId() {
-    return _currentDocId;
+    throw new UnsupportedOperationException();
   }
 }

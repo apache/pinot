@@ -44,7 +44,7 @@ public class OrFilterOperatorTest {
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(new TestFilterOperator(docIds1));
     operators.add(new TestFilterOperator(docIds2));
-    OrFilterOperator orOperator = new OrFilterOperator(operators);
+    OrFilterOperator orOperator = new OrFilterOperator(operators, 40);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
@@ -68,7 +68,7 @@ public class OrFilterOperatorTest {
     operators.add(new TestFilterOperator(docIds1));
     operators.add(new TestFilterOperator(docIds2));
     operators.add(new TestFilterOperator(docIds3));
-    OrFilterOperator orOperator = new OrFilterOperator(operators);
+    OrFilterOperator orOperator = new OrFilterOperator(operators, 40);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
@@ -91,12 +91,12 @@ public class OrFilterOperatorTest {
     List<BaseFilterOperator> childOperators = new ArrayList<>();
     childOperators.add(new TestFilterOperator(docIds1));
     childOperators.add(new TestFilterOperator(docIds2));
-    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators);
+    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, 40);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);
     operators.add(new TestFilterOperator(docIds3));
-    OrFilterOperator orOperator = new OrFilterOperator(operators);
+    OrFilterOperator orOperator = new OrFilterOperator(operators, 40);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;

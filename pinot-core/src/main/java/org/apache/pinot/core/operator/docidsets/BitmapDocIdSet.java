@@ -18,82 +18,26 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class BitmapDocIdSet implements FilterBlockDocIdSet {
-  private final ImmutableRoaringBitmap _bitmap;
-  private int _startDocId;
-  // Inclusive
-  private int _endDocId;
+  private final ImmutableRoaringBitmap _docIds;
+  private final int _numDocs;
 
-  public BitmapDocIdSet(ImmutableRoaringBitmap[] bitmaps, int startDocId, int endDocId, boolean exclusive) {
-    int numBitmaps = bitmaps.length;
-    if (numBitmaps > 1) {
-      MutableRoaringBitmap orBitmap = MutableRoaringBitmap.or(bitmaps);
-      if (exclusive) {
-        orBitmap.flip(startDocId, endDocId + 1);
-      }
-      _bitmap = orBitmap;
-    } else if (numBitmaps == 1) {
-      if (exclusive) {
-        MutableRoaringBitmap bitmap = ImmutableRoaringBitmap.flip(bitmaps[0], startDocId, endDocId + 1);
-        _bitmap = bitmap;
-      } else {
-        _bitmap = bitmaps[0];
-      }
-    } else {
-      MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-      if (exclusive) {
-        bitmap.add(startDocId, endDocId + 1);
-      }
-      _bitmap = bitmap;
-    }
-
-    _startDocId = startDocId;
-    _endDocId = endDocId;
+  public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
+    _docIds = docIds;
+    _numDocs = numDocs;
   }
 
   @Override
-  public int getMinDocId() {
-    return _startDocId;
-  }
-
-  @Override
-  public int getMaxDocId() {
-    return _endDocId;
-  }
-
-  @Override
-  public void setStartDocId(int startDocId) {
-    _startDocId = startDocId;
-  }
-
-  @Override
-  public void setEndDocId(int endDocId) {
-    _endDocId = endDocId;
+  public BitmapDocIdIterator iterator() {
+    return new BitmapDocIdIterator(_docIds, _numDocs);
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    // No value scanned when filtering with bitmap inverted index.
     return 0L;
-  }
-
-  @Override
-  public BlockDocIdIterator iterator() {
-    BitmapDocIdIterator bitmapDocIdIterator = new BitmapDocIdIterator(_bitmap.getIntIterator());
-    bitmapDocIdIterator.setStartDocId(_startDocId);
-    bitmapDocIdIterator.setEndDocId(_endDocId);
-    return bitmapDocIdIterator;
-  }
-
-  @SuppressWarnings("unchecked")
-  @Override
-  public <T> T getRaw() {
-    return (T) _bitmap;
   }
 }

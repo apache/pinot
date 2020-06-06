@@ -16,22 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.blocks;
+package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
+import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 
-/**
- * Singleton class which extends {@link FilterBlock} that is empty, i.e. does not contain any document.
- */
-public final class EmptyFilterBlock extends FilterBlock {
-  private EmptyFilterBlock() {
-    super(EmptyDocIdSet.getInstance());
+public final class SVScanDocIdSet implements FilterBlockDocIdSet {
+  private final SVScanDocIdIterator _docIdIterator;
+
+  public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, SingleValueSet valueSet, int numDocs) {
+    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, valueSet.iterator(), numDocs);
   }
 
-  private static final EmptyFilterBlock INSTANCE = new EmptyFilterBlock();
+  @Override
+  public SVScanDocIdIterator iterator() {
+    return _docIdIterator;
+  }
 
-  public static EmptyFilterBlock getInstance() {
-    return INSTANCE;
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    return _docIdIterator.getNumEntriesScanned();
   }
 }

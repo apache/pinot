@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -53,7 +53,7 @@ public class NotEqualsPredicateEvaluatorFactory {
    * @return Raw value based NEQ predicate evaluator
    */
   public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(NEqPredicate nEqPredicate,
-      FieldSpec.DataType dataType) {
+      DataType dataType) {
     switch (dataType) {
       case INT:
         return new IntRawValueBasedNeqPredicateEvaluator(nEqPredicate);
@@ -143,6 +143,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.INT;
+    }
+
+    @Override
     public boolean applySV(int value) {
       return _nonMatchingValue != value;
     }
@@ -158,6 +163,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.LONG;
     }
 
     @Override
@@ -179,6 +189,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.FLOAT;
+    }
+
+    @Override
     public boolean applySV(float value) {
       return _nonMatchingValue != value;
     }
@@ -194,6 +209,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.DOUBLE;
     }
 
     @Override
@@ -215,6 +235,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public DataType getDataType() {
+      return DataType.STRING;
+    }
+
+    @Override
     public boolean applySV(String value) {
       return !_nonMatchingValue.equals(value);
     }
@@ -230,6 +255,11 @@ public class NotEqualsPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BYTES;
     }
 
     @Override

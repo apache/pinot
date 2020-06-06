@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.predicate.TextMatchPredicate;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -36,9 +37,10 @@ import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,24 +108,41 @@ public class FilterPlanNode implements PlanNode {
       // Leaf filter operator
       Predicate predicate = Predicate.newPredicate(filterQueryTree);
 
-      // Check for null predicate
-      Predicate.Type type = predicate.getType();
-      if (type.equals(Predicate.Type.IS_NULL) || type.equals(Predicate.Type.IS_NOT_NULL)) {
-        DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
-        ImmutableRoaringBitmap nullBitmap = dataSource.getNullValueVector().getNullBitmap();
-        boolean exclusive = (type == Predicate.Type.IS_NOT_NULL);
-        return new BitmapBasedFilterOperator(new ImmutableRoaringBitmap[]{nullBitmap}, 0, numDocs - 1, exclusive);
-      }
-
       TransformExpressionTree expression = filterQueryTree.getExpression();
       if (expression.getExpressionType() == TransformExpressionTree.ExpressionType.FUNCTION) {
+        // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
+        //       IS_NOT_NULL, TEXT_MATCH)
         return new ExpressionFilterOperator(segment, expression, predicate);
-      } else {
-        DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
-        PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
-            .getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                dataSource.getDataSourceMetadata().getDataType());
-        return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
+      }
+
+      // Single column filter
+      String column = filterQueryTree.getColumn();
+      DataSource dataSource = segment.getDataSource(column);
+      Predicate.Type predicateType = predicate.getType();
+      switch (predicateType) {
+        // Specialize predicate types without PredicateEvaluator
+        case IS_NULL:
+          NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+          if (nullValueVector != null) {
+            return new BitmapBasedFilterOperator(nullValueVector.getNullBitmap(), false, numDocs);
+          } else {
+            return EmptyFilterOperator.getInstance();
+          }
+        case IS_NOT_NULL:
+          nullValueVector = dataSource.getNullValueVector();
+          if (nullValueVector != null) {
+            return new BitmapBasedFilterOperator(nullValueVector.getNullBitmap(), true, numDocs);
+          } else {
+            return new MatchAllFilterOperator(numDocs);
+          }
+        case TEXT_MATCH:
+          return new TextMatchFilterOperator(dataSource.getInvertedIndex(),
+              ((TextMatchPredicate) predicate).getSearchQuery(), numDocs);
+        default:
+          PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
+              .getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                  dataSource.getDataSourceMetadata().getDataType());
+          return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
     }
   }

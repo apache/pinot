@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.BaseBlockValSet;
-import org.apache.pinot.core.common.BlockValIterator;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.operator.docvaliterators.SingleValueIterator;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 @SuppressWarnings("unchecked")
@@ -39,7 +38,7 @@ public final class SingleValueSet extends BaseBlockValSet {
   }
 
   @Override
-  public BlockValIterator iterator() {
+  public SingleValueIterator iterator() {
     return new SingleValueIterator(_reader, _numDocs);
   }
 

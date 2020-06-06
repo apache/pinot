@@ -18,57 +18,30 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 
-/**
- * Test for the bitmap docid iterators.
- */
+
 public class BitmapDocIdIteratorTest {
+
   @Test
-  public void testIt() {
+  public void testBitmapDocIdIterator() {
+    int[] docIds = new int[]{1, 2, 4, 5, 6, 8, 12, 15, 16, 18, 20, 21};
     MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-    bitmap.add(0);
-    bitmap.add(1);
-    bitmap.add(3);
-    bitmap.add(4);
-
-    // Iterate over all values
-    int[] expected = new int[]{0, 1, 3, 4, Constants.EOF, Constants.EOF};
-    checkDocIdIterator(expected, new BitmapDocIdIterator(bitmap.getIntIterator()));
-    checkDocIdIterator(expected, new RangelessBitmapDocIdIterator(bitmap.getIntIterator()));
-
-    // Check that advancing to an existing value works
-    expected = new int[]{4, Constants.EOF, Constants.EOF};
-    BlockDocIdIterator docIdIterator = new BitmapDocIdIterator(bitmap.getIntIterator());
-    Assert.assertEquals(docIdIterator.advance(3), 3);
-    checkDocIdIterator(expected, docIdIterator);
-
-    docIdIterator = new BitmapDocIdIterator(bitmap.getIntIterator());
-    Assert.assertEquals(docIdIterator.advance(3), 3);
-    checkDocIdIterator(expected, docIdIterator);
-
-    // Check that advancing to a value that does not exist works
-    expected = new int[]{4, Constants.EOF, Constants.EOF};
-    docIdIterator = new BitmapDocIdIterator(bitmap.getIntIterator());
-    Assert.assertEquals(docIdIterator.advance(2), 3);
-    checkDocIdIterator(expected, docIdIterator);
-
-    docIdIterator = new BitmapDocIdIterator(bitmap.getIntIterator());
-    Assert.assertEquals(docIdIterator.advance(2), 3);
-    checkDocIdIterator(expected, docIdIterator);
-  }
-
-  private void checkDocIdIterator(int[] expectedValues, BlockDocIdIterator docIdIterator) {
-    int index = 0;
-    for (int expected : expectedValues) {
-      Assert.assertEquals(docIdIterator.next(), expected,
-          "Call #" + (index + 1) + " to the iterator did not give the expected result");
-      ++index;
-    }
+    bitmap.add(docIds);
+    int numDocs = 25;
+    BitmapDocIdIterator docIdIterator = new BitmapDocIdIterator(bitmap, numDocs);
+    assertEquals(docIdIterator.advance(2), 2);
+    assertEquals(docIdIterator.advance(3), 4);
+    assertEquals(docIdIterator.next(), 5);
+    assertEquals(docIdIterator.advance(6), 6);
+    assertEquals(docIdIterator.next(), 8);
+    assertEquals(docIdIterator.advance(13), 15);
+    assertEquals(docIdIterator.advance(19), 20);
+    assertEquals(docIdIterator.next(), 21);
+    assertEquals(docIdIterator.next(), Constants.EOF);
   }
 }

@@ -36,7 +36,7 @@ import org.openjdk.jmh.runner.options.TimeValue;
 
 @State(Scope.Benchmark)
 public class BenchmarkOrDocIdIterator {
-  private static final int MAX_DOC_ID = 100000;
+  private static final int NUM_DOCS = 100000;
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
@@ -106,50 +106,36 @@ public class BenchmarkOrDocIdIterator {
   private OrDocIdIterator setUpArrayBased(int numIterators) {
     BlockDocIdIterator[] iterators = new BlockDocIdIterator[numIterators];
     for (int i = 0; i < numIterators; i++) {
-      iterators[i] = new FixedStepsDocIdIterator(MAX_DOC_ID, i + 1);
+      iterators[i] = new FixedStepsDocIdIterator(NUM_DOCS, i + 1);
     }
-    return new OrDocIdIterator(iterators, 0, MAX_DOC_ID);
+    return new OrDocIdIterator(iterators);
   }
 
-  private class FixedStepsDocIdIterator implements BlockDocIdIterator {
-    private final int _maxDocId;
+  private static class FixedStepsDocIdIterator implements BlockDocIdIterator {
+    private final int _numDocs;
     private final int _steps;
 
-    private int _currentDocId = -1;
+    private int _nextDocId = 0;
 
-    public FixedStepsDocIdIterator(int maxDocId, int steps) {
-      _maxDocId = maxDocId;
+    public FixedStepsDocIdIterator(int numDocs, int steps) {
+      _numDocs = numDocs;
       _steps = steps;
     }
 
     @Override
     public int next() {
-      if (_currentDocId == Constants.EOF) {
-        return Constants.EOF;
+      if (_nextDocId < _numDocs) {
+        int nextDocId = _nextDocId;
+        _nextDocId += _steps;
+        return nextDocId;
       }
-      int nextDocId = (_currentDocId + _steps) / _steps * _steps;
-      if (nextDocId > _maxDocId) {
-        _currentDocId = Constants.EOF;
-      } else {
-        _currentDocId = nextDocId;
-      }
-      return _currentDocId;
+      return Constants.EOF;
     }
 
     @Override
     public int advance(int targetDocId) {
-      int nextDocId = (targetDocId + _steps - 1) / _steps * _steps;
-      if (nextDocId > _maxDocId) {
-        _currentDocId = Constants.EOF;
-      } else {
-        _currentDocId = nextDocId;
-      }
-      return _currentDocId;
-    }
-
-    @Override
-    public int currentDocId() {
-      return _currentDocId;
+      _nextDocId = (targetDocId + _steps - 1) / _steps * _steps;
+      return next();
     }
   }
 

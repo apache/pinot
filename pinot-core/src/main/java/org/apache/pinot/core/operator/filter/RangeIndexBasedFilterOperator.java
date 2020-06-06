@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.base.Preconditions;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.core.operator.docidsets.ScanBasedDocIdSet;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
 import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -33,37 +32,29 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "RangeFilterOperator";
 
-  private final OfflineDictionaryBasedRangePredicateEvaluator _predicateEvaluator;
+  // NOTE: Range index can only apply to dictionary-encoded columns for now
+  // TODO: Support raw index columns
+  private final OfflineDictionaryBasedRangePredicateEvaluator _rangePredicateEvaluator;
   private final DataSource _dataSource;
-  private final int _startDocId;
-  private final int _endDocId;
-  private final boolean _exclusive;
+  private final int _numDocs;
 
-  public RangeIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,
-      int endDocId) {
-    // NOTE:
-    // Predicate that is always evaluated as true or false should not be passed into the BitmapBasedFilterOperator for
-    // performance concern.
-    // If predicate is always evaluated as true, use MatchAllFilterOperator; if predicate is always evaluated as false,
-    // use EmptyFilterOperator.
-    Preconditions.checkArgument(!predicateEvaluator.isAlwaysTrue() && !predicateEvaluator.isAlwaysFalse());
-
-    // NOTE: Only dictionary-based evaluator is supported for now
-    _predicateEvaluator = (OfflineDictionaryBasedRangePredicateEvaluator) predicateEvaluator;
+  public RangeIndexBasedFilterOperator(OfflineDictionaryBasedRangePredicateEvaluator rangePredicateEvaluator,
+      DataSource dataSource, int numDocs) {
+    _rangePredicateEvaluator = rangePredicateEvaluator;
     _dataSource = dataSource;
-    _startDocId = startDocId;
-    _endDocId = endDocId;
-    _exclusive = predicateEvaluator.isExclusive();
+    _numDocs = numDocs;
   }
 
   @Override
   protected FilterBlock getNextBlock() {
     RangeIndexReader rangeIndexReader = (RangeIndexReader) _dataSource.getRangeIndex();
     assert rangeIndexReader != null;
-    int firstRangeId = rangeIndexReader.findRangeId(_predicateEvaluator.getStartDictId());
-    int lastRangeId = rangeIndexReader.findRangeId(_predicateEvaluator.getEndDictId() - 1);
-    //Handle Matching Ranges - some ranges match fully but some partially
-    //below code assumes first and last range always match partially which may not be the case always //todo: optimize it
+    int firstRangeId = rangeIndexReader.findRangeId(_rangePredicateEvaluator.getStartDictId());
+    // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
+    int lastRangeId = rangeIndexReader.findRangeId(_rangePredicateEvaluator.getEndDictId() - 1);
+
+    // Need to scan the first and last range as they might be partially matched
+    // TODO: Detect fully matched first and last range
     ImmutableRoaringBitmap docIdsToScan;
     if (firstRangeId == lastRangeId) {
       docIdsToScan = rangeIndexReader.getDocIds(firstRangeId);
@@ -72,22 +63,22 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
           ImmutableRoaringBitmap.or(rangeIndexReader.getDocIds(firstRangeId), rangeIndexReader.getDocIds(lastRangeId));
     }
     ScanBasedFilterOperator scanBasedFilterOperator =
-        new ScanBasedFilterOperator(_predicateEvaluator, _dataSource, _startDocId, _endDocId);
-    ScanBasedDocIdSet scanBasedDocIdSet = (ScanBasedDocIdSet) scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
-    MutableRoaringBitmap docIds = scanBasedDocIdSet.iterator().applyAnd(docIdsToScan);
+        new ScanBasedFilterOperator(_rangePredicateEvaluator, _dataSource, _numDocs);
+    FilterBlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
+    MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(docIdsToScan);
 
-    //All the intermediate ranges will be full match
+    // Ranges in the middle of first and last range are fully matched
     for (int rangeId = firstRangeId + 1; rangeId < lastRangeId; rangeId++) {
       docIds.or(rangeIndexReader.getDocIds(rangeId));
     }
-    return new FilterBlock(
-        new BitmapDocIdSet(new ImmutableRoaringBitmap[]{docIds}, _startDocId, _endDocId, _exclusive) {
+    return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs) {
 
-          @Override
-          public long getNumEntriesScannedInFilter() {
-            return scanBasedDocIdSet.getNumEntriesScannedInFilter();
-          }
-        });
+      // Override this method to reflect the entries scanned
+      @Override
+      public long getNumEntriesScannedInFilter() {
+        return scanBasedDocIdSet.getNumEntriesScannedInFilter();
+      }
+    });
   }
 
   @Override

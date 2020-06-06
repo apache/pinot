@@ -19,74 +19,43 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.core.common.Constants;
-import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
-  final private IntIterator iterator;
-  private int endDocId = Integer.MAX_VALUE;
-  private int startDocId;
-  private int currentDocId = -1;
+/**
+ * The {@code BitmapDocIdIterator} is the bitmap-based iterator to iterate on a bitmap of matching document ids.
+ */
+public final class BitmapDocIdIterator implements BitmapBasedDocIdIterator {
+  private final ImmutableRoaringBitmap _docIds;
+  private final PeekableIntIterator _docIdIterator;
+  private final int _numDocs;
 
-  public BitmapDocIdIterator(IntIterator iterator) {
-    this.iterator = iterator;
+  public BitmapDocIdIterator(ImmutableRoaringBitmap docIds, int numDocs) {
+    _docIds = docIds;
+    _docIdIterator = docIds.getIntIterator();
+    _numDocs = numDocs;
   }
 
   @Override
-  public int currentDocId() {
-    return currentDocId;
-  }
-
-  public void setStartDocId(int startDocId) {
-    this.startDocId = startDocId;
-  }
-
-  public void setEndDocId(int endDocId) {
-    this.endDocId = endDocId;
+  public ImmutableRoaringBitmap getDocIds() {
+    return _docIds;
   }
 
   @Override
   public int next() {
-    // Empty?
-    if (currentDocId == Constants.EOF || !iterator.hasNext()) {
-      currentDocId = Constants.EOF;
-      return Constants.EOF;
+    if (_docIdIterator.hasNext()) {
+      int docId = _docIdIterator.next();
+      if (docId < _numDocs) {
+        return docId;
+      }
     }
-
-    currentDocId = iterator.next();
-
-    // Advance to startDocId if necessary
-    while (currentDocId < startDocId && iterator.hasNext()) {
-      currentDocId = iterator.next();
-    }
-
-    // Current docId outside of the valid range?
-    if (currentDocId < startDocId || endDocId < currentDocId) {
-      currentDocId = Constants.EOF;
-    }
-
-    return currentDocId;
+    return Constants.EOF;
   }
 
   @Override
   public int advance(int targetDocId) {
-    if (targetDocId < currentDocId) {
-      throw new IllegalArgumentException(
-          "Trying to move backwards to docId " + targetDocId + ", current position " + currentDocId);
-    }
-
-    if (currentDocId == targetDocId) {
-      return currentDocId;
-    } else {
-      int curr = next();
-      while (curr < targetDocId && curr != Constants.EOF) {
-        curr = next();
-      }
-      return curr;
-    }
-  }
-
-  public String toString() {
-    return BitmapDocIdIterator.class.getSimpleName();
+    _docIdIterator.advanceIfNeeded(targetDocId);
+    return next();
   }
 }

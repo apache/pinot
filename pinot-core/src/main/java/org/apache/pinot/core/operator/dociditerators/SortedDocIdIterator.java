@@ -20,76 +20,65 @@ package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.List;
 import org.apache.pinot.common.utils.Pairs.IntPair;
+import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
 
 
-public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
-  private List<IntPair> pairs;
-  private String datasourceName;
+/**
+ * The {@code SortedDocIdIterator} is the iterator for SortedDocIdSet to iterate over a list of matching document id
+ * ranges from a sorted column.
+ */
+public final class SortedDocIdIterator implements BlockDocIdIterator {
+  private final List<IntPair> _docIdRanges;
+  private final int _numRanges;
 
-  public SortedDocIdIterator(String datasourceName, List<IntPair> pairs) {
-    this.datasourceName = datasourceName;
-    this.pairs = pairs;
+  private int _currentRangeId = 0;
+  private int _nextDocId;
+
+  public SortedDocIdIterator(List<IntPair> docIdRanges) {
+    _docIdRanges = docIdRanges;
+    _numRanges = _docIdRanges.size();
+    _nextDocId = docIdRanges.get(0).getLeft();
   }
 
-  int pairPointer = 0;
-  int currentDocId = -1;
-
-  @Override
-  public int advance(int targetDocId) {
-    if (pairPointer == this.pairs.size() || targetDocId > pairs.get(pairs.size() - 1).getRight()) {
-      pairPointer = pairs.size();
-      return (currentDocId = Constants.EOF);
-    }
-    if (currentDocId >= targetDocId) {
-      return currentDocId;
-    }
-    // couter < targetDocId
-    while (pairPointer < pairs.size()) {
-      if (pairs.get(pairPointer).getLeft() > targetDocId) {
-        // targetDocId in the gap between two valid pairs.
-        currentDocId = pairs.get(pairPointer).getLeft();
-        break;
-      } else if (targetDocId >= pairs.get(pairPointer).getLeft() && targetDocId <= pairs.get(pairPointer).getRight()) {
-        // targetDocId in the future valid pair.
-        currentDocId = targetDocId;
-        break;
-      }
-      pairPointer++;
-    }
-    if (pairPointer == pairs.size()) {
-      currentDocId = Constants.EOF;
-    }
-    return currentDocId;
+  public List<IntPair> getDocIdRanges() {
+    return _docIdRanges;
   }
 
   @Override
   public int next() {
-    if (pairPointer == pairs.size() || currentDocId > pairs.get(pairs.size() - 1).getRight()) {
-      pairPointer = pairs.size();
-      return (currentDocId = Constants.EOF);
+    IntPair currentRange = _docIdRanges.get(_currentRangeId);
+    if (_nextDocId <= currentRange.getRight()) {
+      // Next document id is within the current range
+      return _nextDocId++;
     }
-    currentDocId = currentDocId + 1;
-    if (pairPointer < pairs.size() && currentDocId > pairs.get(pairPointer).getRight()) {
-      pairPointer++;
-      if (pairPointer == pairs.size()) {
-        currentDocId = Constants.EOF;
-      } else {
-        currentDocId = pairs.get(pairPointer).getLeft();
+    if (_currentRangeId < _numRanges - 1) {
+      // Move to the next range
+      _currentRangeId++;
+      _nextDocId = _docIdRanges.get(_currentRangeId).getLeft();
+      return _nextDocId++;
+    } else {
+      return Constants.EOF;
+    }
+  }
+
+  @Override
+  public int advance(int targetDocId) {
+    IntPair currentRange = _docIdRanges.get(_currentRangeId);
+    if (targetDocId <= currentRange.getRight()) {
+      // Target document id is within the current range
+      _nextDocId = Math.max(targetDocId, currentRange.getLeft());
+      return _nextDocId++;
+    }
+    while (_currentRangeId < _numRanges - 1) {
+      // Move to the range that contains the target document id
+      _currentRangeId++;
+      currentRange = _docIdRanges.get(_currentRangeId);
+      if (targetDocId <= currentRange.getRight()) {
+        _nextDocId = Math.max(targetDocId, currentRange.getLeft());
+        return _nextDocId++;
       }
-    } else if (currentDocId < pairs.get(pairPointer).getLeft()) {
-      currentDocId = pairs.get(pairPointer).getLeft();
     }
-    return currentDocId;
-  }
-
-  @Override
-  public int currentDocId() {
-    return currentDocId;
-  }
-
-  @Override
-  public String toString() {
-    return SortedDocIdIterator.class.getSimpleName() + " [ " + datasourceName + "]";
+    return Constants.EOF;
   }
 }

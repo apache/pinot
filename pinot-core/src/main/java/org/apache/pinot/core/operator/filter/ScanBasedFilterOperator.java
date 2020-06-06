@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.base.Preconditions;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
-import org.apache.pinot.core.operator.docidsets.ScanBasedMultiValueDocIdSet;
-import org.apache.pinot.core.operator.docidsets.ScanBasedSingleValueDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MVScanDocIdSet;
+import org.apache.pinot.core.operator.docidsets.SVScanDocIdSet;
+import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
+import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 
@@ -36,45 +35,27 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
 
   private final PredicateEvaluator _predicateEvaluator;
   private final DataSource _dataSource;
-  private final int _startDocId;
-  // TODO: change it to exclusive
-  // Inclusive
-  private final int _endDocId;
+  private final int _numDocs;
 
-  ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId, int endDocId) {
-    // NOTE:
-    // Predicate that is always evaluated as true or false should not be passed into the ScanBasedFilterOperator for
-    // performance concern.
-    // If predicate is always evaluated as true, use MatchAllFilterOperator; if predicate is always evaluated as false,
-    // use EmptyFilterOperator.
-    Preconditions.checkArgument(!predicateEvaluator.isAlwaysTrue() && !predicateEvaluator.isAlwaysFalse());
-
+  ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
     _dataSource = dataSource;
-    _startDocId = startDocId;
-    _endDocId = endDocId;
+    _numDocs = numDocs;
   }
 
   @Override
   protected FilterBlock getNextBlock() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
-    Block nextBlock = _dataSource.nextBlock();
-    BlockValSet blockValueSet = nextBlock.getBlockValueSet();
-    BlockMetadata blockMetadata = nextBlock.getMetadata();
+    BlockValSet valueSet = _dataSource.nextBlock().getBlockValueSet();
 
-    FilterBlockDocIdSet filterBlockDocIdSet;
+    FilterBlockDocIdSet docIdSet;
     if (dataSourceMetadata.isSingleValue()) {
-      filterBlockDocIdSet =
-          new ScanBasedSingleValueDocIdSet(_dataSource.getOperatorName(), blockValueSet, blockMetadata,
-              _predicateEvaluator);
+      docIdSet = new SVScanDocIdSet(_predicateEvaluator, (SingleValueSet) valueSet, _numDocs);
     } else {
-      filterBlockDocIdSet = new ScanBasedMultiValueDocIdSet(_dataSource.getOperatorName(), blockValueSet, blockMetadata,
-          _predicateEvaluator);
+      docIdSet = new MVScanDocIdSet(_predicateEvaluator, (MultiValueSet) valueSet, _numDocs,
+          dataSourceMetadata.getMaxNumValuesPerMVEntry());
     }
-    filterBlockDocIdSet.setStartDocId(_startDocId);
-    filterBlockDocIdSet.setEndDocId(_endDocId);
-
-    return new FilterBlock(filterBlockDocIdSet);
+    return new FilterBlock(docIdSet);
   }
 
   @Override
@@ -83,14 +64,8 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   }
 
   /**
-   * Returns the predicate evaluator associated with the scan filter.
-   */
-  public PredicateEvaluator getPredicateEvaluator() {
-    return _predicateEvaluator;
-  }
-
-  /**
    * Returns the metadata of the data source associated with the scan filter.
+   * TODO: Replace this with a priority method for all filter operators
    */
   public DataSourceMetadata getDataSourceMetadata() {
     return _dataSource.getDataSourceMetadata();

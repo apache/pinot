@@ -16,41 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.dociditerators;
+package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.operator.dociditerators.MatchAllDocIdIterator;
 
 
-public final class SizeBasedDocIdIterator implements BlockDocIdIterator {
-  private final int _maxDocId;
-  private int _currentDocId = -1;
+public final class MatchAllDocIdSet implements FilterBlockDocIdSet {
+  private final int _numDocs;
 
-  public SizeBasedDocIdIterator(int maxDocId) {
-    _maxDocId = maxDocId;
+  public MatchAllDocIdSet(int numDocs) {
+    _numDocs = numDocs;
   }
 
   @Override
-  public int next() {
-    if (_currentDocId >= _maxDocId) {
-      return Constants.EOF;
-    } else {
-      return ++_currentDocId;
-    }
+  public MatchAllDocIdIterator iterator() {
+    return new MatchAllDocIdIterator(_numDocs);
   }
 
   @Override
-  public int advance(int targetDocId) {
-    _currentDocId = targetDocId;
-    if (_currentDocId >= _maxDocId) {
-      return Constants.EOF;
-    } else {
-      return _currentDocId;
-    }
-  }
-
-  @Override
-  public int currentDocId() {
-    return _currentDocId;
+  public long getNumEntriesScannedInFilter() {
+    return 0L;
   }
 }

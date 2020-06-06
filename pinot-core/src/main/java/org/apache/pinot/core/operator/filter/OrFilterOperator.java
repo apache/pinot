@@ -18,33 +18,22 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
-import org.apache.pinot.core.operator.docidsets.OrBlockDocIdSet;
+import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 
 
 public class OrFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "OrFilterOperator";
 
-  private List<BaseFilterOperator> _filterOperators;
+  private final List<BaseFilterOperator> _filterOperators;
+  private final int _numDocs;
 
-  OrFilterOperator(List<BaseFilterOperator> filterOperators) {
-    // NOTE:
-    // EmptyFilterOperator and MatchAllFilterOperator should not be passed into the OrFilterOperator for performance
-    // concern.
-    // If there is any MatchAllFilterOperator inside OrFilterOperator, the whole OrFilterOperator is equivalent to a
-    // MatchAllFilterOperator; EmptyFilterOperator should be ignored in OrFilterOperator.
-    // After removing the EmptyFilterOperator, if there is no child filter operator left, use EmptyFilterOperator;
-    // if there is only one child filter operator left, use the child filter operator directly.
-    // These checks should be performed before constructing the OrFilterOperator.
-    for (BaseFilterOperator filterOperator : filterOperators) {
-      Preconditions.checkArgument(!filterOperator.isResultEmpty() && !filterOperator.isResultMatchingAll());
-    }
-
+  public OrFilterOperator(List<BaseFilterOperator> filterOperators, int numDocs) {
     _filterOperators = filterOperators;
+    _numDocs = numDocs;
   }
 
   @Override
@@ -53,7 +42,7 @@ public class OrFilterOperator extends BaseFilterOperator {
     for (BaseFilterOperator filterOperator : _filterOperators) {
       filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
     }
-    return new FilterBlock(new OrBlockDocIdSet(filterBlockDocIdSets));
+    return new FilterBlock(new OrDocIdSet(filterBlockDocIdSets, _numDocs));
   }
 
   @Override

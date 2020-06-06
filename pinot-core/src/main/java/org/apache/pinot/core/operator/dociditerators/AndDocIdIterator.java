@@ -18,112 +18,57 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import java.util.Arrays;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
 
 
-// TODO: Optimize this
+/**
+ * The {@code AndDocIdIterator} is the iterator for AndDocIdSet to perform AND on all child BlockDocIdIterators.
+ * <p>It keeps calling {@link BlockDocIdIterator#advance(int)} to gather the common matching document ids from all child
+ * BlockDocIdIterators until one of them hits the end.
+ */
 public final class AndDocIdIterator implements BlockDocIdIterator {
-  public final BlockDocIdIterator[] docIdIterators;
-  public ScanBasedDocIdIterator[] scanBasedDocIdIterators;
-  public final int[] docIdPointers;
-  public boolean reachedEnd = false;
-  public int currentDocId = -1;
-  int currentMax = -1;
-  private boolean hasScanBasedIterators;
+  public final BlockDocIdIterator[] _docIdIterators;
 
-  public AndDocIdIterator(BlockDocIdIterator[] blockDocIdIterators) {
-    int numIndexBasedIterators = 0;
-    int numScanBasedIterators = 0;
-    for (int i = 0; i < blockDocIdIterators.length; i++) {
-      if (blockDocIdIterators[i] instanceof IndexBasedDocIdIterator) {
-        numIndexBasedIterators = numIndexBasedIterators + 1;
-      } else if (blockDocIdIterators[i] instanceof ScanBasedDocIdIterator) {
-        numScanBasedIterators = numScanBasedIterators + 1;
-      }
-    }
-    // if we have at least one index based then do intersection based on index based only, and then
-    // check if matching docs apply on scan based iterator
-    if (numIndexBasedIterators > 0 && numScanBasedIterators > 0) {
-      hasScanBasedIterators = true;
-      int nonScanIteratorsSize = blockDocIdIterators.length - numScanBasedIterators;
-      this.docIdIterators = new BlockDocIdIterator[nonScanIteratorsSize];
-      this.scanBasedDocIdIterators = new ScanBasedDocIdIterator[numScanBasedIterators];
-      int nonScanBasedIndex = 0;
-      int scanBasedIndex = 0;
-      for (int i = 0; i < blockDocIdIterators.length; i++) {
-        if (blockDocIdIterators[i] instanceof ScanBasedDocIdIterator) {
-          this.scanBasedDocIdIterators[scanBasedIndex++] = (ScanBasedDocIdIterator) blockDocIdIterators[i];
-        } else {
-          this.docIdIterators[nonScanBasedIndex++] = blockDocIdIterators[i];
-        }
-      }
-    } else {
-      hasScanBasedIterators = false;
-      this.docIdIterators = blockDocIdIterators;
-    }
-    this.docIdPointers = new int[docIdIterators.length];
-    Arrays.fill(docIdPointers, -1);
-  }
+  private int _nextDocId = 0;
 
-  @Override
-  public int advance(int targetDocId) {
-    if (currentDocId == Constants.EOF) {
-      return currentDocId;
-    }
-    if (currentDocId >= targetDocId) {
-      return currentDocId;
-    }
-    // next() method will always increment currentMax by 1.
-    currentMax = targetDocId - 1;
-    return next();
+  public AndDocIdIterator(BlockDocIdIterator[] docIdIterators) {
+    _docIdIterators = docIdIterators;
   }
 
   @Override
   public int next() {
-    if (currentDocId == Constants.EOF) {
-      return currentDocId;
-    }
-    currentMax = currentMax + 1;
-    // always increment the pointer to current max, when this is called first time, every one will
-    // be set to start of posting list.
-    for (int i = 0; i < docIdIterators.length; i++) {
-      docIdPointers[i] = docIdIterators[i].advance(currentMax);
-      if (docIdPointers[i] == Constants.EOF) {
-        reachedEnd = true;
-        currentMax = Constants.EOF;
-        break;
+    int maxDocId = _nextDocId;
+    int maxDocIdIndex = -1;
+    int numDocIdIterators = _docIdIterators.length;
+    int index = 0;
+    while (index < numDocIdIterators) {
+      if (index == maxDocIdIndex) {
+        // Skip the index with the max document id
+        index++;
+        continue;
       }
-      if (docIdPointers[i] > currentMax) {
-        currentMax = docIdPointers[i];
-        if (i > 0) {
-          // we need to advance all pointer since we found a new max
-          i = -1;
+      int docId = _docIdIterators[index].advance(maxDocId);
+      if (docId != Constants.EOF) {
+        if (docId == maxDocId) {
+          index++;
+        } else {
+          // The current iterator does not contain the maxDocId, update maxDocId and advance all other iterators
+          maxDocId = docId;
+          maxDocIdIndex = index;
+          index = 0;
         }
-      }
-      if (hasScanBasedIterators && i == docIdIterators.length - 1) {
-        // this means we found the docId common to all nonScanBased iterators, now we need to ensure
-        // that its also found in scanBasedIterator, if not matched, we restart the intersection
-        for (ScanBasedDocIdIterator iterator : scanBasedDocIdIterators) {
-          if (!iterator.isMatch(currentMax)) {
-            i = -1;
-            currentMax = currentMax + 1;
-            break;
-          }
-        }
+      } else {
+        return Constants.EOF;
       }
     }
-    currentDocId = currentMax;
-    return currentDocId;
+    _nextDocId = maxDocId;
+    return _nextDocId++;
   }
 
   @Override
-  public int currentDocId() {
-    return currentDocId;
-  }
-
-  public String toString() {
-    return Arrays.toString(docIdIterators);
+  public int advance(int targetDocId) {
+    _nextDocId = targetDocId;
+    return next();
   }
 }
