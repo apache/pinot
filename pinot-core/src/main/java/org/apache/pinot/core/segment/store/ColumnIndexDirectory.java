@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -88,7 +89,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
+  public abstract PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes, ByteOrder byteOrder)
       throws IOException;
 
   /**

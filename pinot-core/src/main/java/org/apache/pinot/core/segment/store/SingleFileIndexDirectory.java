@@ -99,9 +99,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
+  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes, ByteOrder byteOrder)
       throws IOException {
-    return allocNewBufferInternal(column, type, sizeBytes, type.name().toLowerCase() + ".create");
+    return allocNewBufferInternal(column, type, sizeBytes, type.name().toLowerCase() + ".create", byteOrder);
   }
 
   @Override
@@ -109,7 +109,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     if (type == ColumnIndexType.TEXT_INDEX) {
       return hasTextIndex(column);
     }
-    IndexKey key = new IndexKey(column, type);
+    IndexKey key = new IndexKey(column, type, null);
     return columnEntries.containsKey(key);
   }
 
@@ -131,7 +131,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {
-    IndexKey key = new IndexKey(column, type);
+    IndexKey key = new IndexKey(column, type, null);
     IndexEntry entry = columnEntries.get(key);
     if (entry == null || entry.buffer == null) {
       throw new RuntimeException(
@@ -142,10 +142,11 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   // This is using extra resources right now which can be changed.
-  private PinotDataBuffer allocNewBufferInternal(String column, ColumnIndexType indexType, long size, String context)
+  private PinotDataBuffer allocNewBufferInternal(String column, ColumnIndexType indexType, long size, String context,
+      ByteOrder byteOrder)
       throws IOException {
 
-    IndexKey key = new IndexKey(column, indexType);
+    IndexKey key = new IndexKey(column, indexType, byteOrder);
     checkKeyNotPresent(key);
 
     String allocContext = allocationContext(key) + context;
@@ -213,7 +214,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
           .checkState(indexSeparatorPos != -1, "Index separator not found: " + key + " , segment: " + segmentDirectory);
       String indexName = key.substring(indexSeparatorPos + 1, lastSeparatorPos);
       String columnName = key.substring(0, indexSeparatorPos);
-      IndexKey indexKey = new IndexKey(columnName, ColumnIndexType.getValue(indexName));
+      ByteOrder byteOrder;
+      if (indexName.equalsIgnoreCase(ColumnIndexType.FORWARD_INDEX.getIndexName())) {
+        byteOrder = metadata.getColumnMetadataFor(columnName).getForwardIndexByteOrder();
+      } else {
+        byteOrder = ByteOrder.BIG_ENDIAN;
+      }
+      IndexKey indexKey = new IndexKey(columnName, ColumnIndexType.getValue(indexName), byteOrder);
       IndexEntry entry = columnEntries.get(indexKey);
       if (entry == null) {
         entry = new IndexEntry(indexKey);
@@ -254,14 +261,35 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     List<Long> offsetAccum = new ArrayList<>();
     for (Map.Entry<Long, IndexEntry> offsetEntry : indexStartMap.entrySet()) {
       IndexEntry entry = offsetEntry.getValue();
-      runningSize += entry.size;
+      if (entry.key.byteOrder == ByteOrder.LITTLE_ENDIAN) {
+        String context = allocationContext(indexFile,
+            "single_file_index.rw." + "." + (entry.startOffset) + "." + entry.size);
+        // initially we'll start with migrating forward index to LITTLE ENDIAN format
+        // so, we can't use a consolidated buffer based approach to map a
+        // joined range and then slice. So until all buffers are moved to LITTLE_ENDIAN
+        // we will map the LE buffer individually.
+        PinotDataBuffer buffer;
+        if (readMode == ReadMode.heap) {
+          buffer = PinotDataBuffer
+              .loadFile(indexFile, entry.startOffset, entry.size + MAGIC_MARKER_SIZE_BYTES, ByteOrder.LITTLE_ENDIAN,
+                  context);
+        } else {
+          buffer = PinotDataBuffer
+              .mapFile(indexFile, true, entry.startOffset, entry.size + MAGIC_MARKER_SIZE_BYTES, ByteOrder.LITTLE_ENDIAN,
+                  context);
+        }
+        entry.buffer = buffer;
+        allocBuffers.add(buffer);
+      } else {
+        runningSize += entry.size;
 
-      if (runningSize >= MAX_ALLOCATION_SIZE) {
-        mapAndSliceFile(indexStartMap, offsetAccum, offsetEntry.getKey());
-        runningSize = entry.size;
-        offsetAccum.clear();
+        if (runningSize >= MAX_ALLOCATION_SIZE) {
+          mapAndSliceFile(indexStartMap, offsetAccum, offsetEntry.getKey());
+          runningSize = entry.size;
+          offsetAccum.clear();
+        }
+        offsetAccum.add(offsetEntry.getKey());
       }
-      offsetAccum.add(offsetEntry.getKey());
     }
 
     if (offsetAccum.size() > 0) {

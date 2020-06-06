@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.store;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.ConfigurationException;
@@ -315,9 +316,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
+    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes, ByteOrder byteOrder)
         throws IOException {
-      return getNewIndexBuffer(new IndexKey(columnName, indexType), sizeBytes);
+      return getNewIndexBuffer(new IndexKey(columnName, indexType, byteOrder), sizeBytes);
     }
 
     @Override
@@ -332,7 +333,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
         throws IOException {
-      return columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
+      return columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes, key.byteOrder);
     }
 
     @Override

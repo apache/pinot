@@ -88,6 +88,7 @@ public class V1Constants {
       public static final String DATETIME_FORMAT = "datetimeFormat";
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
       public static final String TEXT_INDEX_TYPE = "textIndexType";
+      public static final String FORWARD_INDEX_BYTE_ORDER = "forwardIndexByteOrder";
 
       private static final String COLUMN_PROPS_KEY_PREFIX = "column.";
 

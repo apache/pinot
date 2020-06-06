@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.store;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.segment.ReadMode;
@@ -167,7 +168,7 @@ public abstract class SegmentDirectory implements Closeable {
     // NOTE: an interface like readFrom(File f, String column, ColumnIndexType, int sizeBytes) will be safe
     // but it can lead to potential endianness issues. Endianness used to create data may not be
     // same as PinotDataBufferOld
-    public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
+    public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes, ByteOrder byteOrder)
         throws IOException;
 
     /**

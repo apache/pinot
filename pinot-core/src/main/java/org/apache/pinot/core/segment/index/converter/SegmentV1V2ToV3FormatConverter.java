@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
@@ -146,7 +147,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
           if (v2Metadata.hasDictionary(column)) {
             copyDictionary(v2DataReader, v3DataWriter, column);
           }
-          copyForwardIndex(v2DataReader, v3DataWriter, column);
+          copyForwardIndex(v2DataReader, v3DataWriter, column, v2Metadata.getColumnMetadataFor(column).getForwardIndexByteOrder());
           if (v2DataReader.hasIndexFor(column, ColumnIndexType.NULLVALUE_VECTOR)) {
             copyNullValueVector(v2DataReader, v3DataWriter, column);
           }
@@ -175,32 +176,32 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
   private void copyDictionary(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
-    readCopyBuffers(reader, writer, column, ColumnIndexType.DICTIONARY);
+    readCopyBuffers(reader, writer, column, ColumnIndexType.DICTIONARY, ByteOrder.BIG_ENDIAN);
   }
 
-  private void copyForwardIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
+  private void copyForwardIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column, ByteOrder byteOrder)
       throws IOException {
-    readCopyBuffers(reader, writer, column, ColumnIndexType.FORWARD_INDEX);
+    readCopyBuffers(reader, writer, column, ColumnIndexType.FORWARD_INDEX, byteOrder);
   }
 
   private void copyNullValueVector(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
-    readCopyBuffers(reader, writer, column, ColumnIndexType.NULLVALUE_VECTOR);
+    readCopyBuffers(reader, writer, column, ColumnIndexType.NULLVALUE_VECTOR, ByteOrder.BIG_ENDIAN);
   }
 
   private void copyExistingInvertedIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
     if (reader.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
-      readCopyBuffers(reader, writer, column, ColumnIndexType.INVERTED_INDEX);
+      readCopyBuffers(reader, writer, column, ColumnIndexType.INVERTED_INDEX, ByteOrder.BIG_ENDIAN);
     }
   }
 
   private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
-      ColumnIndexType indexType)
+      ColumnIndexType indexType, ByteOrder byteOrder)
       throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
     long oldBufferSize = oldBuffer.size();
-    PinotDataBuffer newBuffer = writer.newIndexFor(column, indexType, oldBufferSize);
+    PinotDataBuffer newBuffer = writer.newIndexFor(column, indexType, oldBufferSize, byteOrder);
     oldBuffer.copyTo(0, newBuffer, 0, oldBufferSize);
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.store;
 
+import java.nio.ByteOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,14 +31,16 @@ public class IndexKey {
 
   String name;
   ColumnIndexType type;
+  ByteOrder byteOrder;
 
   /**
    * @param name column name
    * @param type index type
    */
-  public IndexKey(String name, ColumnIndexType type) {
+  public IndexKey(String name, ColumnIndexType type, ByteOrder byteOrder) {
     this.name = name;
     this.type = type;
+    this.byteOrder = byteOrder;
   }
 
   @Override
