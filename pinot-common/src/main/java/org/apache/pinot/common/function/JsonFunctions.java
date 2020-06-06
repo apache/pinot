@@ -50,7 +50,7 @@ public class JsonFunctions {
    * Convert object to Json String
    */
   @ScalarFunction
-  static String toJsonObjectStr(Object object)
+  static String json_format(Object object)
       throws JsonProcessingException {
     return JsonUtils.objectToString(object);
   }
