@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
+import java.math.BigDecimal;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -126,13 +127,13 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = Integer.parseInt(src[i]);
+      dest[i] = Double.valueOf(src[i]).intValue();
     }
   }
 
   public static void copy(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = Long.parseLong(src[i]);
+      dest[i] = new BigDecimal(src[i]).longValue();
     }
   }
 

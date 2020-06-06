@@ -95,7 +95,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           case FLOAT:
             float[] rightFloatValues = _rightTransformFunction.transformToFloatValuesSV(projectionBlock);
             for (int i = 0; i < length; i++) {
-              _results[i] = getBinaryFuncResult(Double.compare(leftIntValues[i], rightFloatValues[i]));
+              _results[i] = getBinaryFuncResult(Float.compare(leftIntValues[i], rightFloatValues[i]));
             }
             break;
           case DOUBLE:

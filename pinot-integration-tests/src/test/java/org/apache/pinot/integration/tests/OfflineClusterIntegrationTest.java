@@ -767,14 +767,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             + "LIMIT 1000");
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode rows = response.get("resultTable").get("rows");
-    Assert.assertEquals(response.get("exceptions").size(), 0);
+    assertEquals(response.get("exceptions").size(), 0);
     for (int i = 0; i < rows.size(); i++) {
       String origin = rows.get(i).get(0).asText();
       int originCode = rows.get(i).get(1).asInt();
       if (originCode > 0) {
-        Assert.assertEquals(origin, origins.get(originCode - 1));
+        assertEquals(origin, origins.get(originCode - 1));
       } else {
-        Assert.assertTrue(!origins.contains(origin));
+        assertTrue(!origins.contains(origin));
       }
     }
   }
@@ -787,14 +787,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     System.out.println("response = " + response);
     JsonNode rows = response.get("resultTable").get("rows");
-    Assert.assertEquals(response.get("exceptions").size(), 0);
+    assertEquals(response.get("exceptions").size(), 0);
     for (int i = 0; i < rows.size(); i++) {
       int arrDelay = rows.get(i).get(0).asInt();
       int arrDelayDiff = rows.get(i).get(1).asInt();
       if (arrDelay > 0) {
-        Assert.assertEquals(arrDelay, arrDelayDiff);
+        assertEquals(arrDelay, arrDelayDiff);
       } else {
-        Assert.assertEquals(arrDelay, arrDelayDiff * -1);
+        assertEquals(arrDelay, arrDelayDiff * -1);
       }
     }
   }
@@ -824,7 +824,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     // System.out.println(String.format("query = %s, response = %s",sqlQuery, response));
     long caseSum = response.get("resultTable").get("rows").get(0).get(0).asLong();
-    Assert.assertEquals(caseSum, countValue);
+    assertEquals(caseSum, countValue);
   }
 
   @Test
