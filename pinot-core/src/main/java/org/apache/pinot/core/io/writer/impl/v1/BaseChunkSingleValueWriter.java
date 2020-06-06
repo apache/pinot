@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
  * Base class for fixed and variable byte writer implementations.
  */
 public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleValueWriter {
+  // TODO: Remove this before release 0.5.0
   public static final int DEFAULT_VERSION = 2;
   public static final int CURRENT_VERSION = 3;
 
@@ -64,7 +65,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
    * @param numDocsPerChunk Number of docs per data chunk
    * @param chunkSize Size of chunk
    * @param sizeOfEntry Size of entry (in bytes), max size for variable byte implementation.
-   * @param version format version used to determine whether to use 8 or 4 byte chunk offsets
+   * @param version version of File
    * @throws FileNotFoundException
    */
   protected BaseChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
