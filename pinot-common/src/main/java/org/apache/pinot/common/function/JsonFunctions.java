@@ -46,4 +46,13 @@ public class JsonFunctions {
     return JsonUtils.objectToString(map);
   }
 
+  /**
+   * Convert object to Json String
+   */
+  @ScalarFunction
+  static String json_format(Object object)
+      throws JsonProcessingException {
+    return JsonUtils.objectToString(object);
+  }
+
 }

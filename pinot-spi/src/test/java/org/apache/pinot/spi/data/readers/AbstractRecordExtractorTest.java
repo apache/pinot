@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.avro.generic.GenericData;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
@@ -114,25 +115,35 @@ public abstract class AbstractRecordExtractorTest {
       String columnName = entry.getKey();
       Object expectedValue = entry.getValue();
       Object actualValue = genericRow.getValue(columnName);
-      if (expectedValue instanceof Collection) {
-        List actualArray =
-            actualValue instanceof List ? (ArrayList) actualValue : Arrays.asList((Object[]) actualValue);
-        List expectedArray = (List) expectedValue;
-        for (int j = 0; j < actualArray.size(); j++) {
-          Assert.assertEquals(actualArray.get(j), expectedArray.get(j));
-        }
-      } else if (expectedValue instanceof Map) {
-        Map<Object, Object> actualMap = (HashMap) actualValue;
-        Map<Object, Object> expectedMap = (HashMap) expectedValue;
-        for (Map.Entry<Object, Object> mapEntry : expectedMap.entrySet()) {
-          Assert.assertEquals(actualMap.get(mapEntry.getKey().toString()), mapEntry.getValue());
-        }
+      checkValue(expectedValue, actualValue);
+    }
+  }
+
+  private void checkValue(Object expectedValue, Object actualValue) {
+    if (expectedValue instanceof Collection) {
+      List actualArray =
+          actualValue instanceof List ? (ArrayList) actualValue : Arrays.asList((Object[]) actualValue);
+      List expectedArray = (List) expectedValue;
+      for (int j = 0; j < actualArray.size(); j++) {
+        checkValue(expectedArray.get(j), actualArray.get(j));
+      }
+    } else if (expectedValue instanceof Map) {
+      Map<Object, Object> actualMap = (HashMap) actualValue;
+      Map<Object, Object> expectedMap = (HashMap) expectedValue;
+      for (Map.Entry<Object, Object> mapEntry : expectedMap.entrySet()) {
+        Assert.assertEquals(actualMap.get(mapEntry.getKey().toString()), mapEntry.getValue());
+      }
+    } else if (expectedValue instanceof GenericData.Record) {
+      Map<Object, Object> actualMap = (HashMap) actualValue;
+      GenericData.Record expectedGenericRecord = (GenericData.Record) expectedValue;
+      for (Map.Entry<Object, Object> mapEntry : actualMap.entrySet()) {
+        checkValue(expectedGenericRecord.get(mapEntry.getKey().toString()), mapEntry.getValue());
+      }
+    } else {
+      if (expectedValue != null) {
+        Assert.assertEquals(actualValue, expectedValue);
       } else {
-        if (expectedValue != null) {
-          Assert.assertEquals(actualValue, expectedValue);
-        } else {
-          Assert.assertNull(actualValue);
-        }
+        Assert.assertNull(actualValue);
       }
     }
   }

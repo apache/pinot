@@ -25,7 +25,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
-import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -48,7 +47,7 @@ public class AvroRecordExtractor implements RecordExtractor<GenericRecord> {
   public GenericRow extract(GenericRecord from, GenericRow to) {
     if (_extractAll) {
       Map<String, Object> jsonMap = JsonUtils.genericRecordToJson(from);
-      jsonMap.forEach((fieldName, value) -> to.putValue(fieldName, RecordReaderUtils.convert(value)));
+      jsonMap.forEach((fieldName, value) -> to.putValue(fieldName, AvroUtils.convert(value)));
     } else {
       for (String fieldName : _fields) {
         Object value = from.get(fieldName);

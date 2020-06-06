@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -284,59 +285,83 @@ public class AvroUtils {
   }
 
   /**
-   * Converts the value to a single-valued value or a multi-valued value
+   * Converts the value to either a single value (string, number, bytebuffer), multi value (Object[]) or a Map
+   *
+   * Natively Pinot only understands single values and multi values.
+   * Map is useful only if some ingestion transform functions operates on it in the transformation layer
    */
   public static Object convert(Object value) {
+    if (value == null) {
+      return null;
+    }
     Object convertedValue;
     if (value instanceof Collection) {
       convertedValue = handleMultiValue((Collection) value);
     } else if (value instanceof Map) {
       convertedValue = handleMap((Map) value);
+    } else if(value instanceof GenericData.Record) {
+      convertedValue = handleGenericRecord((GenericData.Record) value);
     } else {
-      convertedValue = handleSingleValue(value);
+      convertedValue = RecordReaderUtils.convertSingleValue(value);
     }
     return convertedValue;
   }
 
   /**
-   * Converts the value to a single-valued value by handling instance of ByteBuffer, Number and String
+   * Handles the conversion of each value of the Collection.
+   * Converts the Collection to an Object array
    */
-  public static Object handleSingleValue(@Nullable Object value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof GenericData.Record) {
-      return handleSingleValue(((GenericData.Record) value).get(0));
-    }
-    return RecordReaderUtils.convertSingleValue(value);
-  }
+  public static Object handleMultiValue(Collection values) {
 
-  /**
-   * Converts the value to a multi-valued column
-   */
-  public static Object handleMultiValue(@Nullable Collection values) {
-    if (values == null || values.isEmpty()) {
+    if (values.isEmpty()) {
       return null;
     }
     int numValues = values.size();
-    List<Object> list = new ArrayList<>(numValues);
+    Object[] array = new Object[numValues];
+    int index = 0;
     for (Object value : values) {
-      list.add(handleSingleValue(value));
+      Object convertedValue = convert(value);
+      if (convertedValue != null && !convertedValue.toString().equals("")) {
+        array[index++] = convertedValue;
+      }
     }
-    return RecordReaderUtils.convertMultiValue(list);
+    if (index == numValues) {
+      return array;
+    } else if (index == 0) {
+      return null;
+    } else {
+      return Arrays.copyOf(array, index);
+    }
   }
 
   /**
-   * Converts the values within the map to single-valued values
+   * Handles the conversion of every value of the Map
    */
-  public static Object handleMap(@Nullable Map map) {
-    if (map == null || map.isEmpty()) {
+  public static Object handleMap(Map map) {
+    if (map.isEmpty()) {
       return null;
     }
 
     Map<Object, Object> convertedMap = new HashMap<>();
     for (Object key : map.keySet()) {
-      convertedMap.put(RecordReaderUtils.convertSingleValue(key), RecordReaderUtils.convertSingleValue(map.get(key)));
+      convertedMap.put(RecordReaderUtils.convertSingleValue(key), convert(map.get(key)));
+    }
+    return convertedMap;
+  }
+
+  /**
+   * Handles the conversion of every field of the GenericRecord
+   */
+  private static Object handleGenericRecord(GenericData.Record record) {
+    List<Field> fields = record.getSchema().getFields();
+    if (fields.isEmpty()) {
+      return null;
+    }
+
+    Map<Object, Object> convertedMap = new HashMap<>();
+    for (Field field : fields) {
+      String fieldName = field.name();
+      convertedMap.put(fieldName, convert(record.get(fieldName)));
     }
     return convertedMap;
   }
