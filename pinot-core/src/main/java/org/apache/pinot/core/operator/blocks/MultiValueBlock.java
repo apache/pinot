@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
@@ -27,15 +26,17 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
+@SuppressWarnings("rawtypes")
 public final class MultiValueBlock implements Block {
   private final BlockValSet _blockValSet;
   private final BlockMetadata _blockMetadata;
 
   public MultiValueBlock(SingleColumnMultiValueReader reader, int numDocs, int maxNumMultiValues,
       FieldSpec.DataType dataType, Dictionary dictionary) {
-    _blockValSet = new MultiValueSet(reader, numDocs, dataType);
+    _blockValSet = new MultiValueSet(reader, dataType);
     _blockMetadata = new BlockMetadataImpl(numDocs, false, maxNumMultiValues, dataType, dictionary);
   }
 

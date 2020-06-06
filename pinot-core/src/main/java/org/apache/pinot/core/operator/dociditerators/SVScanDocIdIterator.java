@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -32,16 +32,16 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
-  private final BlockSingleValIterator _valueIterator;
+  private final SingleValueSet _valueSet;
   private final int _numDocs;
   private final ValueMatcher _valueMatcher;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, BlockSingleValIterator valueIterator, int numDocs) {
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, SingleValueSet valueSet, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _valueIterator = valueIterator;
+    _valueSet = valueSet;
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher();
   }
@@ -51,7 +51,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     while (_nextDocId < _numDocs) {
       int nextDocId = _nextDocId++;
       _numEntriesScanned++;
-      if (_valueMatcher.doesNextValueMatch()) {
+      if (_valueMatcher.doesValueMatch(nextDocId)) {
         return nextDocId;
       }
     }
@@ -61,7 +61,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   @Override
   public int advance(int targetDocId) {
     _nextDocId = targetDocId;
-    _valueIterator.skipTo(targetDocId);
     return next();
   }
 
@@ -71,9 +70,8 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     IntIterator docIdIterator = docIds.getIntIterator();
     int nextDocId;
     while (docIdIterator.hasNext() && (nextDocId = docIdIterator.next()) < _numDocs) {
-      _valueIterator.skipTo(nextDocId);
       _numEntriesScanned++;
-      if (_valueMatcher.doesNextValueMatch()) {
+      if (_valueMatcher.doesValueMatch(nextDocId)) {
         result.add(nextDocId);
       }
     }
@@ -104,56 +102,59 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
-  private static abstract class ValueMatcher {
+  private interface ValueMatcher {
 
-    abstract boolean doesNextValueMatch();
+    /**
+     * Returns {@code true} if the value for the given document id matches the predicate, {@code false} Otherwise.
+     */
+    boolean doesValueMatch(int docId);
   }
 
-  private class IntMatcher extends ValueMatcher {
+  private class IntMatcher implements ValueMatcher {
 
     @Override
-    boolean doesNextValueMatch() {
-      return _predicateEvaluator.applySV(_valueIterator.nextIntVal());
+    public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_valueSet.getIntValue(docId));
     }
   }
 
-  private class LongMatcher extends ValueMatcher {
+  private class LongMatcher implements ValueMatcher {
 
     @Override
-    boolean doesNextValueMatch() {
-      return _predicateEvaluator.applySV(_valueIterator.nextLongVal());
+    public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_valueSet.getLongValue(docId));
     }
   }
 
-  private class FloatMatcher extends ValueMatcher {
+  private class FloatMatcher implements ValueMatcher {
 
     @Override
-    boolean doesNextValueMatch() {
-      return _predicateEvaluator.applySV(_valueIterator.nextFloatVal());
+    public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_valueSet.getFloatValue(docId));
     }
   }
 
-  private class DoubleMatcher extends ValueMatcher {
+  private class DoubleMatcher implements ValueMatcher {
 
     @Override
-    boolean doesNextValueMatch() {
-      return _predicateEvaluator.applySV(_valueIterator.nextDoubleVal());
+    public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_valueSet.getDoubleValue(docId));
     }
   }
 
-  private class StringMatcher extends ValueMatcher {
+  private class StringMatcher implements ValueMatcher {
 
     @Override
-    boolean doesNextValueMatch() {
-      return _predicateEvaluator.applySV(_valueIterator.nextStringVal());
+    public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_valueSet.getStringValue(docId));
     }
   }
 
-  private class BytesMatcher extends ValueMatcher {
+  private class BytesMatcher implements ValueMatcher {
 
     @Override
-    boolean doesNextValueMatch() {
-      return _predicateEvaluator.applySV(_valueIterator.nextBytesVal());
+    public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_valueSet.getBytesValue(docId));
     }
   }
 }

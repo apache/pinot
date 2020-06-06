@@ -21,9 +21,10 @@ package org.apache.pinot.core.common;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
+/**
+ * TODO: Split BlockValSet into multiple interfaces. The docId based APIs do not apply to Block concept.
+ */
 public interface BlockValSet {
-
-  BlockValIterator iterator();
 
   DataType getValueType();
 
@@ -34,80 +35,125 @@ public interface BlockValSet {
    */
 
   /**
-   * Get dictionary Ids for the given docIds.
-   *
-   * @param inDocIds Input docIds
-   * @param inStartPos Start index in inDocIds
-   * @param inDocIdsSize Number of input doc ids
-   * @param outDictionaryIds Output array
-   * @param outStartPos Start position in outDictionaryIds
+   * NOTE: The following single value read APIs do not handle the data type conversion for performance concern. Caller
+   *       should always call the API that matches the data type of the {@code BlockValSet}.
    */
-  void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
 
   /**
-   * Get Integer values for the given docIds.
-   *
-   * @param inDocIds Input docIds
-   * @param inStartPos Start index in inDocIds
-   * @param inDocIdsSize Number of input doc ids
-   * @param outValues Output array
-   * @param outStartPos Start position in outValues
+   * Returns the INT type single-value at the given document id.
+   * <p>NOTE: Dictionary id is handled as INT type.
    */
-  void getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos);
+  int getIntValue(int docId);
 
   /**
-   * Get long values for the given docIds.
-   *
-   * @param inDocIds Input docIds
-   * @param inStartPos Start index in inDocIds
-   * @param inDocIdsSize Number of input doc ids
-   * @param outValues Output array
-   * @param outStartPos Start position in outValues
+   * Returns the LONG type single-value at the given document id.
    */
-  void getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos);
+  long getLongValue(int docId);
 
   /**
-   * Get float values for the given docIds.
-   *
-   * @param inDocIds Input docIds
-   * @param inStartPos Start index in inDocIds
-   * @param inDocIdsSize Number of input doc ids
-   * @param outValues Output array
-   * @param outStartPos Start position in outValues
+   * Returns the FLOAT type single-value at the given document id.
    */
-  void getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos);
+  float getFloatValue(int docId);
 
   /**
-   *
-   * @param inDocIds Input docIds
-   * @param inStartPos Start index in inDocIds
-   * @param inDocIdsSize Number of input doc ids
-   * @param outValues Output array
-   * @param outStartPos Start position in outValues
+   * Returns the DOUBLE type single-value at the given document id.
    */
-  void getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos);
+  double getDoubleValue(int docId);
 
   /**
-   * Get string values for the given docIds.
-   *
-   * @param inDocIds Input docIds
-   * @param inStartPos Start index in inDocIds
-   * @param inDocIdsSize Number of input doc ids
-   * @param outValues Output array
-   * @param outStartPos Start position in outValues
+   * Returns the STRING type single-value at the given document id.
    */
-  void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos);
+  String getStringValue(int docId);
 
   /**
-   * Get byte[] values for the given docIds.
-   *
-   * @param inDocIds Input docIds
-   * @param inStartPos Start index in inDocIds
-   * @param inDocIdsSize Number of input doc ids
-   * @param outValues Output array
-   * @param outStartPos Start position in outValues
+   * Returns the BYTES type single-value at the given document id.
    */
-  void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos);
+  byte[] getBytesValue(int docId);
+
+  /**
+   * Reads the INT type multi-value at the given document id into the value buffer and returns the number of values in
+   * the multi-value entry.
+   * <p>The passed in value buffer should be large enough to hold all the values of a multi-value entry.
+   * <p>NOTE: Dictionary id is handled as INT type.
+   */
+  int getIntValues(int docId, int[] valueBuffer);
+
+  /**
+   * Reads the LONG type multi-value at the given document id into the value buffer and returns the number of values in
+   * the multi-value entry.
+   * <p>The passed in value buffer should be large enough to hold all the values of a multi-value entry.
+   */
+  int getLongValues(int docId, long[] valueBuffer);
+
+  /**
+   * Reads the FLOAT type multi-value at the given document id into the value buffer and returns the number of values
+   * in the multi-value entry.
+   * <p>The passed in value buffer should be large enough to hold all the values of a multi-value entry.
+   */
+  int getFloatValues(int docId, float[] valueBuffer);
+
+  /**
+   * Reads the DOUBLE type multi-value at the given document id into the value buffer and returns the number of values
+   * in the multi-value entry.
+   * <p>The passed in value buffer should be large enough to hold all the values of a multi-value entry.
+   */
+  int getDoubleValues(int docId, double[] valueBuffer);
+
+  /**
+   * Reads the STRING type multi-value at the given document id into the value buffer and returns the number of values
+   * in the multi-value entry.
+   * <p>The passed in value buffer should be large enough to hold all the values of a multi-value entry.
+   */
+  int getStringValues(int docId, String[] valueBuffer);
+
+  /**
+   * NOTE: The following batch value read APIs should be able to handle the data type conversion. Caller can call any
+   *       API regardless of the data type of the {@code BlockValSet}.
+   * TODO: Consider letting the caller handle the data type conversion because for different use cases, we might need to
+   *       convert data type differently.
+   */
+
+  /**
+   * Batch reads the dictionary ids at the given document ids of the given length into the dictionary id buffer.
+   * <p>The passed in dictionary id buffer size should be larger than or equal to the length.
+   */
+  void getDictionaryIds(int[] docIds, int length, int[] dictIdBuffer);
+
+  /**
+   * Batch reads the INT type single-values at the given document ids of the given length into the value buffer.
+   * <p>The passed in value buffer size should be larger than or equal to the length.
+   */
+  void getIntValues(int[] docIds, int length, int[] valueBuffer);
+
+  /**
+   * Batch reads the LONG type single-values at the given document ids of the given length into the value buffer.
+   * <p>The passed in value buffer size should be larger than or equal to the length.
+   */
+  void getLongValues(int[] docIds, int length, long[] valueBuffer);
+
+  /**
+   * Batch reads the FLOAT type single-values at the given document ids of the given length into the value buffer.
+   * <p>The passed in value buffer size should be larger than or equal to the length.
+   */
+  void getFloatValues(int[] docIds, int length, float[] valueBuffer);
+
+  /**
+   * Batch reads the DOUBLE type single-values at the given document ids of the given length into the value buffer.
+   * <p>The passed in value buffer size should be larger than or equal to the length.
+   */
+  void getDoubleValues(int[] docIds, int length, double[] valueBuffer);
+
+  /**
+   * Batch reads the STRING type single-values at the given document ids of the given length into the value buffer.
+   * <p>The passed in value buffer size should be larger than or equal to the length.
+   */
+  void getStringValues(int[] docIds, int length, String[] valueBuffer);
+
+  /**
+   * Batch reads the BYTES type single-values at the given document ids of the given length into the value buffer.
+   * <p>The passed in value buffer size should be larger than or equal to the length.
+   */
+  void getBytesValues(int[] docIds, int length, byte[][] valueBuffer);
 
   /**
    * SINGLE-VALUED COLUMN APIs

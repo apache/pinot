@@ -39,9 +39,6 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockSingleValIterator;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -91,22 +88,16 @@ public class StarTreeIndexViewer {
   static int MAX_CHILDREN = 100;
   private List<String> _dimensionNames;
   private Map<String, Dictionary> dictionaries;
-  private Map<String, BlockSingleValIterator> valueIterators;
 
   public StarTreeIndexViewer(File segmentDir)
       throws Exception {
     IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.heap);
 
     dictionaries = new HashMap<>();
-    valueIterators = new HashMap<>();
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
 
     for (String columnName : metadata.getAllColumns()) {
       DataSource dataSource = indexSegment.getDataSource(columnName);
-      Block block = dataSource.nextBlock();
-      BlockValSet blockValSet = block.getBlockValueSet();
-      BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
-      valueIterators.put(columnName, itr);
       dictionaries.put(columnName, dataSource.getDictionary());
     }
     StarTree tree = indexSegment.getStarTrees().get(0).getStarTree();

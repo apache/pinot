@@ -19,25 +19,21 @@
 package org.apache.pinot.core.operator.docvalsets;
 
 import org.apache.pinot.core.common.BaseBlockValSet;
+import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
-import org.apache.pinot.core.operator.docvaliterators.MultiValueIterator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public final class MultiValueSet extends BaseBlockValSet {
   private final SingleColumnMultiValueReader _reader;
-  private final int _numDocs;
+  private final ReaderContext _readerContext;
   private final DataType _dataType;
 
-  public MultiValueSet(SingleColumnMultiValueReader reader, int numDocs, DataType dataType) {
+  public MultiValueSet(SingleColumnMultiValueReader reader, DataType dataType) {
     _reader = reader;
-    _numDocs = numDocs;
+    _readerContext = reader.createContext();
     _dataType = dataType;
-  }
-
-  @Override
-  public MultiValueIterator iterator() {
-    return new MultiValueIterator(_reader, _numDocs);
   }
 
   @Override
@@ -48,5 +44,10 @@ public final class MultiValueSet extends BaseBlockValSet {
   @Override
   public boolean isSingleValue() {
     return false;
+  }
+
+  @Override
+  public int getIntValues(int docId, int[] valueBuffer) {
+    return _reader.getIntArray(docId, valueBuffer, _readerContext);
   }
 }

@@ -24,43 +24,92 @@ package org.apache.pinot.core.common;
 public abstract class BaseBlockValSet implements BlockValSet {
 
   @Override
-  public BlockValIterator iterator() {
+  public int getIntValue(int docId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
-      int outStartPos) {
+  public long getLongValue(int docId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos) {
+  public float getFloatValue(int docId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos) {
+  public double getDoubleValue(int docId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos) {
+  public String getStringValue(int docId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos) {
+  public byte[] getBytesValue(int docId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos) {
+  public int getIntValues(int docId, int[] valueBuffer) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos) {
+  public int getLongValues(int docId, long[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int getFloatValues(int docId, float[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int getDoubleValues(int docId, double[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int getStringValues(int docId, String[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void getDictionaryIds(int[] docIds, int length, int[] dictIdBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void getIntValues(int[] docIds, int length, int[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void getLongValues(int[] docIds, int length, long[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void getFloatValues(int[] docIds, int length, float[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void getDoubleValues(int[] docIds, int length, double[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void getStringValues(int[] docIds, int length, String[] valueBuffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void getBytesValues(int[] docIds, int length, byte[][] valueBuffer) {
     throw new UnsupportedOperationException();
   }
 
