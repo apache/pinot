@@ -76,32 +76,27 @@ public class RealtimeQuickStart {
     }
     _kafkaStarter.start();
     _kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));
-
+    printStatus(Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
+    MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream(schemaFile);
+    meetupRSVPProvider.run();
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, server and broker *****");
     runner.startAll();
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        printStatus(Color.GREEN, "***** Shutting down realtime quick start *****");
+        runner.stop();
+        meetupRSVPProvider.stopPublishing();
+        _kafkaStarter.stop();
+        ZkStarter.stopLocalZkServer(zookeeperInstance);
+        FileUtils.deleteDirectory(quickstartTmpDir);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }));
     printStatus(Color.CYAN, "***** Adding meetupRSVP table *****");
     runner.addTable();
-    printStatus(Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
-    final MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream(schemaFile);
-    meetupRSVPProvider.run();
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
     Thread.sleep(5000);
-
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        try {
-          printStatus(Color.GREEN, "***** Shutting down realtime quick start *****");
-          meetupRSVPProvider.stopPublishing();
-          runner.stop();
-          _kafkaStarter.stop();
-          ZkStarter.stopLocalZkServer(zookeeperInstance);
-          FileUtils.deleteDirectory(quickstartTmpDir);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-      }
-    });
 
     printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
 

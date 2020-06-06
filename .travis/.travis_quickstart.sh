@@ -30,33 +30,46 @@ java -version
 
 # Quickstart
 DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
-cd ${DIST_BIN_DIR}
+cd "${DIST_BIN_DIR}"
 
 # Test quick-start-batch
 bin/quick-start-batch.sh &
 PID=$!
 
 PASS=0
+
+# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
 sleep 30
-for i in $(seq 1 200)
+for i in $(seq 1 150)
 do
-  COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]]; then
-    if [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
       PASS=1
       break
     fi
   fi
-  sleep 1
+  sleep 2
 done
 
+cleanup () {
+  # Terminate the process and wait for the clean up to be done
+  kill "$1"
+  while true;
+  do
+    kill -0 "$1" && sleep 1 || break
+  done
+
+  # Delete ZK directory
+  rm -rf '/tmp/PinotAdmin/zkData'
+}
+
+cleanup "${PID}"
 if [ "${PASS}" -eq 0 ]; then
   echo 'Batch Quickstart failed: Cannot get correct result for count star query.'
   exit 1
 fi
-
-kill -9 $PID
-rm -rf /tmp/PinotAdmin/zkData
 
 # Test quick-start-streaming
 bin/quick-start-streaming.sh &
@@ -64,26 +77,28 @@ PID=$!
 
 PASS=0
 RES_1=0
-sleep 30
 
-for i in $(seq 1 200)
+# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
+sleep 30
+for i in $(seq 1 150)
 do
-  COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
- if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]]; then
-    if [ "${COUNT_STAR_RES}" -gt 0 ]; then
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from meetupRsvp limit 1","trace":false}' http://localhost:8000/query/sql`
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -gt 0 ]; then
       if [ "${RES_1}" -eq 0 ]; then
-        RES_1=${COUNT_STAR_RES}
+        RES_1="${COUNT_STAR_RES}"
         continue
+      elif [ "${COUNT_STAR_RES}" -gt "${RES_1}" ]; then
+        PASS=1
+        break
       fi
     fi
-    if [ "${COUNT_STAR_RES}" -gt "${RES_1}" ]; then
-      PASS=1
-      break
-    fi
   fi
-  sleep 1
+  sleep 2
 done
 
+cleanup "${PID}"
 if [ "${PASS}" -eq 0 ]; then
   if [ "${RES_1}" -eq 0 ]; then
     echo 'Streaming Quickstart test failed: Cannot get correct result for count star query.'
@@ -93,9 +108,6 @@ if [ "${PASS}" -eq 0 ]; then
   exit 1
 fi
 
-kill -9 $PID
-rm -rf /tmp/PinotAdmin/zkData
-
 # Test quick-start-hybrid
 cd bin
 ./quick-start-hybrid.sh &
@@ -103,25 +115,28 @@ PID=$!
 
 PASS=0
 RES_1=0
+
+# Wait for 30 seconds for table to be set up, then at most 5 minutes to reach the desired state
 sleep 30
-for i in $(seq 1 200)
+for i in $(seq 1 150)
 do
-  COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql | jq '.resultTable.rows[0][0]'`
-  if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]]; then
-    if [ "${COUNT_STAR_RES}" -gt 0 ]; then
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from airlineStats limit 1","trace":false}' http://localhost:8000/query/sql`
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -gt 0 ]; then
       if [ "${RES_1}" -eq 0 ]; then
-        RES_1=${COUNT_STAR_RES}
+        RES_1="${COUNT_STAR_RES}"
         continue
+      elif [ "${COUNT_STAR_RES}" -gt "${RES_1}" ]; then
+        PASS=1
+        break
       fi
     fi
-    if [ "${COUNT_STAR_RES}" -gt "${RES_1}" ]; then
-      PASS=1
-      break
-    fi
   fi
-  sleep 1
+  sleep 2
 done
 
+cleanup "${PID}"
 if [ "${PASS}" -eq 0 ]; then
   if [ "${RES_1}" -eq 0 ]; then
     echo 'Hybrid Quickstart test failed: Cannot get correct result for count star query.'
@@ -130,9 +145,6 @@ if [ "${PASS}" -eq 0 ]; then
   echo 'Hybrid Quickstart test failed: Cannot get incremental counts for count star query.'
   exit 1
 fi
-
-kill -9 $PID
-rm -rf /tmp/PinotAdmin/zkData
 
 cd ../../../../../
 pwd
