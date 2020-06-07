@@ -216,6 +216,7 @@ public class LLRealtimeSegmentDataManagerTest {
       StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
       Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
     }
+    segmentDataManager.destroy();
   }
 
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.
