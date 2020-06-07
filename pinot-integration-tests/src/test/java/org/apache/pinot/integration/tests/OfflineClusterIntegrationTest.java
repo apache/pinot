@@ -318,6 +318,37 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testLiteralOnlyFunc()
+      throws Exception {
+    long currentTsMin = System.currentTimeMillis();
+    String sqlQuery = "SELECT 1, now() as currentTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today";
+    JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    long currentTsMax = System.currentTimeMillis();
+
+    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "1");
+    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "currentTs");
+    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(2).asText(), "abc");
+    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(3).asText(), "today");
+
+    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
+    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
+    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
+    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(3).asText(), "STRING");
+
+    int first = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    long second = response.get("resultTable").get("rows").get(0).get(1).asLong();
+    String third = response.get("resultTable").get("rows").get(0).get(2).asText();
+    Assert.assertEquals(first, 1);
+    Assert.assertTrue(second > currentTsMin);
+    Assert.assertTrue(second < currentTsMax);
+    Assert.assertEquals(third, "abc");
+    String todayStr = response.get("resultTable").get("rows").get(0).get(3).asText();
+    String expectedTodayStr =
+        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    Assert.assertEquals(todayStr, expectedTodayStr);
+  }
+
+  @Test
   public void testRangeIndexTriggering()
       throws Exception {
     long numTotalDocs = getCountStarResult();
