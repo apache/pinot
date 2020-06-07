@@ -108,6 +108,7 @@ public class SegmentCompletionProtocol {
   public static final String COMMIT_TYPE_KEY = "isSplitCommitType";
   public static final String SEGMENT_LOCATION_KEY = "segmentLocation";
   public static final String CONTROLLER_VIP_URL_KEY = "controllerVipUrl";
+  public static final String STREAM_PARTITION_MSG_OFFSET_KEY = "streamPartitionMsgOffset";
 
   public static final String MSG_TYPE_CONSUMED = "segmentConsumed";
   public static final String MSG_TYPE_COMMIT = "segmentCommit";
@@ -459,12 +460,11 @@ public class SegmentCompletionProtocol {
     // TODO Issue 5359 Make it a JsonProperty when we are ready to move the protocol
     // This method is called in the server when the controller responds with
     // CATCH_UP response to segmentConsumed() API.
-    @JsonIgnore
+    @JsonProperty(STREAM_PARTITION_MSG_OFFSET_KEY)
     public String getStreamPartitionMsgOffset() {
       return _streamPartitionMsgOffset;
     }
 
-    @JsonIgnore
     public void setStreamPartitionMsgOffset(String streamPartitionMsgOffset) {
       _streamPartitionMsgOffset = streamPartitionMsgOffset;
     }

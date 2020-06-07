@@ -45,6 +45,7 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -166,6 +167,55 @@ public class LLRealtimeSegmentDataManagerTest {
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(_segmentDirFile);
+  }
+
+  @Test
+  public void testOffsetParsing() throws Exception {
+    final String offset = "34";
+    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    {
+      //  Controller sends catchup response with both offset as well as streamPartitionMsgOffset
+      String responseStr =
+          "{"
+              + "  \"streamPartitionMsgOffset\" : \"" + offset + "\","
+              + "  \"offset\" : " + offset + ","
+              + "  \"buildTimeSec\" : -1,"
+              + "  \"isSplitCommitType\" : false,"
+              + "  \"segmentLocation\" : \"file:///a/b\","
+              + "  \"status\" : \"CATCH_UP\""
+              + "}";
+      SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
+      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
+      Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
+    }
+    {
+      //  Controller sends catchup response with offset only
+      String responseStr =
+          "{"
+              + "  \"offset\" : " + offset + ","
+              + "  \"buildTimeSec\" : -1,"
+              + "  \"isSplitCommitType\" : false,"
+              + "  \"segmentLocation\" : \"file:///a/b\","
+              + "  \"status\" : \"CATCH_UP\""
+              + "}";
+      SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
+      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
+      Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
+    }
+    {
+      //  Controller sends catchup response streamPartitionMsgOffset only
+      String responseStr =
+          "{"
+              + "  \"streamPartitionMsgOffset\" : \"" + offset + "\","
+              + "  \"buildTimeSec\" : -1,"
+              + "  \"isSplitCommitType\" : false,"
+              + "  \"segmentLocation\" : \"file:///a/b\","
+              + "  \"status\" : \"CATCH_UP\""
+              + "}";
+      SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
+      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
+      Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
+    }
   }
 
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.
@@ -709,6 +759,7 @@ public class LLRealtimeSegmentDataManagerTest {
     public Field _state;
     public Field _shouldStop;
     public Field _stopReason;
+    private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
     public boolean _commitSegmentCalled = false;
@@ -745,6 +796,9 @@ public class LLRealtimeSegmentDataManagerTest {
       _stopReason = LLRealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
       _stopReason.setAccessible(true);
       _semaphoreMap = semaphoreMap;
+      _streamMsgOffsetFactory = LLRealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
+      _streamMsgOffsetFactory.setAccessible(true);
+      _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
     }
 
     public String getStopReason() {

@@ -645,7 +645,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return CompletionMode.DEFAULT;
   }
 
-  private StreamPartitionMsgOffset extractOffset(SegmentCompletionProtocol.Response response) {
+  @VisibleForTesting
+  protected StreamPartitionMsgOffset extractOffset(SegmentCompletionProtocol.Response response) {
     if (response.getStreamPartitionMsgOffset() != null) {
       return _streamPartitionMsgOffsetFactory.create(response.getStreamPartitionMsgOffset());
     } else {
