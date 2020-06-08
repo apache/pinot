@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -68,6 +69,7 @@ public class InPredicateAstNode extends PredicateAstNode {
     } else if (childNode instanceof FunctionCallAstNode) {
       if (_function == null && _identifier == null) {
         _function = (FunctionCallAstNode) childNode;
+        _identifier = TransformExpressionTree.getStandardExpression(childNode);
       } else if (_function != null) {
         throw new Pql2CompilationException("IN predicate has more than one function.");
       } else {
