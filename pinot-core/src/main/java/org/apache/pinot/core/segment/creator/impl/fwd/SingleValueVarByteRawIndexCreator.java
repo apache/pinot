@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import org.apache.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -33,18 +34,40 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
 
   private final VarByteChunkSingleValueWriter _indexWriter;
 
+  /**
+   * Create a var-byte raw index creator for the given column
+   * @param baseIndexDir Index directory
+   * @param compressionType Type of compression to use
+   * @param column Name of column to index
+   * @param totalDocs Total number of documents to index
+   * @param maxLength length of longest entry (in bytes)
+   * @throws IOException
+   */
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
       String column, int totalDocs, int maxLength)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, maxLength, false);
+    this(baseIndexDir, compressionType, column, totalDocs, maxLength, false,
+        BaseChunkSingleValueWriter.DEFAULT_VERSION);
   }
 
+  /**
+   * Create a var-byte raw index creator for the given column
+   * @param baseIndexDir Index directory
+   * @param compressionType Type of compression to use
+   * @param column Name of column to index
+   * @param totalDocs Total number of documents to index
+   * @param maxLength length of longest entry (in bytes)
+   * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
+   * @param writerVersion writer format version
+   * @throws IOException
+   */
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
-      String column, int totalDocs, int maxLength, boolean deriveNumDocsPerChunk)
+      String column, int totalDocs, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
-    _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength);
+    _indexWriter =
+        new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion);
   }
 
   @VisibleForTesting

@@ -28,6 +28,7 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
@@ -82,33 +83,47 @@ public class FixedByteChunkSingleValueReaderWriteTest {
       expected[i] = _random.nextInt();
     }
 
-    File outFile = new File(TEST_FILE);
-    FileUtils.deleteQuietly(outFile);
+    File outFileFourByte = new File(TEST_FILE);
+    File outFileEightByte = new File(TEST_FILE + "8byte");
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
 
-    FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES);
+    // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
+    FixedByteChunkSingleValueWriter fourByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+            Integer.BYTES, BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    FixedByteChunkSingleValueWriter eightByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+            Integer.BYTES, BaseChunkSingleValueWriter.CURRENT_VERSION);
 
     for (int i = 0; i < NUM_VALUES; i++) {
-      writer.setInt(i, expected[i]);
+      fourByteOffsetWriter.setInt(i, expected[i]);
+      eightByteOffsetWriter.setInt(i, expected[i]);
     }
-    writer.close();
 
-    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
-      ChunkReaderContext context = reader.createContext();
+    fourByteOffsetWriter.close();
+    eightByteOffsetWriter.close();
+
+    try (FixedByteChunkSingleValueReader fourByteOffsetReader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte));
+        FixedByteChunkSingleValueReader eightByteOffsetReader = new FixedByteChunkSingleValueReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte))) {
+
+      ChunkReaderContext context1 = fourByteOffsetReader.createContext();
+      ChunkReaderContext context2 = eightByteOffsetReader.createContext();
 
       for (int i = 0; i < NUM_VALUES; i++) {
-        int actual = reader.getInt(i, context);
-        Assert.assertEquals(actual, expected[i]);
-
+        Assert.assertEquals(fourByteOffsetReader.getInt(i, context1), expected[i]);
+        Assert.assertEquals(eightByteOffsetReader.getInt(i, context2), expected[i]);
         if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-          actual = reader.getInt(i);
-          Assert.assertEquals(actual, expected[i]);
+          Assert.assertEquals(fourByteOffsetReader.getInt(i), expected[i]);
+          Assert.assertEquals(eightByteOffsetReader.getInt(i), expected[i]);
         }
       }
     }
 
-    FileUtils.deleteQuietly(outFile);
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
   }
 
   public void testLong(ChunkCompressorFactory.CompressionType compressionType)
@@ -118,33 +133,47 @@ public class FixedByteChunkSingleValueReaderWriteTest {
       expected[i] = _random.nextLong();
     }
 
-    File outFile = new File(TEST_FILE);
-    FileUtils.deleteQuietly(outFile);
+    File outFileFourByte = new File(TEST_FILE);
+    File outFileEightByte = new File(TEST_FILE + "8byte");
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
 
-    FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES);
+    // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
+    FixedByteChunkSingleValueWriter fourByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES,
+            BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    FixedByteChunkSingleValueWriter eightByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+            Long.BYTES, BaseChunkSingleValueWriter.CURRENT_VERSION);
 
     for (int i = 0; i < NUM_VALUES; i++) {
-      writer.setLong(i, expected[i]);
+      fourByteOffsetWriter.setLong(i, expected[i]);
+      eightByteOffsetWriter.setLong(i, expected[i]);
     }
-    writer.close();
 
-    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
-      ChunkReaderContext context = reader.createContext();
+    fourByteOffsetWriter.close();
+    eightByteOffsetWriter.close();
+
+    try (FixedByteChunkSingleValueReader fourByteOffsetReader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte));
+        FixedByteChunkSingleValueReader eightByteOffsetReader = new FixedByteChunkSingleValueReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte))) {
+
+      ChunkReaderContext context1 = fourByteOffsetReader.createContext();
+      ChunkReaderContext context2 = eightByteOffsetReader.createContext();
 
       for (int i = 0; i < NUM_VALUES; i++) {
-        long actual = reader.getLong(i, context);
-        Assert.assertEquals(actual, expected[i]);
-
+        Assert.assertEquals(fourByteOffsetReader.getLong(i, context1), expected[i]);
+        Assert.assertEquals(eightByteOffsetReader.getLong(i, context2), expected[i]);
         if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-          actual = reader.getLong(i);
-          Assert.assertEquals(actual, expected[i]);
+          Assert.assertEquals(fourByteOffsetReader.getLong(i), expected[i]);
+          Assert.assertEquals(eightByteOffsetReader.getLong(i), expected[i]);
         }
       }
     }
 
-    FileUtils.deleteQuietly(outFile);
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
   }
 
   public void testFloat(ChunkCompressorFactory.CompressionType compressionType)
@@ -154,33 +183,47 @@ public class FixedByteChunkSingleValueReaderWriteTest {
       expected[i] = _random.nextFloat();
     }
 
-    File outFile = new File(TEST_FILE);
-    FileUtils.deleteQuietly(outFile);
+    File outFileFourByte = new File(TEST_FILE);
+    File outFileEightByte = new File(TEST_FILE + "8byte");
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
 
-    FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES);
+    // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
+    FixedByteChunkSingleValueWriter fourByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+            Float.BYTES, BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    FixedByteChunkSingleValueWriter eightByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+            Float.BYTES, BaseChunkSingleValueWriter.CURRENT_VERSION);
 
     for (int i = 0; i < NUM_VALUES; i++) {
-      writer.setFloat(i, expected[i]);
+      fourByteOffsetWriter.setFloat(i, expected[i]);
+      eightByteOffsetWriter.setFloat(i, expected[i]);
     }
-    writer.close();
 
-    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
-      ChunkReaderContext context = reader.createContext();
+    fourByteOffsetWriter.close();
+    eightByteOffsetWriter.close();
+
+    try (FixedByteChunkSingleValueReader fourByteOffsetReader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte));
+        FixedByteChunkSingleValueReader eightByteOffsetReader = new FixedByteChunkSingleValueReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte))) {
+
+      ChunkReaderContext context1 = fourByteOffsetReader.createContext();
+      ChunkReaderContext context2 = eightByteOffsetReader.createContext();
 
       for (int i = 0; i < NUM_VALUES; i++) {
-        float actual = reader.getFloat(i, context);
-        Assert.assertEquals(actual, expected[i]);
-
+        Assert.assertEquals(fourByteOffsetReader.getFloat(i, context1), expected[i]);
+        Assert.assertEquals(eightByteOffsetReader.getFloat(i, context2), expected[i]);
         if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-          actual = reader.getFloat(i);
-          Assert.assertEquals(actual, expected[i]);
+          Assert.assertEquals(fourByteOffsetReader.getFloat(i), expected[i]);
+          Assert.assertEquals(eightByteOffsetReader.getFloat(i), expected[i]);
         }
       }
     }
 
-    FileUtils.deleteQuietly(outFile);
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
   }
 
   public void testDouble(ChunkCompressorFactory.CompressionType compressionType)
@@ -190,33 +233,47 @@ public class FixedByteChunkSingleValueReaderWriteTest {
       expected[i] = _random.nextDouble();
     }
 
-    File outFile = new File(TEST_FILE);
-    FileUtils.deleteQuietly(outFile);
+    File outFileFourByte = new File(TEST_FILE);
+    File outFileEightByte = new File(TEST_FILE + "8byte");
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
 
-    FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES);
+    // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
+    FixedByteChunkSingleValueWriter fourByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+            Double.BYTES, BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    FixedByteChunkSingleValueWriter eightByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
+            Double.BYTES, BaseChunkSingleValueWriter.CURRENT_VERSION);
 
     for (int i = 0; i < NUM_VALUES; i++) {
-      writer.setDouble(i, expected[i]);
+      fourByteOffsetWriter.setDouble(i, expected[i]);
+      eightByteOffsetWriter.setDouble(i, expected[i]);
     }
-    writer.close();
 
-    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
-      ChunkReaderContext context = reader.createContext();
+    fourByteOffsetWriter.close();
+    eightByteOffsetWriter.close();
+
+    try (FixedByteChunkSingleValueReader fourByteOffsetReader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte));
+        FixedByteChunkSingleValueReader eightByteOffsetReader = new FixedByteChunkSingleValueReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte))) {
+
+      ChunkReaderContext context1 = fourByteOffsetReader.createContext();
+      ChunkReaderContext context2 = eightByteOffsetReader.createContext();
 
       for (int i = 0; i < NUM_VALUES; i++) {
-        double actual = reader.getDouble(i, context);
-        Assert.assertEquals(actual, expected[i]);
-
+        Assert.assertEquals(fourByteOffsetReader.getDouble(i, context1), expected[i]);
+        Assert.assertEquals(eightByteOffsetReader.getDouble(i, context2), expected[i]);
         if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-          actual = reader.getDouble(i);
-          Assert.assertEquals(actual, expected[i]);
+          Assert.assertEquals(fourByteOffsetReader.getDouble(i), expected[i]);
+          Assert.assertEquals(eightByteOffsetReader.getDouble(i), expected[i]);
         }
       }
     }
 
-    FileUtils.deleteQuietly(outFile);
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
   }
 
   public void testBytes(ChunkCompressorFactory.CompressionType compressionType)
@@ -226,38 +283,51 @@ public class FixedByteChunkSingleValueReaderWriteTest {
       expected[i] = RandomStringUtils.randomAscii(50).getBytes(UTF_8);
     }
 
-    File outFile = new File(TEST_FILE);
-    FileUtils.deleteQuietly(outFile);
+    File outFileFourByte = new File(TEST_FILE);
+    File outFileEightByte = new File(TEST_FILE + "8byte");
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
 
-    FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, 50);
+    // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
+    FixedByteChunkSingleValueWriter fourByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, 50,
+            BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    FixedByteChunkSingleValueWriter eightByteOffsetWriter =
+        new FixedByteChunkSingleValueWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, 50,
+            BaseChunkSingleValueWriter.CURRENT_VERSION);
 
     for (int i = 0; i < NUM_VALUES; i++) {
-      writer.setBytes(i, expected[i]);
+      fourByteOffsetWriter.setBytes(i, expected[i]);
+      eightByteOffsetWriter.setBytes(i, expected[i]);
     }
-    writer.close();
 
-    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
-      ChunkReaderContext context = reader.createContext();
+    fourByteOffsetWriter.close();
+    eightByteOffsetWriter.close();
+
+    try (FixedByteChunkSingleValueReader fourByteOffsetReader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte));
+        FixedByteChunkSingleValueReader eightByteOffsetReader = new FixedByteChunkSingleValueReader(
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte))) {
+
+      ChunkReaderContext context1 = fourByteOffsetReader.createContext();
+      ChunkReaderContext context2 = eightByteOffsetReader.createContext();
 
       for (int i = 0; i < NUM_VALUES; i++) {
-        byte[] actual = reader.getBytes(i, context);
-        Assert.assertEquals(actual, expected[i]);
-
+        Assert.assertEquals(fourByteOffsetReader.getBytes(i, context1), expected[i]);
+        Assert.assertEquals(eightByteOffsetReader.getBytes(i, context2), expected[i]);
         if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-          actual = reader.getBytes(i);
-          Assert.assertEquals(actual, expected[i]);
+          Assert.assertEquals(fourByteOffsetReader.getBytes(i), expected[i]);
+          Assert.assertEquals(eightByteOffsetReader.getBytes(i), expected[i]);
         }
       }
     }
 
-    FileUtils.deleteQuietly(outFile);
+    FileUtils.deleteQuietly(outFileFourByte);
+    FileUtils.deleteQuietly(outFileEightByte);
   }
 
   /**
    * This test ensures that the reader can read in an data file from version 1.
-   * @throws IOException
    */
   @Test
   public void testBackwardCompatibilityV1()
@@ -265,6 +335,9 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     testBackwardCompatibilityHelper("data/fixedByteSVRDoubles.v1", 10009, 0);
   }
 
+  /**
+   * This test ensures that the reader can read in an data file from version 2.
+   */
   @Test
   public void testBackwardCompatibilityV2()
       throws Exception {

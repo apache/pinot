@@ -32,6 +32,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -200,7 +201,7 @@ public class RawIndexConverter {
     int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getColumnMaxLength();
     try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
         .getRawIndexCreatorForColumn(_convertedIndexDir, ChunkCompressorFactory.CompressionType.SNAPPY, columnName,
-            dataType, _originalSegmentMetadata.getTotalDocs(), lengthOfLongestEntry)) {
+            dataType, _originalSegmentMetadata.getTotalDocs(), lengthOfLongestEntry, false, BaseChunkSingleValueWriter.DEFAULT_VERSION)) {
       BlockSingleValIterator iterator = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
       int docId = 0;
       while (iterator.hasNext()) {

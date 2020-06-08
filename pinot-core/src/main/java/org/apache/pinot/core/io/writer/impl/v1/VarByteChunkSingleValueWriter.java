@@ -53,7 +53,6 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
  */
 @NotThreadSafe
 public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
-  private static final int CURRENT_VERSION = 3;
   public static final int CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE = Integer.BYTES;
 
   private final int _chunkHeaderSize;
@@ -67,16 +66,16 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
    * @param compressionType Type of compression to use.
    * @param totalDocs Total number of docs to write.
    * @param numDocsPerChunk Number of documents per chunk.
-   * @param lengthOfLongestEntry Length of longest entry (in bytes).
+   * @param lengthOfLongestEntry Length of longest entry (in bytes)
+   * @param writerVersion writer format version
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
   public VarByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int lengthOfLongestEntry)
+      int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
       throws FileNotFoundException {
-
     super(file, compressionType, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + lengthOfLongestEntry), // chunkSize
-        lengthOfLongestEntry, CURRENT_VERSION);
+        lengthOfLongestEntry, writerVersion);
 
     _chunkHeaderOffset = 0;
     _chunkHeaderSize = numDocsPerChunk * CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;

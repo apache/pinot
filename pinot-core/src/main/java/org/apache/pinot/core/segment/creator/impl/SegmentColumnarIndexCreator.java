@@ -35,6 +35,7 @@ import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
@@ -195,9 +196,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
         // Initialize forward index creator
         boolean deriveNumDocsPerChunk = shouldDeriveNumDocsPerChunk(columnName, segmentCreationSpec.getColumnProperties());
+        int writerVersion = rawIndexWriterVersion(columnName, segmentCreationSpec.getColumnProperties());
         _forwardIndexCreatorMap.put(columnName,
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
-                indexCreationInfo.getLengthOfLongestEntry(), deriveNumDocsPerChunk));
+                indexCreationInfo.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion));
 
         // Initialize text index creator
         if (_textIndexColumns.contains(columnName)) {
@@ -221,6 +223,18 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return properties != null && Boolean.parseBoolean(properties.get(FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY));
     }
     return false;
+  }
+
+  public static int rawIndexWriterVersion(String columnName, Map<String, Map<String, String>> columnProperties) {
+    if (columnProperties != null && columnProperties.get(columnName) != null) {
+      Map<String, String> properties = columnProperties.get(columnName);
+      String version = properties.get(FieldConfig.RAW_INDEX_WRITER_VERSION);
+      if (version == null) {
+        return BaseChunkSingleValueWriter.DEFAULT_VERSION;
+      }
+      return Integer.parseInt(version);
+    }
+    return BaseChunkSingleValueWriter.DEFAULT_VERSION;
   }
 
   /**
@@ -542,44 +556,43 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @param column Column name
    * @param totalDocs Total number of documents to index
    * @param lengthOfLongestEntry Length of longest entry
-   * @return
+   * @param deriveNumDocsPerChunk true if varbyte writer should auto-derive the number of rows per chunk
+   * @param writerVersion version to use for the raw index writer
+   * @return raw index creator
    * @throws IOException
    */
   public static SingleValueRawIndexCreator getRawIndexCreatorForColumn(File file,
       ChunkCompressorFactory.CompressionType compressionType, String column, FieldSpec.DataType dataType, int totalDocs,
-      int lengthOfLongestEntry)
-      throws IOException {
-    return getRawIndexCreatorForColumn(file, compressionType, column, dataType, totalDocs, lengthOfLongestEntry, false);
-  }
-
-  public static SingleValueRawIndexCreator getRawIndexCreatorForColumn(File file,
-      ChunkCompressorFactory.CompressionType compressionType, String column, FieldSpec.DataType dataType, int totalDocs,
-      int lengthOfLongestEntry, boolean deriveNumDocsPerChunk)
+      int lengthOfLongestEntry, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
 
     SingleValueRawIndexCreator indexCreator;
     switch (dataType) {
       case INT:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Integer.BYTES);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Integer.BYTES,
+            writerVersion);
         break;
 
       case LONG:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Long.BYTES);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Long.BYTES,
+            writerVersion);
         break;
 
       case FLOAT:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Float.BYTES);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Float.BYTES,
+            writerVersion);
         break;
 
       case DOUBLE:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Double.BYTES);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Double.BYTES,
+            writerVersion);
         break;
 
       case STRING:
       case BYTES:
         indexCreator =
             new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, lengthOfLongestEntry,
-                deriveNumDocsPerChunk);
+                deriveNumDocsPerChunk, writerVersion);
         break;
 
       default:

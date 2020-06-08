@@ -363,9 +363,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int dictionaryElementSize = 0;
 
     boolean deriveNumDocsPerChunk = SegmentColumnarIndexCreator.shouldDeriveNumDocsPerChunk(column, indexLoadingConfig.getColumnProperties());
+    int writerVersion = SegmentColumnarIndexCreator.rawIndexWriterVersion(column, indexLoadingConfig.getColumnProperties());
     SingleValueVarByteRawIndexCreator rawIndexCreator =
         new SingleValueVarByteRawIndexCreator(_indexDir, ChunkCompressorFactory.CompressionType.SNAPPY, column,
-            totalDocs, lengthOfLongestEntry, deriveNumDocsPerChunk);
+            totalDocs, lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion);
 
     for (int docId = 0; docId < totalDocs; docId++) {
       rawIndexCreator.index(docId, defaultValue);
