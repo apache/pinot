@@ -93,16 +93,16 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
     row#  dimName  dimValue  shardId  thetaSketchCol
     ----  =======  ========  =======  ==============
-    1     country  US        1        ...
-    2     country  CA        1        ...
-    3     country  MX        1        ...
-    4     title    Engineer  1        ...
-    5     title    Manager   1        ...
-    6     country  US        2        ...
-    7     country  CA        2        ...
-    8     country  MX        2        ...
-    9     title    Engineer  2        ...
-    10    title    Manager   2        ...
+    1     Course   Math      1        ...
+    2     Course   History   1        ...
+    3     Course   Biology   1        ...
+    4     Gender   Female    1        ...
+    5     Gender   Male      1        ...
+    6     Course   Math      2        ...
+    7     Course   History   2        ...
+    8     Course   Biology   2        ...
+    9     Gender   Female    2        ...
+    10    Gender   Male      2        ...
      */
     return 10;
   }
@@ -113,48 +113,48 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     /*
     Original data:
 
-    Title     Country  Shard#1  Shard#2
+    Gender    Course   Shard#1  Shard#2
     --------  -------  -------  -------
-    Engineer  US       50       110
-    Engineer  CA       60       120
-    Engineer  MX       70       130
-    Manager   US       80       140
-    Manager   CA       90       150
-    Manager   MX       100      160
+    Female    Math     50       110
+    Female    History  60       120
+    Female    Biology  70       130
+    Male      Math     80       140
+    Male      History  90       150
+    Male      Biology  100      160
      */
 
-    // title = engineer
+    // gender = female
     String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'title'\", \"dimValue = 'Engineer'\", \"dimName = 'title' AND dimValue = 'Engineer'\") from "
-        + DEFAULT_TABLE_NAME + " where dimName = 'title' AND dimValue = 'Engineer'";
+        + "\"dimName = 'gender'\", \"dimValue = 'Female'\", \"dimName = 'gender' AND dimValue = 'Female'\") from "
+        + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND dimValue = 'Female'";
     runAndAssert(query, 50 + 60 + 70 + 110 + 120 + 130);
 
-    // title = manager
+    // gender = male
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'title'\", \"dimValue='Manager'\", \"dimName = 'title' AND dimValue = 'Manager'\") from "
-        + DEFAULT_TABLE_NAME + " where dimName = 'title' AND dimValue = 'Manager'";
+        + "\"dimName = 'gender'\", \"dimValue='Male'\", \"dimName = 'gender' AND dimValue = 'Male'\") from "
+        + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND dimValue = 'Male'";
     runAndAssert(query, 80 + 90 + 100 + 140 + 150 + 160);
 
-    // country = US
+    // course = math
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'country'\", \"dimValue = 'US'\", \"dimName = 'country' AND dimValue = 'US'\") from "
-        + DEFAULT_TABLE_NAME + " where dimName = 'country' AND dimValue = 'US'";
+        + "\"dimName = 'course'\", \"dimValue = 'Math'\", \"dimName = 'course' AND dimValue = 'Math'\") from "
+        + DEFAULT_TABLE_NAME + " where dimName = 'course' AND dimValue = 'Math'";
     runAndAssert(query, 50 + 80 + 110 + 140);
 
-    // title = engineer AND country = US
+    // gender = gemale AND course = math
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'title'\", \"dimValue = 'Engineer'\", \"dimName = 'country'\", \"dimValue = 'US'\", "
-        + "\"(dimName = 'title' AND dimValue = 'Engineer') AND (dimName = 'country' AND dimValue = 'US')\") from "
+        + "\"dimName = 'gender'\", \"dimValue = 'Female'\", \"dimName = 'course'\", \"dimValue = 'Math'\", "
+        + "\"(dimName = 'gender' AND dimValue = 'Female') AND (dimName = 'course' AND dimValue = 'Math')\") from "
         + DEFAULT_TABLE_NAME
-        + " where (dimName = 'title' AND dimValue = 'Engineer') OR (dimName = 'country' AND dimValue = 'US')";
+        + " where (dimName = 'gender' AND dimValue = 'Female') OR (dimName = 'course' AND dimValue = 'Math')";
     runAndAssert(query, 50 + 110);
 
-    // title = manager OR country = MX
+    // gender = male OR course = biology
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'title'\", \"dimValue='Manager'\", \"dimName = 'country'\", \"dimValue='MX'\", "
-        + "\"(dimName = 'title' AND dimValue = 'Manager') OR (dimName = 'country' AND dimValue = 'MX')\") from "
+        + "\"dimName = 'gender'\", \"dimValue='Male'\", \"dimName = 'course'\", \"dimValue='Biology'\", "
+        + "\"(dimName = 'gender' AND dimValue = 'Male') OR (dimName = 'course' AND dimValue = 'Biology')\") from "
         + DEFAULT_TABLE_NAME
-        + " where (dimName = 'title' AND dimValue = 'Manager') OR (dimName = 'country' AND dimValue = 'MX')";
+        + " where (dimName = 'gender' AND dimValue = 'Male') OR (dimName = 'course' AND dimValue = 'Biology')";
     runAndAssert(query, 70 + 80 + 90 + 100 + 130 + 140 + 150 + 160);
   }
 
@@ -180,40 +180,40 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
 
-      int memberId = 0;
+      int studentId = 0;
       int cardinality = 50;
       for (int shardId = 0; shardId < 2; shardId++) {
 
-        // populate member data (memberId, title, country) for this shard id
-        String[] allTitles = {"Engineer", "Manager"};
-        String[] allCountries = {"US", "CA", "MX"};
-        Map<Pair<String, String>, List<Integer>> titleCountryToMemberIds = new HashMap<>();
-        for (String title : allTitles) {
-          for (String country : allCountries) {
-            List<Integer> memberIds =
-                titleCountryToMemberIds.computeIfAbsent(ImmutablePair.of(title, country), key -> new ArrayList<>());
+        // populate student-course data (studentId, gender, course) for this shard id
+        String[] allGenders = {"Female", "Male"};
+        String[] allCountries = {"Math", "History", "Biology"};
+        Map<Pair<String, String>, List<Integer>> genderCourseToStudentIds = new HashMap<>();
+        for (String gender : allGenders) {
+          for (String course : allCountries) {
+            List<Integer> studentIds =
+                genderCourseToStudentIds.computeIfAbsent(ImmutablePair.of(gender, course), key -> new ArrayList<>());
             for (int i = 0; i < cardinality; i++) {
-              memberIds.add(memberId++);
+              studentIds.add(studentId++);
             }
             cardinality += 10;
           }
         }
 
-        // [title dimension] calculate theta sketches & add them to avro file
-        for (String title : allTitles) {
+        // [gender dimension] calculate theta sketches & add them to avro file
+        for (String gender : allGenders) {
 
           // calculate theta sketch
           UpdateSketch sketch = new UpdateSketchBuilder().build();
-          titleCountryToMemberIds.forEach((titleCountry, memberIds) -> {
-            if (title.equals(titleCountry.getLeft())) {
-              memberIds.forEach(sketch::update);
+          genderCourseToStudentIds.forEach((genderCourse, studentIds) -> {
+            if (gender.equals(genderCourse.getLeft())) {
+              studentIds.forEach(sketch::update);
             }
           });
 
           // create avro record
           GenericData.Record record = new GenericData.Record(avroSchema);
-          record.put(DIM_NAME, "title");
-          record.put(DIM_VALUE, title);
+          record.put(DIM_NAME, "gender");
+          record.put(DIM_VALUE, gender);
           record.put(SHARD_ID, shardId);
           record.put(THETA_SKETCH, ByteBuffer.wrap(sketch.compact().toByteArray()));
 
@@ -221,21 +221,21 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
           fileWriter.append(record);
         }
 
-        // [country dimension] calculate theta sketches & add them to avro file
-        for (String country : allCountries) {
+        // [course dimension] calculate theta sketches & add them to avro file
+        for (String course : allCountries) {
 
           // calculate theta sketch
           UpdateSketch sketch = new UpdateSketchBuilder().build();
-          titleCountryToMemberIds.forEach((titleCountry, memberIds) -> {
-            if (country.equals(titleCountry.getRight())) {
-              memberIds.forEach(sketch::update);
+          genderCourseToStudentIds.forEach((genderCourse, studentIds) -> {
+            if (course.equals(genderCourse.getRight())) {
+              studentIds.forEach(sketch::update);
             }
           });
 
           // create avro record
           GenericData.Record record = new GenericData.Record(avroSchema);
-          record.put(DIM_NAME, "country");
-          record.put(DIM_VALUE, country);
+          record.put(DIM_NAME, "course");
+          record.put(DIM_VALUE, course);
           record.put(SHARD_ID, shardId);
           record.put(THETA_SKETCH, ByteBuffer.wrap(sketch.compact().toByteArray()));
 
