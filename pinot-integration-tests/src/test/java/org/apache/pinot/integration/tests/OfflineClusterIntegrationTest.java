@@ -321,31 +321,37 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testLiteralOnlyFunc()
       throws Exception {
     long currentTsMin = System.currentTimeMillis();
-    String sqlQuery = "SELECT 1, now() as currentTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today";
+    String sqlQuery = "SELECT 1, now() as currentTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as today, now()";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
 
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "1");
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "currentTs");
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(2).asText(), "abc");
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(3).asText(), "today");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "1");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "currentTs");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(2).asText(), "abc");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(3).asText(), "today");
+    String nowColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(4).asText();
+    assertTrue(Long.parseLong(nowColumnName) > currentTsMin);
+    assertTrue(Long.parseLong(nowColumnName) < currentTsMax);
 
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(3).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(3).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(4).asText(), "LONG");
 
     int first = response.get("resultTable").get("rows").get(0).get(0).asInt();
     long second = response.get("resultTable").get("rows").get(0).get(1).asLong();
     String third = response.get("resultTable").get("rows").get(0).get(2).asText();
-    Assert.assertEquals(first, 1);
-    Assert.assertTrue(second > currentTsMin);
-    Assert.assertTrue(second < currentTsMax);
-    Assert.assertEquals(third, "abc");
+    assertEquals(first, 1);
+    assertTrue(second > currentTsMin);
+    assertTrue(second < currentTsMax);
+    assertEquals(third, "abc");
     String todayStr = response.get("resultTable").get("rows").get(0).get(3).asText();
     String expectedTodayStr =
         Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
-    Assert.assertEquals(todayStr, expectedTodayStr);
+    assertEquals(todayStr, expectedTodayStr);
+    long nowValue = response.get("resultTable").get("rows").get(0).get(4).asLong();
+    assertEquals(nowValue, Long.parseLong(nowColumnName));
   }
 
   @Test

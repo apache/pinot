@@ -128,7 +128,7 @@ public class PinotQuery2BrokerRequestConverter {
           if (selection == null) {
             selection = new Selection();
           }
-          selection.addToSelectionColumns(String.format("'%s'", expression.getLiteral().getFieldValue().toString()));
+          selection.addToSelectionColumns('\'' + expression.getLiteral().getFieldValue().toString() + '\'');
           break;
         case IDENTIFIER:
           if (selection == null) {

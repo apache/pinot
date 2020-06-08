@@ -144,7 +144,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testFilterCaluses() {
+  public void testFilterClauses() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where a > 1.5");
     Function func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN.name());
@@ -192,7 +192,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testFilterCalusesWithRightExpression() {
+  public void testFilterClausesWithRightExpression() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where a > b");
     Function func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN.name());

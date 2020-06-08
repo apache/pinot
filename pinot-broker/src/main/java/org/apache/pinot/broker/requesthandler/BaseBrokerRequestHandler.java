@@ -193,15 +193,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
     if (isLiteralOnlyQuery(brokerRequest)) {
-      LOGGER.info("Request {} contains only Literal, skipping server query: {}", requestId, query);
+      LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
       try {
         BrokerResponse brokerResponse =
             processLiteralOnlyBrokerRequest(brokerRequest, compilationStartTimeNs, requestStatistics);
         return brokerResponse;
-      } catch (IllegalStateException e) {
-        LOGGER
-            .warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId, query,
-                e.getMessage());
+      } catch (Exception e) {
+        // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
+        LOGGER.warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId,
+            query, e.getMessage());
       }
     }
     String tableName = brokerRequest.getQuerySource().getTableName();
@@ -485,7 +485,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private BrokerResponse processLiteralOnlyBrokerRequest(BrokerRequest brokerRequest, long compilationStartTimeNs,
       RequestStatistics requestStatistics)
       throws IllegalStateException {
-    System.out.println("brokerRequest = " + brokerRequest.toString());
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
     List<String> columnNames = new ArrayList<>();
     List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>();
@@ -529,6 +528,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Object fieldValue = literal.getFieldValue();
     columnNames.add(fieldValue.toString());
     switch (literal.getSetField()) {
+      case BOOL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.STRING);
+        row.add(new Boolean(literal.getBoolValue()).toString());
+        break;
+      case BYTE_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.INT);
+        row.add((int)literal.getByteValue());
+        break;
       case SHORT_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.INT);
         row.add((int) literal.getShortValue());
@@ -545,22 +552,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.DOUBLE);
         row.add(literal.getDoubleValue());
         break;
-      case BOOL_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.STRING);
-        row.add(new Boolean(literal.getBoolValue()).toString());
-        break;
       case STRING_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.STRING);
-        System.out.println("literal.getStringValue() = " + literal.getStringValue());
         row.add(literal.getStringValue());
         break;
       case BINARY_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.BYTES);
         row.add(BytesUtils.toHexString(literal.getBinaryValue()));
-        break;
-      case BYTE_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.BYTES);
-        row.add(BytesUtils.toHexString(new byte[]{literal.getByteValue()}));
         break;
     }
   }

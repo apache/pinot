@@ -49,6 +49,17 @@ public class LiteralOnlyBrokerRequestTest {
   }
 
   @Test
+  public void testSelectStarBrokerRequestFromSQL() {
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT '*'")));
+    Assert.assertTrue(BaseBrokerRequestHandler
+        .isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT '*' FROM myTable")));
+    Assert.assertFalse(
+        BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT *")));
+    Assert.assertFalse(
+        BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT * FROM myTable")));
+  }
+
+  @Test
   public void testNumberLiteralBrokerRequestFromSQL() {
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT 1")));
     Assert.assertTrue(
