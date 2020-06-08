@@ -26,9 +26,9 @@ rules:
       threshold: 0.05           # Filter out all changes less than 5% compared to baseline.
   quality:                      # Configure the data quality rules
   - name: data_sla_rule_1
-    type: DATA_SLA              # Alert if data is delayed
+    type: DATA_SLA              # Alert if data is missing.
     params:
-      sla: 3_DAYS               # Data delayed by 3 days since last availability
+      sla: 3_DAYS               # Data is missing for 3 days since last availability
 `;
 
 export const defaultSubscriptionYaml = `subscriptionGroupName: 'give_a_unique_name_to_this_group'
