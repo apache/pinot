@@ -101,7 +101,9 @@ public class DimensionWrapper extends DetectionPipeline {
   private final double minContribution;
   private final double minValue;
   private final double minValueHourly;
+  private final double maxValueHourly;
   private final double minValueDaily;
+  private final double maxValueDaily;
   private final double minLiveZone;
   private final double liveBucketPercentageThreshold;
   private final Period lookback;
@@ -125,7 +127,9 @@ public class DimensionWrapper extends DetectionPipeline {
     this.minContribution = MapUtils.getDoubleValue(config.getProperties(), "minContribution", Double.NaN);
     this.minValue = MapUtils.getDoubleValue(config.getProperties(), "minValue", Double.NaN);
     this.minValueHourly = MapUtils.getDoubleValue(config.getProperties(), "minValueHourly", Double.NaN);
+    this.maxValueHourly = MapUtils.getDoubleValue(config.getProperties(), "maxValueHourly", Double.NaN);
     this.minValueDaily = MapUtils.getDoubleValue(config.getProperties(), "minValueDaily", Double.NaN);
+    this.maxValueDaily = MapUtils.getDoubleValue(config.getProperties(), "maxValueDaily", Double.NaN);
     this.k = MapUtils.getIntValue(config.getProperties(), "k", -1);
     this.dimensions = ConfigUtils.getList(config.getProperties().get("dimensions"));
     this.lookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "lookback", "1w"));
@@ -200,9 +204,19 @@ public class DimensionWrapper extends DetectionPipeline {
         aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueHourly)).dropNull();
       }
 
+      if (!Double.isNaN(this.maxValueHourly)) {
+        double multiplier = TimeUnit.HOURS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).lte(this.maxValueHourly)).dropNull();
+      }
+
       if (!Double.isNaN(this.minValueDaily)) {
         double multiplier = TimeUnit.DAYS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
         aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueDaily)).dropNull();
+      }
+
+      if (!Double.isNaN(this.maxValueDaily)) {
+        double multiplier = TimeUnit.DAYS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).lte(this.maxValueDaily)).dropNull();
       }
 
       aggregates = aggregates.sortedBy(COL_VALUE).reverse();
