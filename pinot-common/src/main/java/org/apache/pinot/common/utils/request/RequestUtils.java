@@ -121,7 +121,7 @@ public class RequestUtils {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
       }
     } else {
-      literal.setStringValue(node.toString().replaceAll("^\'|\'$", ""));
+      literal.setStringValue(node.toString().replaceAll("^'|'$", "").replace("''", "'"));
     }
     expression.setLiteral(literal);
     return expression;
@@ -176,10 +176,11 @@ public class RequestUtils {
     if (object instanceof String) {
       return RequestUtils.getLiteralExpression((String) object);
     }
-    if(object instanceof SqlLiteral) {
+    if (object instanceof SqlLiteral) {
       return RequestUtils.getLiteralExpression((SqlLiteral) object);
     }
-    throw new SqlCompilationException(new IllegalArgumentException("Unsupported Literal value type - " + object.getClass()));
+    throw new SqlCompilationException(
+        new IllegalArgumentException("Unsupported Literal value type - " + object.getClass()));
   }
 
   public static Expression getFunctionExpression(String operator) {
