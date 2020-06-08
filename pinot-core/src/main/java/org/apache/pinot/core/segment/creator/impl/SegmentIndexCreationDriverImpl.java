@@ -24,12 +24,15 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -179,14 +182,25 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       while (recordReader.hasNext()) {
         long start = System.currentTimeMillis();
         reuse.clear();
-        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(reuse));
+        GenericRow decodedRow = recordReader.next(reuse);
+        List<GenericRow> transformedRows;
+        if (decodedRow.getValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY) != null) {
+          transformedRows = new ArrayList<>();
+          for (Object singleRow : (Collection) decodedRow.getValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY)) {
+            transformedRows.add(_recordTransformer.transform((GenericRow) singleRow));
+          }
+        } else {
+          transformedRows = Collections.singletonList(_recordTransformer.transform(decodedRow));
+        }
         long stop = System.currentTimeMillis();
         totalRecordReadTime += (stop - start);
-        if (transformedRow != null) {
-          indexCreator.indexRow(transformedRow);
-          long stop1 = System.currentTimeMillis();
-          totalIndexTime += (stop1 - stop);
+        for (GenericRow transformedRow : transformedRows) {
+          if (transformedRow != null) {
+            indexCreator.indexRow(transformedRow);
+          }
         }
+        long stop1 = System.currentTimeMillis();
+        totalIndexTime += (stop1 - stop);
       }
     } catch (Exception e) {
       indexCreator.close();
