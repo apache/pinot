@@ -31,6 +31,9 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -83,39 +86,39 @@ public class TestSqlUtils {
   @Test
   public void testSqlWithExplicitLimit() {
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
-
+    DateTimeFormatter formatter = DateTimeFormat.forPattern("yyyy-MM-dd").withZone(DateTimeZone.UTC);
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
         .setDataSource(this.dataset)
         .setLimit(100)
         .setGroupBy("country")
-        .setStartTimeInclusive(DateTime.parse("2020-05-01"))
-        .setEndTimeExclusive(DateTime.parse("2020-05-01"))
+        .setStartTimeInclusive(DateTime.parse("2020-05-01", formatter))
+        .setEndTimeExclusive(DateTime.parse("2020-05-01", formatter))
         .setGroupByTimeGranularity(timeGranularity)
         .build("");
 
     String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     TimeSpec timeSpec = new TimeSpec("date", timeGranularity, timeFormat);
     String actualSql = SqlUtils.getSql(request, this.metricFunction, HashMultimap.create(), timeSpec, this.dataset);
-    String expected = "SELECT date, country, SUM(metric) FROM table WHERE  date = 18384 GROUP BY date, country ORDER BY SUM(metric) DESC LIMIT 100";
+    String expected = "SELECT date, country, SUM(metric) FROM table WHERE  date = 18383 GROUP BY date, country ORDER BY SUM(metric) DESC LIMIT 100";
     Assert.assertEquals(actualSql, expected);
   }
 
   @Test
   public void testSqlWithoutExplicitLimit() {
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
-
+    DateTimeFormatter formatter = DateTimeFormat.forPattern("yyyy-MM-dd").withZone(DateTimeZone.UTC);
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
         .setDataSource(this.dataset)
         .setGroupBy("country")
-        .setStartTimeInclusive(DateTime.parse("2020-05-01"))
-        .setEndTimeExclusive(DateTime.parse("2020-05-01"))
+        .setStartTimeInclusive(DateTime.parse("2020-05-01", formatter))
+        .setEndTimeExclusive(DateTime.parse("2020-05-01", formatter))
         .setGroupByTimeGranularity(timeGranularity)
         .build("");
 
     String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     TimeSpec timeSpec = new TimeSpec("date", timeGranularity, timeFormat);
     String actual = SqlUtils.getSql(request, this.metricFunction, HashMultimap.create(), timeSpec, this.dataset);
-    String expected = "SELECT date, country, SUM(metric) FROM table WHERE  date = 18384 GROUP BY date, country LIMIT 100000";
+    String expected = "SELECT date, country, SUM(metric) FROM table WHERE  date = 18383 GROUP BY date, country LIMIT 100000";
     Assert.assertEquals(actual, expected);
   }
 }
