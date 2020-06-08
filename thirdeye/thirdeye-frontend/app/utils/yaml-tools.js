@@ -11,24 +11,29 @@ dataset: dataset_to_which_this_metric_belongs
 # Configure multiple rules with "OR" relationship.
 rules:
 - detection:
-    - name: detection_rule_1
-      type: ALGORITHM             # Configure the detection type here. See doc for more details.
-      params:                     # The parameters for this rule. Different rules have different params.
-        configuration:
-          bucketPeriod: P1D       # Use P1D for daily; PT1H for hourly; PT5M for minutely data.
-          pValueThreshold: 0.05   # Higher value means more sensitive to small changes.
-          mlConfig: true          # Automatically maintain configuration with the best performance.
-  filter:                         # Filter out anomalies detected by rules to reduce noise.
-    - name: filter_rule_1
-      type: PERCENTAGE_CHANGE_FILTER
-      params:
-        pattern: UP_OR_DOWN       # Other patterns: "UP","DOWN".
-        threshold: 0.05           # Filter out all changes less than 5% compared to baseline.
+  - name: detection_rule_1
+    type: ALGORITHM             # Configure the detection type here. See doc for more details.
+    params:                     # The parameters for this rule. Different rules have different params.
+      configuration:
+        bucketPeriod: P1D       # Use P1D for daily; PT1H for hourly; PT5M for minutely data.
+        pValueThreshold: 0.05   # Higher value means more sensitive to small changes.
+        mlConfig: true          # Automatically maintain configuration with the best performance.
+  filter:                       # Filter out anomalies detected by rules to reduce noise.
+  - name: filter_rule_1
+    type: PERCENTAGE_CHANGE_FILTER
+    params:
+      pattern: UP_OR_DOWN       # Other patterns: "UP","DOWN".
+      threshold: 0.05           # Filter out all changes less than 5% compared to baseline.
+  quality:                      # Configure the data quality rules
+  - name: data_sla_rule_1
+    type: DATA_SLA              # Alert if data is missing.
+    params:
+      sla: 3_DAYS               # Data is missing for 3 days since last availability
 `;
 
 export const defaultSubscriptionYaml = `subscriptionGroupName: 'give_a_unique_name_to_this_group'
 
-# Specify your registered application name here. Contact admin/team to register one.
+# Specify your registered application name here. Contact admin/team to register a new one.
 application: thirdeye-internal
 
 # List all alerts (detectionName) you want to subscribe to.
@@ -47,9 +52,8 @@ alertSchemes:
       - manager@company.com
 
 # Make these links appear in the alert notifications
-referenceLinks:
-  "Oncall Runbook": "http://go/oncall"
-  "Thirdeye FAQs": "http://go/thirdeyefaqs"
+# referenceLinks:
+#   "Alert Runbook": "link_to_your_product_runbook"
 `;
 
 /**
