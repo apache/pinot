@@ -62,8 +62,8 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
         reuse.clear();
 
         reuse = _recordReader.next(reuse);
-        if (reuse.getValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY) != null) {
-          for (Object singleRow : (Collection) reuse.getValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY)) {
+        if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
+          for (Object singleRow : (Collection) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
             GenericRow transformedRow = recordTransformer.transform((GenericRow) singleRow);
             if (transformedRow != null) {
               collector.collectRow(transformedRow);

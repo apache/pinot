@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +44,6 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -472,17 +470,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
         try {
-          List<GenericRow> transformedRows;
-          if (decodedRow.getValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY) != null) {
-            transformedRows = new ArrayList<>();
-            for (Object singleRow : (Collection) decodedRow.getValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY)) {
-              transformedRows.add(_recordTransformer.transform((GenericRow) singleRow));
+          if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
+            for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
+              GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
+              if (transformedRow != null) {
+                realtimeRowsConsumedMeter = _serverMetrics
+                    .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
+                indexedMessageCount++;
+                canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
+              } else {
+                realtimeRowsDroppedMeter = _serverMetrics
+                    .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                        realtimeRowsDroppedMeter);
+              }
             }
           } else {
-            transformedRows = Collections.singletonList(_recordTransformer.transform(decodedRow));
-          }
-
-          for (GenericRow transformedRow : transformedRows) {
+            GenericRow transformedRow = _recordTransformer.transform(decodedRow);
             if (transformedRow != null) {
               realtimeRowsConsumedMeter = _serverMetrics
                   .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);

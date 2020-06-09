@@ -180,27 +180,35 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        long start = System.currentTimeMillis();
+        long recordReadStartTime = System.currentTimeMillis();
+        long recordReadStopTime;
+        long indexStopTime;
         reuse.clear();
         GenericRow decodedRow = recordReader.next(reuse);
-        List<GenericRow> transformedRows;
-        if (decodedRow.getValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY) != null) {
-          transformedRows = new ArrayList<>();
-          for (Object singleRow : (Collection) decodedRow.getValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY)) {
-            transformedRows.add(_recordTransformer.transform((GenericRow) singleRow));
+        if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
+          recordReadStopTime = System.currentTimeMillis();
+          totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+          for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
+            recordReadStartTime = System.currentTimeMillis();
+            GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
+            recordReadStopTime = System.currentTimeMillis();
+            totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+            if (transformedRow != null) {
+              indexCreator.indexRow(transformedRow);
+              indexStopTime = System.currentTimeMillis();
+              totalIndexTime += (indexStopTime - recordReadStopTime);
+            }
           }
         } else {
-          transformedRows = Collections.singletonList(_recordTransformer.transform(decodedRow));
-        }
-        long stop = System.currentTimeMillis();
-        totalRecordReadTime += (stop - start);
-        for (GenericRow transformedRow : transformedRows) {
+          GenericRow transformedRow = _recordTransformer.transform(decodedRow);
+          recordReadStopTime = System.currentTimeMillis();
+          totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
           if (transformedRow != null) {
             indexCreator.indexRow(transformedRow);
+            indexStopTime = System.currentTimeMillis();
+            totalIndexTime += (indexStopTime - recordReadStopTime);
           }
         }
-        long stop1 = System.currentTimeMillis();
-        totalIndexTime += (stop1 - stop);
       }
     } catch (Exception e) {
       indexCreator.close();

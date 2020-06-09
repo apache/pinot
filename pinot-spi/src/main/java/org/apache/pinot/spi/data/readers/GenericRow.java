@@ -48,6 +48,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *  We should not be using Boolean, Byte, Character and Short to keep it simple
  */
 public class GenericRow {
+
+  public static final String MULTIPLE_RECORDS_KEY = "$MULTIPLE_RECORDS_KEY$";
+
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
 

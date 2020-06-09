@@ -363,7 +363,5 @@ public class CommonConstants {
 
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
-
-    public static final String MULTIPLE_RECORDS_KEY = "multiple.records.key";
   }
 }

@@ -75,7 +75,6 @@ public class SegmentGenerationWithMultipleRecordsKey {
     Assert.assertTrue(metadata.getAllColumns().containsAll(Sets.newHashSet(SUB_COLUMN_1, SUB_COLUMN_2)));
   }
 
-
   private File buildSegment(final TableConfig tableConfig, final Schema schema)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
@@ -85,13 +84,15 @@ public class SegmentGenerationWithMultipleRecordsKey {
     List<GenericRow> rows = new ArrayList<>(3);
 
     GenericRow genericRow1 = new GenericRow();
-    genericRow1.putValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY, Lists.newArrayList(getRandomArrayElement(), getRandomArrayElement(), getRandomArrayElement()));
+    genericRow1.putValue(GenericRow.MULTIPLE_RECORDS_KEY,
+        Lists.newArrayList(getRandomArrayElement(), getRandomArrayElement(), getRandomArrayElement()));
     rows.add(genericRow1);
     GenericRow genericRow2 = new GenericRow();
-    genericRow2.putValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY, Lists.newArrayList(getRandomArrayElement()));
+    genericRow2.putValue(GenericRow.MULTIPLE_RECORDS_KEY, Lists.newArrayList(getRandomArrayElement()));
     rows.add(genericRow2);
     GenericRow genericRow3 = new GenericRow();
-    genericRow3.putValue(CommonConstants.Segment.MULTIPLE_RECORDS_KEY, Lists.newArrayList(getRandomArrayElement(), getRandomArrayElement()));
+    genericRow3.putValue(GenericRow.MULTIPLE_RECORDS_KEY,
+        Lists.newArrayList(getRandomArrayElement(), getRandomArrayElement()));
     rows.add(genericRow3);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
