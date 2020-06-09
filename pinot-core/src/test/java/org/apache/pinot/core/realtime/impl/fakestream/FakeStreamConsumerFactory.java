@@ -22,6 +22,7 @@ import java.util.Set;
 import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
@@ -32,6 +33,7 @@ import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 /**
@@ -83,14 +85,14 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     int partition = 3;
     StreamMetadataProvider partitionMetadataProvider =
         streamConsumerFactory.createPartitionMetadataProvider(clientId, partition);
-    long partitionOffset =
-        partitionMetadataProvider.fetchPartitionOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, 10_000);
+    StreamPartitionMsgOffset partitionOffset =
+        partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, 10_000);
     System.out.println(partitionOffset);
 
     // Partition level consumer
     PartitionLevelConsumer partitionLevelConsumer =
         streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
-    MessageBatch messageBatch = partitionLevelConsumer.fetchMessages(10, 40, 10_000);
+    MessageBatch messageBatch = partitionLevelConsumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(40), 10_000);
 
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();

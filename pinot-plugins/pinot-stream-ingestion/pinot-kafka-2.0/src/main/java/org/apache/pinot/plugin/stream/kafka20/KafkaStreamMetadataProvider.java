@@ -24,9 +24,11 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler implements StreamMetadataProvider {
@@ -44,19 +46,26 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
   }
 
+  public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    throw new UnsupportedOperationException("The use of this method is not supported");
+  }
+
   @Override
-  public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
       throws TimeoutException {
     Preconditions.checkNotNull(offsetCriteria);
+    long offset = -1;
     if (offsetCriteria.isLargest()) {
-      return _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+      offset =  _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
           .get(_topicPartition);
     } else if (offsetCriteria.isSmallest()) {
-      return _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
+      offset =  _consumer.beginningOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
           .get(_topicPartition);
     } else {
       throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria.toString());
     }
+    return new LongMsgOffset(offset);
   }
 
   @Override

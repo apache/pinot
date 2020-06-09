@@ -27,8 +27,10 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 
@@ -44,8 +46,8 @@ public class FakeStreamConfigUtils {
   private static final String AVRO_SCHEMA_FILE = "fake_stream_avro_schema.avsc";
   private static final String PINOT_SCHEMA_FILE = "fake_stream_pinot_schema.json";
 
-  private static final int SMALLEST_OFFSET = 0;
-  private static final int LARGEST_OFFSET = Integer.MAX_VALUE;
+  private static final LongMsgOffset SMALLEST_OFFSET = new LongMsgOffset(0);
+  private static final LongMsgOffset LARGEST_OFFSET = new LongMsgOffset(Integer.MAX_VALUE);
   private static final String NUM_PARTITIONS_KEY = "num.partitions";
   private static final int DEFAULT_NUM_PARTITIONS = 2;
 
@@ -72,14 +74,14 @@ public class FakeStreamConfigUtils {
   /**
    * Gets smallest offset based on data
    */
-  static int getSmallestOffset() {
+  static StreamPartitionMsgOffset getSmallestOffset() {
     return SMALLEST_OFFSET;
   }
 
   /**
    * Gets largest offset based on data
    */
-  static int getLargestOffset() {
+  static StreamPartitionMsgOffset getLargestOffset() {
     return LARGEST_OFFSET;
   }
 

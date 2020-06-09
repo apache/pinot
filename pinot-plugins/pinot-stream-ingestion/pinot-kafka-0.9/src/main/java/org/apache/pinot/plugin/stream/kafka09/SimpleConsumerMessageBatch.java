@@ -20,7 +20,9 @@ package org.apache.pinot.plugin.stream.kafka09;
 
 import java.util.ArrayList;
 import kafka.message.MessageAndOffset;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 public class SimpleConsumerMessageBatch implements MessageBatch<byte[]> {
@@ -49,7 +51,7 @@ public class SimpleConsumerMessageBatch implements MessageBatch<byte[]> {
     return messageList.get(index).message().payloadSize();
   }
 
-  public long getNextStreamMessageOffsetAtIndex(int index) {
-    return messageList.get(index).nextOffset();
+  public StreamPartitionMsgOffset getNextStreamMessageOffsetAtIndex(int index) {
+    return new LongMsgOffset(messageList.get(index).nextOffset());
   }
 }

@@ -21,21 +21,36 @@ package org.apache.pinot.spi.stream;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 /**
- * This is a class for now (so we can make one round of changes to the code)
- * It will evolve to an interface later with different implementations for the
- * streams. Each stream needs to provide its own serde of an offset.
+ * An interface to be implemented by streams consumed using Pinot LLC consumers.
+ * Pinot expects a stream partition to be a queue of messages. Each time a message
+ * is appended to the queue, the offset of that message should be higher than all
+ * the previous messages appended to the queue. Messages will be retrieved (by Pinot)
+ * in the order in which they were appended to the queue.
  *
- * For now, we will take toString as a serializer.
- * Must be thread-safe for multiple readers and one writer. Readers could get the offset
- * and the writer can update it.
+ * This object represents a direct reference to a message within a stream partition.
+ *
+ * The behavior of the {@link #compareTo(Object other)} method when comparing offsets
+ * across partitions is undefined. Pinot will not invoke this method to compare offsets
+ * across stream partitions
+ *
+ * It is useful to note that these comparators and serialization methods should not change
+ * across versions of the stream implementation. Pinot stores serialized version of
+ * the offset in metadata. Also, Pinot may consume a message delivered by earlier (or later)
+ * versions of the stream implementation
  */
 @InterfaceStability.Evolving
 public interface StreamPartitionMsgOffset extends Comparable {
 
+  /**
+   * Compare this offset with another one.
+   *
+   * @param other
+   * @return
+   */
   int compareTo(Object other);
 
   /**
-   *  A serialized representation of the offset object as a String
+   *  A serialized representation of the offset object as a String.
    * @return
    */
   String toString();

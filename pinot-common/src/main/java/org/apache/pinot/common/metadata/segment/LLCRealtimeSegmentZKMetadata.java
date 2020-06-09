@@ -33,8 +33,8 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
   private static final String NUM_REPLICAS = "segment.realtime.numReplicas";
   public static final String DOWNLOAD_URL = "segment.realtime.download.url";
 
-  private long _startOffset;
-  private long _endOffset;
+  private String _startOffset;
+  private String _endOffset;
   private int _numReplicas;
 
   private String _downloadUrl = null;
@@ -45,17 +45,17 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
 
   public LLCRealtimeSegmentZKMetadata(ZNRecord znRecord) {
     super(znRecord);
-    _startOffset = Long.valueOf(znRecord.getSimpleField(START_OFFSET));
+    _startOffset = znRecord.getSimpleField(START_OFFSET);
     _numReplicas = Integer.valueOf(znRecord.getSimpleField(NUM_REPLICAS));
-    _endOffset = Long.valueOf(znRecord.getSimpleField(END_OFFSET));
+    _endOffset = znRecord.getSimpleField(END_OFFSET);
     _downloadUrl = znRecord.getSimpleField(DOWNLOAD_URL);
   }
 
-  public long getStartOffset() {
+  public String getStartOffset() {
     return _startOffset;
   }
 
-  public long getEndOffset() {
+  public String getEndOffset() {
     return _endOffset;
   }
 
@@ -63,11 +63,11 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     return _numReplicas;
   }
 
-  public void setStartOffset(long startOffset) {
+  public void setStartOffset(String startOffset) {
     _startOffset = startOffset;
   }
 
-  public void setEndOffset(long endOffset) {
+  public void setEndOffset(String endOffset) {
     _endOffset = endOffset;
   }
 
@@ -86,8 +86,13 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
   @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = super.toZNRecord();
-    znRecord.setLongField(START_OFFSET, _startOffset);
-    znRecord.setLongField(END_OFFSET, _endOffset);
+    znRecord.setSimpleField(START_OFFSET, _startOffset);
+    if (_endOffset == null) {
+      // TODO Issue 5359 Keep this until all components have upgraded to a version that can handle _offset being null
+      // For backward compatibility until all components have been upgraded to deal with null value for _endOffset
+      _endOffset = Long.toString(Long.MAX_VALUE);
+    }
+    znRecord.setSimpleField(END_OFFSET, _endOffset);
     znRecord.setIntField(NUM_REPLICAS, _numReplicas);
     znRecord.setSimpleField(DOWNLOAD_URL, _downloadUrl);
     return znRecord;
@@ -141,8 +146,8 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
   @Override
   public Map<String, String> toMap() {
     Map<String, String> configMap = super.toMap();
-    configMap.put(START_OFFSET, Long.toString(_startOffset));
-    configMap.put(END_OFFSET, Long.toString(_endOffset));
+    configMap.put(START_OFFSET, _startOffset);
+    configMap.put(END_OFFSET, _endOffset);
     configMap.put(NUM_REPLICAS, Integer.toString(_numReplicas));
     configMap.put(DOWNLOAD_URL, _downloadUrl);
 

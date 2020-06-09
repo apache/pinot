@@ -137,7 +137,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
     segmentZKMetadata.setSegmentName(_segmentNameStr);
-    segmentZKMetadata.setStartOffset(_startOffset.getOffset());
+    segmentZKMetadata.setStartOffset(_startOffset.toString());
     segmentZKMetadata.setCreationTime(System.currentTimeMillis());
     return segmentZKMetadata;
   }
@@ -447,7 +447,7 @@ public class LLRealtimeSegmentDataManagerTest {
     LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
     final long finalOffsetValue = _startOffsetValue + 600;
     final LongMsgOffset finalOffset = new LongMsgOffset(finalOffsetValue);
-    metadata.setEndOffset(finalOffsetValue);
+    metadata.setEndOffset(finalOffset.toString());
 
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
@@ -695,7 +695,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     // Now let the segment go ONLINE from CONSUMING, and ensure that the file is removed.
     LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-    metadata.setEndOffset(finalOffset);
+    metadata.setEndOffset(new LongMsgOffset(finalOffset).toString());
     segmentDataManager._stopWaitTimeMs = 0;
     segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.HOLDING);
     segmentDataManager.goOnlineFromConsuming(metadata);

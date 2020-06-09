@@ -38,6 +38,7 @@ import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.Message;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.Assert;
@@ -243,7 +244,7 @@ public class KafkaPartitionLevelConsumerTest {
     // test default value
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
         new KafkaPartitionLevelConsumer(clientId, streamConfig, 0, mockKafkaSimpleConsumerFactory);
-    kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
 
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
         kafkaSimpleStreamConsumer.getSimpleConsumer().bufferSize());
@@ -260,7 +261,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
     kafkaSimpleStreamConsumer =
         new KafkaPartitionLevelConsumer(clientId, streamConfig, 0, mockKafkaSimpleConsumerFactory);
-    kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
     Assert.assertEquals(100, kafkaSimpleStreamConsumer.getSimpleConsumer().bufferSize());
     Assert.assertEquals(1000, kafkaSimpleStreamConsumer.getSimpleConsumer().soTimeout());
   }
@@ -320,7 +321,7 @@ public class KafkaPartitionLevelConsumerTest {
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
         new KafkaPartitionLevelConsumer(clientId, streamConfig, partition, mockKafkaSimpleConsumerFactory);
-    kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
   }
 
   @Test(enabled = false)
@@ -351,6 +352,6 @@ public class KafkaPartitionLevelConsumerTest {
     KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig, partition, mockKafkaSimpleConsumerFactory);
     kafkaStreamMetadataProvider
-        .fetchPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000);
+        .fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000);
   }
 }

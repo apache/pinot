@@ -31,6 +31,8 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public interface PartitionLevelConsumer extends Closeable {
 
   /**
+   * Is here for backward compatibility for a short time.
+   * TODO Issue 5359 remove this API once external kafka consumers implements return of StreamPartitionMsgOffset
    * Fetch messages from the stream between the specified offsets
    * @param startOffset
    * @param endOffset
@@ -38,12 +40,26 @@ public interface PartitionLevelConsumer extends Closeable {
    * @return
    * @throws java.util.concurrent.TimeoutException
    */
+  @Deprecated
   MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException;
 
+  /**
+   * Fetch messages and the per-partition high watermark from Kafka between the specified offsets.
+   *
+   * @param startOffset The offset of the first message desired, inclusive
+   * @param endOffset The offset of the last message desired, exclusive, or null
+   * @param timeoutMillis Timeout in milliseconds
+   * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
+   * milliseconds
+   * @return An iterable containing messages fetched from the stream partition and their offsets, as well as the
+   * high watermark for this partition.
+   */
   default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
-    // TODO Issue 5359 remove the default implementation once kafka consumer implements return of StreamPartitionMsgOffset
-    return fetchMessages(Long.parseLong(startOffset.toString()), Long.parseLong(endOffset.toString()), timeoutMillis);
+   // TODO Issue 5359 remove this default implementation once all kafka consumers have migrated to use this API
+    long startOffsetLong = ((LongMsgOffset)startOffset).getOffset();
+    long endOffsetLong = endOffset == null ? Long.MAX_VALUE : ((LongMsgOffset)endOffset).getOffset();
+    return fetchMessages(startOffsetLong, endOffsetLong, timeoutMillis);
   }
 }

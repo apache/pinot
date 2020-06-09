@@ -32,9 +32,12 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,19 +95,26 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
     }
   }
 
-  @Override
   public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) throws TimeoutException {
-    if (startOffset >= FakeStreamConfigUtils.getLargestOffset()) {
+    throw new UnsupportedOperationException("This method is deprecated");
+  }
+
+  @Override
+  public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
+      int timeoutMillis) throws TimeoutException {
+    if (startOffset.compareTo(FakeStreamConfigUtils.getLargestOffset()) >= 0) {
       return new FakeStreamMessageBatch(Collections.emptyList(), Collections.emptyList());
     }
-    if (startOffset < FakeStreamConfigUtils.getSmallestOffset()) {
+    if (startOffset.compareTo(FakeStreamConfigUtils.getSmallestOffset()) < 0) {
       startOffset = FakeStreamConfigUtils.getSmallestOffset();
     }
-    if (endOffset > FakeStreamConfigUtils.getLargestOffset()) {
+    if (endOffset == null || endOffset.compareTo(FakeStreamConfigUtils.getLargestOffset()) > 0) {
       endOffset = FakeStreamConfigUtils.getLargestOffset();
     }
-    return new FakeStreamMessageBatch(messageOffsets.subList((int) startOffset, (int) endOffset),
-        messageBytes.subList((int) startOffset, (int) endOffset));
+    int startOffsetInt = (int) ((LongMsgOffset)startOffset).getOffset();
+    int endOffsetInt = (int) ((LongMsgOffset)endOffset).getOffset();
+    return new FakeStreamMessageBatch(messageOffsets.subList(startOffsetInt, endOffsetInt),
+        messageBytes.subList(startOffsetInt, endOffsetInt));
   }
 
   @Override

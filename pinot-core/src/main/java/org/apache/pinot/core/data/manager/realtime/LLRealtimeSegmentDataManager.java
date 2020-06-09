@@ -371,7 +371,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // anymore. Remove the file if it exists.
     removeSegmentFile();
 
-    final StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.createMaxOffset();
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while (!_shouldStop && !endCriteriaReached()) {
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
@@ -379,7 +378,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       MessageBatch messageBatch;
       try {
         messageBatch = _partitionLevelConsumer
-            .fetchMessages(_currentOffset, endOffset, _partitionLevelStreamConfig.getFetchTimeoutMillis());
+            .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
@@ -507,8 +506,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 realtimeRowsDroppedMeter);
       }
 
-      // TODO Issue 5359 fix when we have streams returning offsets as StreamPartitionMsgOffset instead of long
-      _currentOffset = _streamPartitionMsgOffsetFactory.create(Long.toString(messagesAndOffsets.getNextStreamMessageOffsetAtIndex(index)));
+      _currentOffset = messagesAndOffsets.getNextStreamMessageOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       streamMessageCount++;
@@ -952,8 +950,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
       _leaseExtender.removeSegment(_segmentNameStr);
-      // TODO Issue 5359 fix when we move metadata to have string offsets in it
-      final StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.create(Long.toString(llcMetadata.getEndOffset()));
+      final StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.create(llcMetadata.getEndOffset());
       segmentLogger
           .info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state.toString(),
               _startOffset, endOffset);
@@ -1240,8 +1237,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
-    // TODO Issue 5359 fix when the segment metadata has string offsets in it
-    _startOffset = _streamPartitionMsgOffsetFactory.create(Long.toString(_segmentZKMetadata.getStartOffset()));
+    _startOffset = _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset());
     _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
     if (!_resourceTmpDir.exists()) {
