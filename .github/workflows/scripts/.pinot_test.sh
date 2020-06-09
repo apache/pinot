@@ -25,7 +25,7 @@ java -version
 COMMIT_BEFORE=$(jq -r ".pull_request.base.sha" "${GITHUB_EVENT_PATH}")
 COMMIT_AFTER=$(jq -r ".pull_request.head.sha" "${GITHUB_EVENT_PATH}")
 git fetch
-git diff --name-only "${COMMIT_BEFORE}...${COMMIT_AFTER}" | grep -E
+git diff --name-only "${COMMIT_BEFORE}...${COMMIT_AFTER}" | grep -E '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'ThirdEye changes.'
 
