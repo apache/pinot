@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
-import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
@@ -37,11 +36,7 @@ public class InbuiltFunctionEvaluatorTest {
       throws Exception {
     MyFunc myFunc = new MyFunc();
     FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("reverseString", String.class));
-    FunctionInfo functionInfo = FunctionRegistry
-        .getFunctionByNameWithApplicableArgumentTypes("reverseString", new Class<?>[]{Object.class});
-    System.out.println(functionInfo);
     String expression = "reverseString(testColumn)";
-
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     Assert.assertEquals(evaluator.getArguments(), Lists.newArrayList("testColumn"));
     GenericRow row = new GenericRow();
@@ -91,8 +86,7 @@ public class InbuiltFunctionEvaluatorTest {
   public void testStateSharedBetweenRowsForExecution()
       throws Exception {
     MyFunc myFunc = new MyFunc();
-    FunctionRegistry
-        .registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
+    FunctionRegistry.registerFunction(myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class));
     String expression = String.format("appendToStringAndReturn('%s')", "test ");
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     Assert.assertTrue(evaluator.getArguments().isEmpty());
@@ -101,28 +95,28 @@ public class InbuiltFunctionEvaluatorTest {
     Assert.assertEquals(evaluator.evaluate(row), "test test ");
     Assert.assertEquals(evaluator.evaluate(row), "test test test ");
   }
-}
 
-class MyFunc {
-  String reverseString(String input) {
-    return new StringBuilder(input).reverse().toString();
-  }
+  private static class MyFunc {
+    String reverseString(String input) {
+      return new StringBuilder(input).reverse().toString();
+    }
 
-  MutableDateTime EPOCH_START = new MutableDateTime();
+    MutableDateTime EPOCH_START = new MutableDateTime();
 
-  public MyFunc() {
-    EPOCH_START.setDate(0L);
-  }
+    public MyFunc() {
+      EPOCH_START.setDate(0L);
+    }
 
-  int daysSinceEpoch(String input, String format) {
-    DateTime dateTime = DateTimeFormat.forPattern(format).parseDateTime(input);
-    return Days.daysBetween(EPOCH_START, dateTime).getDays();
-  }
+    int daysSinceEpoch(String input, String format) {
+      DateTime dateTime = DateTimeFormat.forPattern(format).parseDateTime(input);
+      return Days.daysBetween(EPOCH_START, dateTime).getDays();
+    }
 
-  private String baseString = "";
+    private String baseString = "";
 
-  String appendToStringAndReturn(String addedString) {
-    baseString += addedString;
-    return baseString;
+    String appendToStringAndReturn(String addedString) {
+      baseString += addedString;
+      return baseString;
+    }
   }
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.function;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -86,8 +87,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       argumentTypes[i] = childNode.getReturnType();
     }
 
-    FunctionInfo functionInfo =
-        FunctionRegistry.getFunctionByNameWithApplicableArgumentTypes(transformName, argumentTypes);
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(transformName);
+    Preconditions.checkState(functionInfo != null && functionInfo.isApplicable(argumentTypes),
+        "Failed to find function of name: %s with argument types: %s", transformName, Arrays.toString(argumentTypes));
     return new FunctionExecutionNode(functionInfo, childNodes);
   }
 
@@ -114,8 +116,6 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     public FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentProviders)
         throws Exception {
-      Preconditions.checkNotNull(functionInfo);
-      Preconditions.checkNotNull(argumentProviders);
       _functionInvoker = new FunctionInvoker(functionInfo);
       _argumentProviders = argumentProviders;
       _argInputs = new Object[_argumentProviders.length];
