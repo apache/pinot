@@ -44,7 +44,7 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
     _offsetCriteria = offsetCriteria;
     _partitionId = partitionId;
     _streamConfig = streamConfig;
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    _streamConsumerFactory = StreamConsumerFactoryProvider.createConsumerFactory(streamConfig);
     _topicName = streamConfig.getTopicName();
   }
 

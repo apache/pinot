@@ -21,7 +21,6 @@ package org.apache.pinot.spi.stream;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.plugin.PluginManager;
 
-
 /**
  * Provider class for {@link StreamConsumerFactory}
  */
@@ -32,10 +31,26 @@ public abstract class StreamConsumerFactoryProvider {
    * @param streamConfig
    * @return
    */
-  public static StreamConsumerFactory create(StreamConfig streamConfig) {
+  public static StreamConsumerFactory createConsumerFactory(StreamConfig streamConfig) {
     StreamConsumerFactory factory = null;
     try {
       factory = PluginManager.get().createInstance(streamConfig.getConsumerFactoryClassName());
+    } catch (Exception e) {
+      ExceptionUtils.rethrow(e);
+    }
+    factory.init(streamConfig);
+    return factory;
+  }
+
+  /**
+   * Cronstructs the {@link StreamPartitionMsgOffsetFactory} using {@link StreamConfig::getPartitionOffsetFactoryClassName}
+   * and initializes it
+   * @param streamConfig
+   */
+  public static StreamPartitionMsgOffsetFactory createOffsetFactory(StreamConfig streamConfig) {
+    StreamPartitionMsgOffsetFactory factory = null;
+    try {
+      factory = PluginManager.get().createInstance(streamConfig.getPartitionOffsetFactoryClassName());
     } catch (Exception e) {
       ExceptionUtils.rethrow(e);
     }

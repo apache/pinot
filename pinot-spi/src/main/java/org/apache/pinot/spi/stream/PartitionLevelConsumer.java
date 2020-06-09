@@ -40,4 +40,10 @@ public interface PartitionLevelConsumer extends Closeable {
    */
   MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException;
+
+  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    // TODO Issue 5359 remove the default implementation once kafka consumer implements return of StreamPartitionMsgOffset
+    return fetchMessages(Long.parseLong(startOffset.toString()), Long.parseLong(endOffset.toString()), timeoutMillis);
+  }
 }

@@ -36,13 +36,14 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.SegmentName.SEPARATOR;
-
 
 /**
  * This is a singleton class in the controller that drives the state machines for segments that are in the
@@ -113,6 +114,19 @@ public class SegmentCompletionManager {
     return System.currentTimeMillis();
   }
 
+  public StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(String segmentName) {
+    final LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    return getStreamPartitionMsgOffsetFactory(llcSegmentName);
+  }
+
+  protected StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(LLCSegmentName llcSegmentName) {
+    final String rawTableName = llcSegmentName.getTableName();
+    TableConfig tableConfig = _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+    PartitionLevelStreamConfig streamConfig =
+        new PartitionLevelStreamConfig(tableConfig.getTableName(), tableConfig.getIndexingConfig().getStreamConfigs());
+    return StreamConsumerFactoryProvider.createOffsetFactory(streamConfig);
+  }
+
   // We need to make sure that we never create multiple FSMs for the same segment
   // Obtain locks based on segment name, so as to disallow same segment names entering together
   private SegmentCompletionFSM lookupOrCreateFsm(final LLCSegmentName segmentName, String msgType) {
@@ -135,7 +149,9 @@ public class SegmentCompletionManager {
           // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
           // multiple instances of the FSM to be created for the same commit sequence at the same time.
-          final long endOffset = segmentMetadata.getEndOffset();
+          StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
+          // TODO Issue 5359: Pick the offset string from metadata
+          final StreamPartitionMsgOffset endOffset = factory.create(Long.toString(segmentMetadata.getEndOffset()));
           fsm = SegmentCompletionFSM
               .fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(), endOffset);
         } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
@@ -164,15 +180,16 @@ public class SegmentCompletionManager {
    */
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
-    final String tableName = segmentNameStr.split(SEPARATOR)[0];
+    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    final String tableName = segmentName.getTableName();
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
     final String stopReason = reqParams.getReason();
-    final StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
+    final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
+    final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
 
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     SegmentCompletionFSM fsm = null;
     try {
@@ -202,13 +219,14 @@ public class SegmentCompletionManager {
   public SegmentCompletionProtocol.Response segmentCommitStart(
       final SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
-    final String tableName = segmentNameStr.split(SEPARATOR)[0];
+    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    final String tableName = segmentName.getTableName();
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
+    final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
@@ -226,14 +244,15 @@ public class SegmentCompletionManager {
 
   public SegmentCompletionProtocol.Response extendBuildTime(final SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
-    final String tableName = segmentNameStr.split(SEPARATOR)[0];
+    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    final String tableName = segmentName.getTableName();
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
+    final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
+    final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
     final int extTimeSec = reqParams.getExtraTimeSec();
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
@@ -257,14 +276,15 @@ public class SegmentCompletionManager {
   public SegmentCompletionProtocol.Response segmentStoppedConsuming(
       SegmentCompletionProtocol.Request.Params reqParams) {
     final String segmentNameStr = reqParams.getSegmentName();
-    final String tableName = segmentNameStr.split(SEPARATOR)[0];
+    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    final String tableName = segmentName.getTableName();
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
+    final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
+    final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
     final String reason = reqParams.getReason();
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
@@ -293,11 +313,11 @@ public class SegmentCompletionManager {
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
       boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
     final String segmentNameStr = reqParams.getSegmentName();
-    final String tableName = segmentNameStr.split(SEPARATOR)[0];
+    final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    final String tableName = segmentName.getTableName();
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
@@ -357,7 +377,8 @@ public class SegmentCompletionManager {
     private final int _numReplicas;
     private final Set<String> _excludedServerStateMap;
     private final Map<String, StreamPartitionMsgOffset> _commitStateMap;
-    private StreamPartitionMsgOffset _winningOffset = new StreamPartitionMsgOffset(-1);
+    private final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
+    private StreamPartitionMsgOffset _winningOffset = null;
     private String _winner;
     private final PinotLLCRealtimeSegmentManager _segmentManager;
     private final SegmentCompletionManager _segmentCompletionManager;
@@ -379,7 +400,7 @@ public class SegmentCompletionManager {
 
     public static SegmentCompletionFSM fsmInCommit(PinotLLCRealtimeSegmentManager segmentManager,
         SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
-        long winningOffset) {
+        StreamPartitionMsgOffset winningOffset) {
       return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas,
           winningOffset);
     }
@@ -406,6 +427,7 @@ public class SegmentCompletionManager {
       _startTimeMs = _segmentCompletionManager.getCurrentTimeMs();
       _maxTimeToPickWinnerMs = _startTimeMs + MAX_TIME_TO_PICK_WINNER_MS;
       _maxTimeToNotifyWinnerMs = _startTimeMs + MAX_TIME_TO_NOTIFY_WINNER_MS;
+      _streamPartitionMsgOffsetFactory = _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
       long initialCommitTimeMs = MAX_TIME_TO_NOTIFY_WINNER_MS + _segmentManager.getCommitTimeoutMS(_realtimeTableName);
       Long savedCommitTime = _segmentCompletionManager._commitTimeMap.get(_rawTableName);
       if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
@@ -428,11 +450,11 @@ public class SegmentCompletionManager {
     // Ctor that starts the FSM in COMMITTED state
     private SegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
         SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
-        long winningOffset) {
+        StreamPartitionMsgOffset winningOffset) {
       // Constructor used when we get an event after a segment is committed.
       this(segmentManager, segmentCompletionManager, segmentName, numReplicas);
       _state = State.COMMITTED;
-      _winningOffset.setOffset(winningOffset);
+      _winningOffset = winningOffset;
       _winner = "UNKNOWN";
     }
 
@@ -612,7 +634,7 @@ public class SegmentCompletionManager {
     public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
         boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
-      StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
+      StreamPartitionMsgOffset offset = _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
@@ -651,7 +673,7 @@ public class SegmentCompletionManager {
       LOGGER
           .info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
       SegmentCompletionProtocol.Response.Params params =
-          new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(offset)
+          new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(offset.toString())
               .withBuildTimeSeconds(allowedBuildTimeSec)
               .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
               .withSplitCommit(_isSplitCommitEnabled);
@@ -669,14 +691,14 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response keep(String instanceId, StreamPartitionMsgOffset offset) {
       LOGGER.info("{}:KEEP for instance={} offset={}", _state, instanceId, offset);
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
-          .withStreamPartitionMsgOffset(offset)
+          .withStreamPartitionMsgOffset(offset.toString())
           .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP));
     }
 
     private SegmentCompletionProtocol.Response catchup(String instanceId, StreamPartitionMsgOffset offset) {
       LOGGER.info("{}:CATCHUP for instance={} offset={}", _state, instanceId, offset);
       return new SegmentCompletionProtocol.Response(
-          new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(_winningOffset)
+          new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(_winningOffset.toString())
               .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP));
     }
 
@@ -684,7 +706,7 @@ public class SegmentCompletionManager {
       LOGGER.info("{}:HOLD for instance={} offset={}", _state, instanceId, offset);
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
           .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
-          .withStreamPartitionMsgOffset(offset));
+          .withStreamPartitionMsgOffset(offset.toString()));
     }
 
     private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId,
@@ -1036,7 +1058,7 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
         boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
-      StreamPartitionMsgOffset offset = reqParams.getStreamPartitionMsgOffset();
+      StreamPartitionMsgOffset offset = _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
         // State changed while we were out of sync. return a failed commit.
         LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
@@ -1079,7 +1101,8 @@ public class SegmentCompletionManager {
       }
       // Another committer (or same) came in while one was uploading. Ask them to hold in case this one fails.
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
-          .withStreamPartitionMsgOffset(offset).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
+          .withStreamPartitionMsgOffset(offset.toString())
+          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
     }
 
     private SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, StreamPartitionMsgOffset offset, long now) {
@@ -1133,7 +1156,7 @@ public class SegmentCompletionManager {
         return true;
       } else if (now > _maxTimeToPickWinnerMs || _commitStateMap.size() == numReplicasToLookFor()) {
         LOGGER.info("{}:Picking winner time={} size={}", _state, now - _startTimeMs, _commitStateMap.size());
-        StreamPartitionMsgOffset maxOffsetSoFar = new StreamPartitionMsgOffset(-1);
+        StreamPartitionMsgOffset maxOffsetSoFar = _streamPartitionMsgOffsetFactory.createMinOffset();
         String winnerSoFar = null;
         for (Map.Entry<String, StreamPartitionMsgOffset> entry : _commitStateMap.entrySet()) {
           if (entry.getValue().compareTo(maxOffsetSoFar) > 0) {

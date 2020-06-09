@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -31,7 +32,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class SegmentCompletionProtocolDeserTest {
-  private final StreamPartitionMsgOffset OFFSET = new StreamPartitionMsgOffset(1);
+  private final StreamPartitionMsgOffset OFFSET = new LongMsgOffset(1L);
   private final long BUILD_TIME_MILLIS = 123;
   private final String SEGMENT_LOCATION = "file.tmp";
   private final String CONTROLLER_VIP_URL = "http://localhost:8998";
@@ -41,13 +42,13 @@ public class SegmentCompletionProtocolDeserTest {
     // Test with all params
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET)
+            .withStreamPartitionMsgOffset(OFFSET.toString())
             .withSegmentLocation(SEGMENT_LOCATION).withSplitCommit(true)
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
     assertEquals(response.getBuildTimeSeconds(), BUILD_TIME_MILLIS);
-    assertEquals(new StreamPartitionMsgOffset(response.getStreamPartitionMsgOffset()).compareTo(OFFSET), 0);
+    assertEquals(new LongMsgOffset(response.getStreamPartitionMsgOffset()).compareTo(OFFSET), 0);
     assertEquals(response.getSegmentLocation(), SEGMENT_LOCATION);
     assertTrue(response.isSplitCommit());
     assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
@@ -58,12 +59,12 @@ public class SegmentCompletionProtocolDeserTest {
     // Test with reduced params
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET)
+            .withStreamPartitionMsgOffset(OFFSET.toString())
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
     assertEquals(response.getBuildTimeSeconds(), BUILD_TIME_MILLIS);
-    assertEquals(new StreamPartitionMsgOffset(response.getStreamPartitionMsgOffset()).compareTo(OFFSET), 0);
+    assertEquals(new LongMsgOffset(response.getStreamPartitionMsgOffset()).compareTo(OFFSET), 0);
     assertNull(response.getSegmentLocation());
     assertFalse(response.isSplitCommit());
     assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
@@ -74,7 +75,7 @@ public class SegmentCompletionProtocolDeserTest {
     // Test with all params
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET)
+            .withStreamPartitionMsgOffset(OFFSET.toString())
             .withSegmentLocation(SEGMENT_LOCATION).withSplitCommit(true).withControllerVipUrl(CONTROLLER_VIP_URL)
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
@@ -92,7 +93,7 @@ public class SegmentCompletionProtocolDeserTest {
   public void testJsonNullSegmentLocationAndVip() {
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET)
+            .withStreamPartitionMsgOffset(OFFSET.toString())
             .withSplitCommit(false).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
@@ -109,7 +110,7 @@ public class SegmentCompletionProtocolDeserTest {
   public void testJsonResponseWithoutSplitCommit() {
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET)
+            .withStreamPartitionMsgOffset(OFFSET.toString())
             .withSplitCommit(false).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
@@ -127,7 +128,7 @@ public class SegmentCompletionProtocolDeserTest {
     // Should never happen because if split commit, should have both location and VIP, but testing deserialization regardless
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET)
+            .withStreamPartitionMsgOffset(OFFSET.toString())
             .withSegmentLocation(SEGMENT_LOCATION).withSplitCommit(false)
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
@@ -146,7 +147,7 @@ public class SegmentCompletionProtocolDeserTest {
     // Should never happen because if split commit, should have both location and VIP, but testing deserialization regardless
     SegmentCompletionProtocol.Response.Params params =
         new SegmentCompletionProtocol.Response.Params().withBuildTimeSeconds(BUILD_TIME_MILLIS)
-            .withStreamPartitionMsgOffset(OFFSET)
+            .withStreamPartitionMsgOffset(OFFSET.toString())
             .withControllerVipUrl(CONTROLLER_VIP_URL).withSplitCommit(false)
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 

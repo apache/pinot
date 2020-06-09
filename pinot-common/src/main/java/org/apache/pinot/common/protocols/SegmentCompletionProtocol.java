@@ -25,7 +25,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -109,6 +108,7 @@ public class SegmentCompletionProtocol {
   public static final String COMMIT_TYPE_KEY = "isSplitCommitType";
   public static final String SEGMENT_LOCATION_KEY = "segmentLocation";
   public static final String CONTROLLER_VIP_URL_KEY = "controllerVipUrl";
+  public static final String STREAM_PARTITION_MSG_OFFSET_KEY = "streamPartitionMsgOffset";
 
   public static final String MSG_TYPE_CONSUMED = "segmentConsumed";
   public static final String MSG_TYPE_COMMIT = "segmentCommit";
@@ -235,7 +235,7 @@ public class SegmentCompletionProtocol {
         _segmentLocation = params.getSegmentLocation();
         _memoryUsedBytes = params.getMemoryUsedBytes();
         _segmentSizeBytes = params.getSegmentSizeBytes();
-        _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset().toString();
+        _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
       }
 
       @Deprecated
@@ -294,10 +294,10 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withStreamPartitionMsgOffset(StreamPartitionMsgOffset offset) {
-        _streamPartitionMsgOffset = offset.toString();
+      public Params withStreamPartitionMsgOffset(String offset) {
+        _streamPartitionMsgOffset = offset;
         // Try to populate the offset if possible.
-        // TODO Remove this code once we have both sides be able to live without _offset.
+        // TODO Issue 5359 Remove this code once we have both sides be able to live without _offset.
         try {
           _offset = Long.parseLong(_streamPartitionMsgOffset);
         } catch (Exception e) {
@@ -351,11 +351,12 @@ public class SegmentCompletionProtocol {
         return _segmentSizeBytes;
       }
 
-      public StreamPartitionMsgOffset getStreamPartitionMsgOffset() {
+      public String getStreamPartitionMsgOffset() {
         if (_streamPartitionMsgOffset != null) {
-          return new StreamPartitionMsgOffset(_streamPartitionMsgOffset);
+          return _streamPartitionMsgOffset;
         } else {
-          return new StreamPartitionMsgOffset(_offset);
+          // TODO 5359 remove this once we are all upgraded in controllers and servers.
+          return Long.toString(_offset);
         }
       }
 
@@ -456,15 +457,14 @@ public class SegmentCompletionProtocol {
       return _offset;
     }
 
-    // TODO Make it a JsonProperty when we are ready to move the protocol
+    // TODO Issue 5359 Make it a JsonProperty when we are ready to move the protocol
     // This method is called in the server when the controller responds with
     // CATCH_UP response to segmentConsumed() API.
-    @JsonIgnore
+    @JsonProperty(STREAM_PARTITION_MSG_OFFSET_KEY)
     public String getStreamPartitionMsgOffset() {
       return _streamPartitionMsgOffset;
     }
 
-    @JsonIgnore
     public void setStreamPartitionMsgOffset(String streamPartitionMsgOffset) {
       _streamPartitionMsgOffset = streamPartitionMsgOffset;
     }
@@ -515,14 +515,6 @@ public class SegmentCompletionProtocol {
     @JsonProperty(SEGMENT_LOCATION_KEY)
     public void setSegmentLocation(String segmentLocation) {
       _segmentLocation = segmentLocation;
-    }
-
-    public StreamPartitionMsgOffset extractOffset() {
-      if (_streamPartitionMsgOffset != null) {
-        return new StreamPartitionMsgOffset(getStreamPartitionMsgOffset());
-      } else {
-        return new StreamPartitionMsgOffset(getOffset());
-      }
     }
 
     public String toJsonString() {
@@ -585,13 +577,13 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withStreamPartitionMsgOffset(StreamPartitionMsgOffset offset) {
-        _streamPartitionMsgOffset = offset.toString();
-        // TODO Remove the block below once we have both parties be fine without _offset being present.
+      public Params withStreamPartitionMsgOffset(String offset) {
+        _streamPartitionMsgOffset = offset;
+        // TODO Issue 5359 Remove the block below once we have both parties be fine without _offset being present.
         try {
           _offset = Long.parseLong(_streamPartitionMsgOffset);
         } catch (Exception e) {
-          // Ignore. If the received expects _offset, it will return an error to the sender.
+          // Ignore. If the receiver expects _offset, it will return an error to the sender.
         }
         return this;
       }

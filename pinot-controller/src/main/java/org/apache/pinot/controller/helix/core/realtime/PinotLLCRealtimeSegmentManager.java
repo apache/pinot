@@ -78,7 +78,9 @@ import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PartitionOffsetFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.zookeeper.data.Stat;
@@ -249,7 +251,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  TableConfig getTableConfig(String realtimeTableName) {
+  public TableConfig getTableConfig(String realtimeTableName) {
     try {
       return _tableConfigCache.getTableConfig(realtimeTableName);
     } catch (ExecutionException e) {
@@ -481,7 +483,8 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(segmentMetadata != null, "Failed to find segment metadata from descriptor for segment: %s",
         segmentName);
 
-    committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset().getOffset());
+    // TODO Issue 5953 remove the long parsing once metadata is set correctly.
+    committingSegmentZKMetadata.setEndOffset(Long.parseLong(committingSegmentDescriptor.getNextOffset()));
     committingSegmentZKMetadata.setStatus(Status.DONE);
     committingSegmentZKMetadata.setDownloadUrl(URIUtils
         .constructDownloadUrl(_controllerConf.generateVipUrl(), TableNameBuilder.extractRawTableName(realtimeTableName),
@@ -506,7 +509,8 @@ public class PinotLLCRealtimeSegmentManager {
       int numPartitions, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
-    long startOffset = committingSegmentDescriptor.getNextOffset().getOffset();
+    StreamPartitionMsgOffsetFactory offsetFactory = StreamConsumerFactoryProvider.createOffsetFactory(streamConfig);
+    StreamPartitionMsgOffset startOffset = offsetFactory.create(committingSegmentDescriptor.getNextOffset());
     LOGGER
         .info("Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
             segmentName, startOffset, creationTimeMs);
@@ -515,7 +519,8 @@ public class PinotLLCRealtimeSegmentManager {
     newSegmentZKMetadata.setTableName(realtimeTableName);
     newSegmentZKMetadata.setSegmentName(segmentName);
     newSegmentZKMetadata.setCreationTime(creationTimeMs);
-    newSegmentZKMetadata.setStartOffset(startOffset);
+    // TODO Issue 5953 Use string offset in the metadata
+    newSegmentZKMetadata.setStartOffset(Long.parseLong(startOffset.toString()));
     newSegmentZKMetadata.setEndOffset(END_OFFSET_FOR_CONSUMING_SEGMENTS);
     newSegmentZKMetadata.setNumReplicas(numReplicas);
     newSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
@@ -868,8 +873,9 @@ public class PinotLLCRealtimeSegmentManager {
 
             LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
             String newSegmentName = newLLCSegmentName.getSegmentName();
+            // TODO Issue 5953 Fix when metadata changes in zk
             CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(latestSegmentName,
-                new StreamPartitionMsgOffset(latestSegmentZKMetadata.getEndOffset()), 0);
+                (Long.toString(latestSegmentZKMetadata.getEndOffset())), 0);
             createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
                 committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
             updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, newSegmentName,
@@ -898,8 +904,9 @@ public class PinotLLCRealtimeSegmentManager {
               startOffset = partitionStartOffset;
             }
 
+            // TODO Issue 5359 fix when offset in metadata is fixed
             CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(latestSegmentName, new StreamPartitionMsgOffset(startOffset), 0);
+                new CommittingSegmentDescriptor(latestSegmentName, Long.toString(startOffset), 0);
             createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
                 committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
             String newSegmentName = newLLCSegmentName.getSegmentName();
@@ -984,8 +991,9 @@ public class PinotLLCRealtimeSegmentManager {
         new LLCSegmentName(rawTableName, partitionId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
     long startOffset = getPartitionOffset(streamConfig, streamConfig.getOffsetCriteria(), partitionId);
+    // TODO Issue 5359 Fix when we get StreamPartitionOffset from getPartitionOffset() method.
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(null, new StreamPartitionMsgOffset(startOffset), 0);
+        new CommittingSegmentDescriptor(null, Long.toString(startOffset), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas);
 

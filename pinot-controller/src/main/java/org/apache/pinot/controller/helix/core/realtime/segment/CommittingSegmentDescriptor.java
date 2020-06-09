@@ -20,8 +20,6 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-
 
 /**
  * Class to hold properties of the committing segment
@@ -30,7 +28,7 @@ public class CommittingSegmentDescriptor {
   private String _segmentName;
   private long _segmentSizeBytes;
   private String _segmentLocation;
-  private StreamPartitionMsgOffset _nextOffset;
+  private String _nextOffset;
   private SegmentMetadataImpl _segmentMetadata;
 
   public static CommittingSegmentDescriptor fromSegmentCompletionReqParams(
@@ -50,13 +48,13 @@ public class CommittingSegmentDescriptor {
     return committingSegmentDescriptor;
   }
 
-  public CommittingSegmentDescriptor(String segmentName, StreamPartitionMsgOffset nextOffset, long segmentSizeBytes) {
+  public CommittingSegmentDescriptor(String segmentName, String nextOffset, long segmentSizeBytes) {
     _segmentName = segmentName;
     _nextOffset = nextOffset;
     _segmentSizeBytes = segmentSizeBytes;
   }
 
-  public CommittingSegmentDescriptor(String segmentName, StreamPartitionMsgOffset nextOffset, long segmentSizeBytes,
+  public CommittingSegmentDescriptor(String segmentName, String nextOffset, long segmentSizeBytes,
       String segmentLocation) {
     this(segmentName, nextOffset, segmentSizeBytes);
     _segmentLocation = segmentLocation;
@@ -86,7 +84,7 @@ public class CommittingSegmentDescriptor {
     _segmentLocation = segmentLocation;
   }
 
-  public StreamPartitionMsgOffset getNextOffset() {
+  public String getNextOffset() {
     return _nextOffset;
   }
 

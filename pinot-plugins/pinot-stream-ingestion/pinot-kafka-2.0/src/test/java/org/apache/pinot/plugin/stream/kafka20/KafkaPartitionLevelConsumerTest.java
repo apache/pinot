@@ -266,7 +266,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
-    final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.createConsumerFactory(streamConfig);
     int numPartitions =
         new KafkaStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
     for (int partition = 0; partition < numPartitions; partition++) {

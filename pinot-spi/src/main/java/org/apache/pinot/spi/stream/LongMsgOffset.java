@@ -1,3 +1,8 @@
+package org.apache.pinot.spi.stream;
+
+import com.google.common.annotations.VisibleForTesting;
+
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,27 +21,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.stream;
+public class LongMsgOffset implements StreamPartitionMsgOffset {
+  private final long _offset;
 
-import org.apache.pinot.spi.annotations.InterfaceStability;
+  @VisibleForTesting
+  public long getOffset() {
+    return _offset;
+  }
 
-/**
- * This is a class for now (so we can make one round of changes to the code)
- * It will evolve to an interface later with different implementations for the
- * streams. Each stream needs to provide its own serde of an offset.
- *
- * For now, we will take toString as a serializer.
- * Must be thread-safe for multiple readers and one writer. Readers could get the offset
- * and the writer can update it.
- */
-@InterfaceStability.Evolving
-public interface StreamPartitionMsgOffset extends Comparable {
+  public LongMsgOffset(long offset) {
+    _offset = offset;
+  }
 
-  int compareTo(Object other);
+  public LongMsgOffset(String offset) {
+    _offset = Long.parseLong(offset);
+  }
 
-  /**
-   *  A serialized representation of the offset object as a String
-   * @return
-   */
-  String toString();
+  public LongMsgOffset(StreamPartitionMsgOffset other) {
+    _offset = ((LongMsgOffset)other)._offset;
+  }
+
+  @Override
+  public int compareTo(Object other) {
+    return Long.compare(_offset, ((LongMsgOffset)other)._offset);
+  }
+
+  @Override
+  public String toString() {
+    return Long.toString(_offset);
+  }
 }

@@ -72,7 +72,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(numPartitions);
 
     // stream consumer factory
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.createConsumerFactory(streamConfig);
 
     // stream metadata provider
     StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(clientId);

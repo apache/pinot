@@ -94,7 +94,7 @@ public class SegmentBuildTimeLeaseExtender {
   public void addSegment(String segmentId, long initialBuildTimeMs, StreamPartitionMsgOffset offset) {
     final long initialDelayMs = initialBuildTimeMs * 9 / 10;
     final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    reqParams.withStreamPartitionMsgOffset(offset).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS)
+    reqParams.withStreamPartitionMsgOffset(offset.toString()).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS)
         .withInstanceId(_instanceId);
     Future future = _executor
         .scheduleWithFixedDelay(new LeaseExtender(reqParams), initialDelayMs, REPEAT_REQUEST_PERIOD_SEC * 1000L,
