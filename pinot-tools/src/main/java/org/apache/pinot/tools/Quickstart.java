@@ -51,6 +51,25 @@ public class Quickstart {
   public static String prettyPrintResponse(JsonNode response) {
     StringBuilder responseBuilder = new StringBuilder();
 
+    // Sql Results
+    if (response.has("resultTable")) {
+      JsonNode columns = response.get("resultTable").get("dataSchema").get("columnNames");
+      int numColumns = columns.size();
+      for (int i = 0; i < numColumns; i++) {
+        responseBuilder.append(columns.get(i).asText()).append(TAB);
+      }
+      responseBuilder.append(NEW_LINE);
+      JsonNode rows = response.get("resultTable").get("rows");
+      for (int i = 0; i < rows.size(); i++) {
+        JsonNode row = rows.get(i);
+        for (int j = 0; j < numColumns; j++) {
+          responseBuilder.append(row.get(j).asText()).append(TAB);
+        }
+        responseBuilder.append(NEW_LINE);
+      }
+      return responseBuilder.toString();
+    }
+
     // Selection query
     if (response.has("selectionResults")) {
       JsonNode columns = response.get("selectionResults").get("columns");
@@ -168,31 +187,31 @@ public class Quickstart {
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
-    String q1 = "select count(*) from baseballStats limit 0";
+    String q1 = "select count(*) from baseballStats limit 1";
     printStatus(Color.YELLOW, "Total number of documents in the table");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q2 = "select sum('runs') from baseballStats group by playerName top 5 limit 0";
+    String q2 = "select playerName, sum(runs) from baseballStats group by playerName order by sum(runs) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 run scorers of all time ");
     printStatus(Color.CYAN, "Query : " + q2);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q3 = "select sum('runs') from baseballStats where yearID=2000 group by playerName top 5 limit 0";
+    String q3 = "select playerName, sum(runs) from baseballStats where yearID=2000 group by playerName order by sum(runs) desc limit 5";
     printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
     printStatus(Color.CYAN, "Query : " + q3);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q4 = "select sum('runs') from baseballStats where yearID>=2000 group by playerName limit 0";
+    String q4 = "select playerName, sum(runs) from baseballStats where yearID>=2000 group by playerName order by sum(runs) desc limit 10";
     printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q5 = "select playerName,runs,homeRuns from baseballStats order by yearID limit 10";
+    String q5 = "select playerName, runs, homeRuns from baseballStats order by yearID limit 10";
     printStatus(Color.YELLOW, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID");
     printStatus(Color.CYAN, "Query : " + q5);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
