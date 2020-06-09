@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -469,19 +470,33 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
         try {
-          GenericRow transformedRow = _recordTransformer.transform(decodedRow);
-
-          if (transformedRow != null) {
-            realtimeRowsConsumedMeter = _serverMetrics
-                .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
-            indexedMessageCount++;
+          if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
+            for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
+              GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
+              if (transformedRow != null) {
+                realtimeRowsConsumedMeter = _serverMetrics
+                    .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
+                indexedMessageCount++;
+                canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
+              } else {
+                realtimeRowsDroppedMeter = _serverMetrics
+                    .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                        realtimeRowsDroppedMeter);
+              }
+            }
           } else {
-            realtimeRowsDroppedMeter = _serverMetrics
-                .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                    realtimeRowsDroppedMeter);
+            GenericRow transformedRow = _recordTransformer.transform(decodedRow);
+            if (transformedRow != null) {
+              realtimeRowsConsumedMeter = _serverMetrics
+                  .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
+              indexedMessageCount++;
+              canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
+            } else {
+              realtimeRowsDroppedMeter = _serverMetrics
+                  .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                      realtimeRowsDroppedMeter);
+            }
           }
-
-          canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
         } catch (Exception e) {
           segmentLogger.error("Caught exception while transforming the record: {}", decodedRow, e);
           _numRowsErrored++;

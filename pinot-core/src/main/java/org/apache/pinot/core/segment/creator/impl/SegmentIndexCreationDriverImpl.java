@@ -24,12 +24,15 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -177,15 +180,34 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        long start = System.currentTimeMillis();
+        long recordReadStartTime = System.currentTimeMillis();
+        long recordReadStopTime;
+        long indexStopTime;
         reuse.clear();
-        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(reuse));
-        long stop = System.currentTimeMillis();
-        totalRecordReadTime += (stop - start);
-        if (transformedRow != null) {
-          indexCreator.indexRow(transformedRow);
-          long stop1 = System.currentTimeMillis();
-          totalIndexTime += (stop1 - stop);
+        GenericRow decodedRow = recordReader.next(reuse);
+        if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
+          recordReadStopTime = System.currentTimeMillis();
+          totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+          for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
+            recordReadStartTime = System.currentTimeMillis();
+            GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
+            recordReadStopTime = System.currentTimeMillis();
+            totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+            if (transformedRow != null) {
+              indexCreator.indexRow(transformedRow);
+              indexStopTime = System.currentTimeMillis();
+              totalIndexTime += (indexStopTime - recordReadStopTime);
+            }
+          }
+        } else {
+          GenericRow transformedRow = _recordTransformer.transform(decodedRow);
+          recordReadStopTime = System.currentTimeMillis();
+          totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+          if (transformedRow != null) {
+            indexCreator.indexRow(transformedRow);
+            indexStopTime = System.currentTimeMillis();
+            totalIndexTime += (indexStopTime - recordReadStopTime);
+          }
         }
       }
     } catch (Exception e) {

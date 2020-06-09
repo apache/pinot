@@ -18,7 +18,12 @@
  */
 package org.apache.pinot.core.segment.creator;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
@@ -55,9 +60,20 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
       GenericRow reuse = new GenericRow();
       while (_recordReader.hasNext()) {
         reuse.clear();
-        GenericRow transformedRow = recordTransformer.transform(_recordReader.next(reuse));
-        if (transformedRow != null) {
-          collector.collectRow(transformedRow);
+
+        reuse = _recordReader.next(reuse);
+        if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
+          for (Object singleRow : (Collection) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
+            GenericRow transformedRow = recordTransformer.transform((GenericRow) singleRow);
+            if (transformedRow != null) {
+              collector.collectRow(transformedRow);
+            }
+          }
+        } else {
+          GenericRow transformedRow = recordTransformer.transform(reuse);
+          if (transformedRow != null) {
+            collector.collectRow(transformedRow);
+          }
         }
       }
 
