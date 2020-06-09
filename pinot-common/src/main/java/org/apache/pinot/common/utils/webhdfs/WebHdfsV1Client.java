@@ -25,6 +25,7 @@ import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.FileRequestEntity;
 import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.commons.httpclient.methods.RequestEntity;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,7 @@ public class WebHdfsV1Client {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(WebHdfsV1Client.class);
   private static final String LOCATION = "Location";
-  private static final String DEFAULT_PROTOCOL = "http";
+  private static final String DEFAULT_PROTOCOL = CommonConstants.HTTP_PROTOCOL;
   private static final boolean DEFAULT_OVERWRITE = true;
   private static final int DEFAULT_PERMISSION = 755;
 

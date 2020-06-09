@@ -32,6 +32,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 
@@ -383,10 +384,10 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getControllerVipProtocol() {
-    if (containsKey(CONTROLLER_VIP_PROTOCOL) && getProperty(CONTROLLER_VIP_PROTOCOL).equals("https")) {
-      return "https";
+    if (containsKey(CONTROLLER_VIP_PROTOCOL) && getProperty(CONTROLLER_VIP_PROTOCOL).equals(CommonConstants.HTTPS_PROTOCOL)) {
+      return CommonConstants.HTTPS_PROTOCOL;
     }
-    return "http";
+    return CommonConstants.HTTP_PROTOCOL;
   }
 
   public int getRetentionControllerFrequencyInSeconds() {

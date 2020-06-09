@@ -25,12 +25,12 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
+import static org.apache.pinot.common.utils.CommonConstants.HTTP_PROTOCOL;
 import static org.testng.Assert.assertEquals;
 
 
 public class SegmentFetcherFactoryTest {
-  private static final String HTTP_PROTOCOL = "http";
-  private static final String HTTPS_PROTOCOL = "https";
   private static final String FILE_PROTOCOL = "file";
   private static final String TEST_PROTOCOL = "test";
   private static final String TEST_URI = "test://foo/bar";

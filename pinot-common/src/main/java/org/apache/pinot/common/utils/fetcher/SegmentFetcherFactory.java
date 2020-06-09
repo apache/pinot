@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,8 +36,6 @@ public class SegmentFetcherFactory {
 
   public static final String PROTOCOLS_KEY = "protocols";
   public static final String SEGMENT_FETCHER_CLASS_KEY_SUFFIX = ".class";
-  public static final String HTTP_PROTOCOL = "http";
-  public static final String HTTPS_PROTOCOL = "https";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
   private static final Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new HashMap<>();
@@ -62,10 +61,10 @@ public class SegmentFetcherFactory {
       if (segmentFetcherClassName == null) {
         LOGGER.info("Segment fetcher class is not configured for protocol: {}, using default", protocol);
         switch (protocol) {
-          case HTTP_PROTOCOL:
+          case CommonConstants.HTTP_PROTOCOL:
             segmentFetcher = new HttpSegmentFetcher();
             break;
-          case HTTPS_PROTOCOL:
+          case CommonConstants.HTTPS_PROTOCOL:
             segmentFetcher = new HttpsSegmentFetcher();
             break;
           default:
@@ -91,8 +90,8 @@ public class SegmentFetcherFactory {
     } else {
       LOGGER.info("Segment fetcher is not configured for protocol: {}, using default", protocol);
       switch (protocol) {
-        case HTTP_PROTOCOL:
-        case HTTPS_PROTOCOL:
+        case CommonConstants.HTTP_PROTOCOL:
+        case CommonConstants.HTTPS_PROTOCOL:
           return DEFAULT_HTTP_SEGMENT_FETCHER;
         default:
           return DEFAULT_PINOT_FS_SEGMENT_FETCHER;

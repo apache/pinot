@@ -87,15 +87,15 @@ public class PeerServerSegmentFinderTest {
   public void testSegmentFoundSuccessfully()
       throws Exception {
     // SEGMENT_1 has only 1 online replica.
-    assertEquals(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_1, "http", _helixManager),
+    assertEquals(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_1, CommonConstants.HTTP_PROTOCOL, _helixManager),
         StringUtil.join("/", "http://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1));
-    assertEquals(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_1, "https", _helixManager), StringUtil
+    assertEquals(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_1, CommonConstants.HTTPS_PROTOCOL, _helixManager), StringUtil
         .join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1));
   }
 
   @Test
   public void testSegmentNotFound()
       throws Exception {
-    Assert.assertNull(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_2, "http", _helixManager));
+    Assert.assertNull(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_2, CommonConstants.HTTP_PROTOCOL, _helixManager));
   }
 }

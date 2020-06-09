@@ -46,8 +46,8 @@ import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentComple
 // TODO: Use exception based code to handle different types of exceptions.
 public class ServerSegmentCompletionProtocolHandler {
   private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
-  private static final String HTTPS_PROTOCOL = "https";
-  private static final String HTTP_PROTOCOL = "http";
+  private static final String HTTPS_PROTOCOL = CommonConstants.HTTPS_PROTOCOL;
+  private static final String HTTP_PROTOCOL = CommonConstants.HTTP_PROTOCOL;
 
   private static SSLContext _sslContext;
   private static Integer _controllerHttpsPort;

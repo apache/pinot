@@ -39,6 +39,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -324,9 +325,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
-    return SegmentFetcherFactory.HTTP_PROTOCOL
+    return CommonConstants.HTTP_PROTOCOL
         .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())
-        || SegmentFetcherFactory.HTTPS_PROTOCOL
+        || CommonConstants.HTTPS_PROTOCOL
         .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
   }
 

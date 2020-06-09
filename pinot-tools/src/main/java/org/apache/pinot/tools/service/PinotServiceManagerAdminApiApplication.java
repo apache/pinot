@@ -65,7 +65,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot Starter information");
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[]{"http"});
+    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL});
     beanConfig.setBasePath(_baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
