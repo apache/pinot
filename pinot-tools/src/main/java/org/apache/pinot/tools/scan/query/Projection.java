@@ -26,9 +26,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang.ArrayUtils;
-import org.apache.pinot.core.common.BlockMultiValIterator;
-import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
+import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -79,23 +79,20 @@ public class Projection {
     for (Pair pair : _columnList) {
       String column = (String) pair.getFirst();
       if (!_mvColumns.contains(column)) {
-        BlockSingleValIterator bvIter =
-            (BlockSingleValIterator) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
+        SingleValueSet valueSet =
+            (SingleValueSet) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet();
 
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {
-          bvIter.skipTo(docId);
-          resultTable.add(rowId++, bvIter.nextIntVal());
+          resultTable.add(rowId++, valueSet.getIntValue(docId));
         }
       } else {
-        BlockMultiValIterator bvIter =
-            (BlockMultiValIterator) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
+        MultiValueSet valueSet = (MultiValueSet) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet();
 
         int rowId = 0;
-        for (Integer docId : _filteredDocIds) {
-          bvIter.skipTo(docId);
+        for (int docId : _filteredDocIds) {
           int[] dictIds = _mvColumnArrayMap.get(column);
-          int numMVValues = bvIter.nextIntVal(dictIds);
+          int numMVValues = valueSet.getIntValues(docId, dictIds);
 
           dictIds = Arrays.copyOf(dictIds, numMVValues);
           resultTable.add(rowId++, ArrayUtils.toObject(dictIds));

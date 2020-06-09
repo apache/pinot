@@ -110,17 +110,19 @@ public class RealtimeNoDictionaryTest {
 
     Map<String, DataSource> dataSourceBlock = new HashMap<>();
     dataSourceBlock.put(INT_COL_NAME,
-        new MutableDataSource(intSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, intRawIndex, null, null, null,null, null));
+        new MutableDataSource(intSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, intRawIndex, null, null, null, null, null));
     dataSourceBlock.put(LONG_COL_NAME,
-        new MutableDataSource(longSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, longRawIndex, null, null, null,null, null));
+        new MutableDataSource(longSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, longRawIndex, null, null, null, null, null));
     dataSourceBlock.put(FLOAT_COL_NAME,
-        new MutableDataSource(floatSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, floatRawIndex, null, null, null,null, null));
+        new MutableDataSource(floatSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, floatRawIndex, null, null, null, null, null));
     dataSourceBlock.put(DOUBLE_COL_NAME,
-        new MutableDataSource(doubleSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, doubleRawIndex, null, null, null,null, null));
+        new MutableDataSource(doubleSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, doubleRawIndex, null, null, null, null,
+            null));
     dataSourceBlock.put(STRING_COL_NAME,
-        new MutableDataSource(stringSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, stringRawIndex, null, null, null,null, null));
+        new MutableDataSource(stringSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, stringRawIndex, null, null, null, null,
+            null));
     dataSourceBlock.put(BYTES_COL_NAME,
-        new MutableDataSource(bytesSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, bytesRawIndex, null, null, null,null, null));
+        new MutableDataSource(bytesSpec, NUM_ROWS, NUM_ROWS, 0, null, 0, bytesRawIndex, null, null, null, null, null));
 
     return new DataFetcher(dataSourceBlock);
   }
@@ -204,7 +206,7 @@ public class RealtimeNoDictionaryTest {
         int[] intValues = new int[NUM_ROWS];
         dataFetcher.fetchIntValues(LONG_COL_NAME, docIds, numDocIds, intValues);
         Assert.fail("Expected exception converting long to int");
-      } catch (UnsupportedOperationException e) {
+      } catch (IllegalStateException e) {
         // We should see an exception
       }
 
@@ -245,7 +247,7 @@ public class RealtimeNoDictionaryTest {
         int[] intValues = new int[NUM_ROWS];
         dataFetcher.fetchIntValues(FLOAT_COL_NAME, docIds, numDocIds, intValues);
         Assert.fail("Expected exception converting float to int");
-      } catch (UnsupportedOperationException e) {
+      } catch (IllegalStateException e) {
         // We should see an exception
       }
 
@@ -253,7 +255,7 @@ public class RealtimeNoDictionaryTest {
       try {
         dataFetcher.fetchLongValues(FLOAT_COL_NAME, docIds, numDocIds, longValues);
         Assert.fail("Expected exception converting float to long");
-      } catch (UnsupportedOperationException e) {
+      } catch (IllegalStateException e) {
         // We should see an exception
       }
 
@@ -288,7 +290,7 @@ public class RealtimeNoDictionaryTest {
         int[] intValues = new int[NUM_ROWS];
         dataFetcher.fetchIntValues(DOUBLE_COL_NAME, docIds, numDocIds, intValues);
         Assert.fail("Expected exception converting double to int");
-      } catch (UnsupportedOperationException e) {
+      } catch (IllegalStateException e) {
         // We should see an exception
       }
 
@@ -296,7 +298,7 @@ public class RealtimeNoDictionaryTest {
       try {
         dataFetcher.fetchLongValues(DOUBLE_COL_NAME, docIds, numDocIds, longValues);
         Assert.fail("Expected exception converting double to long");
-      } catch (UnsupportedOperationException e) {
+      } catch (IllegalStateException e) {
         // We should see an exception
       }
 
@@ -304,7 +306,7 @@ public class RealtimeNoDictionaryTest {
       try {
         dataFetcher.fetchFloatValues(DOUBLE_COL_NAME, docIds, numDocIds, floatValues);
         Assert.fail("Expected exception converting double to float");
-      } catch (UnsupportedOperationException e) {
+      } catch (IllegalStateException e) {
         // We should see an exception
       }
 

@@ -30,13 +30,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
+import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -298,31 +298,27 @@ public class DictionaryToRawIndexConverter {
       return;
     }
 
-    int totalDocs = segment.getSegmentMetadata().getTotalDocs();
-    BlockSingleValIterator bvIter = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
-
-    FieldSpec.DataType dataType = dataSourceMetadata.getDataType();
-    int lengthOfLongestEntry =
-        (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(bvIter, dictionary) : -1;
-
     ChunkCompressorFactory.CompressionType compressionType =
         ChunkCompressorFactory.CompressionType.valueOf(_compressionType);
-    SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
-        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, totalDocs, lengthOfLongestEntry, false,
-            BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    FieldSpec.DataType dataType = dataSourceMetadata.getDataType();
+    int totalDocs = segment.getSegmentMetadata().getTotalDocs();
+    int lengthOfLongestEntry = (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
+    SingleValueSet valueSet = (SingleValueSet) dataSource.nextBlock().getBlockValueSet();
 
-    int docId = 0;
-    bvIter.reset();
-    while (bvIter.hasNext()) {
-      int dictId = bvIter.nextIntVal();
-      Object value = dictionary.get(dictId);
-      rawIndexCreator.index(docId++, value);
+    try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
+        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, totalDocs, lengthOfLongestEntry,
+            false, BaseChunkSingleValueWriter.DEFAULT_VERSION)) {
+      for (int docId = 0; docId < totalDocs; docId++) {
+        int dictId = valueSet.getIntValue(docId);
+        Object value = dictionary.get(dictId);
+        rawIndexCreator.index(docId++, value);
 
-      if (docId % 1000000 == 0) {
-        LOGGER.info("Converted {} records.", docId);
+        if (docId % 1000000 == 0) {
+          LOGGER.info("Converted {} records.", docId);
+        }
       }
     }
-    rawIndexCreator.close();
+
     deleteForwardIndex(newSegment.getParentFile(), column, dataSourceMetadata.isSorted());
   }
 
@@ -345,16 +341,14 @@ public class DictionaryToRawIndexConverter {
 
   /**
    * Helper method to get the length
-   * @param bvIter Data source blockvalset iterator
    * @param dictionary Column dictionary
    * @return Length of longest entry
    */
-  private int getLengthOfLongestEntry(BlockSingleValIterator bvIter, Dictionary dictionary) {
+  private int getLengthOfLongestEntry(Dictionary dictionary) {
     int lengthOfLongestEntry = 0;
 
-    bvIter.reset();
-    while (bvIter.hasNext()) {
-      int dictId = bvIter.nextIntVal();
+    int length = dictionary.length();
+    for (int dictId = 0; dictId < length; dictId++) {
       String value = (String) dictionary.get(dictId);
       lengthOfLongestEntry = Math.max(lengthOfLongestEntry, StringUtil.encodeUtf8(value).length);
     }

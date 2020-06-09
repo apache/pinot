@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
@@ -27,8 +26,10 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
+@SuppressWarnings("rawtypes")
 public final class SingleValueBlock implements Block {
   private final SingleColumnSingleValueReader _reader;
   private final BlockValSet _blockValSet;
@@ -37,7 +38,7 @@ public final class SingleValueBlock implements Block {
   public SingleValueBlock(SingleColumnSingleValueReader reader, int numDocs, FieldSpec.DataType dataType,
       Dictionary dictionary) {
     _reader = reader;
-    _blockValSet = new SingleValueSet(reader, numDocs, dataType);
+    _blockValSet = new SingleValueSet(reader, dataType);
     _blockMetadata = new BlockMetadataImpl(numDocs, true, 0, dataType, dictionary);
   }
 

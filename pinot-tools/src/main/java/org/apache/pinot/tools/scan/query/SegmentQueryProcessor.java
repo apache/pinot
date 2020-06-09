@@ -32,10 +32,11 @@ import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.common.BlockMultiValIterator;
-import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
+import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -265,32 +266,42 @@ class SegmentQueryProcessor {
 
   private List<Integer> evaluatePredicate(List<Integer> inputDocIds, String column, PredicateFilter predicateFilter) {
     List<Integer> result = new ArrayList<>();
+    DataSource dataSource = _immutableSegment.getDataSource(column);
     if (!_mvColumns.contains(column)) {
-      BlockSingleValIterator bvIter =
-          (BlockSingleValIterator) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
+      SingleValueSet valueSet = (SingleValueSet) dataSource.nextBlock().getBlockValueSet();
 
-      int i = 0;
-      while (bvIter.hasNext() && (inputDocIds == null || i < inputDocIds.size())) {
-        int docId = (inputDocIds != null) ? inputDocIds.get(i++) : i++;
-        bvIter.skipTo(docId);
-        if (predicateFilter.apply(bvIter.nextIntVal())) {
-          result.add(docId);
+      if (inputDocIds != null) {
+        for (int docId : inputDocIds) {
+          if (predicateFilter.apply(valueSet.getIntValue(docId))) {
+            result.add(docId);
+          }
+        }
+      } else {
+        int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
+        for (int docId = 0; docId < numDocs; docId++) {
+          if (predicateFilter.apply(valueSet.getIntValue(docId))) {
+            result.add(docId);
+          }
         }
       }
     } else {
-      BlockMultiValIterator bvIter =
-          (BlockMultiValIterator) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
+      MultiValueSet valueSet = (MultiValueSet) dataSource.nextBlock().getBlockValueSet();
+      int[] dictIds = _mvColumnArrayMap.get(column);
 
-      int i = 0;
-      while (bvIter.hasNext() && (inputDocIds == null || i < inputDocIds.size())) {
-        int docId = (inputDocIds != null) ? inputDocIds.get(i++) : i++;
-        bvIter.skipTo(docId);
-
-        int[] dictIds = _mvColumnArrayMap.get(column);
-        int numMVValues = bvIter.nextIntVal(dictIds);
-
-        if (predicateFilter.apply(dictIds, numMVValues)) {
-          result.add(docId);
+      if (inputDocIds != null) {
+        for (int docId : inputDocIds) {
+          int length = valueSet.getIntValues(docId, dictIds);
+          if (predicateFilter.apply(dictIds, length)) {
+            result.add(docId);
+          }
+        }
+      } else {
+        int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
+        for (int docId = 0; docId < numDocs; docId++) {
+          int length = valueSet.getIntValues(docId, dictIds);
+          if (predicateFilter.apply(dictIds, length)) {
+            result.add(docId);
+          }
         }
       }
     }

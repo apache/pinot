@@ -21,25 +21,19 @@ package org.apache.pinot.core.operator.docvalsets;
 import org.apache.pinot.core.common.BaseBlockValSet;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
-import org.apache.pinot.core.operator.docvaliterators.SingleValueIterator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"rawtypes", "unchecked"})
 public final class SingleValueSet extends BaseBlockValSet {
   private final SingleColumnSingleValueReader _reader;
-  private final int _numDocs;
+  private final ReaderContext _readerContext;
   private final DataType _dataType;
 
-  public SingleValueSet(SingleColumnSingleValueReader reader, int numDocs, DataType dataType) {
+  public SingleValueSet(SingleColumnSingleValueReader reader, DataType dataType) {
     _reader = reader;
-    _numDocs = numDocs;
+    _readerContext = reader.createContext();
     _dataType = dataType;
-  }
-
-  @Override
-  public SingleValueIterator iterator() {
-    return new SingleValueIterator(_reader, _numDocs);
   }
 
   @Override
@@ -53,122 +47,139 @@ public final class SingleValueSet extends BaseBlockValSet {
   }
 
   @Override
-  public void getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + inDocIdsSize;
-    ReaderContext context = _reader.createContext();
+  public int getIntValue(int docId) {
+    return _reader.getInt(docId, _readerContext);
+  }
+
+  @Override
+  public long getLongValue(int docId) {
+    return _reader.getLong(docId, _readerContext);
+  }
+
+  @Override
+  public float getFloatValue(int docId) {
+    return _reader.getFloat(docId, _readerContext);
+  }
+
+  @Override
+  public double getDoubleValue(int docId) {
+    return _reader.getDouble(docId, _readerContext);
+  }
+
+  @Override
+  public String getStringValue(int docId) {
+    return _reader.getString(docId, _readerContext);
+  }
+
+  @Override
+  public byte[] getBytesValue(int docId) {
+    return _reader.getBytes(docId, _readerContext);
+  }
+
+  @Override
+  public void getDictionaryIds(int[] docIds, int length, int[] dictIdBuffer) {
+    _reader.readValues(docIds, 0, length, dictIdBuffer, 0);
+  }
+
+  @Override
+  public void getIntValues(int[] docIds, int length, int[] valueBuffer) {
     if (_dataType == DataType.INT) {
-      for (int i = inStartPos; i < inEndPos; i++) {
-        outValues[outStartPos++] = _reader.getInt(inDocIds[i], context);
+      for (int i = 0; i < length; i++) {
+        valueBuffer[i] = _reader.getInt(docIds[i], _readerContext);
       }
     } else {
-      throw new UnsupportedOperationException();
+      throw new IllegalStateException(String.format("Cannot read %s as INT", _dataType));
     }
   }
 
   @Override
-  public void getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + inDocIdsSize;
-    ReaderContext context = _reader.createContext();
+  public void getLongValues(int[] docIds, int length, long[] valueBuffer) {
     switch (_dataType) {
       case INT:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getInt(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getInt(docIds[i], _readerContext);
         }
         break;
       case LONG:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getLong(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getLong(docIds[i], _readerContext);
         }
         break;
       default:
-        throw new UnsupportedOperationException();
+        throw new IllegalStateException(String.format("Cannot read %s as LONG", _dataType));
     }
   }
 
   @Override
-  public void getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + inDocIdsSize;
-    ReaderContext context = _reader.createContext();
+  public void getFloatValues(int[] docIds, int length, float[] valueBuffer) {
     switch (_dataType) {
       case INT:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getInt(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getInt(docIds[i], _readerContext);
         }
         break;
       case LONG:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getLong(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getLong(docIds[i], _readerContext);
         }
         break;
       case FLOAT:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getFloat(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getFloat(docIds[i], _readerContext);
         }
         break;
       default:
-        throw new UnsupportedOperationException();
+        throw new IllegalStateException(String.format("Cannot read %s as FLOAT", _dataType));
     }
   }
 
   @Override
-  public void getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + inDocIdsSize;
-    ReaderContext context = _reader.createContext();
+  public void getDoubleValues(int[] docIds, int length, double[] valueBuffer) {
     switch (_dataType) {
       case INT:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getInt(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getInt(docIds[i], _readerContext);
         }
         break;
       case LONG:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getLong(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getLong(docIds[i], _readerContext);
         }
         break;
       case FLOAT:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getFloat(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getFloat(docIds[i], _readerContext);
         }
         break;
       case DOUBLE:
-        for (int i = inStartPos; i < inEndPos; i++) {
-          outValues[outStartPos++] = _reader.getDouble(inDocIds[i], context);
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.getDouble(docIds[i], _readerContext);
         }
         break;
       default:
-        throw new UnsupportedOperationException();
+        throw new IllegalStateException(String.format("Cannot read %s as DOUBLE", _dataType));
     }
   }
 
   @Override
-  public void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + inDocIdsSize;
-    ReaderContext context = _reader.createContext();
+  public void getStringValues(int[] docIds, int length, String[] valueBuffer) {
     if (_dataType == DataType.STRING) {
-      for (int i = inStartPos; i < inEndPos; i++) {
-        outValues[outStartPos++] = _reader.getString(inDocIds[i], context);
+      for (int i = 0; i < length; i++) {
+        valueBuffer[i] = _reader.getString(docIds[i], _readerContext);
       }
     } else {
-      throw new UnsupportedOperationException();
+      throw new IllegalStateException(String.format("Cannot read %s as STRING", _dataType));
     }
   }
 
   @Override
-  public void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos) {
-    int inEndPos = inStartPos + inDocIdsSize;
-    ReaderContext context = _reader.createContext();
+  public void getBytesValues(int[] docIds, int length, byte[][] valueBuffer) {
     if (_dataType.equals(DataType.BYTES)) {
-      for (int i = inStartPos; i < inEndPos; i++) {
-        outValues[outStartPos++] = _reader.getBytes(inDocIds[i], context);
+      for (int i = 0; i < length; i++) {
+        valueBuffer[i] = _reader.getBytes(docIds[i], _readerContext);
       }
     } else {
-      throw new UnsupportedOperationException();
+      throw new IllegalStateException(String.format("Cannot read %s as BYTES", _dataType));
     }
-  }
-
-  @Override
-  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
-      int outStartPos) {
-    _reader.readValues(inDocIds, inStartPos, inDocIdsSize, outDictionaryIds, outStartPos);
   }
 }

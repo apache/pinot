@@ -38,7 +38,6 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
@@ -46,6 +45,7 @@ import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -214,45 +214,43 @@ abstract class BaseStarTreeV2Test<R, A> {
     } else {
       starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, rootFilterNode, groupByColumnSet, null);
     }
-    List<BlockSingleValIterator> starTreeAggregationColumnValueIterators = new ArrayList<>(numAggregations);
+    List<SingleValueSet> starTreeAggregationColumnValueSets = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : functionColumnPairs) {
-      starTreeAggregationColumnValueIterators.add(
-          (BlockSingleValIterator) _starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).nextBlock()
-              .getBlockValueSet().iterator());
+      starTreeAggregationColumnValueSets.add(
+          (SingleValueSet) _starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).nextBlock()
+              .getBlockValueSet());
     }
-    List<BlockSingleValIterator> starTreeGroupByColumnValueIterators = new ArrayList<>(numGroupByColumns);
+    List<SingleValueSet> starTreeGroupByColumnValueSets = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
-      starTreeGroupByColumnValueIterators.add(
-          (BlockSingleValIterator) _starTreeV2.getDataSource(groupByColumn).nextBlock().getBlockValueSet().iterator());
+      starTreeGroupByColumnValueSets
+          .add((SingleValueSet) _starTreeV2.getDataSource(groupByColumn).nextBlock().getBlockValueSet());
     }
     Map<List<Integer>, List<Object>> starTreeResult =
-        computeStarTreeResult(starTreeFilterPlanNode, starTreeAggregationColumnValueIterators,
-            starTreeGroupByColumnValueIterators);
+        computeStarTreeResult(starTreeFilterPlanNode, starTreeAggregationColumnValueSets,
+            starTreeGroupByColumnValueSets);
 
     // Extract values without star-tree
     PlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(_indexSegment, brokerRequest);
-    List<BlockSingleValIterator> nonStarTreeAggregationColumnValueIterators = new ArrayList<>(numAggregations);
+    List<SingleValueSet> nonStarTreeAggregationColumnValueSets = new ArrayList<>(numAggregations);
     List<Dictionary> nonStarTreeAggregationColumnDictionaries = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : functionColumnPairs) {
       if (aggregationFunctionColumnPair.getFunctionType() == AggregationFunctionType.COUNT) {
-        nonStarTreeAggregationColumnValueIterators.add(null);
+        nonStarTreeAggregationColumnValueSets.add(null);
         nonStarTreeAggregationColumnDictionaries.add(null);
       } else {
         DataSource dataSource = _indexSegment.getDataSource(aggregationFunctionColumnPair.getColumn());
-        nonStarTreeAggregationColumnValueIterators
-            .add((BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator());
+        nonStarTreeAggregationColumnValueSets.add((SingleValueSet) dataSource.nextBlock().getBlockValueSet());
         nonStarTreeAggregationColumnDictionaries.add(dataSource.getDictionary());
       }
     }
-    List<BlockSingleValIterator> nonStarTreeGroupByColumnValueIterators = new ArrayList<>(numGroupByColumns);
+    List<SingleValueSet> nonStarTreeGroupByColumnValueSets = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
-      nonStarTreeGroupByColumnValueIterators.add(
-          (BlockSingleValIterator) _indexSegment.getDataSource(groupByColumn).nextBlock().getBlockValueSet()
-              .iterator());
+      nonStarTreeGroupByColumnValueSets
+          .add((SingleValueSet) _indexSegment.getDataSource(groupByColumn).nextBlock().getBlockValueSet());
     }
     Map<List<Integer>, List<Object>> nonStarTreeResult =
-        computeNonStarTreeResult(nonStarTreeFilterPlanNode, nonStarTreeAggregationColumnValueIterators,
-            nonStarTreeAggregationColumnDictionaries, nonStarTreeGroupByColumnValueIterators);
+        computeNonStarTreeResult(nonStarTreeFilterPlanNode, nonStarTreeAggregationColumnValueSets,
+            nonStarTreeAggregationColumnDictionaries, nonStarTreeGroupByColumnValueSets);
 
     // Assert results
     assertEquals(starTreeResult.size(), nonStarTreeResult.size());
@@ -269,46 +267,42 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   @SuppressWarnings("unchecked")
   private Map<List<Integer>, List<Object>> computeStarTreeResult(PlanNode starTreeFilterPlanNode,
-      List<BlockSingleValIterator> aggregationColumnValueIterators,
-      List<BlockSingleValIterator> groupByColumnValueIterators) {
+      List<SingleValueSet> aggregationColumnValueSets, List<SingleValueSet> groupByColumnValueSets) {
     Map<List<Integer>, List<Object>> result = new HashMap<>();
-    int numAggregations = aggregationColumnValueIterators.size();
-    int numGroupByColumns = groupByColumnValueIterators.size();
+    int numAggregations = aggregationColumnValueSets.size();
+    int numGroupByColumns = groupByColumnValueSets.size();
     BlockDocIdIterator docIdIterator = starTreeFilterPlanNode.run().nextBlock().getBlockDocIdSet().iterator();
     int docId;
     while ((docId = docIdIterator.next()) != Constants.EOF) {
       // Array of dictionary Ids (zero-length array for non-group-by queries)
       List<Integer> group = new ArrayList<>(numGroupByColumns);
-      for (BlockSingleValIterator valueIterator : groupByColumnValueIterators) {
-        valueIterator.skipTo(docId);
-        group.add(valueIterator.nextIntVal());
+      for (SingleValueSet valueSet : groupByColumnValueSets) {
+        group.add(valueSet.getIntValue(docId));
       }
       List<Object> values = result.computeIfAbsent(group, k -> new ArrayList<>(numAggregations));
       if (values.isEmpty()) {
-        for (BlockSingleValIterator valueIterator : aggregationColumnValueIterators) {
-          valueIterator.skipTo(docId);
-          values.add(getNextAggregatedValue(valueIterator));
+        for (SingleValueSet valueSet : aggregationColumnValueSets) {
+          values.add(getAggregatedValue(valueSet, docId));
         }
       } else {
         for (int i = 0; i < numAggregations; i++) {
           Object value = values.get(i);
-          BlockSingleValIterator valueIterator = aggregationColumnValueIterators.get(i);
-          valueIterator.skipTo(docId);
-          values.set(i, _valueAggregator.applyAggregatedValue(value, getNextAggregatedValue(valueIterator)));
+          SingleValueSet valueSet = aggregationColumnValueSets.get(i);
+          values.set(i, _valueAggregator.applyAggregatedValue(value, getAggregatedValue(valueSet, docId)));
         }
       }
     }
     return result;
   }
 
-  private Object getNextAggregatedValue(BlockSingleValIterator valueIterator) {
+  private Object getAggregatedValue(SingleValueSet valueSet, int docId) {
     switch (_aggregatedValueType) {
       case LONG:
-        return valueIterator.nextLongVal();
+        return valueSet.getLongValue(docId);
       case DOUBLE:
-        return valueIterator.nextDoubleVal();
+        return valueSet.getDoubleValue(docId);
       case BYTES:
-        return _valueAggregator.deserializeAggregatedValue(valueIterator.nextBytesVal());
+        return _valueAggregator.deserializeAggregatedValue(valueSet.getBytesValue(docId));
       default:
         throw new IllegalStateException();
     }
@@ -316,43 +310,40 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   @SuppressWarnings("unchecked")
   private Map<List<Integer>, List<Object>> computeNonStarTreeResult(PlanNode nonStarTreeFilterPlanNode,
-      List<BlockSingleValIterator> aggregationColumnValueIterators, List<Dictionary> aggregationColumnDictionaries,
-      List<BlockSingleValIterator> groupByColumnValueIterators) {
+      List<SingleValueSet> aggregationColumnValueSets, List<Dictionary> aggregationColumnDictionaries,
+      List<SingleValueSet> groupByColumnValueSets) {
     Map<List<Integer>, List<Object>> result = new HashMap<>();
-    int numAggregations = aggregationColumnValueIterators.size();
-    int numGroupByColumns = groupByColumnValueIterators.size();
+    int numAggregations = aggregationColumnValueSets.size();
+    int numGroupByColumns = groupByColumnValueSets.size();
     BlockDocIdIterator docIdIterator = nonStarTreeFilterPlanNode.run().nextBlock().getBlockDocIdSet().iterator();
     int docId;
     while ((docId = docIdIterator.next()) != Constants.EOF) {
       // Array of dictionary Ids (zero-length array for non-group-by queries)
       List<Integer> group = new ArrayList<>(numGroupByColumns);
-      for (BlockSingleValIterator valueIterator : groupByColumnValueIterators) {
-        valueIterator.skipTo(docId);
-        group.add(valueIterator.nextIntVal());
+      for (SingleValueSet valueSet : groupByColumnValueSets) {
+        group.add(valueSet.getIntValue(docId));
       }
       List<Object> values = result.computeIfAbsent(group, k -> new ArrayList<>(numAggregations));
       if (values.isEmpty()) {
         for (int i = 0; i < numAggregations; i++) {
-          BlockSingleValIterator valueIterator = aggregationColumnValueIterators.get(i);
-          if (valueIterator == null) {
+          SingleValueSet valueSet = aggregationColumnValueSets.get(i);
+          if (valueSet == null) {
             // COUNT aggregation function
             values.add(1L);
           } else {
-            valueIterator.skipTo(docId);
-            Object rawValue = getNextRawValue(valueIterator, aggregationColumnDictionaries.get(i));
+            Object rawValue = getNextRawValue(valueSet, docId, aggregationColumnDictionaries.get(i));
             values.add(_valueAggregator.getInitialAggregatedValue(rawValue));
           }
         }
       } else {
         for (int i = 0; i < numAggregations; i++) {
           Object value = values.get(i);
-          BlockSingleValIterator valueIterator = aggregationColumnValueIterators.get(i);
-          if (valueIterator == null) {
+          SingleValueSet valueSet = aggregationColumnValueSets.get(i);
+          if (valueSet == null) {
             // COUNT aggregation function
             value = (Long) value + 1;
           } else {
-            valueIterator.skipTo(docId);
-            Object rawValue = getNextRawValue(valueIterator, aggregationColumnDictionaries.get(i));
+            Object rawValue = getNextRawValue(valueSet, docId, aggregationColumnDictionaries.get(i));
             value = _valueAggregator.applyRawValue(value, rawValue);
           }
           values.set(i, value);
@@ -362,9 +353,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     return result;
   }
 
-  private Object getNextRawValue(BlockSingleValIterator valueIterator, Dictionary dictionary) {
-    int dictId = valueIterator.nextIntVal();
-    return dictionary.get(dictId);
+  private Object getNextRawValue(SingleValueSet valueSet, int docId, Dictionary dictionary) {
+    return dictionary.get(valueSet.getIntValue(docId));
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();
