@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
@@ -205,6 +206,7 @@ public class QuickstartRunner {
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils
-        .stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setQuery(query).run());
+        .stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setQueryType(
+            CommonConstants.Broker.Request.SQL).setQuery(query).run());
   }
 }

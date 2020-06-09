@@ -105,13 +105,13 @@ public class RealtimeQuickStart {
 
     printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
 
-    String q1 = "select count(*) from meetupRsvp limit 0";
+    String q1 = "select count(*) from meetupRsvp limit 1";
     printStatus(Color.YELLOW, "Total number of documents in the table");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q2 = "select sum(rsvp_count) from meetupRsvp group by group_city top 10 limit 0";
+    String q2 = "select group_city, sum(rsvp_count) from meetupRsvp group by group_city order by sum(rsvp_count) desc limit 10";
     printStatus(Color.YELLOW, "Top 10 cities with the most rsvp");
     printStatus(Color.CYAN, "Query : " + q2);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
@@ -123,13 +123,13 @@ public class RealtimeQuickStart {
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q4 = "select sum(rsvp_count) from meetupRsvp group by event_name top 10 limit 0";
+    String q4 = "select event_name, sum(rsvp_count) from meetupRsvp group by event_name order by sum(rsvp_count) desc limit 10";
     printStatus(Color.YELLOW, "Show top 10 rsvp'ed events");
     printStatus(Color.CYAN, "Query : " + q4);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
     printStatus(Color.GREEN, "***************************************************");
 
-    String q5 = "select count(*) from meetupRsvp limit 0";
+    String q5 = "select count(*) from meetupRsvp limit 1";
     printStatus(Color.YELLOW, "Total number of documents in the table");
     printStatus(Color.CYAN, "Query : " + q5);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
