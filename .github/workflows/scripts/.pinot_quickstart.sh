@@ -21,23 +21,14 @@
 # Print environment variables
 printenv
 
-cat "${GITHUB_EVENT_PATH}"
-
 # Java version
 java -version
 
 # Check ThirdEye related changes
-COMMIT_BEFORE=$(jq -r ".pull_request.base.sha" "${GITHUB_EVENT_PATH}")
-COMMIT_AFTER=$(jq -r ".pull_request.head.sha" "${GITHUB_EVENT_PATH}")
-COMMIT_MERGE=$(jq -r ".pull_request.merge_commit_sha" "${GITHUB_EVENT_PATH}")
-
-git fetch
-
-git log  "${COMMIT_BEFORE}"
-git log  "${COMMIT_AFTER}"
-git log  "${COMMIT_MERGE}"
-git diff --name-only "${COMMIT_BEFORE}" "${COMMIT_MERGE}" 
-git diff --name-only "${COMMIT_BEFORE}" "${COMMIT_MERGE}" | grep -E '^(thirdeye)'
+DIFF_URL=$(jq -r ".pull_request.diff_url" "${GITHUB_EVENT_PATH}")
+echo ${DIFF_URL}
+curl ${DIFF_URL} |grep "diff --git"
+curl ${DIFF_URL} |grep "diff --git" | grep -E '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'Skip ThirdEye tests for Quickstart'
   exit 0
