@@ -258,16 +258,17 @@ public class SqlUtils {
       sb.append(" AND ").append(dimensionWhereClause);
     }
 
-    if (limit <= 0) {
-      limit = DEFAULT_LIMIT;
-    }
-
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      sb.append(" LIMIT " + limit);
     }
 
+    if (limit > 0 ){
+      sb.append(" ORDER BY " + getSelectMetricClause(metricConfig, metricFunction) + " DESC");
+    }
+
+    limit = limit > 0 ? limit : DEFAULT_LIMIT;
+    sb.append(" LIMIT " + limit);
     return sb.toString();
   }
 
@@ -290,12 +291,20 @@ public class SqlUtils {
       } else { //timeFormat case
         builder.append(dateTimeSpec.getColumnName()).append(", ");
       }
-  }
+    }
 
     for (String groupByKey: groupByKeys) {
       builder.append(groupByKey).append(", ");
     }
 
+    String selectMetricClause = getSelectMetricClause(metricConfig, metricFunction);
+    builder.append(selectMetricClause);
+
+    return builder.toString();
+  }
+
+  private static String getSelectMetricClause(MetricConfigDTO metricConfig, MetricFunction metricFunction) {
+    StringBuilder builder = new StringBuilder();
     String metricName = null;
     if (metricFunction.getMetricName().equals("*")) {
       metricName = "*";
@@ -303,7 +312,6 @@ public class SqlUtils {
       metricName = metricConfig.getName();
     }
     builder.append(convertAggFunction(metricFunction.getFunctionName())).append("(").append(metricName).append(")");
-
     return builder.toString();
   }
 

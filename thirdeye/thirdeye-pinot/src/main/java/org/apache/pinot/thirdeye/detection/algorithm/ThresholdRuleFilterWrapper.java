@@ -56,7 +56,7 @@ public class ThresholdRuleFilterWrapper extends RuleBasedFilterWrapper {
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
     MetricSlice currentSlice = MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
 
-    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(Collections.singleton(currentSlice), Collections.<String>emptyList());
+    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(Collections.singleton(currentSlice), Collections.<String>emptyList(), -1);
     double currentValue = getValueFromAggregates(currentSlice, aggregates);
     if (!Double.isNaN(this.min) && currentValue < this.min) {
       return false;

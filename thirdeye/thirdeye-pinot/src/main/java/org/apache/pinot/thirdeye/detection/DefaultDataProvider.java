@@ -118,16 +118,12 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public Map<MetricSlice, DataFrame> fetchAggregates(Collection<MetricSlice> slices, final List<String> dimensions) {
+  public Map<MetricSlice, DataFrame> fetchAggregates(Collection<MetricSlice> slices, final List<String> dimensions, int limit) {
     try {
       Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
       for (final MetricSlice slice : slices) {
-        futures.put(slice, this.executor.submit(new Callable<DataFrame>() {
-          @Override
-          public DataFrame call() throws Exception {
-            return DefaultDataProvider.this.aggregationLoader.loadAggregate(slice, dimensions, -1);
-          }
-        }));
+        futures.put(slice, this.executor.submit(
+            () -> DefaultDataProvider.this.aggregationLoader.loadAggregate(slice, dimensions, limit)));
       }
 
       final long deadline = System.currentTimeMillis() + TIMEOUT;

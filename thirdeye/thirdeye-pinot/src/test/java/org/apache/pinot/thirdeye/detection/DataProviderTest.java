@@ -17,6 +17,8 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import java.io.InputStreamReader;
@@ -29,9 +31,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -45,13 +49,20 @@ import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
@@ -69,8 +80,9 @@ public class DataProviderTest {
   private DatasetConfigManager datasetDAO;
   private EvaluationManager evaluationDAO;
   private DetectionConfigManager detectionDAO;
-  private QueryCache cache;
+  private QueryCache queryCache;
   private TimeSeriesLoader timeseriesLoader;
+  private AggregationLoader aggregationLoader;
 
   private DataFrame data;
 
@@ -81,6 +93,8 @@ public class DataProviderTest {
   private List<Long> metricIds;
   private List<Long> datasetIds;
   private List<Long> detectionIds;
+
+  private static final MetricDataset METRIC = new MetricDataset("metric", "collection1");
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -139,12 +153,47 @@ public class DataProviderTest {
       this.data.addSeries(COL_TIME, this.data.getLongs(COL_TIME).multiply(1000));
     }
 
-    // loaders
-    this.timeseriesLoader = new DefaultTimeSeriesLoader(this.metricDAO, this.datasetDAO, this.cache, null);
+    // register caches
+
+    LoadingCache<String, DatasetConfigDTO> mockDatasetConfigCache = Mockito.mock(LoadingCache.class);
+    DatasetConfigDTO datasetConfig = this.datasetDAO.findByDataset("myDataset2");
+    Mockito.when(mockDatasetConfigCache.get("myDataset2")).thenReturn(datasetConfig);
+
+
+    LoadingCache<String, Long> mockDatasetMaxDataTimeCache = Mockito.mock(LoadingCache.class);
+    Mockito.when(mockDatasetMaxDataTimeCache.get("myDataset2"))
+        .thenReturn(Long.MAX_VALUE);
+
+    MetricDataset metricDataset = new MetricDataset("myMetric2", "myDataset2");
+    LoadingCache<MetricDataset, MetricConfigDTO> mockMetricConfigCache = Mockito.mock(LoadingCache.class);
+    MetricConfigDTO metricConfig = this.metricDAO.findByMetricAndDataset("myMetric2", "myDataset2");
+    Mockito.when(mockMetricConfigCache.get(metricDataset)).thenReturn(metricConfig);
+
+    Map<String, DataFrame> datasets = new HashMap<>();
+    datasets.put("myDataset1", data);
+    datasets.put("myDataset2", data);
+
+    Map<Long, String> id2name = new HashMap<>();
+    id2name.put(this.metricIds.get(1), "value");
+    Map<String, ThirdEyeDataSource> dataSourceMap = new HashMap<>();
+    dataSourceMap.put("myDataSource", CSVThirdEyeDataSource.fromDataFrame(datasets, id2name));
+    this.queryCache = new QueryCache(dataSourceMap, Executors.newSingleThreadExecutor());
+
+    ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
+    cacheRegistry.registerMetricConfigCache(mockMetricConfigCache);
+    cacheRegistry.registerDatasetConfigCache(mockDatasetConfigCache);
+    cacheRegistry.registerQueryCache(this.queryCache);
+    cacheRegistry.registerDatasetMaxDataTimeCache(mockDatasetMaxDataTimeCache);
+
+    // time series loader
+    this.timeseriesLoader = new DefaultTimeSeriesLoader(this.metricDAO, this.datasetDAO, this.queryCache, null);
+
+    // aggregation loader
+    this.aggregationLoader = new DefaultAggregationLoader(this.metricDAO, this.datasetDAO, this.queryCache, mockDatasetMaxDataTimeCache);
 
     // provider
     this.provider = new DefaultDataProvider(this.metricDAO, this.datasetDAO, this.eventDAO, this.anomalyDAO,
-        this.evaluationDAO, this.timeseriesLoader, null, null,
+        this.evaluationDAO, this.timeseriesLoader, aggregationLoader, null,
         TimeSeriesCacheBuilder.getInstance(), AnomaliesCacheBuilder.getInstance());
   }
 
@@ -177,6 +226,13 @@ public class DataProviderTest {
     Assert.assertEquals(metrics.size(), 2);
     Assert.assertTrue(metrics.contains(makeMetric(this.metricIds.get(1), "myMetric2", "myDataset2")));
     Assert.assertTrue(metrics.contains(makeMetric(this.metricIds.get(2), "myMetric3", "myDataset1")));
+  }
+
+  @Test
+  public void testFetchAggregation() {
+    MetricSlice metricSlice = MetricSlice.from(this.metricIds.get(1), 0L, 32400000L, ArrayListMultimap.create());
+    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(Collections.singletonList(metricSlice), Collections.emptyList(), 1);
+    Assert.assertEquals(aggregates.keySet().size(), 1);
   }
 
   //

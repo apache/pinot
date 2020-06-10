@@ -57,7 +57,7 @@ public class DefaultInputDataFetcher implements InputDataFetcher {
    */
   public InputData fetchData(InputDataSpec inputDataSpec) {
     Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(inputDataSpec.getTimeseriesSlices());
-    Map<MetricSlice, DataFrame> aggregates = provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList());
+    Map<MetricSlice, DataFrame> aggregates = provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList(), -1);
 
     Collection<AnomalySlice> slicesWithConfigId = new HashSet<>();
     for (AnomalySlice slice : inputDataSpec.getAnomalySlices()) {

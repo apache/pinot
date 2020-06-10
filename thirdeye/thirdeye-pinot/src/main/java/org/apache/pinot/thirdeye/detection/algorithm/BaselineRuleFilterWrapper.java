@@ -87,7 +87,7 @@ public class BaselineRuleFilterWrapper extends RuleBasedFilterWrapper {
         MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
     MetricSlice baselineSlice = this.baseline.scatter(currentSlice).get(0);
 
-    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(Arrays.asList(currentSlice, baselineSlice), Collections.<String>emptyList());
+    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(Arrays.asList(currentSlice, baselineSlice), Collections.<String>emptyList(), -1);
     double currentValue = getValueFromAggregates(currentSlice, aggregates);
     double baselineValue = getValueFromAggregates(baselineSlice, aggregates);
     if (!Double.isNaN(this.difference) && Math.abs(currentValue - baselineValue) < this.difference) {
@@ -102,7 +102,7 @@ public class BaselineRuleFilterWrapper extends RuleBasedFilterWrapper {
       MetricSlice siteWideSlice = this.baseline.scatter(
           MetricSlice.from(siteWideEntity.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters())).get(0);
       double siteWideBaselineValue = getValueFromAggregates(siteWideSlice,
-          this.provider.fetchAggregates(Collections.singleton(siteWideSlice), Collections.<String>emptyList()));
+          this.provider.fetchAggregates(Collections.singleton(siteWideSlice), Collections.<String>emptyList(), -1));
 
       if (siteWideBaselineValue != 0 && (Math.abs(currentValue - baselineValue) / siteWideBaselineValue) < this.siteWideImpactThreshold) {
         return false;

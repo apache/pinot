@@ -112,7 +112,7 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
-  public Map<MetricSlice, DataFrame> fetchAggregates(Collection<MetricSlice> slices, final List<String> dimensions) {
+  public Map<MetricSlice, DataFrame> fetchAggregates(Collection<MetricSlice> slices, final List<String> dimensions, int limit) {
     Map<MetricSlice, DataFrame> result = new HashMap<>();
     for (MetricSlice slice : slices) {
       List<String> expr = new ArrayList<>();
@@ -125,9 +125,13 @@ public class MockDataProvider implements DataProvider {
         result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS)));
 
       } else {
-        result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS))
-            .groupByValue(new ArrayList<>(dimensions)).aggregate(expr)
-            .dropSeries(COL_KEY).setIndex(dimensions));
+        DataFrame aggResult = this.aggregates.get(slice.withFilters(NO_FILTERS))
+            .groupByValue(new ArrayList<>(dimensions)).aggregate(expr);
+
+        if (limit > 0) {
+          aggResult = aggResult.sortedBy(COL_VALUE).reverse().head(limit);
+        }
+        result.put(slice, aggResult.dropSeries(COL_KEY).setIndex(dimensions));
       }
     }
     return result;

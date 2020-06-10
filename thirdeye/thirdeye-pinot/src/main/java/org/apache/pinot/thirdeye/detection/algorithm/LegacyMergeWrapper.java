@@ -256,7 +256,7 @@ public class LegacyMergeWrapper extends DetectionPipeline {
           if (!StringUtils.isBlank(anomalyFunctionSpec.getGlobalMetric())) {
             MetricSlice slice = makeGlobalSlice(anomalyFunctionSpec, mergedAnomalyResult);
 
-            double valGlobal = this.provider.fetchAggregates(Collections.singleton(slice), Collections.<String>emptyList()).get(slice).getDouble(COL_VALUE, 0);
+            double valGlobal = this.provider.fetchAggregates(Collections.singleton(slice), Collections.<String>emptyList(), -1).get(slice).getDouble(COL_VALUE, 0);
             double diffLocal = mergedAnomalyResult.getAvgCurrentVal() - mergedAnomalyResult.getAvgBaselineVal();
 
             mergedAnomalyResult.setImpactToGlobal(diffLocal / valGlobal);
