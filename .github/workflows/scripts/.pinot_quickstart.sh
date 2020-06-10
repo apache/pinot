@@ -18,6 +18,9 @@
 # under the License.
 #
 
+# Print environment variables
+printenv
+
 # Java version
 java -version
 
