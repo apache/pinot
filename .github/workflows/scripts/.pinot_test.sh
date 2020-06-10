@@ -41,7 +41,7 @@ if [ $? -eq 0 ]; then
     exit 0
   else
     exit 1
-  mvn test && exit 0 || exit 1
+  fi
 fi
 
 # Only run integration tests if needed
