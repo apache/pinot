@@ -164,7 +164,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
 
     if (brokerMetrics != null && resultSize > 0) {
-      brokerMetrics.addMeteredQueryValue(_brokerRequest, BrokerMeter.GROUP_BY_SIZE, resultSize);
+      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.GROUP_BY_SIZE, resultSize);
     }
   }
 
@@ -193,7 +193,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       int index = _numGroupBy;
       int aggNum = 0;
       while (index < _numColumns) {
-        values[index] = AggregationFunctionUtils.getSerializableValue(_aggregationFunctions[aggNum++].extractFinalResult(values[index]));
+        values[index] = AggregationFunctionUtils
+            .getSerializableValue(_aggregationFunctions[aggNum++].extractFinalResult(values[index]));
         index++;
       }
       if (_sqlSelectionList != null) {

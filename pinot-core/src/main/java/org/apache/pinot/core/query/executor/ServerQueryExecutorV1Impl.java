@@ -106,6 +106,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     long requestId = queryRequest.getRequestId();
     BrokerRequest brokerRequest = queryRequest.getBrokerRequest();
+    String tableNameWithType = queryRequest.getTableNameWithType();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
     // Use the timeout passed from the request if exists, or the instance-level timeout
     long queryTimeoutMs = _defaultTimeOutMs;
@@ -120,7 +121,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     // Query scheduler wait time already exceeds query timeout, directly return
     if (remainingTimeMs <= 0) {
-      _serverMetrics.addMeteredQueryValue(brokerRequest, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
       String errorMessage = String
           .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
               queryTimeoutMs);
@@ -130,7 +131,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return dataTable;
     }
 
-    String tableNameWithType = queryRequest.getTableNameWithType();
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
 
@@ -224,7 +224,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(numTotalDocs));
       }
     } catch (Exception e) {
-      _serverMetrics.addMeteredQueryValue(brokerRequest, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
 
       // Do not log error for BadQueryRequestException because it's caused by bad query
       if (e instanceof BadQueryRequestException) {

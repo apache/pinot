@@ -26,9 +26,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,23 +90,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     boolean isGlobal();
   }
 
-  /**
-   * Logs the timing of a query phase.
-   *
-   * @param request The broker request associated with this query
-   * @param phase The query phase for which to log time
-   * @param duration The duration that the phase execution took to complete
-   * @param timeUnit The time unit of the duration
-   */
-  public void addPhaseTiming(BrokerRequest request, QP phase, long duration, TimeUnit timeUnit) {
-    String fullTimerName = buildMetricName(request, phase.getQueryPhaseName());
-    addValueToTimer(fullTimerName, duration, timeUnit);
-  }
-
-  public void addPhaseTiming(BrokerRequest request, QP phase, long nanos) {
-    addPhaseTiming(request, phase, nanos, TimeUnit.NANOSECONDS);
-  }
-
   public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {
     String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
     addValueToTimer(fullTimerName, duration, timeUnit);
@@ -152,42 +133,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS)
         .update(duration, timeUnit);
-  }
-
-  /**
-   * Builds a complete metric name, of the form prefix.resource.metric
-   *
-   * @param request The broker request containing all the information
-   * @param metricName The metric name to register
-   * @return The complete metric name
-   */
-  private String buildMetricName(@Nullable BrokerRequest request, String metricName) {
-    if (request != null && request.getQuerySource() != null && request.getQuerySource().getTableName() != null) {
-      return _metricPrefix + getTableName(request.getQuerySource().getTableName()) + "." + metricName;
-    } else {
-      return _metricPrefix + "unknown." + metricName;
-    }
-  }
-
-  /**
-   * Logs the time taken to complete the given callable.
-   *
-   * @param request The broker request associated with this query
-   * @param phase The query phase
-   * @param callable The callable to execute
-   * @param <T> The return type of the callable
-   * @return The return value of the callable passed as a parameter
-   * @throws Exception The exception thrown by the callable
-   */
-  public <T> T timeQueryPhase(final BrokerRequest request, final QP phase, final Callable<T> callable)
-      throws Exception {
-    long startTime = System.nanoTime();
-    T returnValue = callable.call();
-    long totalNanos = System.nanoTime() - startTime;
-
-    addPhaseTiming(request, phase, totalNanos);
-    LOGGER.debug(" Phase: {} took {}ms", phase, TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
-    return returnValue;
   }
 
   /**
@@ -268,25 +213,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     final MetricName metricName = new MetricName(_clazz, fullMeterName);
 
     return MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
-  }
-
-  /**
-   * Logs a value to a meter for a specific query.
-   *
-   * @param request The broker request associated with this query
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   */
-  public void addMeteredQueryValue(final BrokerRequest request, final M meter, final long unitCount) {
-    final String fullMeterName;
-    String meterName = meter.getMeterName();
-    if (request != null) {
-      fullMeterName = buildMetricName(request, meterName);
-    } else {
-      fullMeterName = _metricPrefix + meterName;
-    }
-    final MetricName metricName = new MetricName(_clazz, fullMeterName);
-    MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS).mark(unitCount);
   }
 
   /**
