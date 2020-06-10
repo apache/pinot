@@ -21,12 +21,17 @@
 # Print environment variables
 printenv
 
+cat "${GITHUB_EVENT_PATH}"
+
 # Java version
 java -version
 
 # Check ThirdEye related changes
 COMMIT_BEFORE=$(jq -r ".pull_request.base.sha" "${GITHUB_EVENT_PATH}")
+git log  "${COMMIT_BEFORE}"
 COMMIT_AFTER=$(jq -r ".pull_request.head.sha" "${GITHUB_EVENT_PATH}")
+git log  "${COMMIT_AFTER}"
+
 git fetch
 git diff --name-only "${COMMIT_BEFORE}" "${COMMIT_AFTER}" | grep -E '^(thirdeye)'
 if [ $? -eq 0 ]; then
