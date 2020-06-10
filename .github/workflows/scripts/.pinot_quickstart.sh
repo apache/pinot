@@ -18,35 +18,32 @@
 # under the License.
 #
 
+# Print environment variables
+printenv
+
 # Java version
 java -version
 
 # Check ThirdEye related changes
-COMMIT_BEFORE=$(jq -r ".pull_request.base.sha" "${GITHUB_EVENT_PATH}")
-COMMIT_AFTER=$(jq -r ".pull_request.head.sha" "${GITHUB_EVENT_PATH}")
-git fetch
-git diff --name-only "${COMMIT_BEFORE}...${COMMIT_AFTER}" | grep -E
+DIFF_URL=$(jq -r ".pull_request.diff_url" "${GITHUB_EVENT_PATH}")
+curl -L ${DIFF_URL} |grep -E '^diff --git'
+curl -L ${DIFF_URL} |grep -E '^diff --git' |grep -E '( a/thirdeye)|( b/thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'Skip ThirdEye tests for Quickstart'
   exit 0
 fi
 
 # Build
-PASS=1
+PASS=0
 for i in $(seq 1 5)
 do
-  if [ "${PASS}" -eq 0 ]; then
+  mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true
+  if [ $? -eq 0 ]; then
+    PASS=1
     break;
   fi
-  mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true ${DEPLOY_BUILD_OPTS} ${KAFKA_BUILD_OPTS} > /tmp/mvn_build_log
-  if [ $? -eq 0 ]; then
-    PASS=0
-  else
-    tail -1000 /tmp/mvn_build_log
-    PASS=1
-  fi
 done
-if [ "${PASS}" != 0 ]; then
+if [ "${PASS}" != 1 ]; then
     exit 1;
 fi
 

@@ -22,10 +22,9 @@
 java -version
 
 # Check ThirdEye related changes
-COMMIT_BEFORE=$(jq -r ".pull_request.base.sha" "${GITHUB_EVENT_PATH}")
-COMMIT_AFTER=$(jq -r ".pull_request.head.sha" "${GITHUB_EVENT_PATH}")
-git fetch
-git diff --name-only "${COMMIT_BEFORE}...${COMMIT_AFTER}" | grep -E
+DIFF_URL=$(jq -r ".pull_request.diff_url" "${GITHUB_EVENT_PATH}")
+curl -L ${DIFF_URL} |grep -E '^diff --git'
+curl -L ${DIFF_URL} |grep -E '^diff --git' |grep -E '( a/thirdeye)|( b/thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'ThirdEye changes.'
 
@@ -44,17 +43,9 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
-passed=0
-
 # Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
-  mvn test -B -P travis,travis-integration-tests-only
-  if [ $? -eq 0 ]; then
-    passed=1
-  fi
+  mvn test -B -P travis,travis-integration-tests-only && exit 0 || exit 1
 else
-  mvn test -B -P travis,travis-no-integration-tests
-  if [ $? -eq 0 ]; then
-    passed=1
-  fi
+  mvn test -B -P travis,travis-no-integration-tests && exit 0 || exit 1
 fi
