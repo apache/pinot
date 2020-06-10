@@ -628,8 +628,7 @@ public class CalciteSqlParser {
       funcName = funcSqlNode.getOperator().getName();
     }
     if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null)
-        && funcSqlNode.getFunctionQuantifier().toValue()
-        .equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+        && funcSqlNode.getFunctionQuantifier().toValue().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
       funcName = AggregationFunctionType.DISTINCTCOUNT.getName();
     }
     return funcName;
@@ -667,21 +666,23 @@ public class CalciteSqlParser {
       function.getOperands().set(i, operand);
     }
     String funcName = function.getOperator();
-    if (FunctionRegistry.containsFunctionByName(funcName) && compilable) {
+    if (compilable) {
       FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(funcName);
-      Object[] arguments = new Object[functionOperandsLength];
-      for (int i = 0; i < functionOperandsLength; i++) {
-        arguments[i] = function.getOperands().get(i).getLiteral().getFieldValue();
-      }
-      try {
-        FunctionInvoker invoker = new FunctionInvoker(functionInfo);
-        Object result = invoker.process(arguments);
-        if (result instanceof String) {
-          result = String.format("'%s'", result);
+      if (functionInfo != null) {
+        Object[] arguments = new Object[functionOperandsLength];
+        for (int i = 0; i < functionOperandsLength; i++) {
+          arguments[i] = function.getOperands().get(i).getLiteral().getFieldValue();
         }
-        return RequestUtils.getLiteralExpression(result);
-      } catch (Exception e) {
-        throw new SqlCompilationException(new IllegalArgumentException("Unsupported function - " + funcName, e));
+        try {
+          FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+          Object result = invoker.process(arguments);
+          if (result instanceof String) {
+            result = String.format("'%s'", result);
+          }
+          return RequestUtils.getLiteralExpression(result);
+        } catch (Exception e) {
+          throw new SqlCompilationException(new IllegalArgumentException("Unsupported function - " + funcName, e));
+        }
       }
     }
     return funcExpr;

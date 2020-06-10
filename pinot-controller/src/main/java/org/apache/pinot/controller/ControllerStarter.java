@@ -44,6 +44,7 @@ import org.apache.helix.api.listeners.ControllerChangeListener;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricsHelper;
@@ -151,6 +152,9 @@ public class ControllerStarter implements ServiceStartable {
       _helixResourceManager = null;
       _executorService = null;
     } else {
+      // Initialize FunctionRegistry before starting the admin application (PinotQueryResource requires it to compile
+      // queries)
+      FunctionRegistry.init();
       _adminApp =
           new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}

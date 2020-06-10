@@ -230,8 +230,7 @@ public class InbuiltFunctionsTest {
 
     GenericRow row1 = new GenericRow();
     jsonStr = "{\"k3\":{\"sub1\":10,\"sub2\":1.0},\"k4\":\"baz\",\"k5\":[1,2,3]}";
-    row1.putValue("jsonMap", JsonUtils
-        .stringToObject(jsonStr, Map.class));
+    row1.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, Map.class));
     inputs.add(new Object[]{"toJsonMapStr(jsonMap)", Lists.newArrayList("jsonMap"), row1, jsonStr});
 
     GenericRow row2 = new GenericRow();
@@ -241,20 +240,18 @@ public class InbuiltFunctionsTest {
 
     GenericRow row3 = new GenericRow();
     jsonStr = "{\"k3\":{\"sub1\":10,\"sub2\":1.0},\"k4\":\"baz\",\"k5\":[1,2,3]}";
-    row3.putValue("jsonMap", JsonUtils
-        .stringToObject(jsonStr, Map.class));
+    row3.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, Map.class));
     inputs.add(new Object[]{"json_format(jsonMap)", Lists.newArrayList("jsonMap"), row3, jsonStr});
 
     GenericRow row4 = new GenericRow();
     jsonStr = "[{\"one\":1,\"two\":\"too\"},{\"one\":11,\"two\":\"roo\"}]";
-    row4.putValue("jsonMap", JsonUtils
-        .stringToObject(jsonStr, List.class));
+    row4.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, List.class));
     inputs.add(new Object[]{"json_format(jsonMap)", Lists.newArrayList("jsonMap"), row4, jsonStr});
 
     GenericRow row5 = new GenericRow();
-    jsonStr = "[{\"one\":1,\"two\":{\"sub1\":1.1,\"sub2\":1.2},\"three\":[\"a\",\"b\"]},{\"one\":11,\"two\":{\"sub1\":11.1,\"sub2\":11.2},\"three\":[\"aa\",\"bb\"]}]";
-    row5.putValue("jsonMap", JsonUtils
-        .stringToObject(jsonStr, List.class));
+    jsonStr =
+        "[{\"one\":1,\"two\":{\"sub1\":1.1,\"sub2\":1.2},\"three\":[\"a\",\"b\"]},{\"one\":11,\"two\":{\"sub1\":11.1,\"sub2\":11.2},\"three\":[\"aa\",\"bb\"]}]";
+    row5.putValue("jsonMap", JsonUtils.stringToObject(jsonStr, List.class));
     inputs.add(new Object[]{"json_format(jsonMap)", Lists.newArrayList("jsonMap"), row5, jsonStr});
 
     return inputs.toArray(new Object[0][]);

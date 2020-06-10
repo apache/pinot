@@ -111,30 +111,30 @@ public class TransformFunctionFactory {
    * @return Transform function
    */
   public static TransformFunction get(TransformExpressionTree expression, Map<String, DataSource> dataSourceMap) {
-    TransformFunction transformFunction;
     switch (expression.getExpressionType()) {
       case FUNCTION:
+        TransformFunction transformFunction;
         String functionName = expression.getValue();
-        Class<? extends TransformFunction> transformFunctionClass;
-        FunctionInfo functionInfo = null;
-        if (FunctionRegistry.containsFunctionByName(functionName)) {
-          transformFunctionClass = ScalarTransformFunctionWrapper.class;
-          functionInfo = FunctionRegistry.getFunctionByName(functionName);
-        } else {
-          transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
-        }
-
-        if (transformFunctionClass == null) {
-          throw new BadQueryRequestException("Unsupported transform function: " + functionName);
-        }
-        try {
-          if (functionInfo != null) {
-            transformFunction = new ScalarTransformFunctionWrapper(functionName, functionInfo);
-          } else {
+        Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
+        if (transformFunctionClass != null) {
+          // Transform function
+          try {
             transformFunction = transformFunctionClass.newInstance();
+          } catch (Exception e) {
+            throw new RuntimeException("Caught exception while constructing transform function: " + functionName, e);
           }
-        } catch (Exception e) {
-          throw new RuntimeException("Caught exception while instantiating transform function: " + functionName, e);
+        } else {
+          // Scalar function
+          FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(functionName);
+          if (functionInfo == null) {
+            throw new BadQueryRequestException("Unsupported transform function: " + functionName);
+          }
+          try {
+            transformFunction = new ScalarTransformFunctionWrapper(functionName, functionInfo);
+          } catch (Exception e) {
+            throw new RuntimeException("Caught exception while constructing scalar transform function: " + functionName,
+                e);
+          }
         }
         List<TransformExpressionTree> children = expression.getChildren();
         List<TransformFunction> arguments = new ArrayList<>(children.size());
@@ -144,8 +144,8 @@ public class TransformFunctionFactory {
         try {
           transformFunction.init(arguments, dataSourceMap);
         } catch (Exception e) {
-          throw new BadQueryRequestException(
-              "Caught exception while initializing transform function: " + transformFunction.getName(), e);
+          throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
+              e);
         }
         return transformFunction;
       case IDENTIFIER:

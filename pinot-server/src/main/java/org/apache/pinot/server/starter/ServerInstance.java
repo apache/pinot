@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -71,6 +72,8 @@ public class ServerInstance {
     _instanceDataManager = (InstanceDataManager) Class.forName(instanceDataManagerClassName).newInstance();
     _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics);
 
+    // Initialize FunctionRegistry before starting the query executor
+    FunctionRegistry.init();
     String queryExecutorClassName = serverConf.getQueryExecutorClassName();
     LOGGER.info("Initializing query executor of class: {}", queryExecutorClassName);
     _queryExecutor = (QueryExecutor) Class.forName(queryExecutorClassName).newInstance();

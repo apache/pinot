@@ -18,18 +18,17 @@
  */
 package org.apache.pinot.common.function;
 
-import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.annotations.ScalarFunction;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
-import org.reflections.scanners.SubTypesScanner;
-import org.reflections.scanners.TypeAnnotationsScanner;
 import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
+import org.reflections.util.FilterBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,63 +37,72 @@ import org.slf4j.LoggerFactory;
  * Registry for in-built Pinot functions
  */
 public class FunctionRegistry {
+  private FunctionRegistry() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
-  private static final Map<String, FunctionInfo> _functionInfoMap = new HashMap<>();
+  private static final Map<String, FunctionInfo> FUNCTION_INFO_MAP = new HashMap<>();
 
   /**
-   * Given a function name, asserts that a corresponding function was registered during construction and returns it
+   * Registers the scalar functions via reflection.
+   * NOTE: In order to plugin methods using reflection, the methods should be inside a class that includes ".function."
+   *       in its class path. This convention can significantly reduce the time of class scanning.
    */
-  public static FunctionInfo getFunctionByName(String functionName) {
-    Preconditions.checkArgument(_functionInfoMap.containsKey(functionName.toLowerCase()));
-    return _functionInfoMap.get(functionName.toLowerCase());
-  }
-
-  /**
-   * Given a function name and a set of argument types, asserts that a corresponding function
-   * was registered during construction and returns it
-   */
-  public static FunctionInfo getFunctionByNameWithApplicableArgumentTypes(String functionName,
-      Class<?>[] argumentTypes) {
-    FunctionInfo functionInfo = getFunctionByName(functionName);
-    Preconditions.checkArgument(functionInfo.isApplicable(argumentTypes));
-    return functionInfo;
-  }
-
-  public static void registerFunction(Method method) {
-    registerFunction(method.getName().toLowerCase(), method);
-  }
-
-  public static void registerFunction(String name, Method method) {
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
-    _functionInfoMap.put(name, functionInfo);
-  }
-
-  public static boolean containsFunctionByName(String funcName) {
-    return _functionInfoMap.containsKey(funcName.toLowerCase());
-  }
-
   static {
-    try {
-
-      Reflections reflections = new Reflections(
-          new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-              .setScanners(new MethodAnnotationsScanner()));
-
-      Set<Method> methodSet = reflections.getMethodsAnnotatedWith(ScalarFunction.class);
-      for (Method method : methodSet) {
-        ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
-        if (scalarFunction.enabled()) {
-          if (!scalarFunction.name().isEmpty()) {
-            FunctionRegistry.registerFunction(scalarFunction.name(), method);
-          } else {
-            FunctionRegistry.registerFunction(method);
-          }
+    long startTimeMs = System.currentTimeMillis();
+    Reflections reflections = new Reflections(
+        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
+            .filterInputsBy(new FilterBuilder.Include(".*\\.function\\..*"))
+            .setScanners(new MethodAnnotationsScanner()));
+    Set<Method> methodSet = reflections.getMethodsAnnotatedWith(ScalarFunction.class);
+    for (Method method : methodSet) {
+      ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
+      if (scalarFunction.enabled()) {
+        if (!scalarFunction.name().isEmpty()) {
+          FunctionRegistry.registerFunction(scalarFunction.name(), method);
+        } else {
+          FunctionRegistry.registerFunction(method);
         }
       }
-
-    } catch (Exception e) {
-      LOGGER.error("Caught exception when registering function", e);
-      throw new IllegalStateException(e);
     }
+    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
+        FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
+  }
+
+  /**
+   * Initializes the FunctionRegistry.
+   * NOTE: This method itself is a NO-OP, but can be used to explicitly trigger the static block of registering the
+   *       scalar functions via reflection.
+   */
+  public static void init() {
+  }
+
+  /**
+   * Registers a method with the name of the method.
+   */
+  public static void registerFunction(Method method) {
+    registerFunction(method.getName(), method);
+  }
+
+  /**
+   * Registers a method with the given function name.
+   */
+  public static void registerFunction(String functionName, Method method) {
+    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
+    FUNCTION_INFO_MAP.put(canonicalize(functionName), functionInfo);
+  }
+
+  /**
+   * Returns the {@link FunctionInfo} associated with the given function name, or {@code null} if there is no method
+   * registered under the name. This method should be called after the FunctionRegistry is initialized and all methods
+   * are already registered.
+   */
+  @Nullable
+  public static FunctionInfo getFunctionByName(String functionName) {
+    return FUNCTION_INFO_MAP.get(canonicalize(functionName));
+  }
+
+  private static String canonicalize(String functionName) {
+    return functionName.toLowerCase();
   }
 }

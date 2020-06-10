@@ -49,6 +49,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -210,6 +211,8 @@ public class HelixBrokerStarter implements ServiceStartable {
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
         new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics);
     queryQuotaManager.init(_spectatorHelixManager);
+    // Initialize FunctionRegistry before starting the broker request handler
+    FunctionRegistry.init();
     _brokerRequestHandler =
         new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
             _brokerMetrics, _propertyStore);
@@ -291,8 +294,8 @@ public class HelixBrokerStarter implements ServiceStartable {
         Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
-    ServiceStatus.setServiceStatusCallback(_brokerId, new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-        .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
+    ServiceStatus.setServiceStatusCallback(_brokerId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
+        ImmutableList.of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
@@ -345,7 +348,6 @@ public class HelixBrokerStarter implements ServiceStartable {
     LOGGER.info("Shutdown Broker Metrics Registry");
     _metricsRegistry.shutdown();
     LOGGER.info("Finish shutting down Pinot broker for {}", _brokerId);
-
   }
 
   public HelixManager getSpectatorHelixManager() {
