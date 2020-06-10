@@ -720,7 +720,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String pqlQuery;
     pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch;
     long expectedResult = postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong();
-    System.out.println(expectedResult);
 
     pqlQuery = "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
@@ -754,17 +753,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     List<String> origins = Arrays
         .asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP",
             "CLT", "LGA", "DTW", "JFK", "BWI");
-    String whenThenStatement = "";
+    StringBuilder caseStatementBuilder = new StringBuilder("CASE ");
     for (int i = 0; i < origins.size(); i++) {
       // WHEN origin = 'ATL' THEN 1
       // WHEN origin = 'ORD' THEN 2
       // WHEN origin = 'DFW' THEN 3
       // ....
-      whenThenStatement += String.format("WHEN origin = '%s' THEN %d ", origins.get(i), i + 1);
+      caseStatementBuilder.append(String.format("WHEN origin = '%s' THEN %d ", origins.get(i), i + 1));
     }
-    String sqlQuery = String.format(
-        "SELECT origin, " + "CASE " + whenThenStatement + "ELSE 0 END " + "AS origin_code " + "FROM mytable "
-            + "LIMIT 1000");
+    caseStatementBuilder.append("ELSE 0 END");
+    String sqlQuery = "SELECT origin, " + caseStatementBuilder + " AS origin_code FROM mytable LIMIT 1000";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(response.get("exceptions").size(), 0);
@@ -774,7 +772,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       if (originCode > 0) {
         assertEquals(origin, origins.get(originCode - 1));
       } else {
-        assertTrue(!origins.contains(origin));
+        assertFalse(origins.contains(origin));
       }
     }
   }
@@ -782,10 +780,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testCaseStatementInSelectionWithTransformFunctionInThen()
       throws Exception {
-    String sqlQuery = String.format(
-        "SELECT ArrDelay, CASE WHEN ArrDelay > 0 THEN ArrDelay WHEN ArrDelay < 0 THEN ArrDelay * -1 ELSE 0 END AS ArrTimeDiff FROM mytable LIMIT 1000");
+    String sqlQuery =
+        "SELECT ArrDelay, CASE WHEN ArrDelay > 0 THEN ArrDelay WHEN ArrDelay < 0 THEN ArrDelay * -1 ELSE 0 END AS ArrTimeDiff FROM mytable LIMIT 1000";
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
-    System.out.println("response = " + response);
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(response.get("exceptions").size(), 0);
     for (int i = 0; i < rows.size(); i++) {
@@ -815,14 +812,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void testCountVsCaseQuery(String predicate)
       throws Exception {
-    // System.out.println("predicate = " + predicate);
     String sqlQuery = String.format("SELECT COUNT(*) FROM mytable WHERE %s", predicate);
     JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
-    // System.out.println(String.format("query = %s, response = %s",sqlQuery, response));
     long countValue = response.get("resultTable").get("rows").get(0).get(0).asLong();
     sqlQuery = String.format("SELECT SUM(CASE WHEN %s THEN 1 ELSE 0 END) as sum1 FROM mytable", predicate);
     response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
-    // System.out.println(String.format("query = %s, response = %s",sqlQuery, response));
     long caseSum = response.get("resultTable").get("rows").get(0).get(0).asLong();
     assertEquals(caseSum, countValue);
   }
@@ -840,11 +834,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       pqlQuery =
           "SELECT count(*) FROM mytable WHERE Origin = \"" + origin + "\" AND DaysSinceEpoch = " + daysSinceEpoch;
       JsonNode response1 = postQuery(pqlQuery);
-      //System.out.println(response1);
       pqlQuery = "SELECT count(*) FROM mytable WHERE Origin = \"" + origin
           + "\" AND timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
       JsonNode response2 = postQuery(pqlQuery);
-      //System.out.println(response2);
       double val1 = response1.get("aggregationResults").get(0).get("value").asDouble();
       double val2 = response2.get("aggregationResults").get(0).get("value").asDouble();
       assertEquals(val1, val2);
