@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -34,10 +37,32 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  */
 public class LiteralTransformFunction implements TransformFunction {
   private final String _literal;
-  private String[] _result;
+  private int[] _intResult;
+  private long[] _longResult;
+  private float[] _floatResult;
+  private double[] _doubleResult;
+  private String[] _stringResult;
 
   public LiteralTransformFunction(String literal) {
     _literal = literal;
+  }
+
+  public static FieldSpec.DataType inferLiteralDataType(LiteralTransformFunction transformFunction) {
+    String literal = transformFunction.getLiteral();
+    try {
+      Number literalNum = NumberUtils.createNumber(literal);
+      if (literalNum instanceof Integer) {
+        return FieldSpec.DataType.INT;
+      } else if (literalNum instanceof Long) {
+        return FieldSpec.DataType.LONG;
+      } else if (literalNum instanceof Float) {
+        return FieldSpec.DataType.FLOAT;
+      } else if (literalNum instanceof Double) {
+        return FieldSpec.DataType.DOUBLE;
+      }
+    } catch (Exception e) {
+    }
+    return FieldSpec.DataType.STRING;
   }
 
   public String getLiteral() {
@@ -75,31 +100,47 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    if (_intResult == null) {
+      _intResult = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      Arrays.fill(_intResult, Integer.parseInt(_literal));
+    }
+    return _intResult;
   }
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    if (_longResult == null) {
+      _longResult = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      Arrays.fill(_longResult, new BigDecimal(_literal).longValue());
+    }
+    return _longResult;
   }
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    if (_floatResult == null) {
+      _floatResult = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      Arrays.fill(_floatResult, new BigDecimal(_literal).floatValue());
+    }
+    return _floatResult;
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
+    if (_doubleResult == null) {
+      _doubleResult = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      Arrays.fill(_doubleResult, new BigDecimal(_literal).doubleValue());
+    }
+    return _doubleResult;
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_result == null) {
-      _result = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      Arrays.fill(_result, _literal);
+    if (_stringResult == null) {
+      _stringResult = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      Arrays.fill(_stringResult, _literal);
     }
-    return _result;
+    return _stringResult;
   }
 
   @Override

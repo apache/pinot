@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -96,13 +97,18 @@ public class CaseTransformFunction extends BaseTransformFunction {
     FieldSpec.DataType dataType = _elseThenStatements.get(0).getResultMetadata().getDataType();
     boolean isSingleValueField = _elseThenStatements.get(0).getResultMetadata().isSingleValue();
     for (int i = 1; i < _elseThenStatements.size(); i++) {
-      TransformResultMetadata resultMetadata = _elseThenStatements.get(i).getResultMetadata();
+      TransformFunction transformFunction = _elseThenStatements.get(i);
+      TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
       if (resultMetadata.isSingleValue() != isSingleValueField) {
         throw new IllegalStateException(
             String.format("Mixed Single/Multi Value results in expression types in THEN Clause [%s].", resultMetadata));
       }
       switch (dataType) {
         case INT:
+          if (transformFunction instanceof LiteralTransformFunction) {
+            dataType = LiteralTransformFunction.inferLiteralDataType((LiteralTransformFunction) transformFunction);
+            break;
+          }
           switch (resultMetadata.getDataType()) {
             case INT:
             case LONG:
@@ -117,6 +123,23 @@ public class CaseTransformFunction extends BaseTransformFunction {
           }
           break;
         case LONG:
+          if (transformFunction instanceof LiteralTransformFunction) {
+            FieldSpec.DataType literalDataType =
+                LiteralTransformFunction.inferLiteralDataType((LiteralTransformFunction) transformFunction);
+            switch (literalDataType) {
+              case INT:
+              case LONG:
+                break;
+              case FLOAT:
+              case DOUBLE:
+                dataType = FieldSpec.DataType.DOUBLE;
+                break;
+              default:
+                dataType = FieldSpec.DataType.STRING;
+                break;
+            }
+            break;
+          }
           switch (resultMetadata.getDataType()) {
             case INT:
             case LONG:
@@ -134,6 +157,25 @@ public class CaseTransformFunction extends BaseTransformFunction {
           }
           break;
         case FLOAT:
+          if (transformFunction instanceof LiteralTransformFunction) {
+            FieldSpec.DataType literalDataType =
+                LiteralTransformFunction.inferLiteralDataType((LiteralTransformFunction) transformFunction);
+            switch (literalDataType) {
+              case INT:
+              case FLOAT:
+                break;
+              case LONG:
+              case DOUBLE:
+                dataType = FieldSpec.DataType.DOUBLE;
+                break;
+              case STRING:
+                dataType = FieldSpec.DataType.STRING;
+                break;
+              default:
+                dataType = literalDataType;
+            }
+            break;
+          }
           switch (resultMetadata.getDataType()) {
             case INT:
             case FLOAT:
@@ -151,6 +193,20 @@ public class CaseTransformFunction extends BaseTransformFunction {
           }
           break;
         case DOUBLE:
+          if (transformFunction instanceof LiteralTransformFunction) {
+            FieldSpec.DataType literalDataType =
+                LiteralTransformFunction.inferLiteralDataType((LiteralTransformFunction) transformFunction);
+            switch (literalDataType) {
+              case INT:
+              case LONG:
+              case FLOAT:
+              case DOUBLE:
+                break;
+              default:
+                dataType = literalDataType;
+            }
+            break;
+          }
           switch (resultMetadata.getDataType()) {
             case INT:
             case FLOAT:
@@ -166,6 +222,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
           }
           break;
         case STRING:
+          if (transformFunction instanceof LiteralTransformFunction) {
+            break;
+          }
           switch (resultMetadata.getDataType()) {
             case INT:
             case FLOAT:
