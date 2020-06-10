@@ -492,7 +492,7 @@ export default Component.extend({
    */
   _calculateContributionBarWidth(dimensionRows, record) {
     const overallChangeValues = dimensionRows.map(row => row.cost ? row.cost : 0);
-    const allValuesPositive = overallChangeValues.every(val => val > 0);
+    const allValuesPositive = overallChangeValues.every(val => val >= 0);
     const allValuesNegative = overallChangeValues.every(val => val < 0);
     const widthAdditivePositive = allValuesPositive ? EXTRA_WIDTH : 0;
     const widthAdditiveNegative = allValuesNegative ? EXTRA_WIDTH : 0;
@@ -517,8 +517,8 @@ export default Component.extend({
 
     // These will be used to set our bar widths/classes in dimensions-table/change-bars component
     return {
-      positive: (signCarrier > 0) ? `${widthPercent + widthAdditivePositive}%` : '0%',
-      negative: (signCarrier > 0) ? '0%' : `${widthPercent + widthAdditiveNegative}%`
+      positive: (signCarrier >= 0) ? `${widthPercent + widthAdditivePositive}%` : '0%',
+      negative: (signCarrier >= 0) ? '0%' : `${widthPercent + widthAdditiveNegative}%`
     };
   },
 

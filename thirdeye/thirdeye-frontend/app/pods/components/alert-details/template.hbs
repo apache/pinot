@@ -144,7 +144,11 @@
             {{#if showRules}}
               <h4 class="te-self-serve__block-title">{{selectedRule.name}} {{#if alertHasDimensions}}/ {{selectedDimension}}{{/if}} anomalies over time ({{numFilteredAnomalies}})</h4>
             {{else}}
-              <h4 class="te-self-serve__block-title">{{#if alertHasDimensions}}{{selectedDimension}} a{{else}}A{{/if}}nomalies over time ({{numFilteredAnomalies}})</h4>
+              {{#if isComposite}}
+                <h4 class="te-self-serve__block-title">Composite Anomalies</h4>
+              {{else}}
+                <h4 class="te-self-serve__block-title">{{#if alertHasDimensions}}{{selectedDimension}} a{{else}}A{{/if}}nomalies over time ({{numFilteredAnomalies}})</h4>
+              {{/if}}
             {{/if}}
 
             {{#unless isPreviewMode}}
@@ -190,23 +194,25 @@
                   </div>
                 {{/if}}
               {{else}}
-                {{!-- Dimension selector --}}
-                {{#if alertHasDimensions}}
-                  {{#power-select
-                    triggerId="select-dimension"
-                    triggerClass="te-form__select"
-                    options=dimensionOptions
-                    searchEnabled=true
-                    searchPlaceholder="Type to filter..."
-                    matchTriggerWidth=false
-                    matchContentWidth=true
-                    selected=selectedDimension
-                    onchange=(action "onSelectDimension")
-                    as |dimension|
-                  }}
-                    {{dimension}}
-                  {{/power-select}}
-                {{/if}}
+                {{#unless isComposite}}
+                  {{!-- Dimension selector --}}
+                  {{#if alertHasDimensions}}
+                    {{#power-select
+                      triggerId="select-dimension"
+                      triggerClass="te-form__select"
+                      options=dimensionOptions
+                      searchEnabled=true
+                      searchPlaceholder="Type to filter..."
+                      matchTriggerWidth=false
+                      matchContentWidth=true
+                      selected=selectedDimension
+                      onchange=(action "onSelectDimension")
+                      as |dimension|
+                    }}
+                      {{dimension}}
+                    {{/power-select}}
+                  {{/if}}
+                {{/unless}}
               {{/if}}
             </div>
 
@@ -270,29 +276,35 @@
                     message=blobMessage
                     iconClass="glyphicon glyphicon-equalizer"}}
                 {{else}}
-                  {{timeseries-chart
-                    series=series
-                    colorMapping=colorMapping
-                    axis=axis
-                    zoom=zoom
-                    legend=legend
-                    point=point
-                    order=order
-                  }}
+                  {{#unless isComposite}}
+                    {{timeseries-chart
+                      series=series
+                      colorMapping=colorMapping
+                      axis=axis
+                      zoom=zoom
+                      legend=legend
+                      point=point
+                      order=order
+                    }}
+                  {{/unless}}
                 {{/if}}
               {{/if}}
               {{#unless isPreviewMode}}
-                <div class="te-form__note">
-                  NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
-                </div>
+                {{#unless isComposite}}
+                  <div class="te-form__note">
+                    NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
+                  </div>
+                {{/unless}}
               {{/unless}}
           </div>
-          {{!-- Baseline type selector --}}
-          {{range-pill-selectors
-            title="Baseline"
-            timeRangeOptions=baselineOptions
-            selectAction=(action "onBaselineOptionClick")
-          }}
+          {{#unless isComposite}}
+            {{!-- Baseline type selector --}}
+            {{range-pill-selectors
+              title="Baseline"
+              timeRangeOptions=baselineOptions
+              selectAction=(action "onBaselineOptionClick")
+            }}
+          {{/unless}}
             {{#if anomaliesAny}}
               {{models-table
                 data=tableAnomalies

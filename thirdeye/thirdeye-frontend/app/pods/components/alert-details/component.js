@@ -223,6 +223,17 @@ export default Component.extend({
   ),
 
   /**
+   * flag for handling composite alert
+   * @type {Boolean}
+   */
+  isComposite: computed(
+    'alertData',
+    function() {
+      return (get(this, 'alertData') || {}).type === 'COMPOSITE_ALERT';
+    }
+  ),
+
+  /**
    * flag to differentiate whether we show bounds and rules or not
    * @type {Boolean}
    */
@@ -234,9 +245,10 @@ export default Component.extend({
       const {
         isPreviewMode,
         granularity,
-        dimensionExploration
-      } = this.getProperties('isPreviewMode', 'granularity', 'dimensionExploration');
-      return (isPreviewMode || (!dimensionExploration && ((granularity || '').includes('MINUTES') || (granularity || '').includes('DAYS'))));
+        dimensionExploration,
+        isComposite
+      } = this.getProperties('isPreviewMode', 'granularity', 'dimensionExploration', 'isComposite');
+      return (isPreviewMode || (!isComposite && !dimensionExploration && ((granularity || '').includes('MINUTES') || (granularity || '').includes('DAYS'))));
     }
   ),
 
@@ -678,14 +690,16 @@ export default Component.extend({
     'isPreviewMode',
     'stateOfAnomaliesAndTimeSeries',
     'isEditMode',
+    'isComposite',
     function() {
       const {
         alertHasDimensions,
         isPreviewMode,
         stateOfAnomaliesAndTimeSeries,
-        isEditMode
+        isEditMode,
+        isComposite
       } = this.getProperties('alertHasDimensions', 'isPreviewMode',
-        'stateOfAnomaliesAndTimeSeries', 'isEditMode');
+        'stateOfAnomaliesAndTimeSeries', 'isEditMode', 'isComposite');
       const settingsColumn = ((isEditMode && stateOfAnomaliesAndTimeSeries === 2) ||
       stateOfAnomaliesAndTimeSeries === 3) ? [{
           title: 'Detection Settings',
@@ -702,7 +716,7 @@ export default Component.extend({
         sortDirection: 'desc',
         sortPrecedence: 1 // lower number means higher precedence
       }];
-      const dimensionColumn = alertHasDimensions ? [{
+      const dimensionColumn = (alertHasDimensions && !isComposite) ? [{
         template: 'custom/anomalies-table/dimensions-only',
         title: 'Dimensions',
         propertyName: 'dimensionStr'
@@ -727,13 +741,14 @@ export default Component.extend({
         component: 'custom/anomalies-table/modify-time',
         propertyName: 'updateTime',
         title: 'Modify Time'
-      }, {
+      }];
+      const rcaColumn = (isComposite || isPreviewMode) ? [] : [{
         component: 'custom/anomalies-table/investigation-link',
         title: 'RCA',
         propertyName: 'id'
-      }];
+      }]
       return [...settingsColumn, ...startColumn, ...dimensionColumn,
-        ...middleColumns, ...rightmostColumns];
+        ...middleColumns, ...rightmostColumns, ...rcaColumn];
     }
   ),
 
@@ -885,7 +900,9 @@ export default Component.extend({
         const metricUrnObj = {};
         if (applicationAnomalies) {
           applicationAnomalies.forEach(anomaly => {
-            metricUrnObj[anomaly.metricUrn] = 1;
+            if (anomaly.metricUrn) {
+              metricUrnObj[anomaly.metricUrn] = 1;
+            }
           });
           metricUrnList = Object.keys(metricUrnObj);
           if (metricUrnList.length > 0) {
@@ -943,6 +960,7 @@ export default Component.extend({
         metricUrnList: this.get('metricUrnListRoute'),
         metricUrn: this.get('metricUrnRoute')
       });
+
       this._fetchAnomalies();
     } else {
       this.setProperties({
