@@ -85,12 +85,12 @@ public class HybridQuickstart {
     _dataFile = new File(configDir, "airlineStats_data.avro");
     _realtimeTableConfigFile = new File(configDir, "airlineStats_realtime_table_config.json");
 
-    URL resource = Quickstart.class.getClassLoader().getResource(
-        "examples/stream/airlineStats/airlineStats_realtime_table_config.json");
+    URL resource = Quickstart.class.getClassLoader()
+        .getResource("examples/stream/airlineStats/airlineStats_realtime_table_config.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, _realtimeTableConfigFile);
-    resource = Quickstart.class.getClassLoader().getResource(
-        "examples/stream/airlineStats/sample_data/airlineStats_data.avro");
+    resource = Quickstart.class.getClassLoader()
+        .getResource("examples/stream/airlineStats/sample_data/airlineStats_data.avro");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, _dataFile);
 
@@ -100,7 +100,8 @@ public class HybridQuickstart {
   private void startKafka() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
-      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, KafkaStarterUtils.getDefaultKafkaConfiguration());
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
+          KafkaStarterUtils.getDefaultKafkaConfiguration());
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
@@ -122,18 +123,30 @@ public class HybridQuickstart {
         new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 1, 1, 1, dataDir);
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
-    printStatus(Color.YELLOW, "***** Starting Zookeeper, 1 servers, 1 brokers and 1 controller *****");
-    runner.startAll();
-    printStatus(Color.YELLOW, "***** Adding airlineStats offline and realtime table *****");
-    runner.addTable();
-    printStatus(Color.YELLOW, "***** Launch data ingestion job to build index segments for airlineStats and push to controller *****");
-    runner.launchDataIngestionJob();
-
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");
     Schema schema = Schema.fromFile(_schemaFile);
     TableConfig tableConfig = JsonUtils.fileToObject(_realtimeTableConfigFile, TableConfig.class);
-    final AirlineDataStream stream = new AirlineDataStream(schema, tableConfig, _dataFile);
+    AirlineDataStream stream = new AirlineDataStream(schema, tableConfig, _dataFile);
     stream.run();
+    printStatus(Color.YELLOW, "***** Starting Zookeeper, 1 servers, 1 brokers and 1 controller *****");
+    runner.startAll();
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        printStatus(Color.GREEN, "***** Shutting down hybrid quick start *****");
+        runner.stop();
+        stream.shutdown();
+        _kafkaStarter.stop();
+        ZkStarter.stopLocalZkServer(_zookeeperInstance);
+        FileUtils.deleteDirectory(quickstartTmpDir);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }));
+    printStatus(Color.YELLOW, "***** Adding airlineStats offline and realtime table *****");
+    runner.addTable();
+    printStatus(Color.YELLOW,
+        "***** Launch data ingestion job to build index segments for airlineStats and push to controller *****");
+    runner.launchDataIngestionJob();
 
     printStatus(Color.YELLOW, "***** Pinot Hybrid with hybrid table setup is complete *****");
     printStatus(Color.YELLOW, "***** Sequence of operations *****");
@@ -147,8 +160,7 @@ public class HybridQuickstart {
     printStatus(Color.YELLOW, "*****    7. Built and pushed an offline segment *****");
     printStatus(Color.YELLOW,
         "*****    8. Started publishing a Kafka stream for the realtime instance to start consuming *****");
-    printStatus(Color.YELLOW,
-        "*****    9. Sleep 5 Seconds to wait for all components brought up *****");
+    printStatus(Color.YELLOW, "*****    9. Sleep 5 Seconds to wait for all components brought up *****");
     Thread.sleep(5000);
 
     String q1 = "select count(*) from airlineStats limit 1";
@@ -182,22 +194,5 @@ public class HybridQuickstart {
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000/query to play around in the query console");
-
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        try {
-          printStatus(Color.GREEN, "***** Shutting down hybrid quick start *****");
-          stream.shutdown();
-          Thread.sleep(2000);
-          runner.stop();
-          _kafkaStarter.stop();
-          ZkStarter.stopLocalZkServer(_zookeeperInstance);
-          FileUtils.deleteDirectory(quickstartTmpDir);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-      }
-    });
   }
 }

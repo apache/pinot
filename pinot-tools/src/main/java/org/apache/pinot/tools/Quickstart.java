@@ -165,25 +165,21 @@ public class Quickstart {
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        printStatus(Color.GREEN, "***** Shutting down offline quick start *****");
+        runner.stop();
+        FileUtils.deleteDirectory(quickstartTmpDir);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }));
     printStatus(Color.CYAN, "***** Adding baseballStats table *****");
     runner.addTable();
     printStatus(Color.CYAN, "***** Launch data ingestion job to build index segment for baseballStats and push to controller *****");
     runner.launchDataIngestionJob();
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
     Thread.sleep(5000);
-
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        try {
-          printStatus(Color.GREEN, "***** Shutting down offline quick start *****");
-          runner.stop();
-          FileUtils.deleteDirectory(quickstartTmpDir);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-      }
-    });
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
