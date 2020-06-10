@@ -23,8 +23,8 @@ java -version
 
 # Check ThirdEye related changes
 DIFF_URL=$(jq -r ".pull_request.diff_url" "${GITHUB_EVENT_PATH}")
-curl -L ${DIFF_URL} |grep -E 'diff --git'
-curl -L ${DIFF_URL} |grep -E 'diff --git' |grep -E '( a/thirdeye)|( b/thirdeye)'
+curl -L ${DIFF_URL} |grep -E '^diff --git'
+curl -L ${DIFF_URL} |grep -E '^diff --git' |grep -E '( a/thirdeye)|( b/thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'ThirdEye changes.'
 
