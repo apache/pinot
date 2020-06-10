@@ -225,32 +225,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     }
     for (int i = 0; i < _elseThenStatements.size(); i++) {
       TransformFunction transformFunction = _elseThenStatements.get(i);
-      FieldSpec.DataType dataType = transformFunction.getResultMetadata().getDataType();
       int blockNumDocs = projectionBlock.getNumDocs();
-      int[] evalInts;
-      if (dataType == FieldSpec.DataType.INT) {
-        evalInts = transformFunction.transformToIntValuesSV(projectionBlock);
-      } else {
-        evalInts = new int[blockNumDocs];
-        switch (dataType) {
-          case LONG:
-            ArrayCopyUtils.copy(transformFunction.transformToLongValuesSV(projectionBlock), evalInts, blockNumDocs);
-            break;
-          case FLOAT:
-            ArrayCopyUtils.copy(transformFunction.transformToFloatValuesSV(projectionBlock), evalInts, blockNumDocs);
-            break;
-          case DOUBLE:
-            ArrayCopyUtils.copy(transformFunction.transformToDoubleValuesSV(projectionBlock), evalInts, blockNumDocs);
-            break;
-          case STRING:
-            ArrayCopyUtils.copy(transformFunction.transformToStringValuesSV(projectionBlock), evalInts, blockNumDocs);
-            break;
-          default:
-            throw new IllegalStateException(String
-                .format("Cannot convert result type [%s] to [INT] for transform function [%s]", dataType,
-                    transformFunction));
-        }
-      }
+      int[] evalInts = transformFunction.transformToIntValuesSV(projectionBlock);
       for (int j = 0; j < blockNumDocs; j++) {
         if (selected[j] == i) {
           _intResults[j] = evalInts[j];
@@ -278,24 +254,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
         evalLongs = transformFunction.transformToLongValuesSV(projectionBlock);
       } else {
         evalLongs = new long[blockNumDocs];
-        switch (dataType) {
-          case INT:
-            ArrayCopyUtils.copy(transformFunction.transformToIntValuesSV(projectionBlock), evalLongs, blockNumDocs);
-            break;
-          case FLOAT:
-            ArrayCopyUtils.copy(transformFunction.transformToFloatValuesSV(projectionBlock), evalLongs, blockNumDocs);
-            break;
-          case DOUBLE:
-            ArrayCopyUtils.copy(transformFunction.transformToDoubleValuesSV(projectionBlock), evalLongs, blockNumDocs);
-            break;
-          case STRING:
-            ArrayCopyUtils.copy(transformFunction.transformToStringValuesSV(projectionBlock), evalLongs, blockNumDocs);
-            break;
-          default:
-            throw new IllegalStateException(String
-                .format("Cannot convert result type [%s] to [LONG] for transform function [%s]", dataType,
-                    transformFunction));
-        }
+        // dataType can only be INT
+        ArrayCopyUtils.copy(transformFunction.transformToIntValuesSV(projectionBlock), evalLongs, blockNumDocs);
       }
       for (int j = 0; j < blockNumDocs; j++) {
         if (selected[j] == i) {
@@ -324,24 +284,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
         evalFloats = transformFunction.transformToFloatValuesSV(projectionBlock);
       } else {
         evalFloats = new float[blockNumDocs];
-        switch (dataType) {
-          case INT:
-            ArrayCopyUtils.copy(transformFunction.transformToIntValuesSV(projectionBlock), evalFloats, blockNumDocs);
-            break;
-          case LONG:
-            ArrayCopyUtils.copy(transformFunction.transformToLongValuesSV(projectionBlock), evalFloats, blockNumDocs);
-            break;
-          case DOUBLE:
-            ArrayCopyUtils.copy(transformFunction.transformToDoubleValuesSV(projectionBlock), evalFloats, blockNumDocs);
-            break;
-          case STRING:
-            ArrayCopyUtils.copy(transformFunction.transformToStringValuesSV(projectionBlock), evalFloats, blockNumDocs);
-            break;
-          default:
-            throw new IllegalStateException(String
-                .format("Cannot convert result type [%s] to [FLOAT] for transform function [%s]", dataType,
-                    transformFunction));
-        }
+        // dataType can only be INT
+        ArrayCopyUtils.copy(transformFunction.transformToIntValuesSV(projectionBlock), evalFloats, blockNumDocs);
       }
       for (int j = 0; j < blockNumDocs; j++) {
         if (selected[j] == i) {
@@ -379,10 +323,6 @@ public class CaseTransformFunction extends BaseTransformFunction {
             break;
           case FLOAT:
             ArrayCopyUtils.copy(transformFunction.transformToFloatValuesSV(projectionBlock), evalDoubles, blockNumDocs);
-            break;
-          case STRING:
-            ArrayCopyUtils
-                .copy(transformFunction.transformToStringValuesSV(projectionBlock), evalDoubles, blockNumDocs);
             break;
           default:
             throw new IllegalStateException(String
