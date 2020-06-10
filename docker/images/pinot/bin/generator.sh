@@ -20,35 +20,42 @@
 
 JAR_PATH="$(find /opt/pinot/lib/pinot-all-*-jar-with-dependencies.jar)"
 ADMIN_PATH="/opt/pinot/bin/pinot-admin.sh"
-TEMPLATE_BASEDIR="/tmp/pinotGenerator/generator"
-TEMP_DIR="/tmp/pinotGenerator"
+TEMP_DIR=$(mktemp -d -t pinotGenerator-XXXXXXXX)
+TEMPLATE_BASEDIR="$TEMP_DIR/generator"
 
-if [ -z "$1" ]; then
+TEMPLATE_NAME="$1"
+if [ -z "$TEMPLATE_NAME" ]; then
   echo "No template name specified. Aborting."
   exit 1
 fi
 
-TEMPLATE_NAME="$1"
+TABLE_NAME="$2"
+if [ -z "$TABLE_NAME" ]; then
+  echo "No table name specified. Defaulting to '$TEMPLATE_NAME'"
+  TABLE_NAME=$TEMPLATE_NAME
+fi
+
 DATA_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}"
 SEGMENT_DIR="${TEMP_DIR:?}/${TEMPLATE_NAME}Segment"
 
-echo "Preparing temp directory for ${TEMPLATE_NAME}"
-rm -rf "${DATA_DIR}"
-rm -rf "${SEGMENT_DIR}"
-mkdir -p "${TEMP_DIR}"
-
-echo "Extracting template files"
+echo "Extracting template files to '${TEMP_DIR}'"
 /bin/sh -c "cd \"${TEMP_DIR}\" && jar -xf \"${JAR_PATH}\" \"generator/${TEMPLATE_NAME}_schema.json\" \"generator/${TEMPLATE_NAME}_config.json\" \"generator/${TEMPLATE_NAME}_generator.json\""
+
+echo "Setting table name and schema name to $TABLE_NAME"
+sed -i -e "s/\"tableName\": \"$TEMPLATE_NAME\"/\"tableName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json"
+sed -i -e "s/\"schemaName\": \"$TEMPLATE_NAME\"/\"schemaName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json"
+sed -i -e "s/\"schemaName\": \"$TEMPLATE_NAME\"/\"schemaName\": \"$TABLE_NAME\"/g" "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json"
 
 echo "Generating data for ${TEMPLATE_NAME} in ${DATA_DIR}"
 ${ADMIN_PATH} GenerateData \
--numFiles 1 -numRecords 354780  -format csv \
+-numFiles 1 -numRecords 631152  -format csv \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -schemaAnnotationFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_generator.json" \
 -outDir "$DATA_DIR"
 
 if [ ! -d "${DATA_DIR}" ]; then
   echo "Data generation failed. Aborting."
+  rm -rf "$TEMP_DIR"
   exit 1
 fi
 
@@ -58,21 +65,25 @@ ${ADMIN_PATH} CreateSegment \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" \
 -dataDir "${DATA_DIR}" \
--outDir "${SEGMENT_DIR}" || exit 1
+-outDir "${SEGMENT_DIR}"
 
 if [ ! -d "${SEGMENT_DIR}" ]; then
   echo "Data generation failed. Aborting."
+  rm -rf "$TEMP_DIR"
   exit 1
 fi
 
-echo "Adding table ${TEMPLATE_NAME}"
+echo "Adding table ${TABLE_NAME} from template ${TEMPLATE_NAME}"
 ${ADMIN_PATH} AddTable -exec \
 -tableConfigFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_config.json" \
 -schemaFile "${TEMPLATE_BASEDIR}/${TEMPLATE_NAME}_schema.json" || exit 1
 
 echo "Uploading segment for ${TEMPLATE_NAME}"
 ${ADMIN_PATH} UploadSegment \
--tableName "${TEMPLATE_NAME}" \
--segmentDir "${SEGMENT_DIR}" || exit 1
+-tableName "${TABLE_NAME}" \
+-segmentDir "${SEGMENT_DIR}"
 
-echo "Succesfully applied template ${TEMPLATE_NAME}"
+echo "Deleting temp directory"
+rm -rf "$TEMP_DIR"
+
+echo "Succesfully created table ${TABLE_NAME} from template ${TEMPLATE_NAME}"
