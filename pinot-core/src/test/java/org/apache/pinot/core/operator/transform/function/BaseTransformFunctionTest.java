@@ -160,6 +160,21 @@ public abstract class BaseTransformFunctionTest {
         new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
   }
 
+  protected void testTransformFunction(TransformFunction transformFunction, int[] expectedValues) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(intValues[i], expectedValues[i]);
+      Assert.assertEquals(longValues[i], expectedValues[i]);
+      Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
+      Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
+      Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
+    }
+  }
+
   protected void testTransformFunction(TransformFunction transformFunction, double[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);

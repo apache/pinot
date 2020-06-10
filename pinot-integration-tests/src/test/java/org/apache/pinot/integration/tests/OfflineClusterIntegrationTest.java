@@ -91,6 +91,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
       new ArrayList<>(getNumBrokers() + getNumServers());
+  private String _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
 
   protected int getNumBrokers() {
     return NUM_BROKERS;
@@ -99,8 +100,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   protected int getNumServers() {
     return NUM_SERVERS;
   }
-
-  private String _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
 
   @Override
   protected String getSchemaFileName() {
@@ -747,6 +746,85 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         .format("SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') BETWEEN %d AND %d",
             secondsSinceEpoch - 100, secondsSinceEpoch);
     assertEquals(postQuery(pqlQuery).get("aggregationResults").get(0).get("value").asLong(), expectedResult);
+  }
+
+  @Test
+  public void testCaseStatementInSelection()
+      throws Exception {
+    List<String> origins = Arrays
+        .asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP",
+            "CLT", "LGA", "DTW", "JFK", "BWI");
+    String whenThenStatement = "";
+    for (int i = 0; i < origins.size(); i++) {
+      // WHEN origin = 'ATL' THEN 1
+      // WHEN origin = 'ORD' THEN 2
+      // WHEN origin = 'DFW' THEN 3
+      // ....
+      whenThenStatement += String.format("WHEN origin = '%s' THEN %d ", origins.get(i), i + 1);
+    }
+    String sqlQuery = String.format(
+        "SELECT origin, " + "CASE " + whenThenStatement + "ELSE 0 END " + "AS origin_code " + "FROM mytable "
+            + "LIMIT 1000");
+    JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(response.get("exceptions").size(), 0);
+    for (int i = 0; i < rows.size(); i++) {
+      String origin = rows.get(i).get(0).asText();
+      int originCode = rows.get(i).get(1).asInt();
+      if (originCode > 0) {
+        assertEquals(origin, origins.get(originCode - 1));
+      } else {
+        assertTrue(!origins.contains(origin));
+      }
+    }
+  }
+
+  @Test
+  public void testCaseStatementInSelectionWithTransformFunctionInThen()
+      throws Exception {
+    String sqlQuery = String.format(
+        "SELECT ArrDelay, CASE WHEN ArrDelay > 0 THEN ArrDelay WHEN ArrDelay < 0 THEN ArrDelay * -1 ELSE 0 END AS ArrTimeDiff FROM mytable LIMIT 1000");
+    JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    System.out.println("response = " + response);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(response.get("exceptions").size(), 0);
+    for (int i = 0; i < rows.size(); i++) {
+      int arrDelay = rows.get(i).get(0).asInt();
+      int arrDelayDiff = rows.get(i).get(1).asInt();
+      if (arrDelay > 0) {
+        assertEquals(arrDelay, arrDelayDiff);
+      } else {
+        assertEquals(arrDelay, arrDelayDiff * -1);
+      }
+    }
+  }
+
+  @Test
+  public void testCaseStatementWithInAggregation()
+      throws Exception {
+    testCountVsCaseQuery("origin = 'ATL'");
+    testCountVsCaseQuery("origin <> 'ATL'");
+
+    testCountVsCaseQuery("DaysSinceEpoch > 16312");
+    testCountVsCaseQuery("DaysSinceEpoch >= 16312");
+    testCountVsCaseQuery("DaysSinceEpoch < 16312");
+    testCountVsCaseQuery("DaysSinceEpoch <= 16312");
+    testCountVsCaseQuery("DaysSinceEpoch = 16312");
+    testCountVsCaseQuery("DaysSinceEpoch <> 16312");
+  }
+
+  private void testCountVsCaseQuery(String predicate)
+      throws Exception {
+    // System.out.println("predicate = " + predicate);
+    String sqlQuery = String.format("SELECT COUNT(*) FROM mytable WHERE %s", predicate);
+    JsonNode response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    // System.out.println(String.format("query = %s, response = %s",sqlQuery, response));
+    long countValue = response.get("resultTable").get("rows").get(0).get(0).asLong();
+    sqlQuery = String.format("SELECT SUM(CASE WHEN %s THEN 1 ELSE 0 END) as sum1 FROM mytable", predicate);
+    response = postSqlQuery(sqlQuery, _brokerBaseApiUrl);
+    // System.out.println(String.format("query = %s, response = %s",sqlQuery, response));
+    long caseSum = response.get("resultTable").get("rows").get(0).get(0).asLong();
+    assertEquals(caseSum, countValue);
   }
 
   @Test

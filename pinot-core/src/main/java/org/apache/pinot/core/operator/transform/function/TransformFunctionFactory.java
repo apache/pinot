@@ -76,6 +76,15 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase(), ArrayLengthTransformFunction.class);
           put(TransformFunctionType.VALUEIN.getName().toLowerCase(), ValueInTransformFunction.class);
           put(TransformFunctionType.MAPVALUE.getName().toLowerCase(), MapValueTransformFunction.class);
+
+          put(TransformFunctionType.CASE.getName().toLowerCase(), CaseTransformFunction.class);
+
+          put(TransformFunctionType.EQUALS.getName().toLowerCase(), EqualsTransformFunction.class);
+          put(TransformFunctionType.NOT_EQUALS.getName().toLowerCase(), NotEqualsTransformFunction.class);
+          put(TransformFunctionType.GREATER_THAN.getName().toLowerCase(), GreaterThanTransformFunction.class);
+          put(TransformFunctionType.GREATER_THAN_OR_EQUAL.getName().toLowerCase(), GreaterThanOrEqualTransformFunction.class);
+          put(TransformFunctionType.LESS_THAN.getName().toLowerCase(), LessThanTransformFunction.class);
+          put(TransformFunctionType.LESS_THAN_OR_EQUAL.getName().toLowerCase(), LessThanOrEqualTransformFunction.class);
         }
       };
 
