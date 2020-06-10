@@ -44,17 +44,9 @@ if [ $? -eq 0 ]; then
   fi
 fi
 
-passed=0
-
 # Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
-  mvn test -B -P travis,travis-integration-tests-only
-  if [ $? -eq 0 ]; then
-    passed=1
-  fi
+  mvn test -B -P travis,travis-integration-tests-only && exit 0 || exit 1
 else
-  mvn test -B -P travis,travis-no-integration-tests
-  if [ $? -eq 0 ]; then
-    passed=1
-  fi
+  mvn test -B -P travis,travis-no-integration-tests && exit 0 || exit 1
 fi
