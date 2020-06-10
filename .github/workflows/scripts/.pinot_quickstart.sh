@@ -27,13 +27,15 @@ cat "${GITHUB_EVENT_PATH}"
 java -version
 
 # Check ThirdEye related changes
-COMMIT_BEFORE=$(jq -r ".before" "${GITHUB_EVENT_PATH}")
-COMMIT_AFTER=$(jq -r ".after" "${GITHUB_EVENT_PATH}")
+COMMIT_BEFORE=$(jq -r ".pull_request.base.sha" "${GITHUB_EVENT_PATH}")
+COMMIT_AFTER=$(jq -r ".pull_request.head.sha" "${GITHUB_EVENT_PATH}")
+COMMIT_MERGE=$(jq -r ".merge_commit_sha" "${GITHUB_EVENT_PATH}")
 
 git fetch
 
 git log  "${COMMIT_BEFORE}"
 git log  "${COMMIT_AFTER}"
+git log  "${COMMIT_MERGE}"
 
 git diff --name-only "${COMMIT_BEFORE}" "${COMMIT_AFTER}" | grep -E '^(thirdeye)'
 if [ $? -eq 0 ]; then
