@@ -29,7 +29,7 @@ java -version
 # Check ThirdEye related changes
 COMMIT_BEFORE=$(jq -r ".pull_request.base.sha" "${GITHUB_EVENT_PATH}")
 COMMIT_AFTER=$(jq -r ".pull_request.head.sha" "${GITHUB_EVENT_PATH}")
-COMMIT_MERGE=$(jq -r ".pull_request.head.merge_commit_sha" "${GITHUB_EVENT_PATH}")
+COMMIT_MERGE=$(jq -r ".pull_request.base.head.merge_commit_sha" "${GITHUB_EVENT_PATH}")
 
 git fetch
 
