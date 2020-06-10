@@ -26,30 +26,25 @@ java -version
 
 # Check ThirdEye related changes
 DIFF_URL=$(jq -r ".pull_request.diff_url" "${GITHUB_EVENT_PATH}")
-echo ${DIFF_URL}
-curl ${DIFF_URL} |grep "diff --git"
-curl ${DIFF_URL} |grep "diff --git" | grep -E '^(thirdeye)'
+curl ${DIFF_URL} 
+curl ${DIFF_URL} |grep -E 'diff --git'
+curl ${DIFF_URL} |grep -E 'diff --git' | grep -E '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'Skip ThirdEye tests for Quickstart'
   exit 0
 fi
 
 # Build
-PASS=1
+PASS=0
 for i in $(seq 1 5)
 do
-  if [ "${PASS}" -eq 0 ]; then
-    break;
-  fi
   mvn clean install -B -DskipTests=true -Pbin-dist -Dmaven.javadoc.skip=true
   if [ $? -eq 0 ]; then
-    PASS=0
-  else
-    tail -1000 /tmp/mvn_build_log
     PASS=1
+    break;
   fi
 done
-if [ "${PASS}" != 0 ]; then
+if [ "${PASS}" != 1 ]; then
     exit 1;
 fi
 
