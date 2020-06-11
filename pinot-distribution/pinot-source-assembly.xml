@@ -48,6 +48,11 @@
 
         <!-- Do not include build files from docs -->
         <exclude>docs/_build/**</exclude>
+
+        <!-- Do not include docker, kubernetes, website related files -->
+        <exclude>kubernetes/**</exclude>
+        <exclude>docker/**</exclude>
+        <exclude>website/**</exclude>
       </excludes>
     </fileSet>
   </fileSets>
