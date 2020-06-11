@@ -138,6 +138,9 @@ public class ImmutableSegmentLoader {
               indexContainerMap, readMode);
     }
 
-    return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+    ImmutableSegmentImpl segment =
+        new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
+    LOGGER.info("Successfully loaded segment {} with readMode: {}", segmentName, readMode);
+    return segment;
   }
 }
