@@ -150,8 +150,7 @@ public class SegmentCompletionManager {
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
           // multiple instances of the FSM to be created for the same commit sequence at the same time.
           StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
-          // TODO Issue 5359: Pick the offset string from metadata
-          final StreamPartitionMsgOffset endOffset = factory.create(Long.toString(segmentMetadata.getEndOffset()));
+          final StreamPartitionMsgOffset endOffset = factory.create(segmentMetadata.getEndOffset());
           fsm = SegmentCompletionFSM
               .fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(), endOffset);
         } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
@@ -1156,10 +1155,10 @@ public class SegmentCompletionManager {
         return true;
       } else if (now > _maxTimeToPickWinnerMs || _commitStateMap.size() == numReplicasToLookFor()) {
         LOGGER.info("{}:Picking winner time={} size={}", _state, now - _startTimeMs, _commitStateMap.size());
-        StreamPartitionMsgOffset maxOffsetSoFar = _streamPartitionMsgOffsetFactory.createMinOffset();
+        StreamPartitionMsgOffset maxOffsetSoFar = null;
         String winnerSoFar = null;
         for (Map.Entry<String, StreamPartitionMsgOffset> entry : _commitStateMap.entrySet()) {
-          if (entry.getValue().compareTo(maxOffsetSoFar) > 0) {
+          if (maxOffsetSoFar == null || entry.getValue().compareTo(maxOffsetSoFar) > 0) {
             maxOffsetSoFar = entry.getValue();
             winnerSoFar = entry.getKey();
           }

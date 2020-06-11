@@ -19,7 +19,9 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.util.List;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 /**
@@ -50,7 +52,7 @@ public class FakeStreamMessageBatch implements MessageBatch<byte[]> {
     return _messageBytes.get(index).length;
   }
 
-  public long getNextStreamMessageOffsetAtIndex(int index) {
-    return _messageOffsets.get(index) + 1;
+  public StreamPartitionMsgOffset getNextStreamMessageOffsetAtIndex(int index) {
+    return new LongMsgOffset(_messageOffsets.get(index) + 1);
   }
 }

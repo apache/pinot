@@ -40,6 +40,7 @@ import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.Duration;
@@ -305,8 +306,8 @@ public class RetentionManagerTest {
   private LLCRealtimeSegmentZKMetadata createSegmentMetadata(int replicaCount, long segmentCreationTime) {
     LLCRealtimeSegmentZKMetadata segmentMetadata = new LLCRealtimeSegmentZKMetadata();
     segmentMetadata.setCreationTime(segmentCreationTime);
-    segmentMetadata.setStartOffset(0L);
-    segmentMetadata.setEndOffset(-1L);
+    segmentMetadata.setStartOffset(new LongMsgOffset(0L).toString());
+    segmentMetadata.setEndOffset(new LongMsgOffset(-1L).toString());
 
     segmentMetadata.setNumReplicas(replicaCount);
     return segmentMetadata;

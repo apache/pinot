@@ -24,6 +24,7 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 /**
@@ -41,8 +42,12 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
     return _numPartitions;
   }
 
-  @Override
   public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) throws TimeoutException {
+    throw new UnsupportedOperationException("This method is deprecated");
+  }
+
+  @Override
+  public StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) throws TimeoutException {
     if (offsetCriteria.isSmallest()) {
       return FakeStreamConfigUtils.getSmallestOffset();
     } else {

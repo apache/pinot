@@ -25,9 +25,11 @@ import kafka.api.FetchRequestBuilder;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +57,15 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
     _fetchRequestMinBytes = getkafkaLowLevelStreamConfig().getKafkaFetcherMinBytes();
   }
 
+  @Override
+  public synchronized MessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset,
+      StreamPartitionMsgOffset endMsgOffset, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    final long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
+    final long endOffset = (endMsgOffset == null) ? Long.MAX_VALUE : ((LongMsgOffset) endMsgOffset).getOffset();
+    return fetchMessages(startOffset, endOffset, timeoutMillis);
+  }
+
   /**
    * Fetch messages and the per-partition high watermark from Kafka between the specified offsets.
    *
@@ -66,7 +77,6 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
    * @return An iterable containing messages fetched from Kafka and their offsets, as well as the high watermark for
    * this partition.
    */
-  @Override
   public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
     // TODO Improve error handling

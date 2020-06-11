@@ -37,6 +37,10 @@ public interface StreamMetadataProvider extends Closeable {
    */
   int fetchPartitionCount(long timeoutMillis);
 
+  // Issue 5953 Retain this interface for 0.5.0, remove in 0.6.0
+  @Deprecated
+  long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+      throws java.util.concurrent.TimeoutException;
   /**
    * Fetches the offset for a given partition and offset criteria
    * @param offsetCriteria
@@ -44,6 +48,6 @@ public interface StreamMetadataProvider extends Closeable {
    * @return
    * @throws java.util.concurrent.TimeoutException
    */
-  long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+  StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
       throws java.util.concurrent.TimeoutException;
 }

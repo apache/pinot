@@ -457,7 +457,6 @@ public class SegmentCompletionProtocol {
       return _offset;
     }
 
-    // TODO Issue 5359 Make it a JsonProperty when we are ready to move the protocol
     // This method is called in the server when the controller responds with
     // CATCH_UP response to segmentConsumed() API.
     @JsonProperty(STREAM_PARTITION_MSG_OFFSET_KEY)

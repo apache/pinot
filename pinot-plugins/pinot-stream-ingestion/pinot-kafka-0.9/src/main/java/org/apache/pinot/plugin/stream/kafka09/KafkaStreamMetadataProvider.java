@@ -34,9 +34,11 @@ import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.TopicMetadataResponse;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.protocol.Errors;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,6 +145,11 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
     throw new TimeoutException();
   }
 
+  public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    throw new UnsupportedOperationException("The use of this method s not supported");
+  }
+
   /**
    * Fetches the numeric Kafka offset for this partition for a symbolic name ("largest" or "smallest").
    *
@@ -153,7 +160,7 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
    * @return An offset
    */
   @Override
-  public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+  public synchronized StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
       throws java.util.concurrent.TimeoutException {
     Preconditions.checkState(isPartitionProvided,
         "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
@@ -204,7 +211,7 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
           LOGGER.warn("Fetched offset of 0 for topic {} and partition {}, is this a newly created topic?", _topic,
               _partition);
         }
-        return offset;
+        return new LongMsgOffset(offset);
       } else if (errorCode == Errors.LEADER_NOT_AVAILABLE.code()) {
         // If there is no leader, it'll take some time for a new leader to be elected, wait 100 ms before retrying
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);

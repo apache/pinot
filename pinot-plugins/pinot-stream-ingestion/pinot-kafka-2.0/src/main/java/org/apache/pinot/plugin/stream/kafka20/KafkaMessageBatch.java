@@ -23,7 +23,9 @@ import java.util.List;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.MessageAndOffset;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 public class KafkaMessageBatch implements MessageBatch<byte[]> {
@@ -57,7 +59,7 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   }
 
   @Override
-  public long getNextStreamMessageOffsetAtIndex(int index) {
-    return messageList.get(index).getNextOffset();
+  public StreamPartitionMsgOffset getNextStreamMessageOffsetAtIndex(int index) {
+    return new LongMsgOffset(messageList.get(index).getNextOffset());
   }
 }

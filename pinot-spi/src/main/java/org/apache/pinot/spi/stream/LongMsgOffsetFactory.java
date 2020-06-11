@@ -32,14 +32,4 @@ public class LongMsgOffsetFactory implements StreamPartitionMsgOffsetFactory {
   public StreamPartitionMsgOffset create(StreamPartitionMsgOffset other) {
     return new LongMsgOffset(other);
   }
-
-  @Override
-  public StreamPartitionMsgOffset createMaxOffset() {
-    return new LongMsgOffset(Long.MAX_VALUE);
-  }
-
-  @Override
-  public StreamPartitionMsgOffset createMinOffset() {
-    return new LongMsgOffset(-1L);
-  }
 }

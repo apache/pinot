@@ -36,7 +36,7 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
   private final int _partitionId;
 
   private Exception _exception = null;
-  private long _offset = -1;
+  private StreamPartitionMsgOffset _offset;
   private StreamConsumerFactory _streamConsumerFactory;
   StreamConfig _streamConfig;
 
@@ -48,7 +48,7 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
     _topicName = streamConfig.getTopicName();
   }
 
-  public long getOffset() {
+  public StreamPartitionMsgOffset getOffset() {
     return _offset;
   }
 
@@ -68,7 +68,7 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
     try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory
         .createPartitionMetadataProvider(clientId, _partitionId)) {
       _offset =
-          streamMetadataProvider.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+          streamMetadataProvider.fetchStreamPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
       if (_exception != null) {
         LOGGER.info("Successfully retrieved offset({}) for stream topic {} partition {}", _offset, _topicName,
             _partitionId);

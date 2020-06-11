@@ -22,16 +22,28 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
 /**
- * An interface to be implemented by streams if the offset of message in a stream partition
- * is NOT a Long (or int) type.
- * TODO Document the methods after finalizing the interface (Issue 5359)
- * TODO Try to avoid createMaxOffset and createMinOffset methods. (Issue 5359)
+ * An interface to be implemented by streams that are consumed using Pinot LLC consumption.
  */
 @InterfaceStability.Evolving
 public interface StreamPartitionMsgOffsetFactory {
+  /**
+   * Initialization, called once when the factory is created.
+   * @param streamConfig
+   */
   void init(StreamConfig streamConfig);
+
+  /**
+   * Construct an offset from the string provided.
+   * @param offsetStr
+   * @return StreamPartitionMsgOffset
+   */
   StreamPartitionMsgOffset create(String offsetStr);
+
+  /**
+   * Construct an offset from another one provided, of the same type.
+   *
+   * @param other
+   * @return
+   */
   StreamPartitionMsgOffset create(StreamPartitionMsgOffset other);
-  StreamPartitionMsgOffset createMaxOffset(); // Create an offset that compares highest with all others
-  StreamPartitionMsgOffset createMinOffset(); // Create an offset that compares lowest with all others
 }

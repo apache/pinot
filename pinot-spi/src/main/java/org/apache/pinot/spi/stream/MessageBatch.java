@@ -70,5 +70,5 @@ public interface MessageBatch<T> {
    * @param index
    * @return
    */
-  long getNextStreamMessageOffsetAtIndex(int index);
+  StreamPartitionMsgOffset getNextStreamMessageOffsetAtIndex(int index);
 }

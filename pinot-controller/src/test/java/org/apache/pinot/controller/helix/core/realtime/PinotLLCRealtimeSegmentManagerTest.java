@@ -53,9 +53,11 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -77,7 +79,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
-  static final long PARTITION_OFFSET = RANDOM.nextInt(Integer.MAX_VALUE);
+  static final LongMsgOffset PARTITION_OFFSET = new LongMsgOffset(RANDOM.nextInt(Integer.MAX_VALUE));
   static final long CURRENT_TIME_MS = System.currentTimeMillis();
   static final long START_TIME_MS = CURRENT_TIME_MS - TimeUnit.HOURS.toMillis(RANDOM.nextInt(24) + 24);
   static final long END_TIME_MS = START_TIME_MS + TimeUnit.HOURS.toMillis(RANDOM.nextInt(24) + 1);
@@ -162,7 +164,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       LLCRealtimeSegmentZKMetadata segmentZKMetadata =
           segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName, null);
       assertEquals(segmentZKMetadata.getStatus(), Status.IN_PROGRESS);
-      assertEquals(segmentZKMetadata.getStartOffset(), PARTITION_OFFSET);
+      assertEquals(new LongMsgOffset(segmentZKMetadata.getStartOffset()).compareTo(PARTITION_OFFSET), 0);
       assertEquals(segmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
     }
   }
@@ -186,8 +188,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Commit a segment for partition 0
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(committingSegment, Long.toString(PARTITION_OFFSET + NUM_DOCS), 0L);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
+            new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
 
@@ -207,8 +209,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     LLCRealtimeSegmentZKMetadata committedSegmentZKMetadata =
         segmentManager._segmentZKMetadataMap.get(committingSegment);
     assertEquals(committedSegmentZKMetadata.getStatus(), Status.DONE);
-    assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET);
-    assertEquals(committedSegmentZKMetadata.getEndOffset(), PARTITION_OFFSET + NUM_DOCS);
+    assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
+    assertEquals(committedSegmentZKMetadata.getEndOffset(),
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString());
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
     assertEquals(committedSegmentZKMetadata.getTimeInterval(), INTERVAL);
     assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
@@ -218,14 +221,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
     LLCRealtimeSegmentZKMetadata consumingSegmentZKMetadata =
         segmentManager._segmentZKMetadataMap.get(consumingSegment);
     assertEquals(consumingSegmentZKMetadata.getStatus(), Status.IN_PROGRESS);
-    assertEquals(consumingSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET + NUM_DOCS);
+    assertEquals(consumingSegmentZKMetadata.getStartOffset(),
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString());
     assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
 
     // Turn one instance of the consuming segment OFFLINE and commit the segment
     consumingSegmentInstanceStateMap.entrySet().iterator().next().setValue(SegmentStateModel.OFFLINE);
     committingSegment = consumingSegment;
     committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
-        Long.toString(PARTITION_OFFSET + NUM_DOCS + NUM_DOCS), 0L);
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS + NUM_DOCS).toString(), 0L);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
 
@@ -275,8 +279,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // 2 partitions commit segment
     for (int partitionId = 0; partitionId < 2; partitionId++) {
       String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, CURRENT_TIME_MS).getSegmentName();
-      CommittingSegmentDescriptor committingSegmentDescriptor =
-          new CommittingSegmentDescriptor(segmentName, Long.toString(PARTITION_OFFSET + NUM_DOCS), 0L);
+      CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
+          new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
       segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     }
@@ -361,7 +365,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertTrue(segmentZKMetadataMap.containsKey(segmentName));
       LLCRealtimeSegmentZKMetadata segmentZKMetadata = segmentZKMetadataMap.get(segmentName);
       assertEquals(segmentZKMetadata.getStatus(), Status.IN_PROGRESS);
-      assertEquals(segmentZKMetadata.getStartOffset(), PARTITION_OFFSET);
+      assertEquals(segmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
       assertEquals(segmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
     }
   }
@@ -431,8 +435,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // 2 partitions commit segment
     for (int partitionId = 0; partitionId < 2; partitionId++) {
       String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, CURRENT_TIME_MS).getSegmentName();
-      CommittingSegmentDescriptor committingSegmentDescriptor =
-          new CommittingSegmentDescriptor(segmentName, Long.toString(PARTITION_OFFSET + NUM_DOCS), 0L);
+      CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
+          new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
       segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     }
@@ -473,8 +477,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       int sequenceNumber = partitionId == 0 ? 2 : 0;
       String segmentName =
           new LLCSegmentName(RAW_TABLE_NAME, partitionId, sequenceNumber, CURRENT_TIME_MS).getSegmentName();
-      CommittingSegmentDescriptor committingSegmentDescriptor =
-          new CommittingSegmentDescriptor(segmentName, Long.toString(PARTITION_OFFSET + NUM_DOCS), 0L);
+      CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
+          new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
       committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
       segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     }
@@ -617,7 +621,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         assertEquals(segmentZKMetadata.getStatus(), Status.DONE);
 
         // Verify segment start/end offset
-        assertEquals(segmentZKMetadata.getStartOffset(), PARTITION_OFFSET + i * (long) NUM_DOCS);
+        assertEquals(segmentZKMetadata.getStartOffset(),
+            new LongMsgOffset(PARTITION_OFFSET.getOffset() + i * (long) NUM_DOCS).toString());
         assertEquals(segmentZKMetadata.getEndOffset(),
             segmentManager._segmentZKMetadataMap.get(segments.get(i + 1)).getStartOffset());
       }
@@ -650,9 +655,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Commit a segment for partition 0
     String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(committingSegment, Long.toString(PARTITION_OFFSET + NUM_DOCS),
-            0L);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L);
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
 
     try {
@@ -681,9 +685,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     String segmentLocation = SCHEME + tableDir + "/" + segmentFileName;
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(segmentName, Long.toString(PARTITION_OFFSET), 0,
-            segmentLocation);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
+        PARTITION_OFFSET.toString(), 0, segmentLocation);
     segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     assertFalse(segmentFile.exists());
   }
@@ -707,9 +710,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     String segmentLocation = SCHEME + tableDir + "/" + segmentFileName;
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(segmentName, Long.toString(PARTITION_OFFSET), 0,
-            segmentLocation);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
+        PARTITION_OFFSET.toString(), 0, segmentLocation);
     segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     assertFalse(segmentFile.exists());
     assertFalse(extraSegmentFile.exists());
@@ -886,7 +888,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    long getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria, int partitionId) {
+    LongMsgOffset getPartitionOffset(StreamConfig streamConfig, OffsetCriteria offsetCriteria, int partitionId) {
       // The criteria for this test should always be SMALLEST (for default streaming config and new added partitions)
       assertTrue(offsetCriteria.isSmallest());
       return PARTITION_OFFSET;
