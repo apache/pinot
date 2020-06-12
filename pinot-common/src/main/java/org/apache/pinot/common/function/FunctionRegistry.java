@@ -34,7 +34,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Registry for in-built Pinot functions
+ * Registry for scalar functions.
+ * <p>TODO: Merge FunctionRegistry and FunctionDefinitionRegistry to provide one single registry for all functions.
  */
 public class FunctionRegistry {
   private FunctionRegistry() {
