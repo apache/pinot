@@ -506,6 +506,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
+  // TODO(xiangfu): Move Literal function computation here from Calcite Parser.
   private void computeResultsForExpression(Expression e, List<String> columnNames, List<DataSchema.ColumnDataType> columnTypes,
       List<Object> row) {
     if (e.getType() == ExpressionType.LITERAL) {
@@ -567,6 +568,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Fixes the case-insensitive column names to the actual column names in the given broker request.
    */
   private void handleCaseSensitivity(BrokerRequest brokerRequest) {
+    if (brokerRequest.getQuerySource() == null || brokerRequest.getQuerySource().getTableName() == null) {
+      return;
+    }
     String inputTableName = brokerRequest.getQuerySource().getTableName();
     String actualTableName = _tableCache.getActualTableName(inputTableName);
     brokerRequest.getQuerySource().setTableName(actualTableName);
