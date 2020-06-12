@@ -19,7 +19,8 @@
 package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
@@ -74,9 +75,11 @@ public class HelixSetupUtils {
       // Enable Auto-Join for the cluster
       HelixConfigScope configScope =
           new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
-      admin.setConfig(configScope, Collections.singletonMap(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, "true"));
-      admin.setConfig(configScope, Collections.singletonMap(ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.FALSE.toString()));
-      admin.setConfig(configScope, Collections.singletonMap(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.FALSE.toString()));
+      Map<String, String> configMap = new HashMap<>();
+      configMap.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, Boolean.toString(true));
+      configMap.put(ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(false));
+      configMap.put(CommonConstants.Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.toString(false));
+      admin.setConfig(configScope, configMap);
       LOGGER.info("New Helix cluster: {} created", helixClusterName);
     }
   }
