@@ -30,7 +30,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
@@ -47,6 +46,7 @@ import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.util.QueryOptions;
@@ -105,12 +105,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
     long requestId = queryRequest.getRequestId();
-    BrokerRequest brokerRequest = queryRequest.getBrokerRequest();
     String tableNameWithType = queryRequest.getTableNameWithType();
-    LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
+    QueryContext queryContext = queryRequest.getQueryContext();
+    LOGGER.debug("Incoming request Id: {}, query: {}", requestId, queryContext);
     // Use the timeout passed from the request if exists, or the instance-level timeout
     long queryTimeoutMs = _defaultTimeOutMs;
-    Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
     if (queryOptions != null) {
       Long timeoutFromQueryOptions = QueryOptions.getTimeoutMs(queryOptions);
       if (timeoutFromQueryOptions != null) {
@@ -195,7 +195,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
       LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
       if (numSegmentsMatchedAfterPruning == 0) {
-        dataTable = DataTableUtils.buildEmptyDataTable(brokerRequest);
+        dataTable = DataTableUtils.buildEmptyDataTable(queryContext.getBrokerRequest());
         Map<String, String> metadata = dataTable.getMetadata();
         metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(numTotalDocs));
         metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
@@ -205,8 +205,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         metadata.put(DataTable.NUM_SEGMENTS_MATCHED, "0");
       } else {
         TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-        Plan globalQueryPlan =
-            _planMaker.makeInterSegmentPlan(segmentDataManagers, brokerRequest, executorService, remainingTimeMs);
+        Plan globalQueryPlan = _planMaker
+            .makeInterSegmentPlan(segmentDataManagers, queryContext.getBrokerRequest(), executorService,
+                remainingTimeMs);
         planBuildTimer.stopAndRecord();
 
         if (PRINT_QUERY_PLAN) {

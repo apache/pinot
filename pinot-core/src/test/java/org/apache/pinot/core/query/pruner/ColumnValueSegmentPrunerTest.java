@@ -20,13 +20,13 @@ package org.apache.pinot.core.query.pruner;
 
 import java.util.Collections;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
@@ -119,9 +119,9 @@ public class ColumnValueSegmentPrunerTest {
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
     ServerQueryRequest queryRequest = mock(ServerQueryRequest.class);
-    when(queryRequest.getFilterQueryTree()).thenReturn(filterQueryTree);
+    when(queryRequest.getQueryContext()).thenReturn(queryContext);
     return PRUNER.prune(indexSegment, queryRequest);
   }
 }
