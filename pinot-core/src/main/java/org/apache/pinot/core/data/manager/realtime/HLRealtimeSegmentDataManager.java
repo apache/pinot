@@ -167,7 +167,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _resourceTmpDir.mkdirs();
     }
     // create and init stream level consumer
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.createConsumerFactory(_streamConfig);
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
     _streamLevelConsumer = streamConsumerFactory
         .createStreamLevelConsumer(clientId, _tableNameWithType, SchemaUtils.extractSourceFields(schema),

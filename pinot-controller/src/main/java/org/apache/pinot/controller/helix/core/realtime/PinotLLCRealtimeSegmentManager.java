@@ -508,7 +508,8 @@ public class PinotLLCRealtimeSegmentManager {
       int numPartitions, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
-    StreamPartitionMsgOffsetFactory offsetFactory = StreamConsumerFactoryProvider.createOffsetFactory(streamConfig);
+    StreamPartitionMsgOffsetFactory offsetFactory =
+        StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
     StreamPartitionMsgOffset startOffset = offsetFactory.create(committingSegmentDescriptor.getNextOffset());
     LOGGER
         .info("Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
@@ -830,7 +831,8 @@ public class PinotLLCRealtimeSegmentManager {
 
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
     long currentTimeMs = getCurrentTimeMs();
-    StreamPartitionMsgOffsetFactory offsetFactory = StreamConsumerFactoryProvider.createOffsetFactory(streamConfig);
+    StreamPartitionMsgOffsetFactory offsetFactory =
+        StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
 
     // Get the latest segment ZK metadata for each partition
     Map<Integer, LLCRealtimeSegmentZKMetadata> latestSegmentZKMetadataMap =

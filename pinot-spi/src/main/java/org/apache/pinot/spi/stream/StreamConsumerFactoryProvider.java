@@ -26,39 +26,14 @@ import org.apache.pinot.spi.plugin.PluginManager;
  */
 public abstract class StreamConsumerFactoryProvider {
   /**
-   * This method is here for backward compatibility with older stream implementations
-   * that support 'long' type offsets.
-   */
-  @Deprecated
-  public static StreamConsumerFactory create(StreamConfig streamConfig) {
-    return createConsumerFactory(streamConfig);
-  }
-
-  /**
    * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig::getConsumerFactoryClassName()} property and initializes it
    * @param streamConfig
    * @return
    */
-  public static StreamConsumerFactory createConsumerFactory(StreamConfig streamConfig) {
+  public static StreamConsumerFactory create(StreamConfig streamConfig) {
     StreamConsumerFactory factory = null;
     try {
       factory = PluginManager.get().createInstance(streamConfig.getConsumerFactoryClassName());
-    } catch (Exception e) {
-      ExceptionUtils.rethrow(e);
-    }
-    factory.init(streamConfig);
-    return factory;
-  }
-
-  /**
-   * Cronstructs the {@link StreamPartitionMsgOffsetFactory} using {@link StreamConfig::getPartitionOffsetFactoryClassName}
-   * and initializes it
-   * @param streamConfig
-   */
-  public static StreamPartitionMsgOffsetFactory createOffsetFactory(StreamConfig streamConfig) {
-    StreamPartitionMsgOffsetFactory factory = null;
-    try {
-      factory = PluginManager.get().createInstance(streamConfig.getPartitionOffsetFactoryClassName());
     } catch (Exception e) {
       ExceptionUtils.rethrow(e);
     }

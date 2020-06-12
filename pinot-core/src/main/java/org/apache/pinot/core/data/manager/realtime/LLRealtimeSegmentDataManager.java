@@ -1106,8 +1106,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _partitionLevelStreamConfig = new PartitionLevelStreamConfig(_tableNameWithType, indexingConfig.getStreamConfigs());
-    _streamConsumerFactory = StreamConsumerFactoryProvider.createConsumerFactory(_partitionLevelStreamConfig);
-    _streamPartitionMsgOffsetFactory = StreamConsumerFactoryProvider.createOffsetFactory(_partitionLevelStreamConfig);
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
+    _streamPartitionMsgOffsetFactory =
+        StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig).createStreamMsgOffsetFactory();
     _streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
