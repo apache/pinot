@@ -58,12 +58,12 @@ fi
 
 # Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != 'false' ]; then
-  mvn test -B -P travis,travis-integration-tests-only ${DEPLOY_BUILD_OPTS} ${KAFKA_BUILD_OPTS}
+  mvn test -B -P travis,integration-tests-only ${DEPLOY_BUILD_OPTS} ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi
 else
-  mvn test -B -P travis,travis-no-integration-tests ${DEPLOY_BUILD_OPTS} ${KAFKA_BUILD_OPTS}
+  mvn test -B -P travis,no-integration-tests ${DEPLOY_BUILD_OPTS} ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi
