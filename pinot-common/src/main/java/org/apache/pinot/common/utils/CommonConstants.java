@@ -40,7 +40,9 @@ public class CommonConstants {
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
 
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
-    public static final String ENABLE_CASE_INSENSITIVE_PQL_KEY = "enable.case.insensitive.pql";
+
+    public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
+    public static final String DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive.pql";
 
     // More information on why these numbers are set can be found in the following doc:
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot

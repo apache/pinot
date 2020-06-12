@@ -184,7 +184,7 @@ public abstract class ControllerTest {
         break;
     }
     //enable case insensitive pql for test cases.
-    configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.TRUE.toString());
+    configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
   }
 
   protected ControllerStarter getControllerStarter(ControllerConf config) {

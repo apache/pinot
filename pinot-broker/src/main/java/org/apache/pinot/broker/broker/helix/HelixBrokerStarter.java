@@ -21,6 +21,7 @@ package org.apache.pinot.broker.broker.helix;
 import com.google.common.collect.ImmutableList;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -188,11 +189,16 @@ public class HelixBrokerStarter implements ServiceStartable {
     ConfigAccessor configAccessor = _spectatorHelixManager.getConfigAccessor();
     HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
-    String enableCaseInsensitivePql = configAccessor.get(helixConfigScope, Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY);
-    _brokerConf.setProperty(Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.valueOf(enableCaseInsensitivePql));
-    String enableQueryLimitOverride =
-        configAccessor.get(helixConfigScope, Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE);
-    _brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Boolean.valueOf(enableQueryLimitOverride));
+    Map<String, String> configMap = configAccessor.get(helixConfigScope, Arrays
+        .asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY,
+            Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE));
+    if (Boolean.parseBoolean(configMap.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
+        .parseBoolean(configMap.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY))) {
+      _brokerConf.setProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, true);
+    }
+    if (Boolean.parseBoolean(configMap.get(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE))) {
+      _brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, true);
+    }
 
     LOGGER.info("Setting up broker request handler");
     // Set up metric registry and broker metrics
