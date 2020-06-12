@@ -48,6 +48,9 @@ public interface StreamMetadataProvider extends Closeable {
    * @return
    * @throws java.util.concurrent.TimeoutException
    */
-  StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
-      throws java.util.concurrent.TimeoutException;
+  default StreamPartitionMsgOffset fetchStreamPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    long offset = fetchPartitionOffset(offsetCriteria, timeoutMillis);
+    return new LongMsgOffset(offset);
+  }
 }

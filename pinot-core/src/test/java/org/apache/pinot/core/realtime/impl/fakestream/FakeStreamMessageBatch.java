@@ -52,7 +52,11 @@ public class FakeStreamMessageBatch implements MessageBatch<byte[]> {
     return _messageBytes.get(index).length;
   }
 
-  public StreamPartitionMsgOffset getNextStreamMessageOffsetAtIndex(int index) {
+  public long getNextStreamMessageOffsetAtIndex(int index) {
+    throw new UnsupportedOperationException("This method is deprecated");
+  }
+
+  public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(_messageOffsets.get(index) + 1);
   }
 }

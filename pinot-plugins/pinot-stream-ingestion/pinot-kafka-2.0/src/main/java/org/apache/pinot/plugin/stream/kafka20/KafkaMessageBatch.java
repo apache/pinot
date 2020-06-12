@@ -59,7 +59,12 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   }
 
   @Override
-  public StreamPartitionMsgOffset getNextStreamMessageOffsetAtIndex(int index) {
+  public long getNextStreamMessageOffsetAtIndex(int index) {
+    throw new UnsupportedOperationException("This method is deprecated");
+  }
+
+  @Override
+  public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(messageList.get(index).getNextOffset());
   }
 }
