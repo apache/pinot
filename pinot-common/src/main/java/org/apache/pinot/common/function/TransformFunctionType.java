@@ -54,7 +54,10 @@ public enum TransformFunctionType {
   DATETRUNC("dateTrunc"),
   ARRAYLENGTH("arrayLength"),
   VALUEIN("valueIn"),
-  MAPVALUE("mapValue");
+  MAPVALUE("mapValue"),
+
+  // Special type for annotation based scalar functions
+  SCALAR("scalar");
 
   private final String _name;
 
@@ -70,6 +73,9 @@ public enum TransformFunctionType {
     try {
       return TransformFunctionType.valueOf(upperCaseFunctionName);
     } catch (Exception e) {
+      if (FunctionRegistry.getFunctionByName(functionName) != null) {
+        return SCALAR;
+      }
       // Support function name of both jsonExtractScalar and json_extract_scalar
       if (upperCaseFunctionName.contains("_")) {
         return getTransformFunctionType(upperCaseFunctionName.replace("_", ""));
