@@ -196,6 +196,37 @@ public class AnomaliesResource {
     return anomaliesWrapper;
   }
 
+  /**
+   * Find anomalies by anomaly ids
+   * @param startTime
+   * @param endTime
+   * @param anomalyIdsString
+   * @return
+   * @throws Exception
+   */
+  @GET
+  @Path("search/anomalyIds/{startTime}/{endTime}/{pageNumber}")
+  public AnomaliesWrapper getAnomaliesByAnomalyIds(
+      @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime,
+      @PathParam("pageNumber") int pageNumber,
+      @QueryParam("anomalyIds") String anomalyIdsString,
+      @QueryParam("searchFilters") String searchFiltersJSON,
+      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
+
+    String[] anomalyIds = anomalyIdsString.split(",");
+    List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
+    for (String id : anomalyIds) {
+      Long anomalyId = Long.valueOf(id);
+      MergedAnomalyResultDTO anomaly = mergedAnomalyResultDAO.findById(anomalyId);
+      if (anomaly != null) {
+        mergedAnomalies.add(anomaly);
+      }
+    }
+    AnomaliesWrapper
+        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
+    return anomaliesWrapper;
+  }
   // ----------- HELPER FUNCTIONS
 
   /**
