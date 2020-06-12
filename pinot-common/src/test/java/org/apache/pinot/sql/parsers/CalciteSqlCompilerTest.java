@@ -144,7 +144,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testFilterCaluses() {
+  public void testFilterClauses() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where a > 1.5");
     Function func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN.name());
@@ -192,7 +192,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testFilterCalusesWithRightExpression() {
+  public void testFilterClausesWithRightExpression() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where a > b");
     Function func = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(func.getOperator(), SqlKind.GREATER_THAN.name());
@@ -371,7 +371,7 @@ public class CalciteSqlCompilerTest {
     BrokerRequest tempBrokerRequest = converter.convert(pinotQuery);
     Assert.assertEquals(tempBrokerRequest.getQuerySource().getTableName(), "mytable");
     Assert.assertEquals(tempBrokerRequest.getSelections().getSelectionColumns().get(0),
-        literal.getFieldValue().toString());
+        String.format("'%s'", literal.getFieldValue().toString()));
   }
 
   @Test
@@ -1603,7 +1603,7 @@ public class CalciteSqlCompilerTest {
     Function greaterThan = pinotQuery.getFilterExpression().getFunctionCall();
     String today = greaterThan.getOperands().get(1).getLiteral().getStringValue();
     String expectedTodayStr =
-        "'" + Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z")) + "'";
+        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
     Assert.assertEquals(today, expectedTodayStr);
   }
 
@@ -1626,7 +1626,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertTrue(expression.getLiteral() != null);
     String today = expression.getLiteral().getStringValue();
     String expectedTodayStr =
-        "'" + Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z")) + "'";
+        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
     Assert.assertEquals(today, expectedTodayStr);
     expression = CalciteSqlParser.compileToExpression("toDateTime(playerName)");
     Assert.assertTrue(expression.getFunctionCall() != null);
@@ -1644,7 +1644,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertTrue(expression.getFunctionCall() != null);
     expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);
     Assert.assertTrue(expression.getLiteral() != null);
-    Assert.assertEquals(expression.getLiteral().getFieldValue(), "'emaNreyalp'");
+    Assert.assertEquals(expression.getLiteral().getFieldValue(), "emaNreyalp");
     expression = CalciteSqlParser.compileToExpression("count(*)");
     Assert.assertTrue(expression.getFunctionCall() != null);
     expression = CalciteSqlParser.invokeCompileTimeFunctionExpression(expression);

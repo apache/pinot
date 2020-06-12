@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ZNRecord;
@@ -55,23 +56,30 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -183,6 +191,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestStatistics.setErrorCode(QueryException.PQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
+    }
+    if (isLiteralOnlyQuery(brokerRequest)) {
+      LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
+      try {
+        BrokerResponse brokerResponse =
+            processLiteralOnlyBrokerRequest(brokerRequest, compilationStartTimeNs, requestStatistics);
+        return brokerResponse;
+      } catch (Exception e) {
+        // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
+        LOGGER.warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId,
+            query, e.getMessage());
+      }
     }
     String tableName = brokerRequest.getQuerySource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -436,9 +456,121 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Check if a SQL parsed BrokerRequest is a literal only query.
+   * @param brokerRequest
+   * @return true if this query selects only Literals
+   *
+   */
+  @VisibleForTesting
+  static boolean isLiteralOnlyQuery(BrokerRequest brokerRequest) {
+    if (brokerRequest.getPinotQuery() != null) {
+      for (Expression e: brokerRequest.getPinotQuery().getSelectList()) {
+        if (!CalciteSqlParser.isLiteralOnlyExpression(e)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Compute BrokerResponse for literal only query.
+   *
+   * @param brokerRequest
+   * @param compilationStartTimeNs
+   * @param requestStatistics
+   * @return BrokerResponse
+   */
+  private BrokerResponse processLiteralOnlyBrokerRequest(BrokerRequest brokerRequest, long compilationStartTimeNs,
+      RequestStatistics requestStatistics)
+      throws IllegalStateException {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    List<String> columnNames = new ArrayList<>();
+    List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>();
+    List<Object> row = new ArrayList<>();
+    for (Expression e : brokerRequest.getPinotQuery().getSelectList()) {
+      computeResultsForExpression(e, columnNames, columnTypes, row);
+    }
+    DataSchema dataSchema =
+        new DataSchema(columnNames.toArray(new String[0]), columnTypes.toArray(new DataSchema.ColumnDataType[0]));
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(row.toArray());
+    ResultTable resultTable = new ResultTable(dataSchema, rows);
+    brokerResponse.setResultTable(resultTable);
+
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
+    brokerResponse.setTimeUsedMs(totalTimeMs);
+    requestStatistics.setQueryProcessingTime(totalTimeMs);
+    requestStatistics.setStatistics(brokerResponse);
+    return brokerResponse;
+  }
+
+  // TODO(xiangfu): Move Literal function computation here from Calcite Parser.
+  private void computeResultsForExpression(Expression e, List<String> columnNames, List<DataSchema.ColumnDataType> columnTypes,
+      List<Object> row) {
+    if (e.getType() == ExpressionType.LITERAL) {
+      computeResultsForLiteral(e.getLiteral(), columnNames, columnTypes, row);
+    }
+    if (e.getType() == ExpressionType.FUNCTION) {
+      if (e.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+        String columnName = e.getFunctionCall().getOperands().get(1).getIdentifier().getName();
+        computeResultsForExpression(e.getFunctionCall().getOperands().get(0), columnNames, columnTypes, row);
+        columnNames.set(columnNames.size() - 1, columnName);
+      } else {
+        throw new IllegalStateException(
+            "No able to compute results for function - " + e.getFunctionCall().getOperator());
+      }
+    }
+  }
+
+  private void computeResultsForLiteral(Literal literal, List<String> columnNames, List<DataSchema.ColumnDataType> columnTypes,
+      List<Object> row) {
+    Object fieldValue = literal.getFieldValue();
+    columnNames.add(fieldValue.toString());
+    switch (literal.getSetField()) {
+      case BOOL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.STRING);
+        row.add(new Boolean(literal.getBoolValue()).toString());
+        break;
+      case BYTE_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.INT);
+        row.add((int)literal.getByteValue());
+        break;
+      case SHORT_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.INT);
+        row.add((int) literal.getShortValue());
+        break;
+      case INT_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.INT);
+        row.add(literal.getIntValue());
+        break;
+      case LONG_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.LONG);
+        row.add(literal.getLongValue());
+        break;
+      case DOUBLE_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.DOUBLE);
+        row.add(literal.getDoubleValue());
+        break;
+      case STRING_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.STRING);
+        row.add(literal.getStringValue());
+        break;
+      case BINARY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.BYTES);
+        row.add(BytesUtils.toHexString(literal.getBinaryValue()));
+        break;
+    }
+  }
+
+  /**
    * Fixes the case-insensitive column names to the actual column names in the given broker request.
    */
   private void handleCaseSensitivity(BrokerRequest brokerRequest) {
+    if (brokerRequest.getQuerySource() == null || brokerRequest.getQuerySource().getTableName() == null) {
+      return;
+    }
     String inputTableName = brokerRequest.getQuerySource().getTableName();
     String actualTableName = _tableCache.getActualTableName(inputTableName);
     brokerRequest.getQuerySource().setTableName(actualTableName);
