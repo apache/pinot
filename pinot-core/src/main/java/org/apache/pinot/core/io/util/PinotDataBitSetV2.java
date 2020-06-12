@@ -24,101 +24,50 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public abstract class PinotDataBitSetV2 implements Closeable {
-  private static final int BYTE_MASK = 0xFF;
-  static final int MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ = 16; // comes from 2-bit encoding
+public abstract class PinotDataBitSetV2 extends BasePinotBitSet implements PinotBitSet, Closeable {
+  static final int MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ = 32;
 
-  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
-      ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
-
-  protected PinotDataBuffer _dataBuffer;
-  protected int _numBitsPerValue;
-
-  /**
-   * Decode integers starting at a given index. This is efficient
-   * because of simplified bitmath.
-   * @param index docId
-   * @return unpacked integer
-   */
-  public abstract int readInt(long index);
-
-  /**
-   * Decode integers for a contiguous range of indexes represented by startIndex
-   * and length. This uses vectorization as much as possible for all the aligned
-   * reads and also takes care of the small byte-sized window of unaligned read.
-   * @param startIndex start docId
-   * @param length length
-   * @param out out array to store the unpacked integers
-   */
-  public abstract void readInt(long startIndex, int length, int[] out);
-
-  /**
-   * Decode integers for an array of indexes which is not necessarily
-   * contiguous. So there could be gaps in the array:
-   * e.g: [1, 3, 7, 9, 11, 12]
-   * The actual read is done by the previous API since that is efficient
-   * as it exploits contiguity and uses vectorization. However, since
-   * the out[] array has to be correctly populated with the unpacked integer
-   * for each index, a post-processing step is needed after the bulk contiguous
-   * read to correctly set the unpacked integer into the out array throwing away
-   * the unnecessary values decoded as part of contiguous read
-   * @param docIds index array
-   * @param docIdsStartIndex starting index in the docIds array
-   * @param length length to read (number of docIds to read in the array)
-   * @param out out array to store the decoded integers
-   * @param outpos starting index in the out array
-   */
-  public void readInt(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
-    int startDocId = docIds[docIdsStartIndex];
-    int endDocId = docIds[docIdsStartIndex + length - 1];
-    int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
-    // do a contiguous bulk read
-    readInt(startDocId, endDocId - startDocId + 1, dictIds);
-    out[outpos] = dictIds[0];
-    // set the unpacked integer correctly. this is needed since there could
-    // be gaps and some decoded values may have to be thrown/ignored.
-    for (int i = 1; i < length; i++) {
-      out[outpos + i] = dictIds[docIds[docIdsStartIndex + i] - startDocId];
-    }
-  }
-
-  public static PinotDataBitSetV2 createBitSet(PinotDataBuffer pinotDataBuffer, int numBitsPerValue) {
-    switch (numBitsPerValue) {
-      case 1:
-        return new Bit1Encoded(pinotDataBuffer, numBitsPerValue);
-      case 2:
-        return new Bit2Encoded(pinotDataBuffer, numBitsPerValue);
-      case 4:
-        return new Bit4Encoded(pinotDataBuffer, numBitsPerValue);
-      case 8:
-        return new Bit8Encoded(pinotDataBuffer, numBitsPerValue);
-      case 16:
-        return new Bit16Encoded(pinotDataBuffer, numBitsPerValue);
-      case 32:
-        return new RawInt(pinotDataBuffer, numBitsPerValue);
-      default:
-        throw new UnsupportedOperationException(numBitsPerValue + "not supported by PinotDataBitSetV2");
-    }
+  public PinotDataBitSetV2(PinotDataBuffer dataBuffer, int numBits) {
+    super(dataBuffer, numBits);
   }
 
   public static class Bit1Encoded extends PinotDataBitSetV2 {
+    // grab a final local reference to avoid
+    // the potential performance penalty that comes with super -> super
+    // as jvm sometimes doesn't inline the references across inheritance
+    private final PinotDataBuffer _buffer;
+
     Bit1Encoded(PinotDataBuffer dataBuffer, int numBits) {
-      _dataBuffer = dataBuffer;
-      _numBitsPerValue = numBits;
+      super(dataBuffer, numBits);
+      _buffer = dataBuffer;
     }
 
+    /**
+     * Decode integers starting at a given index. This is efficient
+     * because of simplified bitmath for the exact numBitsPerValue
+     * @param index docId
+     * @return unpacked integer
+     */
     @Override
     public int readInt(long index) {
-      long bitOffset = index * _numBitsPerValue;
+      long bitOffset = index;
       long byteOffset = bitOffset / Byte.SIZE;
-      int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+      int val = (int)_buffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
       return  (val >>> (7 - bitOffset)) & 1;
     }
 
+    /**
+     * Decode integers for a contiguous range of indexes represented by startIndex
+     * and length. This uses vectorization as much as possible for all the aligned
+     * reads and also takes care of the small byte-sized window of unaligned read.
+     * @param startIndex start docId
+     * @param length length
+     * @param out out array to store the unpacked integers
+     */
     @Override
     public void readInt(long startIndex, int length, int[] out) {
-      long bitOffset = startIndex * _numBitsPerValue;
+      long bitOffset = startIndex;
       long byteOffset = bitOffset / Byte.SIZE;
       bitOffset = bitOffset & 7;
       int packed = 0;
@@ -126,7 +75,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // unaligned read within a byte
       if (bitOffset != 0) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         if (bitOffset == 1) {
           // unpack 7 integers from bits 1-7
           out[0] = (packed >>> 6) & 1;
@@ -191,7 +140,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned reads at 4-byte boundary to unpack 32 integers
       while (length >= 32) {
-        packed = _dataBuffer.getInt(byteOffset);
+        packed = _buffer.getInt(byteOffset);
         out[i] = packed >>> 31;
         out[i + 1] = (packed >>> 30) & 1;
         out[i + 2] = (packed >>> 29) & 1;
@@ -231,7 +180,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned reads at 2-byte boundary to unpack 16 integers
       if (length >= 16) {
-        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        packed = (int)_buffer.getShort(byteOffset) & 0xffff;
         out[i] = (packed >>> 15) & 1;
         out[i + 1] = (packed >>> 14) & 1;
         out[i + 2] = (packed >>> 13) & 1;
@@ -255,7 +204,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned reads at byte boundary to unpack 8 integers
       if (length >= 8) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         out[i] = (packed >>> 7) & 1;
         out[i + 1] = (packed >>> 6) & 1;
         out[i + 2] = (packed >>> 5) & 1;
@@ -273,7 +222,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       if (length == 7) {
         // unpack from bits 0-6
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         out[i] = (packed >>> 7) & 1;
         out[i + 1] = (packed >>> 6) & 1;
         out[i + 2] = (packed >>> 5) & 1;
@@ -318,20 +267,39 @@ public abstract class PinotDataBitSetV2 implements Closeable {
   }
 
   public static class Bit2Encoded extends PinotDataBitSetV2 {
-    Bit2Encoded(PinotDataBuffer dataBuffer, int numBits) {
-      _dataBuffer = dataBuffer;
-      _numBitsPerValue = numBits;
+    // grab a final local reference to avoid
+    // the potential performance penalty that comes with super -> super
+    // as jvm sometimes doesn't inline the references across inheritance
+    private final PinotDataBuffer _buffer;
+
+    public Bit2Encoded(PinotDataBuffer dataBuffer, int numBits) {
+      super(dataBuffer, numBits);
+      _buffer = dataBuffer;
     }
 
+    /**
+     * Decode integers starting at a given index. This is efficient
+     * because of simplified bitmath for the exact numBitsPerValue
+     * @param index docId
+     * @return unpacked integer
+     */
     @Override
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+      int val = (int)_buffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
       return  (val >>> (6 - bitOffset)) & 3;
     }
 
+    /**
+     * Decode integers for a contiguous range of indexes represented by startIndex
+     * and length. This uses vectorization as much as possible for all the aligned
+     * reads and also takes care of the small byte-sized window of unaligned read.
+     * @param startIndex start docId
+     * @param length length
+     * @param out out array to store the unpacked integers
+     */
     @Override
     public void readInt(long startIndex, int length, int[] out) {
       long bitOffset = startIndex * _numBitsPerValue;
@@ -352,7 +320,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // unaligned read within a byte
       if (bitOffset != 0) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         if (bitOffset == 2) {
           // unpack 3 integers from bits 2-7
           out[0] = (packed >>> 4) & 3;
@@ -378,7 +346,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned reads at 4-byte boundary to unpack 16 integers
       while (length >= 16) {
-        packed = _dataBuffer.getInt(byteOffset);
+        packed = _buffer.getInt(byteOffset);
         out[i] = packed >>> 30;
         out[i + 1] = (packed >>> 28) & 3;
         out[i + 2] = (packed >>> 26) & 3;
@@ -401,7 +369,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
       }
 
       if (length >= 8) {
-        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        packed = (int)_buffer.getShort(byteOffset) & 0xffff;
         out[i] = (packed >>> 14) & 3;
         out[i + 1] = (packed >>> 12) & 3;
         out[i + 2] = (packed >>> 10) & 3;
@@ -417,7 +385,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at byte boundary to unpack 4 integers
       if (length >= 4) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 6;
         out[i + 1] = (packed >>> 4) & 3;
         out[i + 2] = (packed >>> 2) & 3;
@@ -431,7 +399,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       if (length > 0) {
         // unpack from bits 0-1
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 6;
         length--;
       }
@@ -450,20 +418,38 @@ public abstract class PinotDataBitSetV2 implements Closeable {
   }
 
   public static class Bit4Encoded extends PinotDataBitSetV2 {
-    Bit4Encoded(PinotDataBuffer dataBuffer, int numBits) {
-      _dataBuffer = dataBuffer;
-      _numBitsPerValue = numBits;
+    // grab a final local reference to avoid
+    // the potential performance penalty that comes with super -> super
+    // as jvm sometimes doesn't inline the references across inheritance
+    private final PinotDataBuffer _buffer;
+    public Bit4Encoded(PinotDataBuffer dataBuffer, int numBits) {
+      super(dataBuffer, numBits);
+      _buffer = dataBuffer;
     }
 
+    /**
+     * Decode integers starting at a given index. This is efficient
+     * because of simplified bitmath for the exact numBitsPerValue
+     * @param index docId
+     * @return unpacked integer
+     */
     @Override
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      int val = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+      int val = (int)_buffer.getByte(byteOffset) & 0xff;
       bitOffset = bitOffset & 7;
       return (bitOffset == 0) ? val >>> 4 : val & 0xf;
     }
 
+    /**
+     * Decode integers for a contiguous range of indexes represented by startIndex
+     * and length. This uses vectorization as much as possible for all the aligned
+     * reads and also takes care of the small byte-sized window of unaligned read.
+     * @param startIndex start docId
+     * @param length length
+     * @param out out array to store the unpacked integers
+     */
     @Override
     public void readInt(long startIndex, int length, int[] out) {
       long bitOffset = startIndex * _numBitsPerValue;
@@ -483,7 +469,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // unaligned read within a byte from bits 4-7
       if (bitOffset != 0) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         out[0] = packed & 0xf;
         i = 1;
         byteOffset++;
@@ -492,7 +478,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at 4-byte boundary to unpack 8 integers
       while (length >= 8) {
-        packed = _dataBuffer.getInt(byteOffset);
+        packed = _buffer.getInt(byteOffset);
         out[i] = packed >>> 28;
         out[i + 1] = (packed >>> 24) & 0xf;
         out[i + 2] = (packed >>> 20) & 0xf;
@@ -508,7 +494,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at 2-byte boundary to unpack 4 integers
       if (length >= 4) {
-        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        packed = (int)_buffer.getShort(byteOffset) & 0xffff;
         out[i] = (packed >>> 12) & 0xf;
         out[i + 1] = (packed >>> 8) & 0xf;
         out[i + 2] = (packed >>> 4) & 0xf;
@@ -520,7 +506,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at byte boundary to unpack 2 integers
       if (length >= 2) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 4;
         out[i + 1] = packed & 0xf;
         length -= 2;
@@ -530,25 +516,43 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // handle spill over -- unpack from bits 0-3
       if (length > 0) {
-        packed = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        packed = (int)_buffer.getByte(byteOffset) & 0xff;
         out[i] = packed >>> 4;
       }
     }
   }
 
   public static class Bit8Encoded extends PinotDataBitSetV2 {
-    Bit8Encoded(PinotDataBuffer dataBuffer, int numBits) {
-      _dataBuffer = dataBuffer;
-      _numBitsPerValue = numBits;
+    // grab a final local reference to avoid
+    // the potential performance penalty that comes with super -> super
+    // as jvm sometimes doesn't inline the references across inheritance
+    private final PinotDataBuffer _buffer;
+    public Bit8Encoded(PinotDataBuffer dataBuffer, int numBits) {
+      super(dataBuffer, numBits);
+      _buffer = dataBuffer;
     }
 
+    /**
+     * Decode integers starting at a given index. This is efficient
+     * because of simplified bitmath for the exact numBitsPerValue
+     * @param index docId
+     * @return unpacked integer
+     */
     @Override
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      return ((int)_dataBuffer.getByte(byteOffset)) & 0xff;
+      return ((int)_buffer.getByte(byteOffset)) & 0xff;
     }
 
+    /**
+     * Decode integers for a contiguous range of indexes represented by startIndex
+     * and length. This uses vectorization as much as possible for all the aligned
+     * reads and also takes care of the small byte-sized window of unaligned read.
+     * @param startIndex start docId
+     * @param length length
+     * @param out out array to store the unpacked integers
+     */
     @Override
     public void readInt(long startIndex, int length, int[] out) {
       long bitOffset = startIndex * _numBitsPerValue;
@@ -566,7 +570,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at 4-byte boundary to unpack 4 integers
       while (length >= 4) {
-        packed = _dataBuffer.getInt(byteOffset);
+        packed = _buffer.getInt(byteOffset);
         out[i] = packed >>> 24;
         out[i + 1] = (packed >>> 16) & 0xff;
         out[i + 2] = (packed >>> 8) & 0xff;
@@ -578,7 +582,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned read at 2-byte boundary to unpack 2 integers
       if (length >= 2) {
-        packed = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        packed = (int)_buffer.getShort(byteOffset) & 0xffff;
         out[i] = (packed >>> 8) & 0xff;
         out[i + 1] = packed & 0xff;
         length -= 2;
@@ -588,24 +592,42 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // handle spill over at byte boundary to unpack 1 integer
       if (length > 0) {
-        out[i] = (int)_dataBuffer.getByte(byteOffset) & 0xff;
+        out[i] = (int)_buffer.getByte(byteOffset) & 0xff;
       }
     }
   }
 
   public static class Bit16Encoded extends PinotDataBitSetV2 {
-    Bit16Encoded(PinotDataBuffer dataBuffer, int numBits) {
-      _dataBuffer = dataBuffer;
-      _numBitsPerValue = numBits;
+    // grab a final local reference to avoid
+    // the potential performance penalty that comes with super -> super
+    // as jvm sometimes doesn't inline the references across inheritance
+    private final PinotDataBuffer _buffer;
+    public Bit16Encoded(PinotDataBuffer dataBuffer, int numBits) {
+      super(dataBuffer, numBits);
+      _buffer = dataBuffer;
     }
 
+    /**
+     * Decode integers starting at a given index. This is efficient
+     * because of simplified bitmath for the exact numBitsPerValue
+     * @param index docId
+     * @return unpacked integer
+     */
     @Override
     public int readInt(long index) {
       long bitOffset = index * _numBitsPerValue;
       long byteOffset = bitOffset / Byte.SIZE;
-      return ((int)_dataBuffer.getShort(byteOffset)) & 0xffff;
+      return ((int)_buffer.getShort(byteOffset)) & 0xffff;
     }
 
+    /**
+     * Decode integers for a contiguous range of indexes represented by startIndex
+     * and length. This uses vectorization as much as possible for all the aligned
+     * reads and also takes care of the small byte-sized window of unaligned read.
+     * @param startIndex start docId
+     * @param length length
+     * @param out out array to store the unpacked integers
+     */
     @Override
     public void readInt(long startIndex, int length, int[] out) {
       long bitOffset = startIndex * _numBitsPerValue;
@@ -622,7 +644,7 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // aligned reads at 4-byte boundary to unpack 2 integers
       while (length >= 2) {
-        packed = _dataBuffer.getInt(byteOffset);
+        packed = _buffer.getInt(byteOffset);
         out[i] = packed >>> 16;
         out[i + 1] = packed & 0xffff;
         length -= 2;
@@ -632,98 +654,39 @@ public abstract class PinotDataBitSetV2 implements Closeable {
 
       // handle spill over at 2-byte boundary to unpack 1 integer
       if (length > 0) {
-        out[i] = (int)_dataBuffer.getShort(byteOffset) & 0xffff;
+        out[i] = (int)_buffer.getShort(byteOffset) & 0xffff;
       }
     }
   }
 
   public static class RawInt extends PinotDataBitSetV2 {
+    // grab a final local reference to avoid
+    // the potential performance penalty that comes with super -> super
+    // as jvm sometimes doesn't inline the references across inheritance
+    private final PinotDataBuffer _buffer;
     RawInt(PinotDataBuffer dataBuffer, int numBits) {
-      _dataBuffer = dataBuffer;
-      _numBitsPerValue = numBits;
+      super(dataBuffer, numBits);
+      _buffer = dataBuffer;
     }
 
     @Override
     public int readInt(long index) {
-      return _dataBuffer.getInt(index * Integer.BYTES);
+      return _buffer.getInt(index * Integer.BYTES);
     }
 
     @Override
     public void readInt(long startIndex, int length, int[] out) {
       long byteOffset = startIndex * Integer.BYTES;
       for (int i = 0; i < length; i++) {
-        out[i] = _dataBuffer.getInt(byteOffset);
+        out[i] = _buffer.getInt(byteOffset);
         byteOffset += 4;
       }
     }
   }
 
-  protected void writeInt(int index, int value) {
-    long bitOffset = (long) index * _numBitsPerValue;
-    int byteOffset = (int) (bitOffset / Byte.SIZE);
-    int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
-
-    int firstByte = _dataBuffer.getByte(byteOffset);
-
-    int firstByteMask = BYTE_MASK >>> bitOffsetInFirstByte;
-    int numBitsLeft = _numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
-    if (numBitsLeft <= 0) {
-      // The value is inside the first byte
-      firstByteMask &= BYTE_MASK << -numBitsLeft;
-      _dataBuffer.putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | (value << -numBitsLeft)));
-    } else {
-      // The value is in multiple bytes
-      _dataBuffer
-          .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
-      while (numBitsLeft > Byte.SIZE) {
-        numBitsLeft -= Byte.SIZE;
-        _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
-      }
-      int lastByte = _dataBuffer.getByte(++byteOffset);
-      _dataBuffer.putByte(byteOffset,
-          (byte) ((lastByte & (BYTE_MASK >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft))));
-    }
-  }
-
-  public void writeInt(int startIndex, int length, int[] values) {
-    long startBitOffset = (long) startIndex * _numBitsPerValue;
-    int byteOffset = (int) (startBitOffset / Byte.SIZE);
-    int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);
-
-    int firstByte = _dataBuffer.getByte(byteOffset);
-
-    for (int i = 0; i < length; i++) {
-      int value = values[i];
-      if (bitOffsetInFirstByte == Byte.SIZE) {
-        bitOffsetInFirstByte = 0;
-        firstByte = _dataBuffer.getByte(++byteOffset);
-      }
-      int firstByteMask = BYTE_MASK >>> bitOffsetInFirstByte;
-      int numBitsLeft = _numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
-      if (numBitsLeft <= 0) {
-        // The value is inside the first byte
-        firstByteMask &= BYTE_MASK << -numBitsLeft;
-        firstByte = ((firstByte & ~firstByteMask) | (value << -numBitsLeft));
-        _dataBuffer.putByte(byteOffset, (byte) firstByte);
-        bitOffsetInFirstByte = Byte.SIZE + numBitsLeft;
-      } else {
-        // The value is in multiple bytes
-        _dataBuffer
-            .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
-        while (numBitsLeft > Byte.SIZE) {
-          numBitsLeft -= Byte.SIZE;
-          _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
-        }
-        int lastByte = _dataBuffer.getByte(++byteOffset);
-        firstByte = (lastByte & (0xFF >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft));
-        _dataBuffer.putByte(byteOffset, (byte) firstByte);
-        bitOffsetInFirstByte = numBitsLeft;
-      }
-    }
-  }
-
   @Override
-  public void close()
-      throws IOException {
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
   }
 }

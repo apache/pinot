@@ -20,17 +20,22 @@ package org.apache.pinot.core.io.util;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
-import java.io.IOException;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public final class FixedBitIntReaderWriterV2 implements Closeable {
-  private PinotDataBitSetV2 _dataBitSet;
+  private final PinotBitSet _dataBitSet;
+  private int _numBitsPerValue;
+
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
+      ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
 
   public FixedBitIntReaderWriterV2(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
     Preconditions
         .checkState(dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
-    _dataBitSet = PinotDataBitSetV2.createBitSet(dataBuffer, numBitsPerValue);
+    _dataBitSet = PinotDataBitSetFactory.createBitSet(dataBuffer, numBitsPerValue);
+    _numBitsPerValue = numBitsPerValue;
   }
 
   /**
@@ -86,8 +91,8 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
    * the deviations between each docId and then take mean/stddev of that.
    * This will be expensive as it requires pre-processing.
    *
-   * To increase the probability of using the bulk contiguous API, we make
-   * this decision for every fixed-size chunk of docIds[] array.
+   * To increase the probability of using the bulk contiguous vectorized API,
+   * we make this decision for every fixed-size chunk of docIds[] array.
    *
    * @param docIds array of docIds to read the dictionaryIds for
    * @param docIdStartIndex start index in docIds array
@@ -96,15 +101,25 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
    * @param valuesStartIndex start index in values array
    */
   public void readValues(int[] docIds, int docIdStartIndex, int docIdLength, int[] values, int valuesStartIndex) {
+    if ((_numBitsPerValue & (_numBitsPerValue - 1)) != 0) {
+      // currently vectorized bulk read is not supported for non power of 2 encodings
+      int docIdEndIndex = docIdStartIndex + docIdLength;
+      for (int i = docIdStartIndex; i < docIdEndIndex; i++) {
+        values[valuesStartIndex++] = _dataBitSet.readInt(docIds[i]);
+      }
+      return;
+    }
+
     int bulkReadChunks = docIdLength / PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
     int remainingChunk = docIdLength % PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
     int docIdEndIndex;
+
     while (bulkReadChunks > 0) {
       docIdEndIndex = docIdStartIndex + PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ - 1;
       if (shouldBulkRead(docIds, docIdStartIndex, docIdEndIndex)) {
         // use the bulk API. it takes care of populating the values array correctly
         // by throwing away the extra dictIds
-        _dataBitSet.readInt(docIds, docIdStartIndex, PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ, values, valuesStartIndex);
+        readValuesBulk(docIds, docIdStartIndex, PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ, values, valuesStartIndex);
         valuesStartIndex += PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
       } else {
         // use the single read API
@@ -116,12 +131,38 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
       bulkReadChunks--;
       docIdLength -= PinotDataBitSetV2.MAX_VALUES_UNPACKED_SINGLE_ALIGNED_READ;
     }
+
     if (remainingChunk > 0) {
       // use the single read API
       docIdEndIndex = docIdStartIndex + docIdLength - 1;
       for (int i = docIdStartIndex; i <= docIdEndIndex; i++) {
         values[valuesStartIndex++] = _dataBitSet.readInt(docIds[i]);
       }
+    }
+  }
+
+  /*
+   * Decode integers for an array of indexes which is not necessarily
+   * contiguous. So there could be gaps in the array:
+   * e.g: [1, 3, 7, 9, 11, 12]
+   * The actual read is done by the bulk API in PinotDataBitSetV2 since
+   * that is efficient as it exploits contiguity and uses vectorization.
+   * However, since the out[] array has to be correctly populated with the unpacked integer
+   * for each index, a post-processing step is needed after the bulk contiguous
+   * read to correctly set the unpacked integer into the out array throwing away
+   * the unnecessary values decoded as part of contiguous read
+   */
+  private void readValuesBulk(int[] docIds, int docIdsStartIndex, int length, int[] out, int outpos) {
+    int startDocId = docIds[docIdsStartIndex];
+    int endDocId = docIds[docIdsStartIndex + length - 1];
+    int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+    // do a contiguous bulk read using the vectorized API
+    _dataBitSet.readInt(startDocId, endDocId - startDocId + 1, dictIds);
+    out[outpos] = dictIds[0];
+    // set the unpacked integer correctly. this is needed since there could
+    // be gaps and some decoded values may have to be thrown/ignored.
+    for (int i = 1; i < length; i++) {
+      out[outpos + i] = dictIds[docIds[docIdsStartIndex + i] - startDocId];
     }
   }
 
@@ -140,10 +181,7 @@ public final class FixedBitIntReaderWriterV2 implements Closeable {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    if (_dataBitSet != null) {
-      _dataBitSet.close();
-    }
+  public void close() {
+
   }
 }

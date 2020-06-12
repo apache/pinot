@@ -22,7 +22,7 @@ import java.io.Closeable;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public final class PinotDataBitSet implements Closeable {
+public final class PinotDataBitSet extends BasePinotBitSet implements PinotBitSet, Closeable {
   private static final int[] NUM_BITS_SET = new int[1 << Byte.SIZE];
   private static final int[][] NTH_BIT_SET = new int[Byte.SIZE][1 << Byte.SIZE];
   private static final int[] FIRST_BIT_SET = NTH_BIT_SET[0];
@@ -69,21 +69,20 @@ public final class PinotDataBitSet implements Closeable {
     return numBitsPerValue - FIRST_BIT_SET[maxValue];
   }
 
-  private final PinotDataBuffer _dataBuffer;
-
-  public PinotDataBitSet(PinotDataBuffer dataBuffer) {
-    _dataBuffer = dataBuffer;
+  public PinotDataBitSet(PinotDataBuffer dataBuffer, int numBitsPerValue) {
+    super(dataBuffer, numBitsPerValue);
   }
 
-  public int readInt(int index, int numBitsPerValue) {
-    long bitOffset = (long) index * numBitsPerValue;
+  @Override
+  public int readInt(long index) {
+    long bitOffset = index * _numBitsPerValue;
     int byteOffset = (int) (bitOffset / Byte.SIZE);
     int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
 
     // Initiated with the value in first byte
     int currentValue = _dataBuffer.getByte(byteOffset) & (BYTE_MASK >>> bitOffsetInFirstByte);
 
-    int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
+    int numBitsLeft = _numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
     if (numBitsLeft <= 0) {
       // The value is inside the first byte
       return currentValue >>> -numBitsLeft;
@@ -98,8 +97,9 @@ public final class PinotDataBitSet implements Closeable {
     }
   }
 
-  public void readInt(int startIndex, int numBitsPerValue, int length, int[] buffer) {
-    long startBitOffset = (long) startIndex * numBitsPerValue;
+  @Override
+  public void readInt(long startIndex, int length, int[] buffer) {
+    long startBitOffset = startIndex * _numBitsPerValue;
     int byteOffset = (int) (startBitOffset / Byte.SIZE);
     int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);
 
@@ -111,7 +111,7 @@ public final class PinotDataBitSet implements Closeable {
         bitOffsetInFirstByte = 0;
         currentValue = _dataBuffer.getByte(++byteOffset) & BYTE_MASK;
       }
-      int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
+      int numBitsLeft = _numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
       if (numBitsLeft <= 0) {
         // The value is inside the first byte
         buffer[i] = currentValue >>> -numBitsLeft;
@@ -127,115 +127,6 @@ public final class PinotDataBitSet implements Closeable {
         buffer[i] = (currentValue << numBitsLeft) | (nextByte >>> (Byte.SIZE - numBitsLeft));
         bitOffsetInFirstByte = numBitsLeft;
         currentValue = nextByte & (BYTE_MASK >>> bitOffsetInFirstByte);
-      }
-    }
-  }
-
-  public void writeInt(int index, int numBitsPerValue, int value) {
-    long bitOffset = (long) index * numBitsPerValue;
-    int byteOffset = (int) (bitOffset / Byte.SIZE);
-    int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
-
-    int firstByte = _dataBuffer.getByte(byteOffset);
-
-    int firstByteMask = BYTE_MASK >>> bitOffsetInFirstByte;
-    int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
-    if (numBitsLeft <= 0) {
-      // The value is inside the first byte
-      firstByteMask &= BYTE_MASK << -numBitsLeft;
-      _dataBuffer.putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | (value << -numBitsLeft)));
-    } else {
-      // The value is in multiple bytes
-      _dataBuffer
-          .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
-      while (numBitsLeft > Byte.SIZE) {
-        numBitsLeft -= Byte.SIZE;
-        _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
-      }
-      int lastByte = _dataBuffer.getByte(++byteOffset);
-      _dataBuffer.putByte(byteOffset,
-          (byte) ((lastByte & (BYTE_MASK >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft))));
-    }
-  }
-
-  public void writeInt(int startIndex, int numBitsPerValue, int length, int[] values) {
-    long startBitOffset = (long) startIndex * numBitsPerValue;
-    int byteOffset = (int) (startBitOffset / Byte.SIZE);
-    int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);
-
-    int firstByte = _dataBuffer.getByte(byteOffset);
-
-    for (int i = 0; i < length; i++) {
-      int value = values[i];
-      if (bitOffsetInFirstByte == Byte.SIZE) {
-        bitOffsetInFirstByte = 0;
-        firstByte = _dataBuffer.getByte(++byteOffset);
-      }
-      int firstByteMask = BYTE_MASK >>> bitOffsetInFirstByte;
-      int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
-      if (numBitsLeft <= 0) {
-        // The value is inside the first byte
-        firstByteMask &= BYTE_MASK << -numBitsLeft;
-        firstByte = ((firstByte & ~firstByteMask) | (value << -numBitsLeft));
-        _dataBuffer.putByte(byteOffset, (byte) firstByte);
-        bitOffsetInFirstByte = Byte.SIZE + numBitsLeft;
-      } else {
-        // The value is in multiple bytes
-        _dataBuffer
-            .putByte(byteOffset, (byte) ((firstByte & ~firstByteMask) | ((value >>> numBitsLeft) & firstByteMask)));
-        while (numBitsLeft > Byte.SIZE) {
-          numBitsLeft -= Byte.SIZE;
-          _dataBuffer.putByte(++byteOffset, (byte) (value >> numBitsLeft));
-        }
-        int lastByte = _dataBuffer.getByte(++byteOffset);
-        firstByte = (lastByte & (0xFF >>> numBitsLeft)) | (value << (Byte.SIZE - numBitsLeft));
-        _dataBuffer.putByte(byteOffset, (byte) firstByte);
-        bitOffsetInFirstByte = numBitsLeft;
-      }
-    }
-  }
-
-  public void setBit(int bitOffset) {
-    int byteOffset = bitOffset / Byte.SIZE;
-    int bitOffsetInByte = bitOffset % Byte.SIZE;
-    _dataBuffer.putByte(byteOffset, (byte) (_dataBuffer.getByte(byteOffset) | (0x80 >>> bitOffsetInByte)));
-  }
-
-  public void unsetBit(int bitOffset) {
-    int byteOffset = bitOffset / Byte.SIZE;
-    int bitOffsetInByte = bitOffset % Byte.SIZE;
-    _dataBuffer.putByte(byteOffset, (byte) (_dataBuffer.getByte(byteOffset) & (0xFF7F >>> bitOffsetInByte)));
-  }
-
-  public int getNextSetBitOffset(int bitOffset) {
-    int byteOffset = bitOffset / Byte.SIZE;
-    int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
-    int firstByte = (_dataBuffer.getByte(byteOffset) << bitOffsetInFirstByte) & BYTE_MASK;
-    if (firstByte != 0) {
-      return bitOffset + FIRST_BIT_SET[firstByte];
-    }
-    while (true) {
-      int currentByte = _dataBuffer.getByte(++byteOffset) & BYTE_MASK;
-      if (currentByte != 0) {
-        return (byteOffset * Byte.SIZE) | FIRST_BIT_SET[currentByte];
-      }
-    }
-  }
-
-  public int getNextNthSetBitOffset(int bitOffset, int n) {
-    int byteOffset = bitOffset / Byte.SIZE;
-    int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
-    int firstByte = (_dataBuffer.getByte(byteOffset) << bitOffsetInFirstByte) & BYTE_MASK;
-    int numBitsSet = NUM_BITS_SET[firstByte];
-    if (numBitsSet >= n) {
-      return bitOffset + NTH_BIT_SET[n - 1][firstByte];
-    }
-    while (true) {
-      n -= numBitsSet;
-      int currentByte = _dataBuffer.getByte(++byteOffset) & BYTE_MASK;
-      numBitsSet = NUM_BITS_SET[currentByte];
-      if (numBitsSet >= n) {
-        return (byteOffset * Byte.SIZE) | NTH_BIT_SET[n - 1][currentByte];
       }
     }
   }
