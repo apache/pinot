@@ -66,7 +66,6 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
@@ -506,7 +505,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 realtimeRowsDroppedMeter);
       }
 
-      _currentOffset = messagesAndOffsets.getNextStreamMessageOffsetAtIndex(index);
+      _currentOffset = messagesAndOffsets.getNextStreamParitionMsgOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       streamMessageCount++;

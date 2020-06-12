@@ -51,7 +51,12 @@ public class SimpleConsumerMessageBatch implements MessageBatch<byte[]> {
     return messageList.get(index).message().payloadSize();
   }
 
-  public StreamPartitionMsgOffset getNextStreamMessageOffsetAtIndex(int index) {
+  @Override
+  public long getNextStreamMessageOffsetAtIndex(int index) {
+    throw new UnsupportedOperationException("This method is deprecated");
+  }
+
+  public StreamPartitionMsgOffset getNextStreamParitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(messageList.get(index).nextOffset());
   }
 }
