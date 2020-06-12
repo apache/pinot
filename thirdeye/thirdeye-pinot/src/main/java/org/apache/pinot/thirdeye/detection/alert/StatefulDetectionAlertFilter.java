@@ -62,7 +62,7 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
       // Ignore disabled detections
       DetectionConfigDTO detection = DAORegistry.getInstance().getDetectionConfigManager().findById(detectionId);
       if (detection == null || !detection.isActive()) {
-        return allAnomalies;
+        continue;
       }
 
       // No point in fetching anomalies older than MAX_ANOMALY_NOTIFICATION_LOOKBACK
