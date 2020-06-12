@@ -25,6 +25,14 @@ import org.apache.pinot.spi.plugin.PluginManager;
  * Provider class for {@link StreamConsumerFactory}
  */
 public abstract class StreamConsumerFactoryProvider {
+  /**
+   * This method is here for backward compatibility with older stream implementations
+   * that support 'long' type offsets.
+   */
+  @Deprecated
+  public static StreamConsumerFactory create(StreamConfig streamConfig) {
+    return createConsumerFactory(streamConfig);
+  }
 
   /**
    * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig::getConsumerFactoryClassName()} property and initializes it
