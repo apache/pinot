@@ -125,8 +125,6 @@ public class StreamConfigTest {
     Assert.assertFalse(exception);
     Assert.assertEquals(streamConfig.getConsumerFactoryClassName(),
         StreamConfig.DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING);
-    Assert.assertEquals(streamConfig.getPartitionOffsetFactoryClassName(),
-        StreamConfig.DEFAULT_PARTITION_OFFSET_FACTORY_CLASS_NAME_STRING);
 
     // Missing decoder class
     streamConfigMap.put(StreamConfigProperties

@@ -124,7 +124,7 @@ public class SegmentCompletionManager {
     TableConfig tableConfig = _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
     PartitionLevelStreamConfig streamConfig =
         new PartitionLevelStreamConfig(tableConfig.getTableName(), tableConfig.getIndexingConfig().getStreamConfigs());
-    return StreamConsumerFactoryProvider.createOffsetFactory(streamConfig);
+    return StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
   }
 
   // We need to make sure that we never create multiple FSMs for the same segment

@@ -69,4 +69,8 @@ public abstract class StreamConsumerFactory {
    * @return
    */
   public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);
+
+  public StreamPartitionMsgOffsetFactory createStreamMsgOffsetFactory() {
+    return new LongMsgOffsetFactory();
+  }
 }
