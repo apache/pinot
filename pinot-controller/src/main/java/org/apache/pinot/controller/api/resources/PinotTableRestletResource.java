@@ -445,6 +445,9 @@ public class PinotTableRestletResource {
     SegmentsValidationAndRetentionConfig SegmentConfigToCompare = tableConfigToCompare.getValidationConfig();
 
     String newTimeColumnName = newSegmentConfig.getTimeColumnName();
+    if(newTimeColumnName == null) {
+        throw new PinotHelixResourceManager.InvalidTableConfigException("Must provide valid timeColumnName in tableConfig");
+    }
     String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
     if (!Objects.equal(existingTimeColumnName, newTimeColumnName)) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(String
