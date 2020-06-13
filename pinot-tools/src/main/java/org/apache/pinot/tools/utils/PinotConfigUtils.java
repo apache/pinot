@@ -23,6 +23,9 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.List;
+import java.util.Optional;
+
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -114,7 +117,10 @@ public class PinotConfigUtils {
       throw new ConfigurationException(
           String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT, "null conf object."));
     }
-    if (conf.getControllerPort() == null) {
+
+    List<String> protocols = validateControllerAccessProtocols(conf);
+
+    if (conf.getControllerPort() == null && protocols.isEmpty()) {
       throw new ConfigurationException(String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT,
           "missing controller port, please specify 'controller.port' property in config file."));
     }
@@ -129,8 +135,54 @@ public class PinotConfigUtils {
     return true;
   }
 
-  public static PropertiesConfiguration readConfigFromFile(String configFileName)
-      throws ConfigurationException {
+  private static List<String> validateControllerAccessProtocols(ControllerConf conf) throws ConfigurationException {
+    List<String> protocols = conf.getControllerAccessProtocols();
+    
+    if(!protocols.isEmpty()) {
+      Optional<String> invalidProtocol =
+          protocols.stream().filter(protocol -> !protocol.equals("http") && !protocol.equals("https")).findFirst();
+
+      if (invalidProtocol.isPresent()) {
+        throw new ConfigurationException(String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT,
+            invalidProtocol.get() + " is not a valid protocol for the 'controller.access.protocols' property."));
+      }
+      
+      Optional<ConfigurationException> invalidPort = protocols.stream()
+          .map(protocol -> validatePort(protocol, conf.getControllerAccessProtocolProperty(protocol, "port")))
+
+          .filter(Optional::isPresent)
+
+          .map(Optional::get)
+
+          .findAny();
+
+      if (invalidPort.isPresent()) {
+        throw invalidPort.get();
+      }
+    }
+    
+    return protocols;
+  }
+
+  private static Optional<ConfigurationException> validatePort(String protocol, String port) {
+    if (port == null) {
+      return Optional.of(new ConfigurationException(
+          String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT, "missing controller " + protocol
+              + " port, please fix 'controller.access.protocols." + protocol + ".port' property in config file.")));
+    }
+
+    try {
+      Integer.parseInt(port);
+    } catch (NumberFormatException e) {
+      return Optional.of(new ConfigurationException(String.format(CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT,
+          port + " is not a valid port, please fix 'controller.access.protocols." + protocol
+              + ".port' property in config file.")));
+    }
+
+    return Optional.empty();
+  }
+
+  public static PropertiesConfiguration readConfigFromFile(String configFileName) throws ConfigurationException {
     if (configFileName == null) {
       return null;
     }

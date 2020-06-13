@@ -18,20 +18,18 @@
  */
 package org.apache.pinot.controller;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.primitives.Longs;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
@@ -57,6 +55,7 @@ import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
+import org.apache.pinot.controller.api.listeners.ListenerConfig;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
@@ -71,6 +70,7 @@ import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.util.ListenerConfigUtil;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
@@ -84,6 +84,11 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.primitives.Longs;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.yammer.metrics.core.MetricsRegistry;
+
 
 public class ControllerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -94,6 +99,7 @@ public class ControllerStarter implements ServiceStartable {
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
 
   private final ControllerConf _config;
+  private final List<ListenerConfig> _listenerConfigs;
   private final ControllerAdminApiApplication _adminApp;
   // TODO: rename this variable once it's full separated with Helix controller.
   private final PinotHelixResourceManager _helixResourceManager;
@@ -137,8 +143,11 @@ public class ControllerStarter implements ServiceStartable {
     // Helix related settings.
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
+    _listenerConfigs = ListenerConfigUtil.buildListenerConfigs(_config);
+    
     String host = conf.getControllerHost();
-    int port = Integer.parseInt(conf.getControllerPort());
+    int port = inferPort();
+    
     _helixControllerInstanceId = host + "_" + port;
     _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
@@ -155,8 +164,7 @@ public class ControllerStarter implements ServiceStartable {
       // Initialize FunctionRegistry before starting the admin application (PinotQueryResource requires it to compile
       // queries)
       FunctionRegistry.init();
-      _adminApp =
-          new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
+      _adminApp = new ControllerAdminApiApplication();
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
       _helixResourceManager = new PinotHelixResourceManager(_config);
       _executorService =
@@ -176,6 +184,13 @@ public class ControllerStarter implements ServiceStartable {
         }
       }
     }
+  }
+
+  private int inferPort() {
+    return Optional.ofNullable(_config.getControllerPort()).map(Integer::parseInt)
+
+        // Fall back to protocol listeners if legacy controller.port is undefined. 
+        .orElseGet(() -> _listenerConfigs.stream().findFirst().map(ListenerConfig::getPort).get());
   }
 
   private void setupHelixSystemProperties() {
@@ -354,8 +369,6 @@ public class ControllerStarter implements ServiceStartable {
     final MetadataEventNotifierFactory metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX));
 
-    int jerseyPort = Integer.parseInt(_config.getControllerPort());
-
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
     final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
@@ -378,11 +391,10 @@ public class ControllerStarter implements ServiceStartable {
       }
     });
 
-    _adminApp.start(jerseyPort);
-    LOGGER.info("Started Jersey API on port {}", jerseyPort);
-    LOGGER.info("Pinot controller ready and listening on port {} for API requests", _config.getControllerPort());
-    LOGGER.info("Controller services available at http://{}:{}/", _config.getControllerHost(),
-        _config.getControllerPort());
+    _adminApp.start(_listenerConfigs, ListenerConfigUtil.shouldAdvertiseAsHttps(_listenerConfigs, _config));
+
+    _listenerConfigs.stream().forEach(listenerConfig -> LOGGER.info("Controller services available at {}://{}:{}/",
+        listenerConfig.getProtocol(), listenerConfig.getHost(), listenerConfig.getPort()));
 
     _controllerMetrics.addCallbackGauge("dataDir.exists", () -> new File(_config.getDataDir()).exists() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", () -> {
