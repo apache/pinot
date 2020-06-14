@@ -85,7 +85,7 @@ const features = [
     icon: 'list',
     description: (
       <>
-        Consist of of <Link to="http://pinot.apache.org/img/dynamic-table.png">both offline and realtime table</Link>. Use realtime table only to cover segments for which offline data may not be available yet
+        Consist of <Link to="http://pinot.apache.org/img/dynamic-table.png">both offline and realtime tables</Link>. Use a realtime table only to cover segments for which offline data may not be available yet
       </>
     ),
   },
