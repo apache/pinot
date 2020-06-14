@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -30,8 +31,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggregationFunction {
 
-  public DistinctCountHLLMVAggregationFunction(String column) {
-    super(column);
+  public DistinctCountHLLMVAggregationFunction(List<String> arguments) {
+    super(arguments);
   }
 
   @Override
@@ -47,7 +48,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
-    HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
+    HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder, _log2M);
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
@@ -108,7 +109,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case INT:
         int[][] intValuesArray = blockValSet.getIntValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i], _log2M);
           for (int value : intValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -117,7 +118,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case LONG:
         long[][] longValuesArray = blockValSet.getLongValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i], _log2M);
           for (long value : longValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -126,7 +127,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case FLOAT:
         float[][] floatValuesArray = blockValSet.getFloatValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i], _log2M);
           for (float value : floatValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -135,7 +136,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case DOUBLE:
         double[][] doubleValuesArray = blockValSet.getDoubleValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i], _log2M);
           for (double value : doubleValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -144,7 +145,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
       case STRING:
         String[][] stringValuesArray = blockValSet.getStringValuesMV();
         for (int i = 0; i < length; i++) {
-          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]);
+          HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i], _log2M);
           for (String value : stringValuesArray[i]) {
             hyperLogLog.offer(value);
           }
@@ -168,7 +169,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           int[] intValues = intValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey, _log2M);
             for (int value : intValues) {
               hyperLogLog.offer(value);
             }
@@ -180,7 +181,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           long[] longValues = longValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey, _log2M);
             for (long value : longValues) {
               hyperLogLog.offer(value);
             }
@@ -192,7 +193,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           float[] floatValues = floatValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey, _log2M);
             for (float value : floatValues) {
               hyperLogLog.offer(value);
             }
@@ -204,7 +205,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           double[] doubleValues = doubleValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey, _log2M);
             for (double value : doubleValues) {
               hyperLogLog.offer(value);
             }
@@ -216,7 +217,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
         for (int i = 0; i < length; i++) {
           String[] stringValues = stringValuesArray[i];
           for (int groupKey : groupKeysArray[i]) {
-            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey);
+            HyperLogLog hyperLogLog = getDefaultHyperLogLog(groupByResultHolder, groupKey, _log2M);
             for (String value : stringValues) {
               hyperLogLog.offer(value);
             }

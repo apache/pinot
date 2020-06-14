@@ -44,6 +44,9 @@ public class CommonConstants {
     public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
     public static final String DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive.pql";
 
+    public static final String CONFIG_OF_DEFAULT_HYPERLOGLOG_LOG2M = "default.hyperloglog.log2m";
+    public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
+
     // More information on why these numbers are set can be found in the following doc:
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;

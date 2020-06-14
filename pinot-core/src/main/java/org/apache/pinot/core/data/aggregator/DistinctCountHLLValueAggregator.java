@@ -51,6 +51,7 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
       initialValue = deserializeAggregatedValue(bytes);
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
+      // TODO: Handle configurable log2m for StarTreeBuilder
       initialValue = new HyperLogLog(DistinctCountHLLAggregationFunction.DEFAULT_LOG2M);
       initialValue.offer(rawValue);
       _maxByteSize = Math.max(_maxByteSize, DEFAULT_LOG2M_BYTE_SIZE);

@@ -130,9 +130,9 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNT:
             return new DistinctCountAggregationFunction(column);
           case DISTINCTCOUNTHLL:
-            return new DistinctCountHLLAggregationFunction(column);
+            return new DistinctCountHLLAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLL:
-            return new DistinctCountRawHLLAggregationFunction(column);
+            return new DistinctCountRawHLLAggregationFunction(arguments);
           case FASTHLL:
             return new FastHLLAggregationFunction(column);
           case DISTINCTCOUNTTHETASKETCH:
@@ -154,9 +154,9 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTMV:
             return new DistinctCountMVAggregationFunction(column);
           case DISTINCTCOUNTHLLMV:
-            return new DistinctCountHLLMVAggregationFunction(column);
+            return new DistinctCountHLLMVAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLLMV:
-            return new DistinctCountRawHLLMVAggregationFunction(column);
+            return new DistinctCountRawHLLMVAggregationFunction(arguments);
           case DISTINCT:
             Preconditions.checkState(brokerRequest != null,
                 "Broker request must be provided for 'DISTINCT' aggregation function");
