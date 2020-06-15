@@ -20,10 +20,10 @@ package org.apache.pinot.core.data.aggregator;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {
@@ -52,7 +52,7 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
       // TODO: Handle configurable log2m for StarTreeBuilder
-      initialValue = new HyperLogLog(DistinctCountHLLAggregationFunction.DEFAULT_LOG2M);
+      initialValue = new HyperLogLog(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
       initialValue.offer(rawValue);
       _maxByteSize = Math.max(_maxByteSize, DEFAULT_LOG2M_BYTE_SIZE);
     }

@@ -114,7 +114,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private final boolean _enableCaseInsensitive;
   private final boolean _enableQueryLimitOverride;
-  private final int _hllLog2mOverride;
+  private final int _defaultHllLog2m;
   private final TableCache _tableCache;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingManager routingManager,
@@ -132,12 +132,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } else {
       _tableCache = null;
     }
-    if (_config.containsKey(CommonConstants.Helix.CONFIG_OF_DEFAULT_HYPERLOGLOG_LOG2M)) {
-      _hllLog2mOverride = _config.getInt(CommonConstants.Helix.CONFIG_OF_DEFAULT_HYPERLOGLOG_LOG2M,
-          CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
-    } else {
-      _hllLog2mOverride = -1;
-    }
+    _defaultHllLog2m = _config
+        .getInt(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
 
     _enableQueryLimitOverride = _config.getBoolean(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
 
@@ -209,8 +205,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.warn("Caught exception while rewriting PQL to make it case-insensitive {}: {}, {}", requestId, query, e);
       }
     }
-    if (_hllLog2mOverride > 0) {
-      handleHyperloglogLog2mOverride(brokerRequest, _hllLog2mOverride);
+    if (_defaultHllLog2m > 0) {
+      handleHyperloglogLog2mOverride(brokerRequest, _defaultHllLog2m);
     }
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
@@ -445,18 +441,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   static void handleHyperloglogLog2mOverride(BrokerRequest brokerRequest, int hllLog2mOverride) {
     if (brokerRequest.getAggregationsInfo() != null) {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        switch (AggregationFunctionType.valueOf(aggregationInfo.getAggregationType().toUpperCase())) {
-          case DISTINCTCOUNTHLL:
-          case DISTINCTCOUNTHLLMV:
-          case DISTINCTCOUNTRAWHLL:
-          case DISTINCTCOUNTRAWHLLMV:
+        switch (aggregationInfo.getAggregationType().toUpperCase()) {
+          case "DISTINCTCOUNTHLL":
+          case "DISTINCTCOUNTHLLMV":
+          case "DISTINCTCOUNTRAWHLL":
+          case "DISTINCTCOUNTRAWHLLMV":
             if (aggregationInfo.getExpressionsSize() == 1) {
               aggregationInfo.addToExpressions(Integer.toString(hllLog2mOverride));
             }
         }
       }
     }
-    if (brokerRequest.getPinotQuery() != null && brokerRequest.getSelections() != null) {
+    if (brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().getSelectList() != null) {
       for (Expression expr : brokerRequest.getPinotQuery().getSelectList()) {
         updateDistinctCountHllExpr(expr, hllLog2mOverride);
       }
@@ -464,23 +460,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private static void updateDistinctCountHllExpr(Expression expr, int hllLog2mOverride) {
-    if (expr == null || expr.getFunctionCall() == null) {
+    Function functionCall = expr.getFunctionCall();
+    if (functionCall == null) {
       return;
     }
-    Function functionCall = expr.getFunctionCall();
-    try {
-      switch (AggregationFunctionType.getAggregationFunctionType(functionCall.getOperator())) {
-        case DISTINCTCOUNTHLL:
-        case DISTINCTCOUNTHLLMV:
-        case DISTINCTCOUNTRAWHLL:
-        case DISTINCTCOUNTRAWHLLMV:
-          if (functionCall.getOperandsSize() == 1) {
-            functionCall.addToOperands(RequestUtils.getLiteralExpression(hllLog2mOverride));
-          }
-          return;
-      }
-    } catch (Exception e) {
-      // Swallow exceptions
+    switch (functionCall.getOperator()) {
+      case "DISTINCTCOUNTHLL":
+      case "DISTINCTCOUNTHLLMV":
+      case "DISTINCTCOUNTRAWHLL":
+      case "DISTINCTCOUNTRAWHLLMV":
+        if (functionCall.getOperandsSize() == 1) {
+          functionCall.addToOperands(RequestUtils.getLiteralExpression(hllLog2mOverride));
+        }
+        return;
     }
     if (functionCall.getOperandsSize() > 0) {
       for (Expression operand : functionCall.getOperands()) {
