@@ -67,6 +67,9 @@ public class TransformExpressionTree {
       return standardizeExpression(((FunctionCallAstNode) astNode).getExpression());
     } else if (astNode instanceof LiteralAstNode) {
       // Literal
+      // NOTE: String is treated as column name for backward-compatibility
+      // TODO: This can cause problem for string literals (e.g. in DistinctCountThetaSketch where we have to add special
+      //       handling). Fix this legacy behavior when we migrate to SQL format.
       return ((LiteralAstNode) astNode).getValueAsString();
     } else {
       throw new IllegalStateException("Cannot get standard expression from " + astNode.getClass().getSimpleName());
@@ -87,7 +90,7 @@ public class TransformExpressionTree {
       _expressionType = ExpressionType.FUNCTION;
       _value = ((FunctionCallAstNode) root).getName().toLowerCase();
       _children = new ArrayList<>();
-      if(root.hasChildren()) {
+      if (root.hasChildren()) {
         for (AstNode child : root.getChildren()) {
           _children.add(new TransformExpressionTree(child));
         }
