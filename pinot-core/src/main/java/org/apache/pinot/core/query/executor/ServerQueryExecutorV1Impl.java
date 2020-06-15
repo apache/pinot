@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -205,9 +206,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         metadata.put(DataTable.NUM_SEGMENTS_MATCHED, "0");
       } else {
         TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-        Plan globalQueryPlan = _planMaker
-            .makeInterSegmentPlan(segmentDataManagers, queryContext.getBrokerRequest(), executorService,
-                remainingTimeMs);
+        List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsMatchedAfterPruning);
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          indexSegments.add(segmentDataManager.getSegment());
+        }
+        Plan globalQueryPlan =
+            _planMaker.makeInstancePlan(indexSegments, queryContext, executorService, remainingTimeMs);
         planBuildTimer.stopAndRecord();
 
         if (PRINT_QUERY_PLAN) {

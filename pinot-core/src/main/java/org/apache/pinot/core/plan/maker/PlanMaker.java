@@ -20,36 +20,27 @@ package org.apache.pinot.core.plan.maker;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 
 /**
- * The <code>PlanMaker</code> provides interfaces to make segment level and instance level execution plan.
+ * The {@code PlanMaker} makes logical execution plan for the queries.
  */
+@InterfaceAudience.Private
 public interface PlanMaker {
 
   /**
-   * Make segment level {@link PlanNode} which contains execution plan on only one segment.
-   *
-   * @param indexSegment index segment.
-   * @param brokerRequest broker request.
-   * @return segment level plan node.
+   * Returns an instance level {@link Plan} which contains the logical execution plan for multiple segments.
    */
-  PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest);
+  Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext, ExecutorService executorService,
+      long timeoutMs);
 
   /**
-   * Make instance level {@link Plan} which contains execution plan on multiple segments.
-   *
-   * @param segmentDataManagers list of segment data manager.
-   * @param brokerRequest broker request.
-   * @param executorService executor service.
-   * @param timeOutMs time out in milliseconds.
-   * @return instance level plan.
+   * Returns a segment level {@link PlanNode} which contains the logical execution plan for one segment.
    */
-  Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
-      ExecutorService executorService, long timeOutMs);
+  PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext);
 }

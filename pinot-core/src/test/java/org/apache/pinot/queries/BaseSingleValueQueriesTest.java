@@ -26,8 +26,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -70,7 +68,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_126164076_167572854";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
-  private static final int NUM_SEGMENT_DATA_MANAGERS = 2;
+  private static final int NUM_SEGMENTS = 2;
 
   // Hard-coded query filter.
   private static final String QUERY_FILTER =
@@ -79,7 +77,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
-  private List<SegmentDataManager> _segmentDataManagers;
+  private List<IndexSegment> _indexSegments;
 
   @BeforeTest
   public void buildSegment()
@@ -100,8 +98,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
         .addMetric("column18", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null)
-        .build();
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
 
@@ -130,15 +127,15 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
       throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
-    int numSegmentDataManagers = getNumSegmentDataManagers();
-    _segmentDataManagers = new ArrayList<>(numSegmentDataManagers);
-    for (int i = 0; i < numSegmentDataManagers; i++) {
-      _segmentDataManagers.add(new ImmutableSegmentDataManager(immutableSegment));
+    int numSegments = getNumSegments();
+    _indexSegments = new ArrayList<>(numSegments);
+    for (int i = 0; i < numSegments; i++) {
+      _indexSegments.add(immutableSegment);
     }
   }
 
-  protected int getNumSegmentDataManagers() {
-    return NUM_SEGMENT_DATA_MANAGERS;
+  protected int getNumSegments() {
+    return NUM_SEGMENTS;
   }
 
   @AfterClass
@@ -162,7 +159,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   }
 
   @Override
-  protected List<SegmentDataManager> getSegmentDataManagers() {
-    return _segmentDataManagers;
+  protected List<IndexSegment> getIndexSegments() {
+    return _indexSegments;
   }
 }

@@ -27,8 +27,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -85,7 +83,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments
-  private List<SegmentDataManager> _segmentDataManagers;
+  private List<IndexSegment> _indexSegments;
 
   @Override
   protected String getFilter() {
@@ -98,8 +96,8 @@ public class FastHllQueriesTest extends BaseQueriesTest {
   }
 
   @Override
-  protected List<SegmentDataManager> getSegmentDataManagers() {
-    return _segmentDataManagers;
+  protected List<IndexSegment> getIndexSegments() {
+    return _indexSegments;
   }
 
   @Test
@@ -196,8 +194,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
-    _segmentDataManagers = Arrays
-        .asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
   private void deleteSegment() {

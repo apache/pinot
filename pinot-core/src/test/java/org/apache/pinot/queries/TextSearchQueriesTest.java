@@ -51,8 +51,6 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -63,6 +61,7 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -84,33 +83,20 @@ import org.testng.annotations.Test;
  * The test table has a SKILLS column and QUERY_LOG column. Text index is created
  * on each of these columns.
  */
-public class TextSearchQueriesTest extends BaseQueriesTest {
-
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueries");
+public class TextSearchQueriesTest extends BaseQueriesTest {  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
   private static final String TABLE_NAME = "MyTable";
-  private static final String SEGMENT_NAME = TABLE_NAME + "_100000000_200000000";
+  private static final String SEGMENT_NAME = "testSegment";
+
   private static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
   private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
   private static final String INT_COL_NAME = "INT_COL";
-  private static final List<String> textIndexColumns = new ArrayList<>();
+  private static final List<String> TEXT_INDEX_COLUMNS = Arrays.asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME);
   private static final int INT_BASE_VALUE = 1000;
-  private List<GenericRow> _rows = new ArrayList<>();
-  private RecordReader _recordReader;
-  Schema _schema;
-  private TableConfig _tableConfig;
 
-  private List<IndexSegment> _indexSegments = new ArrayList<>(1);
-  private List<SegmentDataManager> _segmentDataManagers = new ArrayList<>();
+  private final List<GenericRow> _rows = new ArrayList<>();
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    createPinotTableSchema();
-    createTestData();
-    _recordReader = new GenericRowRecordReader(_rows);
-    createSegment();
-    loadSegment();
-  }
+  private IndexSegment _indexSegment;
+  private List<IndexSegment> _indexSegments;
 
   @Override
   protected String getFilter() {
@@ -119,67 +105,66 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
   @Override
   protected IndexSegment getIndexSegment() {
-    return _indexSegments.get(0);
+    return _indexSegment;
   }
 
   @Override
-  protected List<SegmentDataManager> getSegmentDataManagers() {
-    return _segmentDataManagers;
+  protected List<IndexSegment> getIndexSegments() {
+    return _indexSegments;
+  }
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    buildSegment();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setTextIndexColumns(new HashSet<>(TEXT_INDEX_COLUMNS));
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
   @AfterClass
   public void tearDown() {
-    for (IndexSegment indexSegment : _indexSegments) {
-      if (indexSegment != null) {
-        indexSegment.destroy();
-      }
-    }
-    _indexSegments.clear();
+    _indexSegment.destroy();
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private void createPinotTableSchema() {
-    _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+  private void buildSegment()
+      throws Exception {
+    List<GenericRow> rows = createTestData();
+
+    List<FieldConfig> fieldConfigs = new ArrayList<>(TEXT_INDEX_COLUMNS.size());
+    for (String textIndexColumn : TEXT_INDEX_COLUMNS) {
+      fieldConfigs
+          .add(new FieldConfig(textIndexColumn, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null));
+    }
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(TEXT_INDEX_COLUMNS)
+            .setFieldConfigList(fieldConfigs).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(QUERY_LOG_TEXT_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-  }
-
-  private void createSegment()
-      throws Exception {
-    textIndexColumns.add(QUERY_LOG_TEXT_COL_NAME);
-    textIndexColumns.add(SKILLS_TEXT_COL_NAME);
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
-    segmentGeneratorConfig.setTableName(TABLE_NAME);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setRawIndexCreationColumns(textIndexColumns);
-    segmentGeneratorConfig.setTextIndexCreationColumns(textIndexColumns);
-    segmentGeneratorConfig.setSkipTimeValueCheck(true);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(INDEX_DIR.getPath());
+    config.setTableName(TABLE_NAME);
+    config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, _recordReader);
-    driver.build();
-
-    File segmentIndexDir = new File(INDEX_DIR.getAbsolutePath(), SEGMENT_NAME);
-    if (!segmentIndexDir.exists()) {
-      throw new IllegalStateException("Segment generation failed");
+    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
+      driver.init(config, recordReader);
+      driver.build();
     }
   }
 
-  private void loadSegment()
+  private List<GenericRow> createTestData()
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTextIndexColumns(new HashSet<>(textIndexColumns));
-    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegments.add(segment);
-    _segmentDataManagers =
-        Arrays.asList(new ImmutableSegmentDataManager(segment), new ImmutableSegmentDataManager(segment));
-  }
+    List<GenericRow> rows = new ArrayList<>();
 
-  private void createTestData()
-      throws Exception {
     // read the skills file
     URL resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/skills.txt");
     File skillFile = new File(resourceUrl.getFile());
@@ -209,10 +194,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         } else {
           row.putField(SKILLS_TEXT_COL_NAME, skills[counter]);
         }
-        _rows.add(row);
+        rows.add(row);
         counter++;
       }
     }
+
+    return rows;
   }
 
   /**

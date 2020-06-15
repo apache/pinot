@@ -31,21 +31,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -57,6 +47,14 @@ import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggrega
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -92,8 +90,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   protected static final Random RANDOM = new Random(RANDOM_SEED);
   protected static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
 
-  private ImmutableSegment _indexSegment;
-  private List<SegmentDataManager> _segmentDataManagers;
+  private IndexSegment _indexSegment;
+  private List<IndexSegment> _indexSegments;
 
   @Override
   protected String getFilter() {
@@ -106,8 +104,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   }
 
   @Override
-  protected List<SegmentDataManager> getSegmentDataManagers() {
-    return _segmentDataManagers;
+  protected List<IndexSegment> getIndexSegments() {
+    return _indexSegments;
   }
 
   @BeforeClass
@@ -116,9 +114,9 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment();
-    _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
-    _segmentDataManagers =
-        Arrays.asList(new ImmutableSegmentDataManager(_indexSegment), new ImmutableSegmentDataManager(_indexSegment));
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
   protected void buildSegment()
