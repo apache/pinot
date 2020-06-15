@@ -79,7 +79,10 @@ public class SegmentLineageTest {
     Assert.assertEquals(entry3.get(2), LineageEntryState.IN_PROGRESS.toString());
     Assert.assertEquals(entry3.get(3), Long.toString(33333L));
 
-    // Test the conversion frod m the znRecord to the segment lineage
-    Assert.assertEquals(segmentLineage, SegmentLineage.fromZNRecord(segmentLineage.toZNRecord()));
+    // Test the conversion from the znRecord to the segment lineage
+    SegmentLineage segmentLineageFromZNRecord = SegmentLineage.fromZNRecord(segmentLineage.toZNRecord());
+    Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id), lineageEntry);
+    Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id2), lineageEntry2);
+    Assert.assertEquals(segmentLineageFromZNRecord.getLineageEntry(id3), lineageEntry3);
   }
 }

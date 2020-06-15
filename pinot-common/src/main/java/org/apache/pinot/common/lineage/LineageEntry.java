@@ -19,7 +19,7 @@
 package org.apache.pinot.common.lineage;
 
 import java.util.List;
-import org.apache.pinot.spi.utils.EqualityUtils;
+import java.util.Objects;
 
 
 /**
@@ -27,10 +27,10 @@ import org.apache.pinot.spi.utils.EqualityUtils;
  *
  */
 public class LineageEntry {
-  private List<String> _segmentsFrom;
-  private List<String> _segmentsTo;
-  private LineageEntryState _state;
-  private long _timestamp;
+  private final List<String> _segmentsFrom;
+  private final List<String> _segmentsTo;
+  private final LineageEntryState _state;
+  private final long _timestamp;
 
   public LineageEntry(List<String> segmentsFrom, List<String> segmentsTo, LineageEntryState state, long timestamp) {
     _segmentsFrom = segmentsFrom;
@@ -57,24 +57,19 @@ public class LineageEntry {
 
   @Override
   public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
+    if (this == o) {
       return true;
     }
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
     LineageEntry that = (LineageEntry) o;
-    return EqualityUtils.isEqual(_segmentsFrom, that._segmentsFrom) && EqualityUtils.isEqual(_segmentsTo,
-        that._segmentsTo) && EqualityUtils.isEqual(_state, that._state) && EqualityUtils.isEqual(_timestamp,
-        that._timestamp);
+    return _timestamp == that._timestamp && _segmentsFrom.equals(that._segmentsFrom) && _segmentsTo.equals(
+        that._segmentsTo) && _state == that._state;
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_segmentsFrom);
-    result = EqualityUtils.hashCodeOf(result, _segmentsTo);
-    result = EqualityUtils.hashCodeOf(result, _state);
-    result = EqualityUtils.hashCodeOf(result, _timestamp);
-    return result;
+    return Objects.hash(_segmentsFrom, _segmentsTo, _state, _timestamp);
   }
 }

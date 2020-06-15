@@ -23,9 +23,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 /**
@@ -42,8 +42,8 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 public class SegmentLineage {
   private static final String COMMA_SEPARATOR = ",";
 
-  private String _tableNameWithType;
-  private Map<String, LineageEntry> _lineageEntries;
+  private final String _tableNameWithType;
+  private final Map<String, LineageEntry> _lineageEntries;
 
   public SegmentLineage(String tableNameWithType) {
     _tableNameWithType = tableNameWithType;
@@ -77,6 +77,14 @@ public class SegmentLineage {
    */
   public LineageEntry getLineageEntry(String lineageEntryId) {
     return _lineageEntries.get(lineageEntryId);
+  }
+
+  /**
+   * Retrieve the lineage ids for all lineage entries
+   * @return lineage entry ids
+   */
+  public Set<String> getLineageEntryIds() {
+    return _lineageEntries.keySet();
   }
 
   /**
@@ -129,25 +137,5 @@ public class SegmentLineage {
 
   private String generateLineageId() {
     return UUID.randomUUID().toString();
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-    SegmentLineage that = (SegmentLineage) o;
-    return EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType) && EqualityUtils.isEqual(_lineageEntries,
-        that._lineageEntries);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_tableNameWithType);
-    result = EqualityUtils.hashCodeOf(result, _lineageEntries);
-    return result;
   }
 }
