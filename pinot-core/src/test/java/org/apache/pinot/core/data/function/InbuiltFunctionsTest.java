@@ -47,6 +47,12 @@ public class InbuiltFunctionsTest {
   @DataProvider(name = "dateTimeFunctionsTestDataProvider")
   public Object[][] dateTimeFunctionsDataProvider() {
     List<Object[]> inputs = new ArrayList<>();
+    // round epoch millis to nearest 15 minutes
+    GenericRow row0_0 = new GenericRow();
+    row0_0.putValue("timestamp", 1578685189000L);
+    // round to 15 minutes, but keep in milliseconds: Fri Jan 10 2020 19:39:49 becomes Fri Jan 10 2020 19:30:00
+    inputs.add(new Object[]{"round(timestamp, 900000)", Lists.newArrayList(
+        "timestamp"), row0_0, 1578684600000L});
 
     // toEpochSeconds
     GenericRow row1_0 = new GenericRow();
