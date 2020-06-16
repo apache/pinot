@@ -21,12 +21,9 @@ package org.apache.pinot.core.plan;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,14 +31,12 @@ import org.slf4j.LoggerFactory;
  * on a single segment.
  */
 public class ProjectionPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ProjectionPlanNode.class);
-
   private final IndexSegment _indexSegment;
   private final Set<String> _projectionColumns;
   private final DocIdSetPlanNode _docIdSetPlanNode;
 
-  public ProjectionPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull Set<String> projectionColumns,
-      @Nonnull DocIdSetPlanNode docIdSetPlanNode) {
+  public ProjectionPlanNode(IndexSegment indexSegment, Set<String> projectionColumns,
+      DocIdSetPlanNode docIdSetPlanNode) {
     _indexSegment = indexSegment;
     _projectionColumns = projectionColumns;
     _docIdSetPlanNode = docIdSetPlanNode;
@@ -54,15 +49,5 @@ public class ProjectionPlanNode implements PlanNode {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
     return new ProjectionOperator(dataSourceMap, _docIdSetPlanNode.run());
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
-    LOGGER.debug(prefix + "Operator: ProjectionOperator");
-    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    LOGGER.debug(prefix + "Argument 1: Projection Columns - " + _projectionColumns);
-    LOGGER.debug(prefix + "Argument 2: DocIdSet - ");
-    _docIdSetPlanNode.showTree(prefix + "    ");
   }
 }

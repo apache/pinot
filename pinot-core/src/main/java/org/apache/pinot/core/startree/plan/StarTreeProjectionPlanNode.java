@@ -27,13 +27,9 @@ import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class StarTreeProjectionPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeProjectionPlanNode.class);
-
   private final Map<String, DataSource> _dataSourceMap;
   private final StarTreeDocIdSetPlanNode _starTreeDocIdSetPlanNode;
 
@@ -50,14 +46,5 @@ public class StarTreeProjectionPlanNode implements PlanNode {
   @Override
   public ProjectionOperator run() {
     return new ProjectionOperator(_dataSourceMap, _starTreeDocIdSetPlanNode.run());
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "StarTree Projection Plan Node:");
-    LOGGER.debug(prefix + "Operator: ProjectionOperator");
-    LOGGER.debug(prefix + "Argument 0: Data Sources - " + _dataSourceMap.keySet());
-    LOGGER.debug(prefix + "Argument 1: StarTreeDocIdSetPlanNode -");
-    _starTreeDocIdSetPlanNode.showTree(prefix + "    ");
   }
 }

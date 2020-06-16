@@ -22,22 +22,18 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Dictionary based aggregation plan node.
  */
+@SuppressWarnings("rawtypes")
 public class DictionaryBasedAggregationPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryBasedAggregationPlanNode.class);
-
   private final IndexSegment _indexSegment;
   private final AggregationFunction[] _aggregationFunctions;
   private final Map<String, Dictionary> _dictionaryMap;
@@ -59,15 +55,8 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public DictionaryBasedAggregationOperator run() {
     return new DictionaryBasedAggregationOperator(_aggregationFunctions, _dictionaryMap,
         _indexSegment.getSegmentMetadata().getTotalDocs());
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug("{} Segment Level Inner-Segment Plan Node:", prefix);
-    LOGGER.debug("{} Operator: DictionaryBasedAggregationOperator", prefix);
-    LOGGER.debug("{} IndexSegment: {}", prefix, _indexSegment.getSegmentName());
   }
 }

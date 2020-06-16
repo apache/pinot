@@ -25,13 +25,9 @@ import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.startree.operator.StarTreeFilterOperator;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class StarTreeFilterPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeFilterPlanNode.class);
-
   private final StarTreeV2 _starTreeV2;
   private final FilterQueryTree _rootFilterNode;
   private final Set<String> _groupByColumns;
@@ -48,13 +44,5 @@ public class StarTreeFilterPlanNode implements PlanNode {
   @Override
   public StarTreeFilterOperator run() {
     return new StarTreeFilterOperator(_starTreeV2, _rootFilterNode, _groupByColumns, _debugOptions);
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "StarTree Filter Plan Node:");
-    LOGGER.debug(prefix + "Operator: StarTreeFilterOperator");
-    LOGGER.debug(prefix + "Argument 0: Filters - " + _rootFilterNode);
-    LOGGER.debug(prefix + "Argument 1: Group-by Columns - " + _groupByColumns);
   }
 }

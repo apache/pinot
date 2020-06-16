@@ -27,21 +27,18 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>SelectionPlanNode</code> class provides the execution plan for selection query on a single segment.
  */
 public class SelectionPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionPlanNode.class);
-
   private final IndexSegment _indexSegment;
   private final Selection _selection;
   private final TransformPlanNode _transformPlanNode;
@@ -54,7 +51,7 @@ public class SelectionPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public Operator<IntermediateResultsBlock> run() {
     TransformOperator transformOperator = _transformPlanNode.run();
     if (_selection.getSize() > 0) {
       if (_selection.getSelectionSortSequence() == null) {
@@ -65,24 +62,6 @@ public class SelectionPlanNode implements PlanNode {
     } else {
       return new EmptySelectionOperator(_indexSegment, _selection, transformOperator);
     }
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
-    if (_selection.getSize() > 0) {
-      if (_selection.isSetSelectionSortSequence()) {
-        LOGGER.debug(prefix + "Operator: SelectionOrderByOperator");
-      } else {
-        LOGGER.debug(prefix + "Operator: SelectionOnlyOperator");
-      }
-    } else {
-      LOGGER.debug(prefix + "Operator: LimitZeroSelectionOperator");
-    }
-    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    LOGGER.debug(prefix + "Argument 1: Selections - " + _selection);
-    LOGGER.debug(prefix + "Argument 2: Transform -");
-    _transformPlanNode.showTree(prefix + "    ");
   }
 
   private Set<TransformExpressionTree> collectExpressionsToTransform(IndexSegment indexSegment,

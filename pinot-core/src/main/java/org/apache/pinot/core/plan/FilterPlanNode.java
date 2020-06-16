@@ -41,12 +41,9 @@ import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class FilterPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FilterPlanNode.class);
   private final BrokerRequest _brokerRequest;
   private final IndexSegment _segment;
 
@@ -145,13 +142,5 @@ public class FilterPlanNode implements PlanNode {
           return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
     }
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    final String treeStructure =
-        prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: " + _brokerRequest
-            .getFilterQuery();
-    LOGGER.debug(treeStructure);
   }
 }

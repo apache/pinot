@@ -20,9 +20,7 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -34,23 +32,18 @@ import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>AggregationGroupByPlanNode</code> class provides the execution plan for aggregation group-by query on a
  * single segment.
  */
+@SuppressWarnings("rawtypes")
 public class AggregationGroupByPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AggregationGroupByPlanNode.class);
-
   private final IndexSegment _indexSegment;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final List<AggregationInfo> _aggregationInfos;
   private final AggregationFunction[] _aggregationFunctions;
-  private final GroupBy _groupBy;
   private final TransformExpressionTree[] _groupByExpressions;
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
@@ -60,10 +53,8 @@ public class AggregationGroupByPlanNode implements PlanNode {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _aggregationInfos = brokerRequest.getAggregationsInfo();
     _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
-    _groupBy = brokerRequest.getGroupBy();
-    List<String> groupByExpressions = _groupBy.getExpressions();
+    List<String> groupByExpressions = brokerRequest.getGroupBy().getExpressions();
     int numGroupByExpressions = groupByExpressions.size();
     _groupByExpressions = new TransformExpressionTree[numGroupByExpressions];
     for (int i = 0; i < numGroupByExpressions; i++) {
@@ -121,22 +112,6 @@ public class AggregationGroupByPlanNode implements PlanNode {
       // Use star-tree
       return new AggregationGroupByOperator(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
           _numGroupsLimit, _starTreeTransformPlanNode.run(), numTotalDocs, true);
-    }
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Aggregation Group-by Plan Node:");
-    LOGGER.debug(prefix + "Operator: AggregationGroupByOperator");
-    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    LOGGER.debug(prefix + "Argument 1: Aggregations - " + _aggregationInfos);
-    LOGGER.debug(prefix + "Argument 2: GroupBy - " + _groupBy);
-    if (_transformPlanNode != null) {
-      LOGGER.debug(prefix + "Argument 3: TransformPlanNode -");
-      _transformPlanNode.showTree(prefix + "    ");
-    } else {
-      LOGGER.debug(prefix + "Argument 3: StarTreeTransformPlanNode -");
-      _starTreeTransformPlanNode.showTree(prefix + "    ");
     }
   }
 }
