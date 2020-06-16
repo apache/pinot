@@ -243,7 +243,8 @@ public class DateTimeFunctions {
 
 
   /**
-   * Round the given time value to nearest rounding bucket
+   * Round the given time value to nearest multiple
+   * @return the original value but rounded to the nearest multiple of @param roundToNearest
    */
   @ScalarFunction
   static Long round(Long timeValue, Number roundToNearest) {
