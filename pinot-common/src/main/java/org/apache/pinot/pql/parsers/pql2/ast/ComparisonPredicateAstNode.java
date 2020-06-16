@@ -23,7 +23,6 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
@@ -32,7 +31,7 @@ import org.apache.pinot.pql.parsers.Pql2CompilationException;
  * AST node for comparison predicates.
  */
 public class ComparisonPredicateAstNode extends PredicateAstNode {
-  private String _operand;
+  private final String _operand;
   private LiteralAstNode _literal;
 
   public ComparisonPredicateAstNode(String operand) {
@@ -54,38 +53,24 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
-      if (_identifier == null && _function == null) {
-        _identifier = ((IdentifierAstNode) childNode).getName();
-      } else if (_identifier != null) {
-        throw new Pql2CompilationException("Comparison between two columns is not supported.");
-      } else {
-        throw new Pql2CompilationException("Comparison between function and column is not supported.");
+      if (_identifier != null) {
+        throw new Pql2CompilationException("Comparison predicate has more than one column/function");
       }
+      _identifier = ((IdentifierAstNode) childNode).getName();
     } else if (childNode instanceof FunctionCallAstNode) {
-      if (_function == null && _identifier == null) {
-        _function = (FunctionCallAstNode) childNode;
-        _identifier = TransformExpressionTree.getStandardExpression(childNode);
-      } else if (_function != null) {
-        throw new Pql2CompilationException("Comparison between two functions is not supported.");
-      } else {
-        throw new Pql2CompilationException("Comparison between column and function is not supported.");
+      if (_identifier != null) {
+        throw new Pql2CompilationException("Comparison predicate has more than one column/function");
       }
+      _identifier = TransformExpressionTree.getStandardExpression(childNode);
     } else if (childNode instanceof LiteralAstNode) {
-      LiteralAstNode node = (LiteralAstNode) childNode;
-      if (_literal == null) {
-        _literal = node;
-      } else {
-        throw new Pql2CompilationException("Comparison between two constants is not supported.");
+      if (_literal != null) {
+        throw new Pql2CompilationException("Comparison between two constants is not supported");
       }
+      _literal = (LiteralAstNode) childNode;
     }
 
     // Add the child nonetheless
     super.addChild(childNode);
-  }
-
-  @Override
-  public String toString() {
-    return "ComparisonPredicateAstNode{" + "_operand='" + _operand + '\'' + '}';
   }
 
   /**
@@ -227,37 +212,6 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
         return expr;
       } else {
         throw new Pql2CompilationException("One column is needed for comparison.");
-      }
-    }
-  }
-
-  @Override
-  public HavingQueryTree buildHavingQueryTree() {
-    if (_function == null) {
-      throw new Pql2CompilationException("Comparison predicate has no function");
-    }
-
-    if ("=".equals(_operand)) {
-      if (_function != null && _literal != null) {
-        return new HavingQueryTree(_function.buildAggregationInfo(),
-            Collections.singletonList(_literal.getValueAsString()), FilterOperator.EQUALITY, null);
-      } else {
-        throw new Pql2CompilationException("Comparison is not between a function and a constant");
-      }
-    } else if ("<>".equals(_operand) || "!=".equals(_operand)) {
-      if (_function != null && _literal != null) {
-        return new HavingQueryTree(_function.buildAggregationInfo(),
-            Collections.singletonList(_literal.getValueAsString()), FilterOperator.NOT, null);
-      } else {
-        throw new Pql2CompilationException("Comparison is not between a function and a constant");
-      }
-    } else {
-      String comparison = createRangeStringForComparison();
-      if (_function != null) {
-        return new HavingQueryTree(_function.buildAggregationInfo(), Collections.singletonList(comparison),
-            FilterOperator.RANGE, null);
-      } else {
-        throw new Pql2CompilationException("Function call is needed for comparison.");
       }
     }
   }

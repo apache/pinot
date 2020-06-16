@@ -35,8 +35,6 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.HavingFilterQuery;
-import org.apache.pinot.common.request.HavingFilterQueryMap;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.Selection;
@@ -190,17 +188,6 @@ public class RequestUtils {
     return expression;
   }
 
-  public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
-    Map<Integer, HavingFilterQuery> filterQueryMap = new HashMap<>();
-    MutableInt currentId = new MutableInt(0);
-    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
-    filterQueryMap.put(root.getId(), root);
-    request.setHavingFilterQuery(root);
-    HavingFilterQueryMap mp = new HavingFilterQueryMap();
-    mp.setFilterQueryMap(filterQueryMap);
-    request.setHavingFilterSubQueryMap(mp);
-  }
-
   private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree,
       Map<Integer, FilterQuery> filterQueryMap, MutableInt currentId) {
     int currentNodeId = currentId.intValue();
@@ -223,31 +210,6 @@ public class RequestUtils {
     query.setOperator(tree.getOperator());
     query.setValue(tree.getValue());
     return query;
-  }
-
-  private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree tree,
-      Map<Integer, HavingFilterQuery> filterQueryMap, MutableInt currentId) {
-    int currentNodeId = currentId.intValue();
-    currentId.increment();
-
-    final List<Integer> filterIds = new ArrayList<>();
-    if (null != tree.getChildren()) {
-      for (final HavingQueryTree child : tree.getChildren()) {
-        int childNodeId = currentId.intValue();
-        currentId.increment();
-        filterIds.add(childNodeId);
-        final HavingFilterQuery filterQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap, currentId);
-        filterQueryMap.put(childNodeId, filterQuery);
-      }
-    }
-
-    HavingFilterQuery havingFilterQuery = new HavingFilterQuery();
-    havingFilterQuery.setAggregationInfo(tree.getAggregationInfo());
-    havingFilterQuery.setId(currentNodeId);
-    havingFilterQuery.setNestedFilterQueryIds(filterIds);
-    havingFilterQuery.setOperator(tree.getOperator());
-    havingFilterQuery.setValue(tree.getValue());
-    return havingFilterQuery;
   }
 
   /**

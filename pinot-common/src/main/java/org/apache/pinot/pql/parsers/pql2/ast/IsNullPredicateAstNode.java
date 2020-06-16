@@ -22,7 +22,6 @@ import java.util.Collections;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
@@ -41,15 +40,12 @@ public class IsNullPredicateAstNode extends PredicateAstNode {
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
-      if (_identifier == null) {
-        _identifier = ((IdentifierAstNode) childNode).getName();
-      } else {
-        throw new Pql2CompilationException("Only one column supported in IS predicate.");
+      if (_identifier != null) {
+        throw new Pql2CompilationException("IS predicate has more than one column/function");
       }
+      _identifier = ((IdentifierAstNode) childNode).getName();
     } else if (childNode instanceof FunctionCallAstNode) {
-      throw new Pql2CompilationException("Function not supported in IS predicate");
-    } else if (childNode instanceof LiteralAstNode) {
-      throw new Pql2CompilationException("Constants not supported in IS predicate");
+      throw new Pql2CompilationException("IS predicate cannot be applied to function");
     } else {
       super.addChild(childNode);
     }
@@ -61,9 +57,9 @@ public class IsNullPredicateAstNode extends PredicateAstNode {
       throw new Pql2CompilationException("IS predicate has no identifier");
     }
     if (_isNegation) {
-      return new FilterQueryTree(_identifier, Collections.EMPTY_LIST, FilterOperator.IS_NOT_NULL, null);
+      return new FilterQueryTree(_identifier, Collections.emptyList(), FilterOperator.IS_NOT_NULL, null);
     }
-    return new FilterQueryTree(_identifier, Collections.EMPTY_LIST, FilterOperator.IS_NULL, null);
+    return new FilterQueryTree(_identifier, Collections.emptyList(), FilterOperator.IS_NULL, null);
   }
 
   @Override
@@ -75,10 +71,5 @@ public class IsNullPredicateAstNode extends PredicateAstNode {
     Expression expression = RequestUtils.getFunctionExpression(filterName);
     expression.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
     return expression;
-  }
-
-  @Override
-  public HavingQueryTree buildHavingQueryTree() {
-    throw new Pql2CompilationException("IS NOT? NULL predicate is not supported in HAVING clause.");
   }
 }

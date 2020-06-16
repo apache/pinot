@@ -140,22 +140,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query =
         "SELECT SUM(TotalAddGTime) FROM mytable WHERE DivArrDelay NOT IN (67, 260) AND Carrier IN ('F9', 'B6') OR DepTime BETWEEN 2144 AND 1926";
     testQuery(query, Collections.singletonList(query));
-    query =
-        "SELECT ActualElapsedTime, OriginStateFips, MIN(DivReachedDest), SUM(ArrDelay), AVG(CRSDepTime) FROM mytable "
-            + "WHERE OriginCityName > 'Beaumont/Port Arthur, TX' OR FlightDate IN ('2014-12-09', '2014-10-05')"
-            + " GROUP BY ActualElapsedTime, OriginStateFips "
-            + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CRSDepTime) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274 TOP 29";
-    testQuery(query, Arrays.asList(
-        "SELECT ActualElapsedTime, OriginStateFips, MIN(DivReachedDest) FROM mytable WHERE OriginCityName > 'Beaumont/Port Arthur, "
-            + "TX' OR FlightDate IN ('2014-12-09', '2014-10-05') GROUP BY ActualElapsedTime, OriginStateFips "
-            + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CAST(CRSDepTime AS DOUBLE)) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274",
-        "SELECT ActualElapsedTime, OriginStateFips, SUM(ArrDelay) FROM mytable WHERE OriginCityName > 'Beaumont/Port Arthur, TX' OR "
-            + "FlightDate IN ('2014-12-09', '2014-10-05') GROUP BY ActualElapsedTime, OriginStateFips "
-            + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CAST(CRSDepTime AS DOUBLE)) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274",
-        "SELECT ActualElapsedTime, OriginStateFips,"
-            + " AVG(CAST(CRSDepTime AS DOUBLE)) FROM mytable WHERE OriginCityName > 'Beaumont/Port Arthur, TX' OR "
-            + "FlightDate IN ('2014-12-09', '2014-10-05') GROUP BY ActualElapsedTime, OriginStateFips "
-            + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CAST(CRSDepTime AS DOUBLE)) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274"));
   }
 
   /**

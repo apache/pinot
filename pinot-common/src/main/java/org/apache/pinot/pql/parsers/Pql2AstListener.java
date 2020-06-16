@@ -29,7 +29,6 @@ import org.apache.pinot.pql.parsers.pql2.ast.ExpressionParenthesisGroupAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FloatingPointLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.GroupByAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.HavingAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.InPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
@@ -293,7 +292,7 @@ public class Pql2AstListener extends PQL2BaseListener {
 
   @Override
   public void enterHaving(@NotNull PQL2Parser.HavingContext ctx) {
-    pushNode(new HavingAstNode());
+    throw new UnsupportedOperationException("HAVING clause is not supported");
   }
 
   @Override

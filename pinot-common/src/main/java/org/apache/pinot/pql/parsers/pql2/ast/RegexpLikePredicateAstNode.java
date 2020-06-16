@@ -22,8 +22,8 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
@@ -34,14 +34,15 @@ public class RegexpLikePredicateAstNode extends PredicateAstNode {
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
-      if (_identifier == null) {
-        IdentifierAstNode node = (IdentifierAstNode) childNode;
-        _identifier = node.getName();
-      } else {
-        throw new Pql2CompilationException("REGEXP_LIKE predicate has more than one identifier.");
+      if (_identifier != null) {
+        throw new Pql2CompilationException("REGEXP_LIKE predicate has more than one column/function");
       }
+      _identifier = ((IdentifierAstNode) childNode).getName();
     } else if (childNode instanceof FunctionCallAstNode) {
-      throw new Pql2CompilationException("REGEXP_LIKE operator can not be called for a function.");
+      if (_identifier != null) {
+        throw new Pql2CompilationException("REGEXP_LIKE predicate has more than one column/function");
+      }
+      _identifier = TransformExpressionTree.getStandardExpression(childNode);
     } else {
       super.addChild(childNode);
     }
@@ -74,10 +75,5 @@ public class RegexpLikePredicateAstNode extends PredicateAstNode {
       expression.getFunctionCall().addToOperands(RequestUtils.getExpression(astNode));
     }
     return expression;
-  }
-
-  @Override
-  public HavingQueryTree buildHavingQueryTree() {
-    throw new Pql2CompilationException("REGEXP_LIKE predicate is not supported in HAVING clause.");
   }
 }
