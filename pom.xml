@@ -1475,6 +1475,12 @@
             <exclude>**/normalize*</exclude>
             <exclude>**/handlebars*</exclude>
             <exclude>**/beautify*</exclude>
+            <exclude>**/node_modules/**</exclude>
+            <exclude>**/dist/**</exclude>
+            <exclude>**/.factorypath</exclude>
+            <exclude>**/app/**</exclude>
+            <exclude>pinot-controller/src/main/resources/**</exclude>
+            <exclude>pinot-controller/src/main/resources/.*</exclude>
           </excludes>
           <mapping>
             <thrift>JAVADOC_STYLE</thrift>
