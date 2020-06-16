@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -43,6 +44,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -51,6 +53,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.util.ReplicationUtils;
@@ -341,6 +344,46 @@ public class PinotTableRestletResource {
 
     return new SuccessResponse("Table config updated for " + tableName);
   }
+  
+  @POST
+  @Path("/tables/{tableName}/truncate")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Truncate table")
+  public SuccessResponse truncateTable(
+      @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) throws Exception {
+
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
+    }
+
+    // Disable table on tableType
+    if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      // disable offline table
+      _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.DISABLE);
+    }
+    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      // disable real-time table
+      _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.DISABLE);
+
+    }
+
+    // Get all segment names for table and delete all segments
+    String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
+    List<String> segmentNames = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType);
+    PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentNames);
+
+    if (!response.isSuccessful()) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to delete segments from table: " + tableNameWithType + ", error message: " + response.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    return new SuccessResponse("Table " + tableName + " successfully truncated");
+  }
 
   @POST
   @Path("/tables/validate")
@@ -361,6 +404,16 @@ public class PinotTableRestletResource {
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
+    }
+  }
+  
+  private List<String> getExistingTableNamesWithType(String tableName, @Nullable TableType tableType) {
+    try {
+      return _pinotHelixResourceManager.getExistingTableNamesWithType(tableName, tableType);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
     }
   }
 
