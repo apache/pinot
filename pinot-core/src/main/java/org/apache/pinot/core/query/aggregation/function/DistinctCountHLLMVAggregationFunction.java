@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -30,8 +31,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggregationFunction {
 
-  public DistinctCountHLLMVAggregationFunction(String column) {
-    super(column);
+  public DistinctCountHLLMVAggregationFunction(List<String> arguments) {
+    super(arguments);
   }
 
   @Override

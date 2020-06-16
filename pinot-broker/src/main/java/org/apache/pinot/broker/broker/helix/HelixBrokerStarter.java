@@ -191,10 +191,19 @@ public class HelixBrokerStarter implements ServiceStartable {
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
     Map<String, String> configMap = configAccessor.get(helixConfigScope, Arrays
         .asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY,
-            Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE));
+            Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY));
     if (Boolean.parseBoolean(configMap.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean
         .parseBoolean(configMap.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY))) {
       _brokerConf.setProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, true);
+    }
+    String log2mStr = configMap.get(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY);
+    if (log2mStr != null) {
+      try {
+        _brokerConf.setProperty(Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.parseInt(log2mStr));
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid config of '{}': '{}', using: {} as the default log2m for HyperLogLog",
+            Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, log2mStr, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
+      }
     }
     if (Boolean.parseBoolean(configMap.get(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE))) {
       _brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, true);

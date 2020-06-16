@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -32,8 +33,8 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
   private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
-  public DistinctCountRawHLLAggregationFunction(String column) {
-    this(column, new DistinctCountHLLAggregationFunction(column));
+  public DistinctCountRawHLLAggregationFunction(List<String> arguments) {
+    this(arguments.get(0), new DistinctCountHLLAggregationFunction(arguments));
   }
 
   DistinctCountRawHLLAggregationFunction(String column,

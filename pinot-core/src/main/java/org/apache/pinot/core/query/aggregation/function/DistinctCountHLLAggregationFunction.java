@@ -20,9 +20,11 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -34,10 +36,22 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
-  public static final int DEFAULT_LOG2M = 8;
+  protected final int _log2m;
 
-  public DistinctCountHLLAggregationFunction(String column) {
-    super(column);
+  public DistinctCountHLLAggregationFunction(List<String> arguments) {
+    super(arguments.get(0));
+    int numExpressions = arguments.size();
+    // This function expects 1 or 2 arguments.
+    Preconditions
+        .checkArgument(numExpressions <= 2 && numExpressions >= 1, "DistinctCountHLL expects 1 or 2 arguments, got: %s",
+            numExpressions);
+    if (arguments.size() == 2) {
+      // TODO: Currently PinotQuery2BrokerRequestConverter enforces single quoted non-string literal
+      //       in ParserUtils.standardizeExpression(...).
+      _log2m = Integer.valueOf(arguments.get(1).replace("'", ""));
+    } else {
+      _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
+    }
   }
 
   @Override
@@ -267,7 +281,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public HyperLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
-      return new HyperLogLog(DEFAULT_LOG2M);
+      return new HyperLogLog(_log2m);
     } else {
       return hyperLogLog;
     }
@@ -277,7 +291,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   public HyperLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
-      return new HyperLogLog(DEFAULT_LOG2M);
+      return new HyperLogLog(_log2m);
     } else {
       return hyperLogLog;
     }
@@ -329,10 +343,10 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
    * @param aggregationResultHolder Result holder
    * @return HyperLogLog from the result holder
    */
-  protected static HyperLogLog getDefaultHyperLogLog(AggregationResultHolder aggregationResultHolder) {
+  protected HyperLogLog getDefaultHyperLogLog(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(DEFAULT_LOG2M);
+      hyperLogLog = new HyperLogLog(_log2m);
       aggregationResultHolder.setValue(hyperLogLog);
     }
     return hyperLogLog;
@@ -345,10 +359,10 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
    * @param groupKey Group key for which to return the HyperLogLog
    * @return HyperLogLog for the group key
    */
-  protected static HyperLogLog getDefaultHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
+  protected HyperLogLog getDefaultHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(DEFAULT_LOG2M);
+      hyperLogLog = new HyperLogLog(_log2m);
       groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
     }
     return hyperLogLog;

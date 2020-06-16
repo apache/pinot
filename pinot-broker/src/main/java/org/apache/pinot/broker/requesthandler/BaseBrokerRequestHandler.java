@@ -61,6 +61,7 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
@@ -74,6 +75,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.helix.TableCache;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -112,6 +114,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private final boolean _enableCaseInsensitive;
   private final boolean _enableQueryLimitOverride;
+  private final int _defaultHllLog2m;
   private final TableCache _tableCache;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingManager routingManager,
@@ -129,6 +132,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } else {
       _tableCache = null;
     }
+    _defaultHllLog2m = _config
+        .getInt(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
 
     _enableQueryLimitOverride = _config.getBoolean(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
 
@@ -199,6 +204,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       } catch (Exception e) {
         LOGGER.warn("Caught exception while rewriting PQL to make it case-insensitive {}: {}, {}", requestId, query, e);
       }
+    }
+    if (_defaultHllLog2m > 0) {
+      handleHyperloglogLog2mOverride(brokerRequest, _defaultHllLog2m);
     }
     if (_enableQueryLimitOverride) {
       handleQueryLimitOverride(brokerRequest, _queryResponseLimit);
@@ -423,6 +431,54 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _numDroppedLog.incrementAndGet();
     }
     return brokerResponse;
+  }
+
+  /**
+   * Set Log2m value for DistinctCountHLL Function
+   * @param brokerRequest
+   * @param hllLog2mOverride
+   */
+  static void handleHyperloglogLog2mOverride(BrokerRequest brokerRequest, int hllLog2mOverride) {
+    if (brokerRequest.getAggregationsInfo() != null) {
+      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
+        switch (aggregationInfo.getAggregationType().toUpperCase()) {
+          case "DISTINCTCOUNTHLL":
+          case "DISTINCTCOUNTHLLMV":
+          case "DISTINCTCOUNTRAWHLL":
+          case "DISTINCTCOUNTRAWHLLMV":
+            if (aggregationInfo.getExpressionsSize() == 1) {
+              aggregationInfo.addToExpressions(Integer.toString(hllLog2mOverride));
+            }
+        }
+      }
+    }
+    if (brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().getSelectList() != null) {
+      for (Expression expr : brokerRequest.getPinotQuery().getSelectList()) {
+        updateDistinctCountHllExpr(expr, hllLog2mOverride);
+      }
+    }
+  }
+
+  private static void updateDistinctCountHllExpr(Expression expr, int hllLog2mOverride) {
+    Function functionCall = expr.getFunctionCall();
+    if (functionCall == null) {
+      return;
+    }
+    switch (functionCall.getOperator()) {
+      case "DISTINCTCOUNTHLL":
+      case "DISTINCTCOUNTHLLMV":
+      case "DISTINCTCOUNTRAWHLL":
+      case "DISTINCTCOUNTRAWHLLMV":
+        if (functionCall.getOperandsSize() == 1) {
+          functionCall.addToOperands(RequestUtils.getLiteralExpression(hllLog2mOverride));
+        }
+        return;
+    }
+    if (functionCall.getOperandsSize() > 0) {
+      for (Expression operand : functionCall.getOperands()) {
+        updateDistinctCountHllExpr(operand, hllLog2mOverride);
+      }
+    }
   }
 
   /**
