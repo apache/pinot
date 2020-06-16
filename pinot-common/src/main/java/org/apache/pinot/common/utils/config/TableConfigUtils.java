@@ -211,9 +211,8 @@ public class TableConfigUtils {
   private static void validateValidationConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig != null) {
-      String timeColumnName = validationConfig.getTimeColumnName();
-      if(timeColumnName == null) {
-        throw new IllegalStateException("Must provide valid timeColumnName in tableConfig");
+      if (tableConfig.getTableType() == TableType.REALTIME && validationConfig.getTimeColumnName() == null) {
+        throw new IllegalStateException("Must provide time column in real-time table config");
       }
       String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
       if (peerSegmentDownloadScheme != null) {
