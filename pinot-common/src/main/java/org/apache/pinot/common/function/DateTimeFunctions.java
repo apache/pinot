@@ -247,7 +247,8 @@ public class DateTimeFunctions {
    */
   @ScalarFunction
   static Long round(Long timeValue, Number roundToNearest) {
-    return (timeValue / roundToNearest.intValue()) * roundToNearest.intValue();
+    long roundingValue = roundToNearest.longValue();
+    return (timeValue / roundingValue) * roundingValue;
   }
 
   /**
