@@ -22,15 +22,17 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -55,6 +57,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
  *   </li>
  * </ul>
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class ColumnValueSegmentPruner implements SegmentPruner {
 
   @Override
@@ -63,65 +66,67 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
 
   @Override
   public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
-    FilterQueryTree filterQueryTree = queryRequest.getFilterQueryTree();
-    if (filterQueryTree == null) {
+    FilterContext filter = queryRequest.getQueryContext().getFilter();
+    if (filter == null) {
       return false;
     }
 
     // This map caches the data sources
     Map<String, DataSource> dataSourceCache = new HashMap<>();
-    return pruneSegment(segment, filterQueryTree, dataSourceCache);
+    return pruneSegment(segment, filter, dataSourceCache);
   }
 
-  private boolean pruneSegment(IndexSegment segment, FilterQueryTree filterQueryTree,
-      Map<String, DataSource> dataSourceCache) {
-    // Only prune columns
-    TransformExpressionTree expression = filterQueryTree.getExpression();
-    if (expression != null && !expression.isColumn()) {
-      return false;
-    }
-
-    switch (filterQueryTree.getOperator()) {
+  private boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache) {
+    switch (filter.getType()) {
       case AND:
-        for (FilterQueryTree child : filterQueryTree.getChildren()) {
+        for (FilterContext child : filter.getChildren()) {
           if (pruneSegment(segment, child, dataSourceCache)) {
             return true;
           }
         }
         return false;
       case OR:
-        for (FilterQueryTree child : filterQueryTree.getChildren()) {
+        for (FilterContext child : filter.getChildren()) {
           if (!pruneSegment(segment, child, dataSourceCache)) {
             return false;
           }
         }
         return true;
-      case EQUALITY:
-        return pruneEqualityFilter(segment, filterQueryTree, dataSourceCache);
-      case RANGE:
-        return pruneRangeFilter(segment, filterQueryTree, dataSourceCache);
+      case PREDICATE:
+        Predicate predicate = filter.getPredicate();
+        // Only prune columns
+        if (predicate.getLhs().getType() != ExpressionContext.Type.IDENTIFIER) {
+          return false;
+        }
+        Predicate.Type predicateType = predicate.getType();
+        if (predicateType == Predicate.Type.EQ) {
+          return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache);
+        } else if (predicateType == Predicate.Type.RANGE) {
+          return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache);
+        } else {
+          return false;
+        }
       default:
-        return false;
+        throw new IllegalStateException();
     }
   }
 
   /**
-   * For EQUALITY filter, prune the segment based on:
+   * For EQ predicate, prune the segment based on:
    * <ul>
    *   <li>Column min/max value</li>
    *   <li>Column partition</li>
    *   <li>Column bloom filter</li>
    * </ul>
    */
-  @SuppressWarnings("unchecked")
-  private boolean pruneEqualityFilter(IndexSegment segment, FilterQueryTree filterQueryTree,
+  private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
       Map<String, DataSource> dataSourceCache) {
-    String column = filterQueryTree.getColumn();
+    String column = eqPredicate.getLhs().getIdentifier();
     DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-    Comparable value = convertValue(filterQueryTree.getValue().get(0), dataSourceMetadata.getDataType());
+    Comparable value = convertValue(eqPredicate.getValue(), dataSourceMetadata.getDataType());
 
     // Check min/max value
     Comparable minValue = dataSourceMetadata.getMinValue();
@@ -155,15 +160,14 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   }
 
   /**
-   * For RANGE filter, prune the segment based on:
+   * For RANGE predicate, prune the segment based on:
    * <ul>
    *   <li>Column min/max value</li>
    * </ul>
    */
-  @SuppressWarnings("unchecked")
-  private boolean pruneRangeFilter(IndexSegment segment, FilterQueryTree filterQueryTree,
+  private boolean pruneRangePredicate(IndexSegment segment, RangePredicate rangePredicate,
       Map<String, DataSource> dataSourceCache) {
-    String column = filterQueryTree.getColumn();
+    String column = rangePredicate.getLhs().getIdentifier();
     DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
@@ -171,29 +175,28 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
 
     // Get lower/upper boundary value
     DataType dataType = dataSourceMetadata.getDataType();
-    RangePredicate rangePredicate = new RangePredicate(null, filterQueryTree.getValue());
-    String lowerBoundary = rangePredicate.getLowerBoundary();
-    boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
-    Comparable lowerBoundaryValue = null;
-    if (!lowerBoundary.equals(RangePredicate.UNBOUNDED)) {
-      lowerBoundaryValue = convertValue(lowerBoundary, dataType);
+    String lowerBound = rangePredicate.getLowerBound();
+    Comparable lowerBoundValue = null;
+    if (!lowerBound.equals(RangePredicate.UNBOUNDED)) {
+      lowerBoundValue = convertValue(lowerBound, dataType);
     }
-    String upperBoundary = rangePredicate.getUpperBoundary();
-    boolean includeUpperBoundary = rangePredicate.includeUpperBoundary();
-    Comparable upperBoundaryValue = null;
-    if (!upperBoundary.equals(RangePredicate.UNBOUNDED)) {
-      upperBoundaryValue = convertValue(upperBoundary, dataType);
+    boolean lowerInclusive = rangePredicate.isLowerInclusive();
+    String upperBound = rangePredicate.getUpperBound();
+    Comparable upperBoundValue = null;
+    if (!upperBound.equals(RangePredicate.UNBOUNDED)) {
+      upperBoundValue = convertValue(upperBound, dataType);
     }
+    boolean upperInclusive = rangePredicate.isUpperInclusive();
 
     // Check if the range is valid
     // TODO: This check should be performed on the broker
-    if (lowerBoundaryValue != null && upperBoundaryValue != null) {
-      if (includeLowerBoundary && includeUpperBoundary) {
-        if (lowerBoundaryValue.compareTo(upperBoundaryValue) > 0) {
+    if (lowerBoundValue != null && upperBoundValue != null) {
+      if (lowerInclusive && upperInclusive) {
+        if (lowerBoundValue.compareTo(upperBoundValue) > 0) {
           return true;
         }
       } else {
-        if (lowerBoundaryValue.compareTo(upperBoundaryValue) >= 0) {
+        if (lowerBoundValue.compareTo(upperBoundValue) >= 0) {
           return true;
         }
       }
@@ -205,24 +208,24 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       Comparable maxValue = dataSourceMetadata.getMaxValue();
       assert maxValue != null;
 
-      if (lowerBoundaryValue != null) {
-        if (includeLowerBoundary) {
-          if (lowerBoundaryValue.compareTo(maxValue) > 0) {
+      if (lowerBoundValue != null) {
+        if (lowerInclusive) {
+          if (lowerBoundValue.compareTo(maxValue) > 0) {
             return true;
           }
         } else {
-          if (lowerBoundaryValue.compareTo(maxValue) >= 0) {
+          if (lowerBoundValue.compareTo(maxValue) >= 0) {
             return true;
           }
         }
       }
-      if (upperBoundaryValue != null) {
-        if (includeUpperBoundary) {
-          if (upperBoundaryValue.compareTo(minValue) < 0) {
+      if (upperBoundValue != null) {
+        if (upperInclusive) {
+          if (upperBoundValue.compareTo(minValue) < 0) {
             return true;
           }
         } else {
-          if (upperBoundaryValue.compareTo(minValue) <= 0) {
+          if (upperBoundValue.compareTo(minValue) <= 0) {
             return true;
           }
         }
