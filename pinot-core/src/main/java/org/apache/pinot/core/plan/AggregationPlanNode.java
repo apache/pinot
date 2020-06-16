@@ -20,7 +20,6 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -33,26 +32,21 @@ import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>AggregationPlanNode</code> class provides the execution plan for aggregation only query on a single
  * segment.
  */
+@SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AggregationPlanNode.class);
-
   private final IndexSegment _indexSegment;
-  private final List<AggregationInfo> _aggregationInfos;
   private final AggregationFunction[] _aggregationFunctions;
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
 
   public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
-    _aggregationInfos = brokerRequest.getAggregationsInfo();
     _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
@@ -103,21 +97,6 @@ public class AggregationPlanNode implements PlanNode {
     } else {
       // Use star-tree
       return new AggregationOperator(_aggregationFunctions, _starTreeTransformPlanNode.run(), numTotalDocs, true);
-    }
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Aggregation Plan Node:");
-    LOGGER.debug(prefix + "Operator: AggregationOperator");
-    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    LOGGER.debug(prefix + "Argument 1: Aggregations - " + _aggregationInfos);
-    if (_transformPlanNode != null) {
-      LOGGER.debug(prefix + "Argument 2: TransformPlanNode -");
-      _transformPlanNode.showTree(prefix + "    ");
-    } else {
-      LOGGER.debug(prefix + "Argument 2: StarTreeTransformPlanNode -");
-      _starTreeTransformPlanNode.showTree(prefix + "    ");
     }
   }
 }

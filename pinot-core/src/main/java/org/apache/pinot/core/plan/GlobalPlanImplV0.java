@@ -50,9 +50,4 @@ public class GlobalPlanImplV0 implements Plan {
     LOGGER.debug("InstanceResponseOperator.nextBlock() took: {}ms", endTime2 - endTime1);
     return instanceResponseBlock.getInstanceResponseDataTable();
   }
-
-  @Override
-  public void print() {
-    _instanceResponsePlanNode.showTree("");
-  }
 }

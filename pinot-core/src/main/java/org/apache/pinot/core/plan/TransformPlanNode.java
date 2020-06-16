@@ -27,25 +27,18 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>TransformPlanNode</code> class provides the execution plan for transforms on a single segment.
  */
 public class TransformPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TransformPlanNode.class);
-
-  private final String _segmentName;
   private final ProjectionPlanNode _projectionPlanNode;
   private final Set<TransformExpressionTree> _expressions;
   private int _maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
   public TransformPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest,
       Set<TransformExpressionTree> expressionsToPlan) {
-    _segmentName = indexSegment.getSegmentName();
-
     setMaxDocsForSelection(brokerRequest);
     Set<String> projectionColumns = new HashSet<>();
     extractProjectionColumns(expressionsToPlan, projectionColumns);
@@ -108,14 +101,5 @@ public class TransformPlanNode implements PlanNode {
   @Override
   public TransformOperator run() {
     return new TransformOperator(_projectionPlanNode.run(), _expressions);
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
-    LOGGER.debug(prefix + "Operator: TransformOperator");
-    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _segmentName);
-    LOGGER.debug(prefix + "Argument 1: Projection -");
-    _projectionPlanNode.showTree(prefix + "    ");
   }
 }

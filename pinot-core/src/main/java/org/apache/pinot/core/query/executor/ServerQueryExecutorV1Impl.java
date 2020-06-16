@@ -58,7 +58,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
-  private static final boolean PRINT_QUERY_PLAN = false;
 
   private InstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
@@ -209,13 +208,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
             .makeInterSegmentPlan(segmentDataManagers, queryContext.getBrokerRequest(), executorService,
                 remainingTimeMs);
         planBuildTimer.stopAndRecord();
-
-        if (PRINT_QUERY_PLAN) {
-          LOGGER.debug("***************************** Query Plan for Request {} ***********************************",
-              queryRequest.getRequestId());
-          globalQueryPlan.print();
-          LOGGER.debug("*********************************** End Query Plan ***********************************");
-        }
 
         TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
         dataTable = globalQueryPlan.execute();

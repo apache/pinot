@@ -30,19 +30,16 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.CombineGroupByOperator;
 import org.apache.pinot.core.operator.CombineGroupByOrderByOperator;
 import org.apache.pinot.core.operator.CombineOperator;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.core.util.trace.TraceCallable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments.
  */
 public class CombinePlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
-
   // Use at most 10 or half of the processors threads for each query.
   // If there are less than 2 processors, use 1 thread.
   // Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
@@ -77,8 +74,9 @@ public class CombinePlanNode implements PlanNode {
     _numGroupsLimit = numGroupsLimit;
   }
 
+  @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
-  public Operator run() {
+  public Operator<IntermediateResultsBlock> run() {
     int numPlanNodes = _planNodes.size();
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
@@ -171,18 +169,6 @@ public class CombinePlanNode implements PlanNode {
     } else {
       // Selection or aggregation only query
       return new CombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);
-    }
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Instance Level Inter-Segments Combine Plan Node:");
-    LOGGER.debug(prefix + "Operator: CombineOperator/CombineGroupByOperator");
-    LOGGER.debug(prefix + "Argument 0: BrokerRequest - " + _brokerRequest);
-    int i = 1;
-    for (PlanNode planNode : _planNodes) {
-      LOGGER.debug(prefix + "Argument " + (i++) + ":");
-      planNode.showTree(prefix + "    ");
     }
   }
 }

@@ -28,13 +28,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Assert;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.testng.annotations.Test;
 
 
 public class CombinePlanNodeTest {
-  private ExecutorService _executorService = Executors.newFixedThreadPool(10);
+  private final ExecutorService _executorService = Executors.newFixedThreadPool(10);
 
   /**
    * Tests that the tasks are executed as expected in parallel mode.
@@ -50,16 +49,9 @@ public class CombinePlanNodeTest {
       int numPlans = rand.nextInt(5000);
       List<PlanNode> planNodes = new ArrayList<>();
       for (int index = 0; index < numPlans; index++) {
-        planNodes.add(new PlanNode() {
-          @Override
-          public Operator run() {
-            count.incrementAndGet();
-            return null;
-          }
-
-          @Override
-          public void showTree(String prefix) {
-          }
+        planNodes.add(() -> {
+          count.incrementAndGet();
+          return null;
         });
       }
       CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, new BrokerRequest(), _executorService, 1000,
@@ -77,22 +69,15 @@ public class CombinePlanNodeTest {
 
     List<PlanNode> planNodes = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
-      planNodes.add(new PlanNode() {
-        @Override
-        public Operator run() {
-          try {
-            Thread.sleep(20000);
-          } catch (InterruptedException e) {
-            // Thread should be interrupted
-            throw new RuntimeException(e);
-          }
-          notInterrupted.set(true);
-          return null;
+      planNodes.add(() -> {
+        try {
+          Thread.sleep(20000);
+        } catch (InterruptedException e) {
+          // Thread should be interrupted
+          throw new RuntimeException(e);
         }
-
-        @Override
-        public void showTree(String prefix) {
-        }
+        notInterrupted.set(true);
+        return null;
       });
     }
     CombinePlanNode combinePlanNode =
@@ -112,15 +97,8 @@ public class CombinePlanNodeTest {
   public void testPlanNodeThrowException() {
     List<PlanNode> planNodes = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
-      planNodes.add(new PlanNode() {
-        @Override
-        public Operator run() {
-          throw new RuntimeException("Inner exception message.");
-        }
-
-        @Override
-        public void showTree(String prefix) {
-        }
+      planNodes.add(() -> {
+        throw new RuntimeException("Inner exception message.");
       });
     }
     CombinePlanNode combinePlanNode =
