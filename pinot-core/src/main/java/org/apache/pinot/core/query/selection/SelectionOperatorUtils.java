@@ -40,6 +40,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.util.ArrayCopyUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -68,6 +69,7 @@ public class SelectionOperatorUtils {
   private SelectionOperatorUtils() {
   }
 
+  public static final ExpressionContext IDENTIFIER_STAR = ExpressionContext.forIdentifier("*");
   public static final int MAX_ROW_HOLDER_INITIAL_CAPACITY = 10_000;
 
   private static final String INT_PATTERN = "##########";

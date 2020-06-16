@@ -31,6 +31,7 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
@@ -44,6 +45,8 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator;
 import org.apache.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -93,14 +96,15 @@ public class NoDictionaryGroupKeyGeneratorTest {
     // Create transform operator and block
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
     String query = String.format("SELECT COUNT(*) FROM table GROUP BY %s", StringUtils.join(COLUMN_NAMES, ", "));
+    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(query);
+    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
 
     // Compute the transform expressions
     Set<TransformExpressionTree> expressionTrees = new LinkedHashSet<>();
     for (String columnName : COLUMN_NAMES) {
       expressionTrees.add(TransformExpressionTree.compileToExpressionTree(columnName));
     }
-    TransformPlanNode transformPlanNode =
-        new TransformPlanNode(indexSegment, new Pql2Compiler().compileToBrokerRequest(query), expressionTrees);
+    TransformPlanNode transformPlanNode = new TransformPlanNode(indexSegment, queryContext, expressionTrees);
     _transformOperator = transformPlanNode.run();
     _transformBlock = _transformOperator.nextBlock();
   }

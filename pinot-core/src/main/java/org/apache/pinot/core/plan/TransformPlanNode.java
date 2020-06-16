@@ -19,14 +19,12 @@
 package org.apache.pinot.core.plan;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
 
 /**
@@ -37,15 +35,15 @@ public class TransformPlanNode implements PlanNode {
   private final Set<TransformExpressionTree> _expressions;
   private int _maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
-  public TransformPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest,
+  public TransformPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       Set<TransformExpressionTree> expressionsToPlan) {
-    setMaxDocsForSelection(brokerRequest);
+    setMaxDocsForSelection(queryContext);
     Set<String> projectionColumns = new HashSet<>();
     extractProjectionColumns(expressionsToPlan, projectionColumns);
 
     _expressions = expressionsToPlan;
     _projectionPlanNode = new ProjectionPlanNode(indexSegment, projectionColumns,
-        new DocIdSetPlanNode(indexSegment, brokerRequest, _maxDocPerNextCall));
+        new DocIdSetPlanNode(indexSegment, queryContext, _maxDocPerNextCall));
   }
 
   private void extractProjectionColumns(Set<TransformExpressionTree> expressionsToPlan, Set<String> projectionColumns) {
@@ -79,16 +77,13 @@ public class TransformPlanNode implements PlanNode {
   /**
    * Helper method to set the max number of docs to return for selection queries
    */
-  private void setMaxDocsForSelection(BrokerRequest brokerRequest) {
-    if (!brokerRequest.isSetAggregationsInfo()) {
-      Selection selection = brokerRequest.getSelections();
-
-      // Update MaxDocPerNextCall
-      if (selection.getSize() > 0) {
-        List<SelectionSort> sortSequence = selection.getSelectionSortSequence();
-        if (sortSequence == null) {
-          // For selection only queries, select minimum number of documents
-          _maxDocPerNextCall = Math.min(selection.getSize(), _maxDocPerNextCall);
+  private void setMaxDocsForSelection(QueryContext queryContext) {
+    if (!QueryContextUtils.isAggregationQuery(queryContext)) {
+      // Selection queries
+      if (queryContext.getLimit() > 0) {
+        if (queryContext.getOrderByExpressions() == null) {
+          // For selection-only queries, select minimum number of documents
+          _maxDocPerNextCall = Math.min(queryContext.getLimit(), _maxDocPerNextCall);
         }
       } else {
         // For LIMIT 0 queries, fetch at least 1 document per DocIdSetPlanNode's requirement

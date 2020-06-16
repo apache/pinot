@@ -20,7 +20,6 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -28,6 +27,8 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
@@ -48,22 +49,23 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
 
-  public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest,
+  public AggregationGroupByOrderByPlanNode(IndexSegment indexSegment, QueryContext queryContext,
       int maxInitialResultHolderCapacity, int numGroupsLimit) {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
-    List<String> groupByExpressions = brokerRequest.getGroupBy().getExpressions();
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext.getBrokerRequest());
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    assert groupByExpressions != null;
     int numGroupByExpressions = groupByExpressions.size();
     _groupByExpressions = new TransformExpressionTree[numGroupByExpressions];
     for (int i = 0; i < numGroupByExpressions; i++) {
-      _groupByExpressions[i] = TransformExpressionTree.compileToExpressionTree(groupByExpressions.get(i));
+      _groupByExpressions[i] = groupByExpressions.get(i).toTransformExpressionTree();
     }
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {
-      if (!StarTreeUtils.isStarTreeDisabled(brokerRequest)) {
+      if (!StarTreeUtils.isStarTreeDisabled(queryContext)) {
         int numAggregationFunctions = _aggregationFunctions.length;
         AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
             new AggregationFunctionColumnPair[numAggregationFunctions];
@@ -79,7 +81,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
           }
         }
         if (!hasUnsupportedAggregationFunction) {
-          FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(brokerRequest);
+          FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(queryContext.getBrokerRequest());
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils
                 .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, _groupByExpressions,
@@ -87,7 +89,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
               _transformPlanNode = null;
               _starTreeTransformPlanNode =
                   new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, _groupByExpressions,
-                      rootFilterNode, brokerRequest.getDebugOptions());
+                      rootFilterNode, queryContext.getDebugOptions());
               return;
             }
           }
@@ -97,7 +99,7 @@ public class AggregationGroupByOrderByPlanNode implements PlanNode {
 
     Set<TransformExpressionTree> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions);
-    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest, expressionsToTransform);
+    _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform);
     _starTreeTransformPlanNode = null;
   }
 
