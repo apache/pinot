@@ -211,6 +211,10 @@ public class TableConfigUtils {
   private static void validateValidationConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig != null) {
+      String timeColumnName = validationConfig.getTimeColumnName();
+      if(timeColumnName == null) {
+        throw new IllegalStateException("Must provide valid timeColumnName in tableConfig");
+      }
       String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
       if (peerSegmentDownloadScheme != null) {
         if (!"http".equalsIgnoreCase(peerSegmentDownloadScheme) && !"https".equalsIgnoreCase(peerSegmentDownloadScheme)) {
