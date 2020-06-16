@@ -45,7 +45,8 @@ import org.testng.annotations.Test;
 public class MergeDimensionThresholdIntegrationTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private static final String METRIC = "myMetric2";
+  private static final String METRIC1 = "myMetric1";
+  private static final String METRIC2 = "myMetric2";
   private static final String DATASET = "myDataset2";
   private static final Map<String, String> ONE_TWO = new HashMap<>();
   static {
@@ -60,6 +61,7 @@ public class MergeDimensionThresholdIntegrationTest {
 
   private DataFrame data1;
   private DataFrame data2;
+  private MetricConfigDTO metric1;
   private MetricConfigDTO metric2;
   private DatasetConfigDTO dataset;
 
@@ -90,13 +92,18 @@ public class MergeDimensionThresholdIntegrationTest {
     this.timeseries = new HashMap<>();
     this.timeseries.put(MetricSlice.from(2, 0, 18000), this.data2);
 
+    this.metric1 = new MetricConfigDTO();
+    this.metric1.setId(1L);
+    this.metric1.setName(METRIC1);
+    this.metric1.setDataset(DATASET);
     this.metric2 = new MetricConfigDTO();
     this.metric2.setId(2L);
-    this.metric2.setName(METRIC);
+    this.metric2.setName(METRIC2);
     this.metric2.setDataset(DATASET);
 
     this.metrics = new ArrayList<>();
     this.metrics.add(this.metric2);
+    this.metrics.add(this.metric1);
 
     this.dataset = new DatasetConfigDTO();
     this.dataset.setId(3L);
@@ -144,7 +151,7 @@ public class MergeDimensionThresholdIntegrationTest {
       dimensions.put(entry.getKey(), entry.getValue());
     }
 
-    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(-1L, start, end, METRIC, DATASET, dimensions);
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(-1L, start, end, METRIC2, DATASET, dimensions);
     anomaly.setMetricUrn(metricUrn);
     return anomaly;
   }
