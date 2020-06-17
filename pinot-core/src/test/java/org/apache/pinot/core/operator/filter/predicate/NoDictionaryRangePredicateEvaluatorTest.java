@@ -16,12 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
-import java.util.Collections;
-import org.apache.pinot.core.common.predicate.RangePredicate;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
@@ -32,7 +30,7 @@ import org.testng.annotations.Test;
  * Unit test for no-dictionary based range predicate evaluators.
  */
 public class NoDictionaryRangePredicateEvaluatorTest {
-  private static final String COLUMN_NAME = "column";
+  private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
 
   @Test
   public void testIntPredicateEvaluator() {
@@ -77,6 +75,14 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     }
     Assert.assertTrue(predicateEvaluator.applySV(Integer.MIN_VALUE));
     Assert.assertTrue(predicateEvaluator.applySV(Integer.MAX_VALUE));
+
+    predicateEvaluator =
+        buildRangePredicate(String.format("(%d\t\t%d)", Integer.MIN_VALUE, Integer.MAX_VALUE), FieldSpec.DataType.INT);
+    for (int i = -20; i < 20; i++) {
+      Assert.assertTrue(predicateEvaluator.applySV(i));
+    }
+    Assert.assertFalse(predicateEvaluator.applySV(Integer.MIN_VALUE));
+    Assert.assertFalse(predicateEvaluator.applySV(Integer.MAX_VALUE));
   }
 
   @Test
@@ -122,6 +128,14 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     }
     Assert.assertTrue(predicateEvaluator.applySV(Long.MIN_VALUE));
     Assert.assertTrue(predicateEvaluator.applySV(Long.MAX_VALUE));
+
+    predicateEvaluator =
+        buildRangePredicate(String.format("(%d\t\t%d)", Long.MIN_VALUE, Long.MAX_VALUE), FieldSpec.DataType.LONG);
+    for (int i = -20; i < 20; i++) {
+      Assert.assertTrue(predicateEvaluator.applySV((long) i));
+    }
+    Assert.assertFalse(predicateEvaluator.applySV(Long.MIN_VALUE));
+    Assert.assertFalse(predicateEvaluator.applySV(Long.MAX_VALUE));
   }
 
   @Test
@@ -167,6 +181,15 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     }
     Assert.assertTrue(predicateEvaluator.applySV(Float.NEGATIVE_INFINITY));
     Assert.assertTrue(predicateEvaluator.applySV(Float.POSITIVE_INFINITY));
+
+    predicateEvaluator =
+        buildRangePredicate(String.format("(%f\t\t%f)", Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY),
+            FieldSpec.DataType.FLOAT);
+    for (int i = -20; i < 20; i++) {
+      Assert.assertTrue(predicateEvaluator.applySV((float) i));
+    }
+    Assert.assertFalse(predicateEvaluator.applySV(Float.NEGATIVE_INFINITY));
+    Assert.assertFalse(predicateEvaluator.applySV(Float.POSITIVE_INFINITY));
   }
 
   @Test
@@ -212,6 +235,15 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     }
     Assert.assertTrue(predicateEvaluator.applySV(Double.NEGATIVE_INFINITY));
     Assert.assertTrue(predicateEvaluator.applySV(Double.POSITIVE_INFINITY));
+
+    predicateEvaluator =
+        buildRangePredicate(String.format("(%f\t\t%f)", Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
+            FieldSpec.DataType.DOUBLE);
+    for (int i = -20; i < 20; i++) {
+      Assert.assertTrue(predicateEvaluator.applySV((double) i));
+    }
+    Assert.assertFalse(predicateEvaluator.applySV(Double.NEGATIVE_INFINITY));
+    Assert.assertFalse(predicateEvaluator.applySV(Double.POSITIVE_INFINITY));
   }
 
   @Test
@@ -321,7 +353,7 @@ public class NoDictionaryRangePredicateEvaluatorTest {
   }
 
   private PredicateEvaluator buildRangePredicate(String rangeString, FieldSpec.DataType dataType) {
-    RangePredicate predicate = new RangePredicate(COLUMN_NAME, Collections.singletonList(rangeString));
+    RangePredicate predicate = new RangePredicate(COLUMN_EXPRESSION, rangeString);
     return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator(predicate, dataType);
   }
 }

@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.core.common.predicate.RangePredicate;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
@@ -31,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 
 public class RangeOfflineDictionaryPredicateEvaluatorTest {
+  private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
   private static final int DICT_LEN = 10;
 
   @Test
@@ -260,9 +260,6 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
   }
 
   private RangePredicate createPredicate(int lower, boolean inclLower, int upper, boolean inclUpper) {
-    RangePredicate predicate = mock(RangePredicate.class);
-    when(predicate.includeLowerBoundary()).thenReturn(inclLower);
-    when(predicate.includeUpperBoundary()).thenReturn(inclUpper);
     String lowerStr = "lower";
     if (lower == 0 && inclLower) {
       lowerStr = "*";
@@ -271,8 +268,6 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     if (upper == DICT_LEN - 1 && inclUpper) {
       upperStr = "*";
     }
-    when(predicate.getLowerBoundary()).thenReturn(lowerStr);
-    when(predicate.getUpperBoundary()).thenReturn(upperStr);
-    return predicate;
+    return new RangePredicate(COLUMN_EXPRESSION, inclLower, lowerStr, inclUpper, upperStr);
   }
 }

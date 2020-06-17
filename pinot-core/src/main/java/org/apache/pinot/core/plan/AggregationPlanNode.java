@@ -21,12 +21,11 @@ package org.apache.pinot.core.plan;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
@@ -67,13 +66,13 @@ public class AggregationPlanNode implements PlanNode {
           }
         }
         if (!hasUnsupportedAggregationFunction) {
-          FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(queryContext.getBrokerRequest());
+          FilterContext filter = queryContext.getFilter();
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils
-                .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null, rootFilterNode)) {
+                .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null, filter)) {
               _transformPlanNode = null;
               _starTreeTransformPlanNode =
-                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null, rootFilterNode,
+                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null, filter,
                       queryContext.getDebugOptions());
               return;
             }

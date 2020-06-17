@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,48 +49,33 @@ public class RangeMergeOptimizerTest {
 
   @Test
   public void testRangeIntersection() {
-    List<String> range1 = Arrays.asList("");
-    List<String> range2 = Arrays.asList("");
-
     // One range within another
-    range1.set(0, "(1\t\t100)");
-    range2.set(0, "(10\t\t20]");
-    testRangeOptimizer(range1, range2, "(10\t\t20]");
+    testRangeOptimizer("(1\t\t100)", "(10\t\t20]", "(10\t\t20]");
 
     // One range within another, and one range is unbounded
-    range1.set(0, "(*\t\t*)");
-    range2.set(0, "[1\t\t2)");
-    testRangeOptimizer(range1, range2, "[1\t\t2)");
+    testRangeOptimizer("(*\t\t*)", "[1\t\t2)", "[1\t\t2)");
 
     // One range with unbounded lower
-    range1.set(0, "(*\t\t5]");
-    range2.set(0, "[1\t\t20)");
-    testRangeOptimizer(range1, range2, "[1\t\t5]");
+    testRangeOptimizer("(*\t\t5]", "[1\t\t20)", "[1\t\t5]");
 
     // One range with unbounded upper
-    range1.set(0, "(5\t\t*)");
-    range2.set(0, "[1\t\t20)");
-    testRangeOptimizer(range1, range2, "(5\t\t20)");
+    testRangeOptimizer("(5\t\t*)", "[1\t\t20)", "(5\t\t20)");
 
     // Partial overlap
-    range1.set(0, "(1\t\t10]");
-    range2.set(0, "[5\t\t20)");
-    testRangeOptimizer(range1, range2, "[5\t\t10]");
+    testRangeOptimizer("(1\t\t10]", "[5\t\t20)", "[5\t\t10]");
 
     // No overlap
-    range1.set(0, "(1\t\t10]");
-    range2.set(0, "[20\t\t30)");
-    testRangeOptimizer(range1, range2, "[20\t\t10]");
+    testRangeOptimizer("(1\t\t10]", "[20\t\t30)", "[20\t\t10]");
 
     // Single point overlap
-    range1.set(0, "(1\t\t10]");
-    range2.set(0, "[10\t\t30)");
-    testRangeOptimizer(range1, range2, "[10\t\t10]");
+    testRangeOptimizer("(1\t\t10]", "[10\t\t30)", "[10\t\t10]");
 
     // Redundant case
-    range1.set(0, "(*\t\t10]");
-    range2.set(0, "(*\t\t30)");
-    testRangeOptimizer(range1, range2, "(*\t\t10]");
+    testRangeOptimizer("(*\t\t10]", "(*\t\t30)", "(*\t\t10]");
+
+    // Extreme values
+    testRangeOptimizer(String.format("(*\t\t%d)", Long.MAX_VALUE), String.format("(%d\t\t*)", Long.MIN_VALUE),
+        String.format("(%d\t\t%d)", Long.MIN_VALUE, Long.MAX_VALUE));
   }
 
   @Test
@@ -190,12 +174,9 @@ public class RangeMergeOptimizerTest {
     compareTrees(actualTree, expectedTree);
   }
 
-  private void testRangeOptimizer(List<String> range1, List<String> range2, String expected) {
-    String actual;
-    actual = RangeMergeOptimizer.intersectRanges(range1, range2).get(0);
-    Assert.assertEquals(actual, expected);
-    actual = RangeMergeOptimizer.intersectRanges(range2, range1).get(0);
-    Assert.assertEquals(actual, expected);
+  private void testRangeOptimizer(String range1, String range2, String expected) {
+    Assert.assertEquals(RangeMergeOptimizer.intersectRanges(range1, range2), expected);
+    Assert.assertEquals(RangeMergeOptimizer.intersectRanges(range2, range1), expected);
   }
 
   /**

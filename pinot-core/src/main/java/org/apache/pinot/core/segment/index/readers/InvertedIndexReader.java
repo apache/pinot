@@ -19,7 +19,6 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import java.io.Closeable;
-import org.apache.pinot.core.common.Predicate;
 
 
 public interface InvertedIndexReader<T> extends Closeable {

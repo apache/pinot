@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.core.common.Predicate;
-import org.apache.pinot.core.common.predicate.EqPredicate;
-import org.apache.pinot.core.common.predicate.InPredicate;
-import org.apache.pinot.core.common.predicate.NEqPredicate;
-import org.apache.pinot.core.common.predicate.NotInPredicate;
-import org.apache.pinot.core.common.predicate.RangePredicate;
-import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.InPredicate;
+import org.apache.pinot.core.query.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.core.query.request.context.predicate.NotInPredicate;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.query.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -34,7 +35,7 @@ public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, Dictionary dictionary,
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType) {
     try {
       if (dictionary != null) {
@@ -42,8 +43,9 @@ public class PredicateEvaluatorProvider {
         switch (predicate.getType()) {
           case EQ:
             return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary);
-          case NEQ:
-            return NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NEqPredicate) predicate, dictionary);
+          case NOT_EQ:
+            return NotEqualsPredicateEvaluatorFactory
+                .newDictionaryBasedEvaluator((NotEqPredicate) predicate, dictionary);
           case IN:
             return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary);
           case NOT_IN:
@@ -62,8 +64,8 @@ public class PredicateEvaluatorProvider {
         switch (predicate.getType()) {
           case EQ:
             return EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);
-          case NEQ:
-            return NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((NEqPredicate) predicate, dataType);
+          case NOT_EQ:
+            return NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotEqPredicate) predicate, dataType);
           case IN:
             return InPredicateEvaluatorFactory.newRawValueBasedEvaluator((InPredicate) predicate, dataType);
           case NOT_IN:

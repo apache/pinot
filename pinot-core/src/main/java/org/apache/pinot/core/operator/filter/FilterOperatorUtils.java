@@ -25,9 +25,9 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
 
 
 public class FilterOperatorUtils {
