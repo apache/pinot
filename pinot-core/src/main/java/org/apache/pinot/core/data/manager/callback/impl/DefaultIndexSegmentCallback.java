@@ -23,6 +23,7 @@ import org.apache.pinot.core.data.manager.callback.IndexSegmentCallback;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 import java.util.Map;
 
@@ -46,7 +47,7 @@ public class DefaultIndexSegmentCallback implements IndexSegmentCallback {
   }
 
   @Override
-  public String getVirtualColumnInfo(long offset) {
+  public String getVirtualColumnInfo(StreamPartitionMsgOffset offset) {
     return Strings.EMPTY;
   }
 }
