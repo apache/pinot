@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.callback;
 
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -29,19 +30,40 @@ import java.io.File;
  * component inject to {@link org.apache.pinot.core.data.manager.TableDataManager} for handling extra logic for
  * other workflows other than regular append-mode ingestion.
  */
+@InterfaceStability.Evolving
 public interface TableDataManagerCallback {
 
+  /**
+   * Initialize callback from {@link org.apache.pinot.core.data.manager.TableDataManager}, injected into
+   * {@link org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager} constructor to make sure this class is
+   * initialized during the creation process.
+   */
   void init();
 
   /**
-   * Callback to ensure other components related to the callback are added when
-   * {@link org.apache.pinot.core.data.manager.TableDataManager#addSegment(File, IndexLoadingConfig)} is called
+   * handle any internal logic for upsert table to add segment to its internal table storage. this method is injected into
+   * {@link org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager#addSegment(File, IndexLoadingConfig)}
+   *
+   * In append-tables callback, this method will do nothing
+   * In upsert-tables callback, this method will notify the local update log storage to create proper storage provider
+   * for this new segment
+   *
+   * @param tableName the name of the table we are trying to add the segment to
+   * @param segmentName the name of the segment we are trying to add
    */
   void addSegment(String tableName, String segmentName);
 
   /**
    * return a callback object for a mutable segment data manager callback component when a table create a new
    * immutable {@link org.apache.pinot.core.data.manager.SegmentDataManager}
+   *
+   * @param tableName the name of the table
+   * @param segmentName the name of the segment
+   * @param schema the table schema
+   * @param tableConfig the config of the table
+   * @param serverMetrics the server metrics object
+   * @return {@link DataManagerCallback} object appropriate for this table, either a regular append-only callback
+   * or a upsert-enabled callback
    */
   DataManagerCallback getMutableDataManagerCallback(String tableName, String segmentName, Schema schema,
       TableConfig tableConfig, ServerMetrics serverMetrics);
@@ -49,6 +71,14 @@ public interface TableDataManagerCallback {
   /**
    * return a callback object for an Immutable segment data manager callback component when a table create a new
    * immutable {@link org.apache.pinot.core.data.manager.SegmentDataManager}
+   *
+   * @param tableName the name of the table
+   * @param segmentName the name of the segment
+   * @param schema the table schema
+   * @param tableConfig the config of the table
+   * @param serverMetrics the server metrics object
+   * @return {@link DataManagerCallback} object appropriate for this table, either a regular append-only callback
+   * or a upsert-enabled callback
    */
   DataManagerCallback getImmutableDataManagerCallback(String tableName, String segmentName, Schema schema,
       TableConfig tableConfig, ServerMetrics serverMetrics);
@@ -56,6 +86,12 @@ public interface TableDataManagerCallback {
   /**
    * create a no-op default callback for segmentDataManager that don't support upsert
    * (eg, offline table, HLL consumers etc)
+   *
+   * @param tableName the name of the table
+   * @param segmentName the name of the segment
+   * @param schema the table schema
+   * @param tableConfig the config of the table
+   * @param serverMetrics the server metrics object
    * @return a no-op default callback for data manager
    */
   DataManagerCallback getDefaultDataManagerCallback();
