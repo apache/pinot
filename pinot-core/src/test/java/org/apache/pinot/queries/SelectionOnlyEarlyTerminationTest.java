@@ -40,7 +40,7 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
    * (2 * MAX_NUM_THREADS_PER_QUERY) segments per server.
    */
   @Override
-  protected int getNumSegmentDataManagers() {
+  protected int getNumSegments() {
     return CombineOperator.MAX_NUM_THREADS_PER_QUERY * 2;
   }
 
@@ -52,7 +52,7 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
   @Test
   public void testSelectOnlyQuery() {
     int numThreadsPerServer = CombineOperator.MAX_NUM_THREADS_PER_QUERY;
-    int numSegmentsPerServer = getNumSegmentDataManagers();
+    int numSegmentsPerServer = getNumSegments();
 
     // LIMIT = 5, 10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480
     for (int limit = 5; limit < NUM_DOCS_PER_SEGMENT; limit *= 2) {
@@ -95,7 +95,7 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
    */
   @Test
   public void testSelectWithOrderByQuery() {
-    int numSegmentsPerServer = getNumSegmentDataManagers();
+    int numSegmentsPerServer = getNumSegments();
     String query = "SELECT column11, column18, column1 FROM testTable ORDER BY column11";
     int numColumnsInSelection = 3;
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
