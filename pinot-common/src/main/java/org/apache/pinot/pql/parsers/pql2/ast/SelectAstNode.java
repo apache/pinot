@@ -40,7 +40,6 @@ public class SelectAstNode extends BaseAstNode {
   // Optional clauses can be given in any order, so we keep track of whether we've already seen one
   private boolean _hasWhereClause = false;
   private boolean _hasGroupByClause = false;
-  private boolean _hasHavingClause = false;
   private boolean _hasOrderByClause = false;
   private boolean _hasTopClause = false;
   private boolean _hasLimitClause = false;
@@ -85,13 +84,6 @@ public class SelectAstNode extends BaseAstNode {
 
       super.addChild(childNode);
       _hasGroupByClause = true;
-    } else if (childNode instanceof HavingAstNode) {
-      if (_hasHavingClause) {
-        throw new Pql2CompilationException("More than one HAVING clause specified!");
-      }
-
-      super.addChild(childNode);
-      _hasHavingClause = true;
     } else if (childNode instanceof OrderByAstNode) {
       if (_hasOrderByClause) {
         throw new Pql2CompilationException("More than one ORDER BY clause specified!");

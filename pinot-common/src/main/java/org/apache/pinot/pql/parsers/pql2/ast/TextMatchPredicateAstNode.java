@@ -20,35 +20,26 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 
 
 public class TextMatchPredicateAstNode extends PredicateAstNode {
 
-  private static final String SEPERATOR = "\t\t";
-
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
-      if (_identifier == null) {
-        IdentifierAstNode node = (IdentifierAstNode) childNode;
-        _identifier = node.getName();
-      } else {
-        throw new Pql2CompilationException("TEXT_MATCH predicate has more than one identifier.");
+      if (_identifier != null) {
+        throw new Pql2CompilationException("TEXT_MATCH predicate has more than one column");
       }
+      _identifier = ((IdentifierAstNode) childNode).getName();
     } else if (childNode instanceof FunctionCallAstNode) {
-      throw new Pql2CompilationException("TEXT_MATCH is not supported with function");
+      throw new Pql2CompilationException("TEXT_MATCH predicate cannot be applied to function");
     } else {
       super.addChild(childNode);
     }
@@ -61,10 +52,11 @@ public class TextMatchPredicateAstNode extends PredicateAstNode {
     }
 
     List<? extends AstNode> children = getChildren();
-    Preconditions.checkState(children != null && children.size() == 1, "TEXT_MATCH predicate should have exactly one query string");
+    Preconditions.checkState(children != null && children.size() == 1,
+        "TEXT_MATCH predicate should have exactly one query string");
     AstNode child = children.get(0);
     Preconditions.checkState(child instanceof StringLiteralAstNode);
-    String expr = ((StringLiteralAstNode)child).getValueAsString();
+    String expr = ((StringLiteralAstNode) child).getValueAsString();
     FilterOperator filterOperator = FilterOperator.TEXT_MATCH;
     List<String> value = Collections.singletonList(expr);
     return new FilterQueryTree(_identifier, value, filterOperator, null);
@@ -84,10 +76,5 @@ public class TextMatchPredicateAstNode extends PredicateAstNode {
     }
     function.addToOperands(RequestUtils.getExpression(children.get(0)));
     return expression;
-  }
-
-  @Override
-  public HavingQueryTree buildHavingQueryTree() {
-    throw new UnsupportedOperationException("TEXT_MATCH is not supported with HAVING");
   }
 }
