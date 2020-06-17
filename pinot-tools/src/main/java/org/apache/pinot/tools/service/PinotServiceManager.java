@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -85,7 +86,7 @@ public class PinotServiceManager {
       throws Exception {
     switch (role) {
       case CONTROLLER:
-        return startController((ControllerConf) conf);
+        return startController(new ControllerConf(conf));
       case BROKER:
         return startBroker(conf);
       case SERVER:
