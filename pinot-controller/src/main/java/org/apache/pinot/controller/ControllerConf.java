@@ -20,6 +20,7 @@ package org.apache.pinot.controller;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.configuration.Configuration;
@@ -169,6 +170,15 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public ControllerConf() {
     super();
+  }
+
+  public ControllerConf(Configuration conf) {
+    super();
+    Iterator<String> keysIterator = conf.getKeys();
+    while(keysIterator.hasNext()) {
+      String key = keysIterator.next();
+      this.setProperty(key, conf.getProperty(key));
+    }
   }
 
   public void setLocalTempDir(String localTempDir) {
