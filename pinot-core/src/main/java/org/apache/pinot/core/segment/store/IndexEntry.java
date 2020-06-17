@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.store;
 
+import java.nio.ByteOrder;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

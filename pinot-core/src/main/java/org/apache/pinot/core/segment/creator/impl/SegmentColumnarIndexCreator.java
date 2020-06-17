@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -481,6 +482,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(getKeyFor(column, HAS_NULL_VALUE), String.valueOf(columnIndexCreationInfo.hasNulls()));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
     properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), textIndexType.name());
+    // write now we are only creating the mechanism of having a LE byte order fwd index
+    // when we actually start creating LE order, write the actual value
+    properties.setProperty(getKeyFor(column, FORWARD_INDEX_BYTE_ORDER), ByteOrder.BIG_ENDIAN.toString());
     properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
         String.valueOf(hasInvertedIndex));
     properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SINGLE_VALUED),
