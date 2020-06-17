@@ -94,7 +94,7 @@ public class RangePredicateEvaluatorFactory {
       boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
       boolean includeUpperBoundary = rangePredicate.includeUpperBoundary();
 
-      if (lowerBoundary.equals("*")) {
+      if (lowerBoundary.equals(RangePredicate.UNBOUNDED)) {
         _startDictId = 0;
       } else {
         int insertionIndex = dictionary.insertionIndexOf(lowerBoundary);
@@ -108,7 +108,7 @@ public class RangePredicateEvaluatorFactory {
           }
         }
       }
-      if (upperBoundary.equals("*")) {
+      if (upperBoundary.equals(RangePredicate.UNBOUNDED)) {
         _endDictId = dictionary.length();
       } else {
         int insertionIndex = dictionary.insertionIndexOf(upperBoundary);
@@ -269,12 +269,14 @@ public class RangePredicateEvaluatorFactory {
     final boolean _includeUpperBoundary;
 
     IntRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
-      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
       String lowerBoundary = rangePredicate.getLowerBoundary();
       String upperBoundary = rangePredicate.getUpperBoundary();
-      _lowerBoundary = lowerBoundary.equals("*") ? Integer.MIN_VALUE : Integer.parseInt(lowerBoundary);
-      _upperBoundary = upperBoundary.equals("*") ? Integer.MAX_VALUE : Integer.parseInt(upperBoundary);
+      _lowerBoundary =
+          lowerBoundary.equals(RangePredicate.UNBOUNDED) ? Integer.MIN_VALUE : Integer.parseInt(lowerBoundary);
+      _upperBoundary =
+          upperBoundary.equals(RangePredicate.UNBOUNDED) ? Integer.MAX_VALUE : Integer.parseInt(upperBoundary);
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
     }
 
     @Override
@@ -311,12 +313,12 @@ public class RangePredicateEvaluatorFactory {
     final boolean _includeUpperBoundary;
 
     LongRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
-      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
       String lowerBoundary = rangePredicate.getLowerBoundary();
       String upperBoundary = rangePredicate.getUpperBoundary();
-      _lowerBoundary = lowerBoundary.equals("*") ? Integer.MIN_VALUE : Long.parseLong(lowerBoundary);
-      _upperBoundary = upperBoundary.equals("*") ? Integer.MAX_VALUE : Long.parseLong(upperBoundary);
+      _lowerBoundary = lowerBoundary.equals(RangePredicate.UNBOUNDED) ? Long.MIN_VALUE : Long.parseLong(lowerBoundary);
+      _upperBoundary = upperBoundary.equals(RangePredicate.UNBOUNDED) ? Long.MAX_VALUE : Long.parseLong(upperBoundary);
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
     }
 
     @Override
@@ -353,12 +355,14 @@ public class RangePredicateEvaluatorFactory {
     final boolean _includeUpperBoundary;
 
     FloatRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
-      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
       String lowerBoundary = rangePredicate.getLowerBoundary();
       String upperBoundary = rangePredicate.getUpperBoundary();
-      _lowerBoundary = lowerBoundary.equals("*") ? Integer.MIN_VALUE : Float.parseFloat(lowerBoundary);
-      _upperBoundary = upperBoundary.equals("*") ? Integer.MAX_VALUE : Float.parseFloat(upperBoundary);
+      _lowerBoundary =
+          lowerBoundary.equals(RangePredicate.UNBOUNDED) ? Float.NEGATIVE_INFINITY : Float.parseFloat(lowerBoundary);
+      _upperBoundary =
+          upperBoundary.equals(RangePredicate.UNBOUNDED) ? Float.POSITIVE_INFINITY : Float.parseFloat(upperBoundary);
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
     }
 
     @Override
@@ -395,12 +399,14 @@ public class RangePredicateEvaluatorFactory {
     final boolean _includeUpperBoundary;
 
     DoubleRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
-      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
       String lowerBoundary = rangePredicate.getLowerBoundary();
       String upperBoundary = rangePredicate.getUpperBoundary();
-      _lowerBoundary = lowerBoundary.equals("*") ? Integer.MIN_VALUE : Double.parseDouble(lowerBoundary);
-      _upperBoundary = upperBoundary.equals("*") ? Integer.MAX_VALUE : Double.parseDouble(upperBoundary);
+      _lowerBoundary =
+          lowerBoundary.equals(RangePredicate.UNBOUNDED) ? Double.NEGATIVE_INFINITY : Double.parseDouble(lowerBoundary);
+      _upperBoundary =
+          upperBoundary.equals(RangePredicate.UNBOUNDED) ? Double.POSITIVE_INFINITY : Double.parseDouble(upperBoundary);
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
     }
 
     @Override
@@ -437,8 +443,10 @@ public class RangePredicateEvaluatorFactory {
     final boolean _includeUpperBoundary;
 
     StringRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      _lowerBoundary = rangePredicate.getLowerBoundary();
-      _upperBoundary = rangePredicate.getUpperBoundary();
+      String lowerBoundary = rangePredicate.getLowerBoundary();
+      String upperBoundary = rangePredicate.getUpperBoundary();
+      _lowerBoundary = lowerBoundary.equals(RangePredicate.UNBOUNDED) ? null : lowerBoundary;
+      _upperBoundary = upperBoundary.equals(RangePredicate.UNBOUNDED) ? null : upperBoundary;
       _includeLowerBoundary = rangePredicate.includeLowerBoundary();
       _includeUpperBoundary = rangePredicate.includeUpperBoundary();
     }
@@ -456,14 +464,14 @@ public class RangePredicateEvaluatorFactory {
     @Override
     public boolean applySV(String value) {
       boolean result = true;
-      if (!_lowerBoundary.equals("*")) {
+      if (_lowerBoundary != null) {
         if (_includeLowerBoundary) {
           result = _lowerBoundary.compareTo(value) <= 0;
         } else {
           result = _lowerBoundary.compareTo(value) < 0;
         }
       }
-      if (!_upperBoundary.equals("*")) {
+      if (_upperBoundary != null) {
         if (_includeUpperBoundary) {
           result &= _upperBoundary.compareTo(value) >= 0;
         } else {
@@ -481,16 +489,10 @@ public class RangePredicateEvaluatorFactory {
     final boolean _includeUpperBoundary;
 
     BytesRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      if (!"*".equals(rangePredicate.getLowerBoundary())) {
-        _lowerBoundary = BytesUtils.toBytes(rangePredicate.getLowerBoundary());
-      } else {
-        _lowerBoundary = null;
-      }
-      if (!"*".equals(rangePredicate.getUpperBoundary())) {
-        _upperBoundary = BytesUtils.toBytes(rangePredicate.getUpperBoundary());
-      } else {
-        _upperBoundary = null;
-      }
+      String lowerBoundary = rangePredicate.getLowerBoundary();
+      String upperBoundary = rangePredicate.getUpperBoundary();
+      _lowerBoundary = lowerBoundary.equals(RangePredicate.UNBOUNDED) ? null : BytesUtils.toBytes(lowerBoundary);
+      _upperBoundary = upperBoundary.equals(RangePredicate.UNBOUNDED) ? null : BytesUtils.toBytes(upperBoundary);
       _includeLowerBoundary = rangePredicate.includeLowerBoundary();
       _includeUpperBoundary = rangePredicate.includeUpperBoundary();
     }

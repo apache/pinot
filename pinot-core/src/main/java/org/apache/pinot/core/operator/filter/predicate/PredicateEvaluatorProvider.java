@@ -77,8 +77,8 @@ public class PredicateEvaluatorProvider {
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
       }
-    } catch (NumberFormatException e) {
-      // This NumberFormatException is caused by passing in a non-numeric string as numeric number in query
+    } catch (Exception e) {
+      // Exception here is caused by mismatch between the column data type and the predicate value in the query
       throw new BadQueryRequestException(e);
     }
   }
