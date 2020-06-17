@@ -27,8 +27,8 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import java.io.IOException;
 
 /**
- * create component inject to {@link org.apache.pinot.core.data.manager.SegmentDataManager} for handling extra logic for
- * other workflows other than regular append-mode ingestion.
+ * Component inject to {@link org.apache.pinot.core.data.manager.SegmentDataManager} for handling extra logic for
+ * upsert-enabled pinot ingestion mode.
  */
 @InterfaceStability.Evolving
 public interface DataManagerCallback {
@@ -36,7 +36,8 @@ public interface DataManagerCallback {
   void init() throws IOException;
 
   /**
-   * create a {@link IndexSegmentCallback} object to allow SegmentDataManager to create proper IndexSegment.
+   * create a {@link IndexSegmentCallback} object to allow SegmentDataManager to create proper IndexSegment that supports
+   * either append/upsert mode
    *
    * In append-tables callback, this method will create a DefaultIndexSegmentCallback
    * In upsert-tables callback, this method will create a UpsertDataManagerCallbackImpl

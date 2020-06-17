@@ -477,6 +477,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
               GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
               if (transformedRow != null) {
+                _dataManagerCallback.processTransformedRow(transformedRow, _currentOffset);
                 realtimeRowsConsumedMeter = _serverMetrics
                     .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
                 indexedMessageCount++;
