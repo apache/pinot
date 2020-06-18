@@ -19,11 +19,11 @@
 package org.apache.pinot.core.predicate;
 
 import java.util.Collections;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -75,11 +75,12 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV(i));
     }
+    Assert.assertTrue(predicateEvaluator.applySV(Integer.MIN_VALUE));
+    Assert.assertTrue(predicateEvaluator.applySV(Integer.MAX_VALUE));
   }
 
   @Test
   public void testLongPredicateEvaluator() {
-
     PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.LONG);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((long) i), (i >= -10 && i <= 10));
@@ -119,11 +120,12 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((long) i));
     }
+    Assert.assertTrue(predicateEvaluator.applySV(Long.MIN_VALUE));
+    Assert.assertTrue(predicateEvaluator.applySV(Long.MAX_VALUE));
   }
 
   @Test
   public void testFloatPredicateEvaluator() {
-
     PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.FLOAT);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((float) i), (i >= -10 && i <= 10));
@@ -163,11 +165,12 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((float) i));
     }
+    Assert.assertTrue(predicateEvaluator.applySV(Float.NEGATIVE_INFINITY));
+    Assert.assertTrue(predicateEvaluator.applySV(Float.POSITIVE_INFINITY));
   }
 
   @Test
   public void testDoublePredicateEvaluator() {
-
     PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.DOUBLE);
     for (int i = -20; i < 20; i++) {
       Assert.assertEquals(predicateEvaluator.applySV((double) i), (i >= -10 && i <= 10));
@@ -207,11 +210,12 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV((double) i));
     }
+    Assert.assertTrue(predicateEvaluator.applySV(Double.NEGATIVE_INFINITY));
+    Assert.assertTrue(predicateEvaluator.applySV(Double.POSITIVE_INFINITY));
   }
 
   @Test
   public void testStringPredicateEvaluator() {
-
     PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
@@ -264,7 +268,6 @@ public class NoDictionaryRangePredicateEvaluatorTest {
 
   @Test
   public void testBytesPredicateEvaluator() {
-
     PredicateEvaluator predicateEvaluator = buildRangePredicate("[10\t\t20]", FieldSpec.DataType.BYTES);
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
