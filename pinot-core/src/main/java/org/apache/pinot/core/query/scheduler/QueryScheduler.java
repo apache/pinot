@@ -197,13 +197,16 @@ public abstract class QueryScheduler {
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
     long schedulerWaitMs = timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT);
 
+    // Please keep the format as name=value comma-separated with no spaces
+    // Please add new entries at the end
     if (queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
-      LOGGER.info(
-          "Processed requestId={},table={},segments(queried/processed/matched/consuming)={}/{}/{}/{},"
-              + "schedulerWaitMs={},totalExecMs={},totalTimeMs={},minConsumingFreshnessMs={},broker={},"
-              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
-          requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
-          numSegmentsConsuming, schedulerWaitMs, timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+      LOGGER.info("Processed requestId={},table={},segments(queried/processed/matched/consuming)={}/{}/{}/{},"
+              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},broker={},"
+              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}", requestId, tableNameWithType,
+          numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming, schedulerWaitMs,
+          timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
+          timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+          timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
           queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
 
