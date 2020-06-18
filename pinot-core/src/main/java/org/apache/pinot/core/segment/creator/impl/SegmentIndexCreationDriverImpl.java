@@ -25,14 +25,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -255,7 +253,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     FileUtils.deleteQuietly(tempIndexDir);
 
     // Convert segment format if necessary
-    convertFormatIfNeeded(segmentOutputDir);
+    convertFormatIfNecessary(segmentOutputDir);
 
     // Build star-tree V2 if necessary
     buildStarTreeV2IfNecessary(segmentOutputDir);
@@ -314,7 +312,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   // Using converter is similar to option (2), plus it's battle-tested code. We will roll out with
   // this change to keep changes limited. Once we've migrated we can implement approach (1) with option to
   // copy for indexes for which we don't know sizes upfront.
-  private void convertFormatIfNeeded(File segmentDirectory)
+  private void convertFormatIfNecessary(File segmentDirectory)
       throws Exception {
     SegmentVersion versionToGenerate = config.getSegmentVersion();
     if (versionToGenerate.equals(SegmentVersion.v1)) {

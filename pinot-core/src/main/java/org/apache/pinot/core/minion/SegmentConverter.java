@@ -71,7 +71,6 @@ public class SegmentConverter {
   private RecordAggregator _recordAggregator;
   private List<String> _groupByColumns;
   private boolean _skipTimeValueCheck;
-  private IndexingConfig _indexingConfig;
 
   public SegmentConverter(List<File> inputIndexDirs, File workingDir, String tableName, String segmentName,
       int totalNumPartition, RecordTransformer recordTransformer, @Nullable RecordPartitioner recordPartitioner,
@@ -90,7 +89,6 @@ public class SegmentConverter {
     _recordAggregator = recordAggregator;
     _groupByColumns = groupByColumns;
     _skipTimeValueCheck = skipTimeValueCheck;
-    _indexingConfig = tableConfig.getIndexingConfig();
   }
 
   public List<File> convertSegment()
@@ -121,9 +119,10 @@ public class SegmentConverter {
       }
 
       // Sorting on sorted column and creating indices
-      if (_indexingConfig != null) {
-        List<String> sortedColumn = _indexingConfig.getSortedColumn();
-        List<String> invertedIndexColumns = _indexingConfig.getInvertedIndexColumns();
+      if (_tableConfig != null) {
+        IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
+        List<String> sortedColumn = indexingConfig.getSortedColumn();
+        List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
 
         // Check if the table config has any index configured
         if (CollectionUtils.isNotEmpty(sortedColumn) || CollectionUtils.isNotEmpty(invertedIndexColumns)) {

@@ -194,9 +194,13 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       // TODO: add support for rollup
       String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
       MergeRollupSegmentConverter mergeRollupSegmentConverter =
-          new MergeRollupSegmentConverter.Builder().setMergeType(_mergeType).setSegmentName(_outputSegmentName)
-              .setInputIndexDirs(inputIndexDirs).setWorkingDir(workingDir).setTableName(tableName)
-              .setTableConfig(tableConfig).build();
+          new MergeRollupSegmentConverter.Builder().setMergeType(MergeType.fromString(_mergeType))
+              .setSegmentName(_outputSegmentName)
+              .setInputIndexDirs(inputIndexDirs)
+              .setWorkingDir(workingDir)
+              .setTableName(tableName)
+              .setTableConfig(tableConfig)
+              .build();
 
       List<File> outputSegments = mergeRollupSegmentConverter.convert();
       Preconditions.checkState(outputSegments.size() == 1);
