@@ -51,10 +51,9 @@ public class LiteralOnlyBrokerRequestTest {
   @Test
   public void testSelectStarBrokerRequestFromSQL() {
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT '*'")));
-    Assert.assertTrue(BaseBrokerRequestHandler
-        .isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT '*' FROM myTable")));
-    Assert.assertFalse(
-        BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT *")));
+    Assert.assertTrue(
+        BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT '*' FROM myTable")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT *")));
     Assert.assertFalse(
         BaseBrokerRequestHandler.isLiteralOnlyQuery(SQL_COMPILER.compileToBrokerRequest("SELECT * FROM myTable")));
   }
@@ -101,7 +100,6 @@ public class LiteralOnlyBrokerRequestTest {
     RequestStatistics requestStats = new RequestStatistics();
     BrokerResponseNative brokerResponse =
         (BrokerResponseNative) requestHandler.handleRequest(request, null, requestStats);
-    System.out.println("brokerResponse = " + brokerResponse.toJsonString());
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), String.format("%d", randNum));
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
         DataSchema.ColumnDataType.LONG);
@@ -128,7 +126,6 @@ public class LiteralOnlyBrokerRequestTest {
     BrokerResponseNative brokerResponse =
         (BrokerResponseNative) requestHandler.handleRequest(request, null, requestStats);
     long currentTsMax = System.currentTimeMillis();
-    System.out.println("brokerResponse = " + brokerResponse.toJsonString());
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "currentTs");
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
         DataSchema.ColumnDataType.LONG);
