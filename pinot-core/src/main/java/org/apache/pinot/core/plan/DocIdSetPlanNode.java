@@ -19,9 +19,9 @@
 package org.apache.pinot.core.plan;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.DocIdSetOperator;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class DocIdSetPlanNode implements PlanNode {
@@ -30,14 +30,10 @@ public class DocIdSetPlanNode implements PlanNode {
   private final FilterPlanNode _filterPlanNode;
   private final int _maxDocPerCall;
 
-  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest, int maxDocPerCall) {
+  public DocIdSetPlanNode(IndexSegment indexSegment, QueryContext queryContext, int maxDocPerCall) {
     Preconditions.checkState(maxDocPerCall > 0 && maxDocPerCall <= MAX_DOC_PER_CALL);
-    _filterPlanNode = new FilterPlanNode(indexSegment, brokerRequest);
+    _filterPlanNode = new FilterPlanNode(indexSegment, queryContext);
     _maxDocPerCall = maxDocPerCall;
-  }
-
-  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
-    this(indexSegment, brokerRequest, MAX_DOC_PER_CALL);
   }
 
   @Override

@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
@@ -102,13 +101,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       planNodes.add(makeSegmentPlanNode(indexSegment, queryContext));
     }
     CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, queryContext.getBrokerRequest(), executorService, timeOutMs, _numGroupsLimit);
+        new CombinePlanNode(planNodes, queryContext, executorService, timeOutMs, _numGroupsLimit);
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
   }
 
   @Override
   public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       // Aggregation query
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -117,25 +115,25 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
         // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
         if (queryOptions.isGroupByModeSQL()) {
-          return new AggregationGroupByOrderByPlanNode(indexSegment, brokerRequest, _maxInitialResultHolderCapacity,
+          return new AggregationGroupByOrderByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
               _numGroupsLimit);
         }
-        return new AggregationGroupByPlanNode(indexSegment, brokerRequest, _maxInitialResultHolderCapacity,
+        return new AggregationGroupByPlanNode(indexSegment, queryContext, _maxInitialResultHolderCapacity,
             _numGroupsLimit);
       } else {
         // Aggregation only query
         if (queryContext.getFilter() == null) {
           if (isFitForMetadataBasedPlan(queryContext)) {
-            return new MetadataBasedAggregationPlanNode(indexSegment, brokerRequest);
+            return new MetadataBasedAggregationPlanNode(indexSegment, queryContext);
           } else if (isFitForDictionaryBasedPlan(queryContext, indexSegment)) {
-            return new DictionaryBasedAggregationPlanNode(indexSegment, brokerRequest);
+            return new DictionaryBasedAggregationPlanNode(indexSegment, queryContext);
           }
         }
-        return new AggregationPlanNode(indexSegment, brokerRequest);
+        return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else {
       // Selection query
-      return new SelectionPlanNode(indexSegment, brokerRequest);
+      return new SelectionPlanNode(indexSegment, queryContext);
     }
   }
 

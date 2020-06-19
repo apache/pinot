@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -40,22 +39,23 @@ import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 
 
 public class FilterPlanNode implements PlanNode {
-  private final BrokerRequest _brokerRequest;
-  private final IndexSegment _segment;
+  private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
 
-  public FilterPlanNode(IndexSegment segment, BrokerRequest brokerRequest) {
-    _segment = segment;
-    _brokerRequest = brokerRequest;
+  public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    _indexSegment = indexSegment;
+    _queryContext = queryContext;
   }
 
   @Override
   public BaseFilterOperator run() {
-    FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    return constructPhysicalOperator(rootFilterNode, _segment, _brokerRequest.getDebugOptions());
+    FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_queryContext.getBrokerRequest());
+    return constructPhysicalOperator(rootFilterNode, _indexSegment, _queryContext.getDebugOptions());
   }
 
   /**

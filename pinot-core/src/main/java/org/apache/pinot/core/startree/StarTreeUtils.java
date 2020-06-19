@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 
@@ -37,10 +38,10 @@ public class StarTreeUtils {
   public static final String USE_STAR_TREE_KEY = "useStarTree";
 
   /**
-   * Returns whether star-tree is disabled in broker request.
+   * Returns whether star-tree is disabled for the query.
    */
-  public static boolean isStarTreeDisabled(BrokerRequest brokerRequest) {
-    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
+  public static boolean isStarTreeDisabled(QueryContext queryContext) {
+    Map<String, String> debugOptions = queryContext.getDebugOptions();
     return debugOptions != null && "false".equalsIgnoreCase(debugOptions.get(USE_STAR_TREE_KEY));
   }
 
