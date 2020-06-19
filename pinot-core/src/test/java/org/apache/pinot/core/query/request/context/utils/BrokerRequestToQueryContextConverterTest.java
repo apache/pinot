@@ -258,7 +258,7 @@ public class BrokerRequestToQueryContextConverterTest {
         assertEquals(orFilter.getChildren().get(1), new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(ExpressionContext.forIdentifier("foobar"), "potato")));
         assertEquals(filter.toString(),
-            "(foo IN RANGE (15,*) AND (div(bar,foo) IN RANGE [10,20] OR foobar TEXT_MATCH 'potato'))");
+            "(foo > '15' AND (div(bar,foo) BETWEEN '10' AND '20' OR text_match(foobar,'potato')))");
         assertNull(queryContext.getGroupByExpressions());
         assertNull(queryContext.getOrderByExpressions());
         assertNull(queryContext.getHavingFilter());

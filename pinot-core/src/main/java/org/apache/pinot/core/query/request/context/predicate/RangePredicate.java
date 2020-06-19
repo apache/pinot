@@ -119,7 +119,16 @@ public class RangePredicate implements Predicate {
 
   @Override
   public String toString() {
-    return _lhs + " IN RANGE " + (_lowerInclusive ? LOWER_INCLUSIVE : LOWER_EXCLUSIVE) + _lowerBound + ',' + _upperBound
-        + (_upperInclusive ? UPPER_INCLUSIVE : UPPER_EXCLUSIVE);
+    if (_lowerBound.equals(UNBOUNDED)) {
+      return _lhs + (_upperInclusive ? " <= '" : " < '") + _upperBound + '\'';
+    }
+    if (_upperBound.equals(UNBOUNDED)) {
+      return _lhs + (_lowerInclusive ? " >= '" : " > '") + _lowerBound + '\'';
+    }
+    if (_lowerInclusive && _upperInclusive) {
+      return _lhs + " BETWEEN '" + _lowerBound + "' AND '" + _upperBound + '\'';
+    }
+    return "(" + _lhs + (_lowerInclusive ? " >= '" : " > '") + _lowerBound + "' AND " + _lhs + (_upperInclusive
+        ? " <= '" : " < '") + _upperBound + "')";
   }
 }
