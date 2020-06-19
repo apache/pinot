@@ -61,6 +61,6 @@ public class IsNullPredicate implements Predicate {
 
   @Override
   public String toString() {
-    return _lhs + "IS NULL";
+    return _lhs + " IS NULL";
   }
 }

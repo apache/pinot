@@ -67,6 +67,6 @@ public class TextMatchPredicate implements Predicate {
 
   @Override
   public String toString() {
-    return _lhs + " TEXT_MATCH '" + _value + '\'';
+    return "text_match(" + _lhs + ",'" + _value + "')";
   }
 }
