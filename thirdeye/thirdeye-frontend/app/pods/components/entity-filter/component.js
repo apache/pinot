@@ -37,6 +37,9 @@ import {
 } from '@ember/object';
 import { isPresent } from '@ember/utils';
 import Component from '@ember/component';
+import { autocompleteAPI } from 'thirdeye-frontend/utils/api/self-serve';
+import { task, timeout } from 'ember-concurrency';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Component.extend({
 
@@ -49,6 +52,11 @@ export default Component.extend({
    * Select fields enabled by default
    */
   selectDisabled: false,
+
+  //
+  // internal
+  //
+  mostRecentSearches: {}, // promise
 
   /**
    * Overwrite the init function
@@ -68,7 +76,7 @@ export default Component.extend({
       let matchWidth = block.matchWidth ? block.matchWidth : false;
 
       // Initially load existing state of selected filters if available
-      if (filterStateObj && filterStateObj[tag] && filterStateObj[tag].length) {
+      if (filterStateObj && filterStateObj[tag] && Array.isArray(filterStateObj[tag])) {
         block.selected = filterStateObj[tag];
       }
       // If any pre-selected items, bring them into the new filter object
@@ -105,6 +113,39 @@ export default Component.extend({
   alertFilters: [],
 
   /**
+   * Ember concurrency task that triggers various autocomplete calls
+   */
+  searchTypes: task(function* (type, text) {
+    yield timeout(1000);
+    switch(type) {
+      case 'metric': {
+        return fetch(autocompleteAPI.metric(text))
+          .then(checkStatus)
+          .then(metrics => metrics.map(m => m.name));
+      }
+      case 'application': {
+        return fetch(autocompleteAPI.application(text))
+          .then(checkStatus)
+          .then(applications => applications.map(a => a.application));
+      }
+      case 'subscription': {
+        return fetch(autocompleteAPI.subscriptionGroup(text))
+          .then(checkStatus)
+          .then(groups => groups.map(g => g.name));
+      }
+      case 'owner': {
+        return fetch(autocompleteAPI.owner(text))
+          .then(checkStatus);
+      }
+      case 'dataset': {
+        return fetch(autocompleteAPI.dataset(text))
+          .then(checkStatus)
+          .then(datasets => datasets.map(d => d.name));
+      }
+    }
+  }),
+
+  /**
    * Defined actions for component
    */
   actions: {
@@ -137,6 +178,12 @@ export default Component.extend({
         const activeFilter = filterObj.filtersArray.find(filter => filter.name === selectedItems);
         set(activeFilter, 'isActive', true);
       }
+
+      // // Handle metric filter
+      // if (filterObj.tag === 'metric') {
+      //   selectedArr = selectedItems.map(filter => filter.name);
+      // }
+
       // Sets the 'alertFilters' object in parent
       set(selectKeys, filterObj.tag, selectedArr);
       set(selectKeys, 'triggerType', filterObj.type);
@@ -162,6 +209,23 @@ export default Component.extend({
      */
     clearFilters() {
       this.get('onClearFilters')();
+    },
+
+    /**
+     * Performs a search task while cancelling the previous one
+     * @param {String} type
+     * @param {String} text
+     */
+    onSearch(type, text) {
+      const searchCache = this.get('mostRecentSearches');
+      if (searchCache[type]) {
+        searchCache[type].cancel();
+      }
+      const task = this.get('searchTypes');
+      const taskInstance = task.perform(type, text);
+      set(searchCache, type, taskInstance);
+
+      return taskInstance;
     }
   }
 });

@@ -18,7 +18,7 @@ import {
   getBoundsUrl,
   getAiAvailabilityUrl
 } from 'thirdeye-frontend/utils/api/anomaly';
-import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
+import { yamlAPI } from 'thirdeye-frontend/utils/api/self-serve';
 
 /**
  * Response type options for anomalies.
@@ -194,7 +194,7 @@ export function getAnomalyFiltersByAnomalyId(startTime, endTime, anomalyIds) {
  * @return {Ember.RSVP.Promise}
  */
 export function putAlertActiveStatus(detectionConfigId, active) {
-  const url = selfServeApiCommon.setAlertActivationUrl(detectionConfigId, active);
+  const url = yamlAPI.setAlertActivationUrl(detectionConfigId, active);
   return fetch(url, putProps()).then(checkStatus);
 }
 

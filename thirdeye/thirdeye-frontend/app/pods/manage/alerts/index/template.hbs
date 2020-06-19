@@ -24,16 +24,18 @@
     <div class="manage-alert-search__input">
       {{#power-select
         triggerId="select-alert-by-name"
-        placeholder="Search by alert name"
+        placeholder="Search for alert name"
         options=originalAlerts
         selected=selectedAlert
         searchEnabled=true
         searchField="functionName"
+        search=(action "onSearch")
+        searchPlaceholder="Search for alert name"
         allowClear=true
         onchange=(action "onSelectAlertByName")
         as |alert|
       }}
-        {{alert.functionName}}
+        {{alert.name}}
       {{/power-select}}
     </div>
 
@@ -55,7 +57,7 @@
 
   <div class="manage-alert-results">
     <section class="te-search-header">
-      <span class="te-search-title">Alerts ({{totalFilteredAlerts}})</span>
+      <span class="te-search-title">Alerts ({{totalNumberOfAlerts}})</span>
       {{#if allowFilterSummary}}
         <span class="te-search-filters">{{activeFiltersString}}</span>
         {{#if (gt activeFiltersString.length maxFilterStrngLength)}}
@@ -68,7 +70,7 @@
       {{#if paginatedSelectedAlerts}}
         <span class="te-search-header__displaynum pull-right">
           Showing {{currentPageAlerts}} of
-          {{totalFilteredAlerts}} {{if (gt totalFilteredAlerts 1) 'alerts' 'alert'}}
+          {{totalNumberOfAlerts}} {{if (gt totalNumberOfAlerts 1) 'alerts' 'alert'}}
         </span>
       {{/if}}
     </section>

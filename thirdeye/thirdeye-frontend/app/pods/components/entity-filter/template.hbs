@@ -44,7 +44,7 @@
       {{#if (eq block.type "link")}}
         {{#each block.filtersArray as |filter|}}
           <li class="entity-filter__group-filter entity-filter__group-filter--link {{if filter.isActive 'entity-filter__group-filter--selected'}}" {{action "onFilterSelection" block filter.name}}>
-            {{filter.name}} <span>({{filter.total}})</span>
+            {{filter.name}}
           </li>
         {{/each}}
       {{/if}}
@@ -58,6 +58,26 @@
           onchange=(action "onFilterSelection" block)
           placeholder=(concat " Select " block.title)
           triggerId=(concat "entity-filter-by" block.tag)
+          triggerClass="te-form__select filter-select"
+          verticalPosition="below"
+          disabled=selectDisabled
+          as |option|
+        }}
+          {{option}}
+        {{/power-select-multiple}}
+      {{/if}}
+
+      {{#if (eq block.type "search")}}
+        {{#power-select-multiple
+          selected=(get multiSelectKeys block.tag)
+          options=block.filterKeys
+          searchEnabled=true
+          matchTriggerWidth=block.matchWidth
+          onchange=(action "onFilterSelection" block)
+          placeholder=(concat " Search for " block.title)
+          triggerId=(concat "entity-filter-by" block.tag)
+          search=(action "onSearch" block.tag)
+          searchPlaceholder=(concat " Search for " block.title)
           triggerClass="te-form__select filter-select"
           verticalPosition="below"
           disabled=selectDisabled

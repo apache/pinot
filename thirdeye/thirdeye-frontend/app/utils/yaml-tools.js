@@ -338,12 +338,131 @@ export function postYamlProps(postData) {
   };
 }
 
+export function enrichAlertResponseObject(alerts) {
+  for (let yamlAlert of alerts) {
+    let dimensions = '';
+    let dimensionsArray = yamlAlert.dimensionExploration ? yamlAlert.dimensionExploration.dimensions : null;
+    if (Array.isArray(dimensionsArray)) {
+      dimensionsArray.forEach(dim => {
+        dimensions = dimensions + `${dim}, `;
+      });
+      dimensions = dimensions.substring(0, dimensions.length-2);
+    }
+    Object.assign(yamlAlert, {
+      functionName: yamlAlert.name,
+      collection: yamlAlert.datasetNames.toString(),
+      granularity: yamlAlert.monitoringGranularity.toString(),
+      type: _detectionType(yamlAlert),
+      exploreDimensions: dimensions,
+      filters: formatYamlFilter(yamlAlert.filters),
+      isNewPipeline: true,
+      group: Array.isArray(yamlAlert.subscriptionGroup) ? yamlAlert.subscriptionGroup.join(", ") : null
+    });
+  }
+
+  return alerts;
+}
+
+/**
+ * Grab detection type if available, else return yamlAlert.pipelineType
+ */
+function _detectionType(yamlAlert) {
+  if (yamlAlert.rules && Array.isArray(yamlAlert.rules) && yamlAlert.rules.length > 0) {
+    if (yamlAlert.rules[0].detection && Array.isArray(yamlAlert.rules[0].detection) && yamlAlert.rules[0].detection.length > 0) {
+      return yamlAlert.rules[0].detection[0].type;
+    }
+  }
+  return yamlAlert.pipelineType;
+}
+
+// Maps filter name to alert property for filtering
+export const filterToPropertyMap = {
+  application: 'application',
+  subscription: 'group',
+  owner: 'createdBy',
+  type: 'type',
+  metric: 'metric',
+  dataset: 'collection',
+  granularity: 'granularity'
+};
+
+// Maps filter name to alerts API params for filtering
+export const filterToParamsMap = {
+  application: 'application',
+  subscription: 'subscriptionGroup',
+  owner: 'createdBy',
+  type: 'ruleType',
+  metric: 'metric',
+  dataset: 'dataset',
+  granularity: 'granularity',
+  status: 'active',
+  names: 'names'
+};
+
+export function populateFiltersLocal(originalAlerts, rules) {
+  // This filter category is "secondary". To add more, add an entry here and edit the controller's "filterToPropertyMap"
+  const filterBlocksLocal = [
+    {
+      name: 'status',
+      title: 'Status',
+      type: 'checkbox',
+      selected: ['Active', 'Inactive'],
+      filterKeys: ['Active', 'Inactive']
+    },
+    {
+      name: 'application',
+      title: 'Applications',
+      type: 'search',
+      matchWidth: true,
+      hasNullOption: true, // allow searches for 'none'
+      filterKeys: []
+    },
+    {
+      name: 'subscription',
+      title: 'Subscription Groups',
+      hasNullOption: true, // allow searches for 'none'
+      type: 'search',
+      filterKeys: []
+    },
+    {
+      name: 'owner',
+      title: 'Owners',
+      type: 'search',
+      matchWidth: true,
+      filterKeys: []
+    },
+    {
+      name: 'type',
+      title: 'Detection Type',
+      type: 'select',
+      filterKeys: rules
+    },
+    {
+      name: 'metric',
+      title: 'Metrics',
+      type: 'search',
+      filterKeys: []
+    },
+    {
+      name: 'dataset',
+      title: 'Datasets',
+      type: 'search',
+      filterKeys: []
+    }
+  ];
+  return filterBlocksLocal;
+}
+
 export default {
   defaultDetectionYaml,
   defaultSubscriptionYaml,
+  enrichAlertResponseObject,
+  filterToParamsMap,
+  filterToPropertyMap,
   formatYamlFilter,
   getValueFromYaml,
   fieldsToYaml,
+  populateFiltersLocal,
   postYamlProps,
   redundantParse
 };
