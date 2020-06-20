@@ -525,11 +525,12 @@ public abstract class BaseNotificationContent implements NotificationContent {
     String entityName;
     String anomalyType;
     String properties;
+    String metricUrn;
 
     public AnomalyReportEntity(String anomalyId, String anomalyURL, String baselineVal, String currentVal, String lift,
         boolean positiveLift, Double swi, List<String> dimensions, String duration, String feedback, String function,
         String funcDescription, String metric, String startTime, String endTime, String timezone, String issueType,
-        String anomalyType, String properties) {
+        String anomalyType, String properties, String metricUrn) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
       this.baselineVal = baselineVal;
@@ -556,6 +557,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
       this.issueType = issueType;
       this.anomalyType = anomalyType;
       this.properties = properties;
+      this.metricUrn = metricUrn;
     }
 
     public void setSeasonalValues(COMPARE_MODE compareMode, double seasonalValue, double current) {
@@ -871,6 +873,14 @@ public abstract class BaseNotificationContent implements NotificationContent {
 
     public void setWo4wLift(String wo4wLift) {
       this.wo4wLift = wo4wLift;
+    }
+
+    public String getMetricUrn() {
+      return metricUrn;
+    }
+
+    public void setMetricUrn(String metricUrn) {
+      this.metricUrn = metricUrn;
     }
   }
 }

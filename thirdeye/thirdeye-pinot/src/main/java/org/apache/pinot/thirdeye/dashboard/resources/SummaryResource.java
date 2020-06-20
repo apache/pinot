@@ -59,6 +59,9 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.thirdeye.common.constants.rca.MultiDimensionalSummaryConstants.*;
+import static org.apache.pinot.thirdeye.common.constants.rca.RootCauseResourceConstants.*;
+
 
 @Path(value = "/dashboard")
 public class SummaryResource {
@@ -96,21 +99,21 @@ public class SummaryResource {
   @Path(value = "/summary/autoDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
   public String buildSummary(
-      @QueryParam("metricUrn") String metricUrn,
+      @QueryParam(METRIC_URN) String metricUrn,
       @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric,
-      @QueryParam("currentStart") long currentStartInclusive,
-      @QueryParam("currentEnd") long currentEndExclusive,
-      @QueryParam("baselineStart") long baselineStartInclusive,
-      @QueryParam("baselineEnd") long baselineEndExclusive,
+      @QueryParam(CURRENT_START) long currentStartInclusive,
+      @QueryParam(CURRENT_END) long currentEndExclusive,
+      @QueryParam(BASELINE_START) long baselineStartInclusive,
+      @QueryParam(BASELINE_END) long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
       @QueryParam("filters") String filterJsonPayload,
-      @QueryParam("summarySize") int summarySize,
-      @QueryParam("depth") @DefaultValue(DEFAULT_DEPTH) int depth,
-      @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
-      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
-      @QueryParam("excludedDimensions") @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
-      @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+      @QueryParam(CUBE_SUMMARY_SIZE) int summarySize,
+      @QueryParam(CUBE_DEPTH) @DefaultValue(DEFAULT_DEPTH) int depth,
+      @QueryParam(CUBE_DIM_HIERARCHIES) @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
+      @QueryParam(CUBE_ONE_SIDE_ERROR) @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam(CUBE_EXCLUDED_DIMENSIONS) @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
+      @QueryParam(TIME_ZONE) @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
     String metricName = metric;
@@ -176,18 +179,18 @@ public class SummaryResource {
   @Path(value = "/summary/manualDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
   public String buildSummaryManualDimensionOrder(
-      @QueryParam("metricUrn") String metricUrn,
+      @QueryParam(METRIC_URN) String metricUrn,
       @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric,
-      @QueryParam("currentStart") long currentStartInclusive,
-      @QueryParam("currentEnd") long currentEndExclusive,
-      @QueryParam("baselineStart") long baselineStartInclusive,
-      @QueryParam("baselineEnd") long baselineEndExclusive,
+      @QueryParam(CURRENT_START) long currentStartInclusive,
+      @QueryParam(CURRENT_END) long currentEndExclusive,
+      @QueryParam(BASELINE_START) long baselineStartInclusive,
+      @QueryParam(BASELINE_END) long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
       @QueryParam("filters") String filterJsonPayload,
-      @QueryParam("summarySize") int summarySize,
-      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
-      @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+      @QueryParam(CUBE_SUMMARY_SIZE) int summarySize,
+      @QueryParam(CUBE_ONE_SIDE_ERROR) @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam(TIME_ZONE) @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
     String metricName = metric;

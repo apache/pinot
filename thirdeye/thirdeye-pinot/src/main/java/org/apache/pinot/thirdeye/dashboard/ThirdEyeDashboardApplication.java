@@ -238,8 +238,8 @@ public class ThirdEyeDashboardApplication
       }
 
       env.jersey().register(new ThirdEyeAuthFilter(authenticator, authConfig.getAllowedPaths(), authConfig.getAdminUsers(), DAORegistry.getInstance().getSessionDAO()));
-      env.jersey().register(new AuthResource(authenticator, authConfig.getCookieTTL() * 1000));
       env.jersey().register(new AuthValueFactoryProvider.Binder<>(ThirdEyePrincipal.class));
+      env.jersey().register(new AuthResource(authenticator, authConfig.getCookieTTL() * 1000));
     }
 
     if (config.getModelDownloaderConfig() != null) {
@@ -273,6 +273,7 @@ public class ThirdEyeDashboardApplication
 
     RootCauseConfiguration rcConfig = config.getRootCause();
     return new RootCauseResource(
+        config.getDashboardHost(),
         makeRootCauseFrameworks(rcConfig, definitionsFile),
         makeRootCauseFormatters(rcConfig));
   }

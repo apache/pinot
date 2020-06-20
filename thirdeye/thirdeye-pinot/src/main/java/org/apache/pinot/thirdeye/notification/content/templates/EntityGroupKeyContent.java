@@ -161,7 +161,7 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
         detectionConfig.getName(), detectionConfig.getDescription(), anomaly.getMetric(),
         getDateString(anomaly.getStartTime(), dateTimeZone), getDateString(anomaly.getEndTime(), dateTimeZone),
         getTimezoneString(dateTimeZone), getIssueType(anomaly), anomaly.getType().getLabel(),
-        ThirdEyeStringUtils.encodeCompactedProperties(props));
+        ThirdEyeStringUtils.encodeCompactedProperties(props), anomaly.getMetricUrn());
 
     // Extract out the whitelisted metrics
     if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_SUB_ENTITY_NAME)

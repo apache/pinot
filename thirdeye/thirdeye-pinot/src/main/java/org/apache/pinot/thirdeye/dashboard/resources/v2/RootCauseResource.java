@@ -19,19 +19,15 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import org.apache.pinot.thirdeye.api.Constants;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
-import org.apache.pinot.thirdeye.rootcause.Entity;
-import org.apache.pinot.thirdeye.rootcause.RCAFramework;
-import org.apache.pinot.thirdeye.rootcause.RCAFrameworkExecutionResult;
-import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
-import org.apache.pinot.thirdeye.rootcause.impl.TimeRangeEntity;
+import com.google.gson.Gson;
+import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +38,15 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
+import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRcaRestClient;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.RCAFramework;
+import org.apache.pinot.thirdeye.rootcause.RCAFrameworkExecutionResult;
+import org.apache.pinot.thirdeye.rootcause.impl.TimeRangeEntity;
+import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,10 +65,49 @@ public class RootCauseResource {
 
   private final List<RootCauseEntityFormatter> formatters;
   private final Map<String, RCAFramework> frameworks;
+  private final String dashboardHost;
 
-  public RootCauseResource(Map<String, RCAFramework> frameworks, List<RootCauseEntityFormatter> formatters) {
+  public RootCauseResource(String dashboardHost, Map<String, RCAFramework> frameworks, List<RootCauseEntityFormatter> formatters) {
+    this.dashboardHost = dashboardHost;
     this.frameworks = frameworks;
     this.formatters = formatters;
+  }
+
+  @GET
+  @Path("/highlights")
+  @ApiOperation(value = "Send query")
+  public Map<String, String> highlights(
+      @ApiParam(value = "internal id of the anomaly")
+      @QueryParam("anomalyId") long anomalyId,
+      @Auth ThirdEyePrincipal principal) {
+    Map<String, String> responseMessage = new HashMap<>();
+    ThirdEyeRcaRestClient rcaClient = new ThirdEyeRcaRestClient(principal, dashboardHost);
+
+    Map<String, Object> eventHighlights = new HashMap<>();
+    try {
+      eventHighlights = rcaClient.getRelatedEventHighlights(anomalyId);
+    } catch (IOException e) {
+      LOG.error("Failed to retrieve the RCA Event Highlights", e);
+    }
+    responseMessage.put("relatedEvents", new Gson().toJson(eventHighlights));
+
+    Map<String, Object> relatedMetricHighlights = new HashMap<>();
+    try {
+      relatedMetricHighlights = rcaClient.getRelatedMetricHighlights(anomalyId);
+    } catch (IOException e) {
+      LOG.error("Failed to retrieve the RCA Metric Highlights", e);
+    }
+    responseMessage.put("relatedMetrics", new Gson().toJson(relatedMetricHighlights));
+
+    Map<String, Object> cubeHighlights = new HashMap<>();
+    try {
+      cubeHighlights = rcaClient.getCubeHighlights(anomalyId);
+    } catch (IOException e) {
+      LOG.error("Failed to retrieve the RCA Cube Highlights", e);
+    }
+    responseMessage.put("cubeResults", new Gson().toJson(cubeHighlights));
+
+    return responseMessage;
   }
 
   @GET
