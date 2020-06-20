@@ -20,11 +20,17 @@ package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.Arrays;
 import java.util.Collections;
+import org.apache.pinot.spi.config.table.IngestionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -41,6 +47,7 @@ public class RecordTransformerTest {
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
       .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING).build();
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
   static {
     SCHEMA.getFieldSpecFor("svStringWithLengthLimit").setMaxLength(2);
@@ -64,6 +71,49 @@ public class RecordTransformerTest {
     record.putValue("svStringWithNullCharacters", "1\0002\0003");
     record.putValue("svStringWithLengthLimit", "123");
     return record;
+  }
+
+  @Test
+  public void testFilterTransformer() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+
+    // expression false, not filtered
+    GenericRow genericRow = getRecord();
+    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt > 123}, svInt)")));
+    RecordTransformer transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.FILTER_RECORD_KEY));
+
+    // expression true, filtered
+    genericRow = getRecord();
+    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt <= 123}, svInt)")));
+    transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.FILTER_RECORD_KEY));
+
+    // value not found
+    genericRow = getRecord();
+    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({notPresent == 123}, notPresent)")));
+    transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.FILTER_RECORD_KEY));
+
+    // invalid function
+    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy(svInt == 123)")));
+    try {
+      new FilterTransformer(tableConfig);
+      Assert.fail("Should have failed constructing FilterTransformer");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // multi value column
+    genericRow = getRecord();
+    tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)")));
+    transformer = new FilterTransformer(tableConfig);
+    transformer.transform(genericRow);
+    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.FILTER_RECORD_KEY));
+
   }
 
   @Test
@@ -160,7 +210,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testDefaultTransformer() {
-    RecordTransformer transformer = CompositeTransformer.getDefaultTransformer(SCHEMA);
+    RecordTransformer transformer = CompositeTransformer.getDefaultTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);

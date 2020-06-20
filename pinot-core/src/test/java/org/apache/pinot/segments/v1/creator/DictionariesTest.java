@@ -31,6 +31,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -57,6 +59,7 @@ import org.apache.pinot.core.segment.index.readers.FloatDictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -70,6 +73,8 @@ public class DictionariesTest {
   static Map<String, Set<Object>> uniqueEntries;
 
   private static File segmentDirectory;
+
+  private static TableConfig _tableConfig ;
 
   @AfterClass
   public static void cleanup() {
@@ -88,6 +93,7 @@ public class DictionariesTest {
     final SegmentGeneratorConfig config = SegmentTestUtils
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day", TimeUnit.DAYS,
             "test");
+    _tableConfig = config.getTableConfig();
 
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -441,7 +447,7 @@ public class DictionariesTest {
   private AbstractColumnStatisticsCollector buildStatsCollector(String column, DataType dataType) {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(column, dataType, true));
-    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(schema, null);
+    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(schema, _tableConfig, null);
 
     switch (dataType) {
       case INT:

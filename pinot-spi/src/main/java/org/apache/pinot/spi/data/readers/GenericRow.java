@@ -50,6 +50,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class GenericRow {
 
   public static final String MULTIPLE_RECORDS_KEY = "$MULTIPLE_RECORDS_KEY$";
+  public static final String FILTER_RECORD_KEY = "$FILTER_RECORD_KEY$";
 
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();

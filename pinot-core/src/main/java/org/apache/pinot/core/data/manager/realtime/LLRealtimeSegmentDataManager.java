@@ -58,6 +58,7 @@ import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
@@ -79,7 +80,6 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.stream.TransientConsumerException;
-import org.apache.pinot.core.util.SchemaUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -471,7 +471,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
             for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
               GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
-              if (transformedRow != null) {
+              if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
                 realtimeRowsConsumedMeter = _serverMetrics
                     .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
                 indexedMessageCount++;
@@ -484,7 +484,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             }
           } else {
             GenericRow transformedRow = _recordTransformer.transform(decodedRow);
-            if (transformedRow != null) {
+            if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
               realtimeRowsConsumedMeter = _serverMetrics
                   .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
               indexedMessageCount++;
@@ -1185,12 +1185,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir);
 
     // Create message decoder
-    _messageDecoder =
-        StreamDecoderProvider.create(_partitionLevelStreamConfig, SchemaUtils.extractSourceFields(_schema));
+    _messageDecoder = StreamDecoderProvider
+        .create(_partitionLevelStreamConfig, IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema));
     _clientId = _streamTopic + "-" + _streamPartitionId;
 
     // Create record transformer
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
 
     // Acquire semaphore to create Kafka consumers
     try {
