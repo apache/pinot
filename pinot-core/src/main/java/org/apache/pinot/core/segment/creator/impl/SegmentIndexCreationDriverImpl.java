@@ -102,8 +102,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     TableConfig tableConfig = segmentGeneratorConfig.getTableConfig();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
-    Set<String> sourceFields =
-        IngestionUtils.getFieldsForRecordExtractor(tableConfig, segmentGeneratorConfig.getSchema());
+    Set<String> sourceFields = IngestionUtils
+        .getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), segmentGeneratorConfig.getSchema());
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -195,7 +195,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
             GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
             recordReadStopTime = System.currentTimeMillis();
             totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-            if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
+            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
               indexCreator.indexRow(transformedRow);
               indexStopTime = System.currentTimeMillis();
               totalIndexTime += (indexStopTime - recordReadStopTime);
@@ -205,7 +205,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           GenericRow transformedRow = _recordTransformer.transform(decodedRow);
           recordReadStopTime = System.currentTimeMillis();
           totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-          if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
+          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             indexCreator.indexRow(transformedRow);
             indexStopTime = System.currentTimeMillis();
             totalIndexTime += (indexStopTime - recordReadStopTime);

@@ -26,7 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.IngestionConfig;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -39,11 +38,14 @@ public class IngestionUtils {
 
   /**
    * Extracts all fields required by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given TableConfig and Schema
+   * Fields for ingestion come from 2 places:
+   * 1. The schema
+   * 2. The ingestion config in the table config. The ingestion config (e.g. filter) can have fields which are not in the schema.
    */
-  public static Set<String> getFieldsForRecordExtractor(TableConfig tableConfig, Schema schema) {
+  public static Set<String> getFieldsForRecordExtractor(IngestionConfig ingestionConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
-    fieldsForRecordExtractor.addAll(getFieldsForRecordExtractor(tableConfig.getIngestionConfig()));
-    fieldsForRecordExtractor.addAll(getFieldsForRecordExtractor(schema));
+    fieldsForRecordExtractor.addAll(getFieldsFromIngestionConfig(ingestionConfig));
+    fieldsForRecordExtractor.addAll(getFieldsFromSchema(schema));
     return fieldsForRecordExtractor;
   }
 
@@ -51,7 +53,7 @@ public class IngestionUtils {
    * Extracts all the fields needed by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given Schema
    * TODO: for now, we assume that arguments to transform function are in the source i.e. no columns are derived from transformed columns
    */
-  private static Set<String> getFieldsForRecordExtractor(Schema schema) {
+  private static Set<String> getFieldsFromSchema(Schema schema) {
     Set<String> fieldNames = new HashSet<>();
 
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -69,7 +71,7 @@ public class IngestionUtils {
   /**
    * Extracts the fields needed by a RecordExtractor from given {@link IngestionConfig}
    */
-  private static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig) {
+  private static Set<String> getFieldsFromIngestionConfig(@Nullable IngestionConfig ingestionConfig) {
     if (ingestionConfig != null && ingestionConfig.getFilterConfig() != null) {
       String filterFunction = ingestionConfig.getFilterConfig().getFilterFunction();
       if (filterFunction != null) {
@@ -85,7 +87,7 @@ public class IngestionUtils {
   /**
    * Returns true if the record doesn not contain key {@link GenericRow#FILTER_RECORD_KEY} with value true
    */
-  public static boolean passedFilter(GenericRow genericRow) {
+  public static boolean shouldIngestRow(GenericRow genericRow) {
     return !Boolean.TRUE.equals(genericRow.getValue(GenericRow.FILTER_RECORD_KEY));
   }
 }

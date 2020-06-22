@@ -49,7 +49,16 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class GenericRow {
 
+  /**
+   * This key is used by a Decoder/RecordReader to handle 1 record to many records flattening.
+   * If a Decoder/RecordReader produces multiple GenericRows from the given record, they must be put into the destination GenericRow as a List<GenericRow> with this key
+   * The segment generation drivers handle this key as a special case and process the multiple records
+   */
   public static final String MULTIPLE_RECORDS_KEY = "$MULTIPLE_RECORDS_KEY$";
+  /**
+   * This key is used by the FilterTransformer to handle filtering out of records during ingestion
+   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering out criteria, based on FilterConfig
+   */
   public static final String FILTER_RECORD_KEY = "$FILTER_RECORD_KEY$";
 
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();

@@ -169,8 +169,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // create and init stream level consumer
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
-    _streamLevelConsumer = streamConsumerFactory.createStreamLevelConsumer(clientId, _tableNameWithType,
-        IngestionUtils.getFieldsForRecordExtractor(tableConfig, schema),
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), schema);
+    _streamLevelConsumer = streamConsumerFactory.createStreamLevelConsumer(clientId, _tableNameWithType, fieldsToRead,
         instanceMetadata.getGroupId(_tableNameWithType));
     _streamLevelConsumer.start();
     _tableStreamName = _tableNameWithType + "_" + _streamConfig.getTopicName();
@@ -245,8 +245,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             if (consumedRow != null) {
               try {
                 GenericRow transformedRow = _recordTransformer.transform(consumedRow);
-                // FIXME: MULTIPLE_RECORDS_KEY is not handled here
-                if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
+                // FIXME: handle MULTIPLE_RECORDS_KEY for HLL
+                if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
                   // we currently do not get ingestion data through stream-consumer
                   notFull = _realtimeSegment.index(transformedRow, null);
                   exceptionSleepMillis = 50L;

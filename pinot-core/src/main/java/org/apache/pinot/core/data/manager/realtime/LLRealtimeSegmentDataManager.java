@@ -471,7 +471,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           if (decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
             for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
               GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
-              if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
+              if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
                 realtimeRowsConsumedMeter = _serverMetrics
                     .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
                 indexedMessageCount++;
@@ -484,7 +484,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             }
           } else {
             GenericRow transformedRow = _recordTransformer.transform(decodedRow);
-            if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
+            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
               realtimeRowsConsumedMeter = _serverMetrics
                   .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
               indexedMessageCount++;
@@ -1185,8 +1185,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir);
 
     // Create message decoder
-    _messageDecoder = StreamDecoderProvider
-        .create(_partitionLevelStreamConfig, IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema));
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
+    _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
     _clientId = _streamTopic + "-" + _streamPartitionId;
 
     // Create record transformer

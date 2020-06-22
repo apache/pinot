@@ -62,13 +62,13 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
         if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
           for (Object singleRow : (Collection) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
             GenericRow transformedRow = recordTransformer.transform((GenericRow) singleRow);
-            if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
+            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
               collector.collectRow(transformedRow);
             }
           }
         } else {
           GenericRow transformedRow = recordTransformer.transform(reuse);
-          if (transformedRow != null && IngestionUtils.passedFilter(transformedRow)) {
+          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             collector.collectRow(transformedRow);
           }
         }

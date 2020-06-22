@@ -19,6 +19,7 @@
 package org.apache.pinot.hadoop.io;
 
 import java.io.IOException;
+import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -107,8 +108,10 @@ public class PinotOutputFormat<T> extends FileOutputFormat<NullWritable, T> {
       throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig = getSegmentGeneratorConfig(job);
     FieldExtractor<T> fieldExtractor = getFieldExtractor(job);
-    fieldExtractor.init(job.getConfiguration(), IngestionUtils
-        .getFieldsForRecordExtractor(segmentGeneratorConfig.getTableConfig(), segmentGeneratorConfig.getSchema()));
+    Set<String> fieldsToRead = IngestionUtils
+        .getFieldsForRecordExtractor(segmentGeneratorConfig.getTableConfig().getIngestionConfig(),
+            segmentGeneratorConfig.getSchema());
+    fieldExtractor.init(job.getConfiguration(), fieldsToRead);
     return new PinotRecordWriter<>(job, segmentGeneratorConfig, fieldExtractor);
   }
 
