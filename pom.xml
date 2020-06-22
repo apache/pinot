@@ -152,6 +152,8 @@
     To change kafka connector dependency, we only need to update this version number config.
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
     <kafka.version>2.0</kafka.version>
+    <protobuf.version>3.12.0</protobuf.version>
+    <grpc.version>1.30.0</grpc.version>
   </properties>
 
   <profiles>
@@ -702,6 +704,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -758,6 +764,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
 
@@ -787,6 +797,10 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -839,6 +853,12 @@
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
         <version>1.5.9</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -1140,10 +1160,38 @@
         <artifactId>reflections</artifactId>
         <version>${reflections.version}</version>
       </dependency>
+      <!-- protobuf and grpc -->
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java</artifactId>
+        <version>${protobuf.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-netty-shaded</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-protobuf</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-stub</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
     <defaultGoal>clean install</defaultGoal>
+    <extensions>
+      <extension>
+        <groupId>kr.motd.maven</groupId>
+        <artifactId>os-maven-plugin</artifactId>
+        <version>1.6.2</version>
+      </extension>
+    </extensions>
     <pluginManagement>
       <plugins>
         <plugin>
@@ -1314,6 +1362,26 @@
           <configuration>
             <autoVersionSubmodules>true</autoVersionSubmodules>
           </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.xolstice.maven.plugins</groupId>
+          <artifactId>protobuf-maven-plugin</artifactId>
+          <version>0.6.1</version>
+          <configuration>
+            <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+            <pluginId>grpc-java</pluginId>
+            <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>compile</goal>
+                <goal>compile-custom</goal>
+                <goal>test-compile</goal>
+                <goal>test-compile-custom</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>

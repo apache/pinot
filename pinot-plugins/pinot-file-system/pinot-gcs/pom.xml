@@ -51,12 +51,15 @@
           <groupId>com.google.guava</groupId>
           <artifactId>guava</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <version>3.10.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.api-client</groupId>
