@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,26 +27,23 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
@@ -54,39 +52,32 @@ import org.apache.pinot.core.util.QueryOptions;
 /**
  * Helper class to reduce data tables and set group by results into the BrokerResponseNative
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByDataTableReducer implements DataTableReducer {
-  private final BrokerRequest _brokerRequest;
+  private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
-  private final List<SelectionSort> _orderBy;
-  private final GroupBy _groupBy;
   private final int _numAggregationFunctions;
-  private final int _numGroupBy;
+  private final List<ExpressionContext> _groupByExpressions;
+  private final int _numGroupByExpressions;
   private final int _numColumns;
   private final boolean _preserveType;
   private final boolean _groupByModeSql;
   private final boolean _responseFormatSql;
-  private final List<Expression> _sqlSelectionList;
-  private final List<Expression> _groupByList;
+  private final boolean _sqlQuery;
 
-  GroupByDataTableReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
-      QueryOptions queryOptions) {
-    _brokerRequest = brokerRequest;
+  GroupByDataTableReducer(QueryContext queryContext, AggregationFunction[] aggregationFunctions) {
+    _queryContext = queryContext;
     _aggregationFunctions = aggregationFunctions;
     _numAggregationFunctions = aggregationFunctions.length;
-    _groupBy = brokerRequest.getGroupBy();
-    _numGroupBy = _groupBy.getExpressionsSize();
-    _orderBy = brokerRequest.getOrderBy();
-    _numColumns = _numAggregationFunctions + _numGroupBy;
+    _groupByExpressions = queryContext.getGroupByExpressions();
+    assert _groupByExpressions != null;
+    _numGroupByExpressions = _groupByExpressions.size();
+    _numColumns = _numAggregationFunctions + _numGroupByExpressions;
+    QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
     _preserveType = queryOptions.isPreserveType();
     _groupByModeSql = queryOptions.isGroupByModeSQL();
     _responseFormatSql = queryOptions.isResponseFormatSQL();
-    if (_responseFormatSql && brokerRequest.getPinotQuery() != null) {
-      _sqlSelectionList = brokerRequest.getPinotQuery().getSelectList();
-      _groupByList = brokerRequest.getPinotQuery().getGroupByList();
-    } else {
-      _sqlSelectionList = null;
-      _groupByList = null;
-    }
+    _sqlQuery = queryContext.getBrokerRequest().getPinotQuery() != null;
   }
 
   /**
@@ -143,9 +134,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       // 4. groupByMode = pql, responseFormat = pql
       // This is the primary PQL compliant group by
 
-      boolean[] aggregationFunctionSelectStatus =
-          AggregationFunctionUtils.getAggregationFunctionsSelectStatus(_brokerRequest.getAggregationsInfo());
-      setGroupByResults(brokerResponseNative, aggregationFunctionSelectStatus, dataTables);
+      setGroupByResults(brokerResponseNative, dataTables);
 
       if (_responseFormatSql) {
         resultSize = brokerResponseNative.getResultTable().getRows().size();
@@ -171,106 +160,81 @@ public class GroupByDataTableReducer implements DataTableReducer {
    */
   private void setSQLGroupByInResultTable(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       Collection<DataTable> dataTables) {
-
+    DataSchema resultTableSchema = getSQLResultTableSchema(dataSchema);
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables);
-
-    int[] finalSchemaMapIdx = null;
-    if (_sqlSelectionList != null) {
-      finalSchemaMapIdx = getFinalSchemaMapIdx();
-    }
-    List<Object[]> rows = new ArrayList<>();
     Iterator<Record> sortedIterator = indexedTable.iterator();
-    int numRows = 0;
-    while (numRows < _groupBy.getTopN() && sortedIterator.hasNext()) {
-      Record nextRecord = sortedIterator.next();
-      Object[] values = nextRecord.getValues();
+    int limit = _queryContext.getLimit();
+    List<Object[]> rows = new ArrayList<>(limit);
 
-      int index = _numGroupBy;
-      int aggNum = 0;
-      while (index < _numColumns) {
-        values[index] = AggregationFunctionUtils
-            .getSerializableValue(_aggregationFunctions[aggNum++].extractFinalResult(values[index]));
-        index++;
+    if (_sqlQuery) {
+      // NOTE: For SQL query, need to reorder the columns in the data table based on the select expressions.
+
+      int[] selectExpressionIndexMap = getSelectExpressionIndexMap();
+      int numSelectExpressions = selectExpressionIndexMap.length;
+      String[] columnNames = resultTableSchema.getColumnNames();
+      DataSchema.ColumnDataType[] columnDataTypes = resultTableSchema.getColumnDataTypes();
+      String[] reorderedColumnNames = new String[numSelectExpressions];
+      DataSchema.ColumnDataType[] reorderedColumnDataTypes = new DataSchema.ColumnDataType[numSelectExpressions];
+      resultTableSchema = new DataSchema(reorderedColumnNames, reorderedColumnDataTypes);
+      for (int i = 0; i < numSelectExpressions; i++) {
+        reorderedColumnNames[i] = columnNames[selectExpressionIndexMap[i]];
+        reorderedColumnDataTypes[i] = columnDataTypes[selectExpressionIndexMap[i]];
       }
-      if (_sqlSelectionList != null) {
-        Object[] finalValues = new Object[_sqlSelectionList.size()];
-        for (int i = 0; i < finalSchemaMapIdx.length; i++) {
-          finalValues[i] = values[finalSchemaMapIdx[i]];
+      while (rows.size() < limit && sortedIterator.hasNext()) {
+        Record nextRecord = sortedIterator.next();
+        Object[] values = nextRecord.getValues();
+        for (int i = 0; i < _numAggregationFunctions; i++) {
+          int valueIndex = i + _numGroupByExpressions;
+          values[valueIndex] = AggregationFunctionUtils
+              .getSerializableValue(_aggregationFunctions[i].extractFinalResult(values[valueIndex]));
         }
-        rows.add(finalValues);
-      } else {
+
+        Object[] reorderedValues = new Object[numSelectExpressions];
+        for (int i = 0; i < numSelectExpressions; i++) {
+          reorderedValues[i] = values[selectExpressionIndexMap[i]];
+        }
+        rows.add(reorderedValues);
+      }
+    } else {
+      while (rows.size() < limit && sortedIterator.hasNext()) {
+        Record nextRecord = sortedIterator.next();
+        Object[] values = nextRecord.getValues();
+        for (int i = 0; i < _numAggregationFunctions; i++) {
+          int valueIndex = i + _numGroupByExpressions;
+          values[valueIndex] = AggregationFunctionUtils
+              .getSerializableValue(_aggregationFunctions[i].extractFinalResult(values[valueIndex]));
+        }
         rows.add(values);
       }
-      numRows++;
     }
 
-    DataSchema finalDataSchema = getSQLResultTableSchema(dataSchema);
-    if (_sqlSelectionList != null) {
-      int columnSize = _sqlSelectionList.size();
-      String[] columns = new String[columnSize];
-      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columnSize];
-      for (int i = 0; i < columnSize; i++) {
-        columns[i] = finalDataSchema.getColumnName(finalSchemaMapIdx[i]);
-        columnDataTypes[i] = finalDataSchema.getColumnDataType(finalSchemaMapIdx[i]);
-      }
-      finalDataSchema = new DataSchema(columns, columnDataTypes);
-    }
-    brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, rows));
+    brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, rows));
   }
 
   /**
-   * Generate index mapping based on selection expression to DataTable schema, which is groupBy columns,
-   * then aggregation functions.
-   *
-   * @return a mapping from final schema idx to corresponding idx in data table schema.
+   * Helper method to generate a map from the expression index in the select expressions to the column index in the data
+   * schema. This map is used to reorder the expressions according to the select expressions.
    */
-  private int[] getFinalSchemaMapIdx() {
-    int[] finalSchemaMapIdx = new int[_sqlSelectionList.size()];
-    int nextAggregationIdx = _numGroupBy;
-    for (int i = 0; i < _sqlSelectionList.size(); i++) {
-      finalSchemaMapIdx[i] = getExpressionMapIdx(_sqlSelectionList.get(i), nextAggregationIdx);
-      if (finalSchemaMapIdx[i] == nextAggregationIdx) {
-        nextAggregationIdx++;
+  private int[] getSelectExpressionIndexMap() {
+    List<ExpressionContext> selectExpressions = _queryContext.getSelectExpressions();
+    List<ExpressionContext> groupByExpressions = _queryContext.getGroupByExpressions();
+    assert groupByExpressions != null;
+    int numSelectExpressions = selectExpressions.size();
+    int[] selectExpressionIndexMap = new int[numSelectExpressions];
+    int aggregationExpressionIndex = _numGroupByExpressions;
+    for (int i = 0; i < numSelectExpressions; i++) {
+      ExpressionContext selectExpression = selectExpressions.get(i);
+      if (selectExpression.getType() == ExpressionContext.Type.FUNCTION
+          && selectExpression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
+        selectExpressionIndexMap[i] = aggregationExpressionIndex++;
+      } else {
+        int indexInGroupByExpressions = groupByExpressions.indexOf(selectExpression);
+        Preconditions.checkState(indexInGroupByExpressions >= 0,
+            "Select expression: %s is not an aggregation expression and not contained in the group-by expressions");
+        selectExpressionIndexMap[i] = indexInGroupByExpressions;
       }
     }
-    return finalSchemaMapIdx;
-  }
-
-  private int getExpressionMapIdx(Expression expression, int nextAggregationIdx) {
-    // Check if expression matches groupBy list.
-    int idxFromGroupByList = getGroupByIdx(_groupByList, expression);
-    if (idxFromGroupByList != -1) {
-      return idxFromGroupByList;
-    }
-    // Handle all functions
-    if (expression.getFunctionCall() != null) {
-      // handle AS
-      if (expression.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
-        return getExpressionMapIdx(expression.getFunctionCall().getOperands().get(0), nextAggregationIdx);
-      }
-      // Return next aggregation idx.
-      return nextAggregationIdx;
-    }
-    // Shouldn't reach here.
-    throw new IllegalArgumentException(
-        "Failed to get index from GroupBy Clause for selected expression - " + RequestUtils.prettyPrint(expression));
-  }
-
-  /**
-   * Trying to match an expression based on given groupByList.
-   *
-   * @param groupByList
-   * @param expression
-   * @return matched idx from groupByList
-   */
-  private int getGroupByIdx(List<Expression> groupByList, Expression expression) {
-    for (int i = 0; i < groupByList.size(); i++) {
-      Expression groupByExpr = groupByList.get(i);
-      if (groupByExpr.equals(expression)) {
-        return i;
-      }
-    }
-    return -1;
+    return selectExpressionIndexMap;
   }
 
   /**
@@ -282,7 +246,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[_numColumns];
     int aggIdx = 0;
     for (int i = 0; i < _numColumns; i++) {
-      if (i < _numGroupBy) {
+      if (i < _numGroupByExpressions) {
         finalColumnDataTypes[i] = dataSchema.getColumnDataType(i);
       } else {
         finalColumnDataTypes[i] = _aggregationFunctions[aggIdx].getFinalResultColumnType();
@@ -293,9 +257,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
   }
 
   private IndexedTable getIndexedTable(DataSchema dataSchema, Collection<DataTable> dataTables) {
-    int indexedTableCapacity = GroupByUtils.getTableCapacity(_groupBy, _orderBy);
+    int indexedTableCapacity = GroupByUtils.getTableCapacity(_queryContext);
     IndexedTable indexedTable =
-        new ConcurrentIndexedTable(dataSchema, _aggregationFunctions, _orderBy, indexedTableCapacity);
+        new ConcurrentIndexedTable(dataSchema, _aggregationFunctions, _queryContext.getOrderByExpressions(),
+            indexedTableCapacity);
 
     for (DataTable dataTable : dataTables) {
       BiFunction[] functions = new BiFunction[_numColumns];
@@ -354,9 +319,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private void setSQLGroupByInAggregationResults(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       Collection<DataTable> dataTables) {
 
-    List<String> groupByColumns = new ArrayList<>(_numGroupBy);
+    List<String> groupByColumns = new ArrayList<>(_numGroupByExpressions);
     int idx = 0;
-    while (idx < _numGroupBy) {
+    while (idx < _numGroupByExpressions) {
       groupByColumns.add(dataSchema.getColumnName(idx));
       idx++;
     }
@@ -372,16 +337,16 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (!dataTables.isEmpty()) {
       IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables);
 
+      int limit = _queryContext.getLimit();
       Iterator<Record> sortedIterator = indexedTable.iterator();
       int numRows = 0;
-      while (numRows < _groupBy.getTopN() && sortedIterator.hasNext()) {
-
+      while (numRows < limit && sortedIterator.hasNext()) {
         Record nextRecord = sortedIterator.next();
         Object[] values = nextRecord.getValues();
 
         int index = 0;
-        List<String> group = new ArrayList<>(_numGroupBy);
-        while (index < _numGroupBy) {
+        List<String> group = new ArrayList<>(_numGroupByExpressions);
+        while (index < _numGroupByExpressions) {
           group.add(values[index].toString());
           index++;
         }
@@ -424,18 +389,16 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Constructs the final result table schema for PQL execution mode
    */
-  private DataSchema getPQLResultTableSchema(String finalAggregationName, AggregationFunction aggregationFunction) {
-    String[] finalDataSchemaColumns = new String[_numColumns];
-    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[_numColumns];
-    int i;
-    List<String> groupByExpressions = _groupBy.getExpressions();
-    for (i = 0; i < _numGroupBy; i++) {
-      finalDataSchemaColumns[i] = groupByExpressions.get(i);
-      finalColumnDataTypes[i] = DataSchema.ColumnDataType.STRING;
+  private DataSchema getPQLResultTableSchema(AggregationFunction aggregationFunction) {
+    String[] columnNames = new String[_numColumns];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_numColumns];
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      columnNames[i] = _groupByExpressions.get(i).toString();
+      columnDataTypes[i] = DataSchema.ColumnDataType.STRING;
     }
-    finalDataSchemaColumns[i] = finalAggregationName;
-    finalColumnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
-    return new DataSchema(finalDataSchemaColumns, finalColumnDataTypes);
+    columnNames[_numGroupByExpressions] = aggregationFunction.getResultColumnName();
+    columnDataTypes[_numGroupByExpressions] = aggregationFunction.getFinalResultColumnType();
+    return new DataSchema(columnNames, columnDataTypes);
   }
 
   /**
@@ -444,9 +407,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param brokerResponseNative broker response.
    * @param dataTables Collection of data tables
    */
-  @SuppressWarnings("unchecked")
-  private void setGroupByResults(BrokerResponseNative brokerResponseNative, boolean[] aggregationFunctionsSelectStatus,
-      Collection<DataTable> dataTables) {
+  private void setGroupByResults(BrokerResponseNative brokerResponseNative, Collection<DataTable> dataTables) {
 
     // Merge results from all data tables.
     String[] columnNames = new String[_numAggregationFunctions];
@@ -486,69 +447,44 @@ public class GroupByDataTableReducer implements DataTableReducer {
       finalResultMaps[i] = finalResultMap;
     }
 
-    int aggregationNumsInFinalResult = 0;
-    for (int i = 0; i < _numAggregationFunctions; i++) {
-      if (aggregationFunctionsSelectStatus[i]) {
-        aggregationNumsInFinalResult++;
-      }
-    }
+    // Trim the final result maps and set them into the broker response.
+    AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
+        new AggregationGroupByTrimmingService(_aggregationFunctions, _queryContext.getLimit());
+    List<GroupByResult>[] groupByResultLists = aggregationGroupByTrimmingService.trimFinalResults(finalResultMaps);
 
-    if (aggregationNumsInFinalResult > 0) {
-      String[] finalColumnNames = new String[aggregationNumsInFinalResult];
-      Map<String, Comparable>[] finalOutResultMaps = new Map[aggregationNumsInFinalResult];
-      String[] finalResultTableAggNames = new String[aggregationNumsInFinalResult];
-      AggregationFunction[] finalAggregationFunctions = new AggregationFunction[aggregationNumsInFinalResult];
-      int count = 0;
-      for (int i = 0; i < _numAggregationFunctions; i++) {
-        if (aggregationFunctionsSelectStatus[i]) {
-          finalColumnNames[count] = columnNames[i];
-          finalOutResultMaps[count] = finalResultMaps[i];
-          AggregationFunction aggregationFunction = _aggregationFunctions[i];
-          finalResultTableAggNames[count] = aggregationFunction.getResultColumnName();
-          finalAggregationFunctions[count] = aggregationFunction;
-          count++;
+    if (_responseFormatSql) {
+      assert _numAggregationFunctions == 1;
+      List<GroupByResult> groupByResultList = groupByResultLists[0];
+      List<Object[]> rows = new ArrayList<>();
+      for (GroupByResult groupByResult : groupByResultList) {
+        Object[] row = new Object[_numColumns];
+        int i = 0;
+        for (String column : groupByResult.getGroup()) {
+          row[i++] = column;
         }
+        row[i] = groupByResult.getValue();
+        rows.add(row);
       }
-      // Trim the final result maps to topN and set them into the broker response.
-      AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-          new AggregationGroupByTrimmingService(finalAggregationFunctions, (int) _groupBy.getTopN());
-      List<GroupByResult>[] groupByResultLists = aggregationGroupByTrimmingService.trimFinalResults(finalOutResultMaps);
-
-      if (_responseFormatSql) {
-        assert aggregationNumsInFinalResult == 1;
-        List<GroupByResult> groupByResultList = groupByResultLists[0];
-        List<Object[]> rows = new ArrayList<>();
-        for (GroupByResult groupByResult : groupByResultList) {
-          Object[] row = new Object[_numColumns];
-          int i = 0;
-          for (String column : groupByResult.getGroup()) {
-            row[i++] = column;
-          }
-          row[i] = groupByResult.getValue();
-          rows.add(row);
-        }
-        DataSchema finalDataSchema = getPQLResultTableSchema(finalResultTableAggNames[0], finalAggregationFunctions[0]);
-        brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, rows));
-      } else {
-        // Format the value into string if required
-        if (!_preserveType) {
-          for (List<GroupByResult> groupByResultList : groupByResultLists) {
-            for (GroupByResult groupByResult : groupByResultList) {
-              groupByResult.setValue(AggregationFunctionUtils.formatValue(groupByResult.getValue()));
-            }
-          }
-        }
-        List<AggregationResult> aggregationResults = new ArrayList<>(count);
-        for (int i = 0; i < aggregationNumsInFinalResult; i++) {
-          List<GroupByResult> groupByResultList = groupByResultLists[i];
-          aggregationResults
-              .add(new AggregationResult(groupByResultList, _groupBy.getExpressions(), finalColumnNames[i]));
-        }
-        brokerResponseNative.setAggregationResults(aggregationResults);
-      }
+      DataSchema finalDataSchema = getPQLResultTableSchema(_aggregationFunctions[0]);
+      brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, rows));
     } else {
-      throw new IllegalStateException(
-          "There should be minimum one aggregation function in the select list of a Group by query");
+      // Format the value into string if required
+      if (!_preserveType) {
+        for (List<GroupByResult> groupByResultList : groupByResultLists) {
+          for (GroupByResult groupByResult : groupByResultList) {
+            groupByResult.setValue(AggregationFunctionUtils.formatValue(groupByResult.getValue()));
+          }
+        }
+      }
+      List<String> groupByColumns = new ArrayList<>(_numGroupByExpressions);
+      for (ExpressionContext groupByExpression : _groupByExpressions) {
+        groupByColumns.add(groupByExpression.toString());
+      }
+      List<AggregationResult> aggregationResults = new ArrayList<>(_numAggregationFunctions);
+      for (int i = 0; i < _numAggregationFunctions; i++) {
+        aggregationResults.add(new AggregationResult(groupByResultLists[i], groupByColumns, columnNames[i]));
+      }
+      brokerResponseNative.setAggregationResults(aggregationResults);
     }
   }
 }

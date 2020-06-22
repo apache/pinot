@@ -26,15 +26,19 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -74,28 +78,25 @@ public class SelectionOperatorServiceTest {
   private final Object[] _compatibleRow2 =
       {11L, 12.0F, 13.0, 14, "15", new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new int[]{19}, new String[]{"20"}, BytesUtils.toByteArray(
           "7000")};
-  private final Selection _selectionOrderBy = new Selection();
+  private QueryContext _queryContext;
 
   @BeforeClass
   public void setUp() {
-    // SELECT * FROM table ORDER BY int DESC LIMIT 1, 2
-    _selectionOrderBy.setSelectionColumns(Arrays.asList(_columnNames));
-    SelectionSort selectionSort = new SelectionSort();
-    selectionSort.setColumn("int");
-    selectionSort.setIsAsc(false);
-    _selectionOrderBy.setSelectionSortSequence(Collections.singletonList(selectionSort));
-    _selectionOrderBy.setSize(2);
-    _selectionOrderBy.setOffset(1);
+    _queryContext = BrokerRequestToQueryContextConverter.convert(new Pql2Compiler().compileToBrokerRequest(
+        "SELECT " + String.join(", ", _columnNames) + " FROM testTable ORDER BY int DESC LIMIT 1, 2"));
   }
 
   @Test
   public void testExtractExpressions() {
     // For non 'SELECT *' select only queries, should return deduplicated selection expressions
-    List<String> selectionColumns = Arrays.asList("add(foo,'1')", "foo", "sub(bar,'2')", "bar", "foo", "foobar", "bar");
+    List<ExpressionContext> selectExpressions = Arrays.asList(QueryContextConverterUtils.getExpression("add(foo,'1')"),
+        QueryContextConverterUtils.getExpression("foo"), QueryContextConverterUtils.getExpression("sub(bar,'2')"),
+        QueryContextConverterUtils.getExpression("bar"), QueryContextConverterUtils.getExpression("foo"),
+        QueryContextConverterUtils.getExpression("foobar"), QueryContextConverterUtils.getExpression("bar"));
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getColumnNames()).thenReturn(new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
     List<TransformExpressionTree> expressions =
-        SelectionOperatorUtils.extractExpressions(selectionColumns, indexSegment);
+        SelectionOperatorUtils.extractExpressions(selectExpressions, indexSegment);
     assertEquals(expressions.size(), 5);
     assertEquals(expressions.get(0).toString(), "add(foo,'1')");
     assertEquals(expressions.get(1).toString(), "foo");
@@ -104,7 +105,8 @@ public class SelectionOperatorServiceTest {
     assertEquals(expressions.get(4).toString(), "foobar");
 
     // For 'SELECT *' select only queries, should return all physical columns in alphabetical order
-    expressions = SelectionOperatorUtils.extractExpressions(Collections.singletonList("*"), indexSegment);
+    expressions = SelectionOperatorUtils
+        .extractExpressions(Collections.singletonList(SelectionOperatorUtils.IDENTIFIER_STAR), indexSegment);
     assertEquals(expressions.size(), 3);
     assertEquals(expressions.get(0).toString(), "bar");
     assertEquals(expressions.get(1).toString(), "foo");
@@ -112,12 +114,10 @@ public class SelectionOperatorServiceTest {
 
     // For non 'SELECT *' select order-by queries, should return deduplicated order-by expressions followed by selection
     // expressions
-    SelectionSort selectionSort1 = new SelectionSort();
-    selectionSort1.setColumn("foo");
-    SelectionSort selectionSort2 = new SelectionSort();
-    selectionSort2.setColumn("sub(bar,'2')");
-    List<SelectionSort> sortSequence = Arrays.asList(selectionSort1, selectionSort2);
-    expressions = SelectionOperatorUtils.extractExpressions(selectionColumns, indexSegment, sortSequence);
+    List<OrderByExpressionContext> orderByExpressions = Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("foo"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sub(bar,'2')"), false));
+    expressions = SelectionOperatorUtils.extractExpressions(selectExpressions, orderByExpressions, indexSegment);
     assertEquals(expressions.size(), 5);
     assertEquals(expressions.get(0).toString(), "foo");
     assertEquals(expressions.get(1).toString(), "sub(bar,'2')");
@@ -127,7 +127,9 @@ public class SelectionOperatorServiceTest {
 
     // For 'SELECT *' select order-by queries, should return deduplicated order-by expressions followed by all physical
     // columns in alphabetical order
-    expressions = SelectionOperatorUtils.extractExpressions(Collections.singletonList("*"), indexSegment, sortSequence);
+    expressions = SelectionOperatorUtils
+        .extractExpressions(Collections.singletonList(SelectionOperatorUtils.IDENTIFIER_STAR), orderByExpressions,
+            indexSegment);
     assertEquals(expressions.size(), 4);
     assertEquals(expressions.get(0).toString(), "foo");
     assertEquals(expressions.get(1).toString(), "sub(bar,'2')");
@@ -139,18 +141,22 @@ public class SelectionOperatorServiceTest {
   public void testGetSelectionColumns() {
     // For non 'SELECT *', should return selection columns as is
     DataSchema dataSchema = mock(DataSchema.class);
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(Arrays.asList("add(foo,'1')", "sub(bar,'2')", "foobar"), dataSchema);
+    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(Arrays
+        .asList(QueryContextConverterUtils.getExpression("add(foo,'1')"),
+            QueryContextConverterUtils.getExpression("sub(bar,'2')"),
+            QueryContextConverterUtils.getExpression("foobar")), dataSchema);
     assertEquals(selectionColumns, Arrays.asList("add(foo,'1')", "sub(bar,'2')", "foobar"));
 
     // 'SELECT *' should return columns (no transform expressions) in alphabetical order
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"add(foo,'1')", "sub(bar,'2')", "foo", "bar", "foobar"});
-    selectionColumns = SelectionOperatorUtils.getSelectionColumns(Collections.singletonList("*"), dataSchema);
+    selectionColumns = SelectionOperatorUtils
+        .getSelectionColumns(Collections.singletonList(SelectionOperatorUtils.IDENTIFIER_STAR), dataSchema);
     assertEquals(selectionColumns, Arrays.asList("bar", "foo", "foobar"));
 
     // Test data schema from DataTableBuilder.buildEmptyDataTable()
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"*"});
-    selectionColumns = SelectionOperatorUtils.getSelectionColumns(Collections.singletonList("*"), dataSchema);
+    selectionColumns = SelectionOperatorUtils
+        .getSelectionColumns(Collections.singletonList(SelectionOperatorUtils.IDENTIFIER_STAR), dataSchema);
     assertEquals(selectionColumns, Collections.singletonList("*"));
   }
 
@@ -171,9 +177,9 @@ public class SelectionOperatorServiceTest {
 
   @Test
   public void testCompatibleRowsMergeWithOrdering() {
-    SelectionOperatorService selectionOperatorService = new SelectionOperatorService(_selectionOrderBy, _dataSchema);
+    SelectionOperatorService selectionOperatorService = new SelectionOperatorService(_queryContext, _dataSchema);
     PriorityQueue<Object[]> mergedRows = selectionOperatorService.getRows();
-    int maxNumRows = _selectionOrderBy.getOffset() + _selectionOrderBy.getSize();
+    int maxNumRows = _queryContext.getOffset() + _queryContext.getLimit();
     Collection<Object[]> rowsToMerge1 = new ArrayList<>(2);
     rowsToMerge1.add(_row1);
     rowsToMerge1.add(_row2);
@@ -238,7 +244,7 @@ public class SelectionOperatorServiceTest {
   @Test
   public void testCompatibleRowsRenderSelectionResultsWithOrdering() {
     SelectionOperatorService selectionOperatorService =
-        new SelectionOperatorService(_selectionOrderBy, _upgradedDataSchema);
+        new SelectionOperatorService(_queryContext, _upgradedDataSchema);
     PriorityQueue<Object[]> rows = selectionOperatorService.getRows();
     rows.offer(_row1);
     rows.offer(_compatibleRow1);
@@ -252,7 +258,7 @@ public class SelectionOperatorServiceTest {
     assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
     assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
-    selectionOperatorService = new SelectionOperatorService(_selectionOrderBy, _upgradedDataSchema);
+    selectionOperatorService = new SelectionOperatorService(_queryContext, _upgradedDataSchema);
     rows = selectionOperatorService.getRows();
     rows.offer(_row1);
     rows.offer(_compatibleRow1);

@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
@@ -48,9 +49,9 @@ public class DistinctDataTableReducer implements DataTableReducer {
   private final boolean _responseFormatSql;
 
   // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
-  DistinctDataTableReducer(BrokerRequest brokerRequest, QueryOptions queryOptions) {
-    _brokerRequest = brokerRequest;
-    _responseFormatSql = queryOptions.isResponseFormatSQL();
+  DistinctDataTableReducer(QueryContext queryContext) {
+    _brokerRequest = queryContext.getBrokerRequest();
+    _responseFormatSql = new QueryOptions(queryContext.getQueryOptions()).isResponseFormatSQL();
   }
 
   /**

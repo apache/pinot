@@ -18,40 +18,37 @@
  */
 package org.apache.pinot.core.util;
 
-import java.util.List;
-import java.util.Map;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.SelectionSort;
-
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public final class GroupByUtils {
+  private GroupByUtils() {
+  }
 
   private static final int NUM_RESULTS_LOWER_LIMIT = 5000;
 
-  private GroupByUtils() {
-
+  /**
+   * (For PQL semantic) Returns the capacity of the table required by the given query.
+   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy because the results are always ordered
+   *       in PQL semantic.
+   */
+  public static int getTableCapacity(int limit) {
+    return Math.max(limit * 5, NUM_RESULTS_LOWER_LIMIT);
   }
 
   /**
-   * Returns the higher of topN * 5 or 5k. This is to ensure better precision in results
+   * (For SQL semantic) Returns the capacity of the table required by the given query.
+   * <ul>
+   *   <li>For group-by & order-by queries, returns {@code max(limit * 5, 5000)} to ensure the result accuracy</li>
+   *   <li>For group-by without order-by queries, returns the limit</li>
+   * </ul>
    */
-  public static int getTableCapacity(int topN) {
-    return Math.max(topN * 5, NUM_RESULTS_LOWER_LIMIT);
-  }
-
-  /**
-   * For group by + order by queries: returns the higher of (topN * 5) or (5k), to ensure better precision in results
-   * For group by with no order by queries: returns the topN
-   */
-  public static int getTableCapacity(GroupBy groupBy, List<SelectionSort> orderBy) {
-    int topN = (int) groupBy.getTopN();
-    if (orderBy != null && !orderBy.isEmpty()) {
-      return getTableCapacity(topN);
+  public static int getTableCapacity(QueryContext queryContext) {
+    int limit = queryContext.getLimit();
+    if (queryContext.getOrderByExpressions() != null) {
+      return Math.max(limit * 5, NUM_RESULTS_LOWER_LIMIT);
     } else {
-      return topN;
+      return limit;
     }
   }
 }

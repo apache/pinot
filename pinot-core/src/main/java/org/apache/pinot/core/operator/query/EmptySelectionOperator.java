@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -29,6 +28,7 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
@@ -43,9 +43,10 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
   private final DataSchema _dataSchema;
   private final ExecutionStatistics _executionStatistics;
 
-  public EmptySelectionOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
+  public EmptySelectionOperator(IndexSegment indexSegment, QueryContext queryContext,
+      TransformOperator transformOperator) {
     List<TransformExpressionTree> expressions =
-        SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment);
+        SelectionOperatorUtils.extractExpressions(queryContext.getSelectExpressions(), indexSegment);
 
     int numExpressions = expressions.size();
     String[] columnNames = new String[numExpressions];

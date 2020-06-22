@@ -21,7 +21,6 @@ package org.apache.pinot.core.plan;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -53,15 +52,14 @@ public class SelectionPlanNode implements PlanNode {
   @Override
   public Operator<IntermediateResultsBlock> run() {
     TransformOperator transformOperator = _transformPlanNode.run();
-    Selection selection = _queryContext.getBrokerRequest().getSelections();
     if (_queryContext.getLimit() > 0) {
       if (_queryContext.getOrderByExpressions() == null) {
-        return new SelectionOnlyOperator(_indexSegment, selection, transformOperator);
+        return new SelectionOnlyOperator(_indexSegment, _queryContext, transformOperator);
       } else {
-        return new SelectionOrderByOperator(_indexSegment, selection, transformOperator);
+        return new SelectionOrderByOperator(_indexSegment, _queryContext, transformOperator);
       }
     } else {
-      return new EmptySelectionOperator(_indexSegment, selection, transformOperator);
+      return new EmptySelectionOperator(_indexSegment, _queryContext, transformOperator);
     }
   }
 

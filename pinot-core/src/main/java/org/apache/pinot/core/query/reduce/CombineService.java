@@ -22,12 +22,12 @@ import java.util.Collection;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,14 +36,14 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>CombineService</code> class provides the utility methods to combine {@link IntermediateResultsBlock}s.
  */
-@SuppressWarnings({"ConstantConditions", "unchecked"})
+@SuppressWarnings({"ConstantConditions", "rawtypes", "unchecked"})
 public class CombineService {
   private CombineService() {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CombineService.class);
 
-  public static void mergeTwoBlocks(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock,
+  public static void mergeTwoBlocks(QueryContext queryContext, IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge) {
     // Combine processing exceptions.
     List<ProcessingException> mergedProcessingExceptions = mergedBlock.getProcessingExceptions();
@@ -55,36 +55,31 @@ public class CombineService {
     }
 
     // Combine result.
-    if (brokerRequest.isSetAggregationsInfo()) {
-      // Combine aggregation result.
+    if (QueryContextUtils.isAggregationQuery(queryContext)) {
+      // NOTE: Aggregation group-by queries should not reach here.
+      assert queryContext.getGroupByExpressions() == null;
 
-      if (!brokerRequest.isSetGroupBy()) {
-        // Combine aggregation only result.
+      // Combine aggregation-only result.
+      // Might be null if caught exception during query execution.
+      List<Object> aggregationResultToMerge = blockToMerge.getAggregationResult();
+      if (aggregationResultToMerge == null) {
+        // No data in block to merge.
+        return;
+      }
 
-        // Might be null if caught exception during query execution.
-        List<Object> aggregationResultToMerge = blockToMerge.getAggregationResult();
-        if (aggregationResultToMerge == null) {
-          // No data in block to merge.
-          return;
-        }
-
-        AggregationFunction[] mergedAggregationFunctions = mergedBlock.getAggregationFunctions();
-        if (mergedAggregationFunctions == null) {
-          // No data in merged block.
-          mergedBlock.setAggregationFunctions(blockToMerge.getAggregationFunctions());
-          mergedBlock.setAggregationResults(aggregationResultToMerge);
-        } else {
-          // Merge two blocks.
-          List<Object> mergedAggregationResult = mergedBlock.getAggregationResult();
-          int numAggregationFunctions = mergedAggregationFunctions.length;
-          for (int i = 0; i < numAggregationFunctions; i++) {
-            mergedAggregationResult.set(i,
-                mergedAggregationFunctions[i].merge(mergedAggregationResult.get(i), aggregationResultToMerge.get(i)));
-          }
-        }
+      AggregationFunction[] mergedAggregationFunctions = mergedBlock.getAggregationFunctions();
+      if (mergedAggregationFunctions == null) {
+        // No data in merged block.
+        mergedBlock.setAggregationFunctions(blockToMerge.getAggregationFunctions());
+        mergedBlock.setAggregationResults(aggregationResultToMerge);
       } else {
-        // Combine aggregation group-by result, which should not come into CombineService.
-        throw new UnsupportedOperationException();
+        // Merge two blocks.
+        List<Object> mergedAggregationResult = mergedBlock.getAggregationResult();
+        int numAggregationFunctions = mergedAggregationFunctions.length;
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          mergedAggregationResult.set(i,
+              mergedAggregationFunctions[i].merge(mergedAggregationResult.get(i), aggregationResultToMerge.get(i)));
+        }
       }
     } else {
       // Combine selection result.
@@ -107,12 +102,11 @@ public class CombineService {
       } else {
         // Some data in merged block.
 
-        Selection selection = brokerRequest.getSelections();
-        boolean isSelectionOrderBy = selection.isSetSelectionSortSequence();
-        int selectionSize = selection.getSize();
+        boolean isSelectionOrderBy = queryContext.getOrderByExpressions() != null;
+        int limit = queryContext.getLimit();
 
         // No need to merge if already got enough rows for selection only.
-        if (!isSelectionOrderBy && (mergedBlockResultSet.size() == selectionSize)) {
+        if (!isSelectionOrderBy && mergedBlockResultSet.size() == limit) {
           return;
         }
 
@@ -129,10 +123,10 @@ public class CombineService {
               // Combine selection order-by.
               SelectionOperatorUtils
                   .mergeWithOrdering((PriorityQueue<Object[]>) mergedBlockResultSet, blockToMergeResultSet,
-                      selection.getOffset() + selectionSize);
+                      queryContext.getOffset() + limit);
             } else {
               // Combine selection only.
-              SelectionOperatorUtils.mergeWithoutOrdering(mergedBlockResultSet, blockToMergeResultSet, selectionSize);
+              SelectionOperatorUtils.mergeWithoutOrdering(mergedBlockResultSet, blockToMergeResultSet, limit);
             }
             mergedBlock.setSelectionResult(mergedBlockResultSet);
           } else {

@@ -30,6 +30,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -62,8 +63,9 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testCombineOperator() {
     List<Operator> operators = getOperators();
-    CombineOperator combineOperator = new CombineOperator(operators, _executorService, TIMEOUT_MS,
-        COMPILER.compileToBrokerRequest("SELECT * FROM table"));
+    CombineOperator combineOperator = new CombineOperator(operators,
+        BrokerRequestToQueryContextConverter.convert(COMPILER.compileToBrokerRequest("SELECT * FROM table")),
+        _executorService, TIMEOUT_MS);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -71,8 +73,9 @@ public class CombineSlowOperatorsTest {
   public void testCombineGroupByOperator() {
     List<Operator> operators = getOperators();
     CombineGroupByOperator combineGroupByOperator = new CombineGroupByOperator(operators,
-        COMPILER.compileToBrokerRequest("SELECT COUNT(*) FROM table GROUP BY column"), _executorService, TIMEOUT_MS,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+        BrokerRequestToQueryContextConverter
+            .convert(COMPILER.compileToBrokerRequest("SELECT COUNT(*) FROM table GROUP BY column")), _executorService,
+        TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
     testCombineOperator(operators, combineGroupByOperator);
   }
 
@@ -80,7 +83,9 @@ public class CombineSlowOperatorsTest {
   public void testCombineGroupByOrderByOperator() {
     List<Operator> operators = getOperators();
     CombineGroupByOrderByOperator combineGroupByOrderByOperator = new CombineGroupByOrderByOperator(operators,
-        COMPILER.compileToBrokerRequest("SELECT COUNT(*) FROM table GROUP BY column"), _executorService, TIMEOUT_MS);
+        BrokerRequestToQueryContextConverter
+            .convert(COMPILER.compileToBrokerRequest("SELECT COUNT(*) FROM table GROUP BY column")), _executorService,
+        TIMEOUT_MS);
     testCombineOperator(operators, combineGroupByOrderByOperator);
   }
 

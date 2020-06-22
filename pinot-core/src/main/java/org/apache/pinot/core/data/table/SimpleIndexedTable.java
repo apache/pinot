@@ -23,10 +23,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,12 +50,12 @@ public class SimpleIndexedTable extends IndexedTable {
    * Initializes the data structures needed for this Table
    * @param dataSchema data schema of the record's keys and values
    * @param aggregationFunctions aggregation functions for the record's values
-   * @param orderBy list of {@link SelectionSort} defining the order by
+   * @param orderByExpressions list of {@link OrderByExpressionContext} defining the order by
    * @param capacity the capacity of the table
    */
   public SimpleIndexedTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions,
-      List<SelectionSort> orderBy, int capacity) {
-    super(dataSchema, aggregationFunctions, orderBy, capacity);
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int capacity) {
+    super(dataSchema, aggregationFunctions, orderByExpressions, capacity);
 
     _lookupMap = new HashMap<>();
   }

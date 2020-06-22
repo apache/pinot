@@ -19,42 +19,41 @@
 package org.apache.pinot.core.query.reduce;
 
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
 
 /**
- * Factory class to construct the right result reducer based on the broker request
+ * Factory class to construct the right result reducer based on the query context.
  */
+@SuppressWarnings("rawtypes")
 public final class ResultReducerFactory {
 
   /**
-   * Constructs the right result reducer based on the broker request
+   * Constructs the right result reducer based on the given query context.
    */
-  public static DataTableReducer getResultReducer(BrokerRequest brokerRequest) {
-    DataTableReducer dataTableReducer;
-    QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
-    if (brokerRequest.getSelections() != null) {
+  public static DataTableReducer getResultReducer(QueryContext queryContext) {
+    if (!QueryContextUtils.isAggregationQuery(queryContext)) {
       // Selection query
-      dataTableReducer = new SelectionDataTableReducer(brokerRequest, queryOptions);
+      return new SelectionDataTableReducer(queryContext);
     } else {
       // Aggregation query
-      AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
-      if (!brokerRequest.isSetGroupBy()) {
+      AggregationFunction[] aggregationFunctions =
+          AggregationFunctionUtils.getAggregationFunctions(queryContext.getBrokerRequest());
+      if (queryContext.getGroupByExpressions() == null) {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
           // Distinct query
-          dataTableReducer = new DistinctDataTableReducer(brokerRequest, queryOptions);
+          return new DistinctDataTableReducer(queryContext);
         } else {
-          dataTableReducer = new AggregationDataTableReducer(brokerRequest, aggregationFunctions, queryOptions);
+          return new AggregationDataTableReducer(queryContext, aggregationFunctions);
         }
       } else {
         // Aggregation group-by query
-        dataTableReducer = new GroupByDataTableReducer(brokerRequest, aggregationFunctions, queryOptions);
+        return new GroupByDataTableReducer(queryContext, aggregationFunctions);
       }
     }
-    return dataTableReducer;
   }
 }

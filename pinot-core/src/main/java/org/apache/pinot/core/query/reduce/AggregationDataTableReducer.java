@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -32,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
 
@@ -39,14 +39,15 @@ import org.apache.pinot.core.util.QueryOptions;
 /**
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationDataTableReducer implements DataTableReducer {
   private final AggregationFunction[] _aggregationFunctions;
   private final boolean _preserveType;
   private final boolean _responseFormatSql;
 
-  AggregationDataTableReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
-      QueryOptions queryOptions) {
+  AggregationDataTableReducer(QueryContext queryContext, AggregationFunction[] aggregationFunctions) {
     _aggregationFunctions = aggregationFunctions;
+    QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
     _preserveType = queryOptions.isPreserveType();
     _responseFormatSql = queryOptions.isResponseFormatSQL();
   }
@@ -112,7 +113,8 @@ public class AggregationDataTableReducer implements DataTableReducer {
     int numAggregationFunctions = _aggregationFunctions.length;
     Object[] row = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      row[i] = AggregationFunctionUtils.getSerializableValue(_aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
+      row[i] = AggregationFunctionUtils
+          .getSerializableValue(_aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
     }
     rows.add(row);
 
