@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.api.events;
 
-import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public class DefaultMetadataEventNotifierFactory extends MetadataEventNotifierFactory {
@@ -27,7 +27,7 @@ public class DefaultMetadataEventNotifierFactory extends MetadataEventNotifierFa
     return new DefaultMetadataEventNotifier();
   }
 
-  public void init(Configuration configuration) {
+  public void init(PinotConfiguration configuration) {
 
   }
 }

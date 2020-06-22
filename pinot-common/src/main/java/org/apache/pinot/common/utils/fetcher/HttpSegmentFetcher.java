@@ -20,9 +20,10 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 
@@ -30,7 +31,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   protected FileUploadDownloadClient _httpClient;
 
   @Override
-  protected void doInit(Configuration config) {
+  protected void doInit(PinotConfiguration config) {
     _httpClient = new FileUploadDownloadClient();
   }
 

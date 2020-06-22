@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
-import com.google.common.base.Preconditions;
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -34,7 +35,7 @@ public class PolicyBasedResourceManager extends ResourceManager {
 
   private final ResourceLimitPolicy resourcePolicy;
 
-  public PolicyBasedResourceManager(Configuration config) {
+  public PolicyBasedResourceManager(PinotConfiguration config) {
     super(config);
     this.resourcePolicy = new ResourceLimitPolicy(config, numQueryWorkerThreads);
   }

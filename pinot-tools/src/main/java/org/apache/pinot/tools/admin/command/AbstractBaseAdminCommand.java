@@ -29,8 +29,9 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
@@ -107,7 +108,7 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     pidFile.close();
   }
 
-  PropertiesConfiguration readConfigFromFile(String configFileName)
+  Map<String, Object> readConfigFromFile(String configFileName)
       throws ConfigurationException {
     return PinotConfigUtils.readConfigFromFile(configFileName);
   }

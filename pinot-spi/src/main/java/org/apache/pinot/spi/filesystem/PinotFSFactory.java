@@ -18,15 +18,17 @@
  */
 package org.apache.pinot.spi.filesystem;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.Configuration;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -46,7 +48,7 @@ public class PinotFSFactory {
   };
 
 
-  public static void register(String scheme, String fsClassName, Configuration configuration) {
+  public static void register(String scheme, String fsClassName, PinotConfiguration configuration) {
     try {
       LOGGER.info("Initializing PinotFS for scheme {}, classname {}", scheme, fsClassName);
       PinotFS pinotFS = PluginManager.get().createInstance(fsClassName);
@@ -58,17 +60,19 @@ public class PinotFSFactory {
     }
   }
 
-  public static void init(Configuration fsConfig) {
+  public static void init(PinotConfiguration fsConfig) {
     // Get schemes and their respective classes
-    Iterator<String> keys = fsConfig.subset(CLASS).getKeys();
-    if (!keys.hasNext()) {
+    PinotConfiguration schemesConfiguration = fsConfig.subset(CLASS);
+    List<String> schemes = schemesConfiguration.getKeys();
+    if (!schemes.isEmpty()) {
       LOGGER.info("Did not find any fs classes in the configuration");
     }
-    while (keys.hasNext()) {
-      String key = keys.next();
-      String fsClassName = (String) fsConfig.getProperty(CLASS + "." + key);
-      LOGGER.info("Got scheme {}, classname {}, starting to initialize", key, fsClassName);
-      register(key, fsClassName, fsConfig.subset(key));
+    
+    for(String scheme : schemes){
+      String fsClassName = (String) schemesConfiguration.getProperty(scheme);
+      
+      LOGGER.info("Got scheme {}, classname {}, starting to initialize", scheme, fsClassName);
+      register(scheme, fsClassName, schemesConfiguration.subset(scheme));
     }
   }
 

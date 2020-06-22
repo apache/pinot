@@ -18,12 +18,18 @@
  */
 package org.apache.pinot.core.startree.v2.builder;
 
-import com.google.common.base.Preconditions;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.INDEX_FILE_NAME;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.INDEX_MAP_FILE_NAME;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_TREE_TEMP_DIR;
+
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -33,16 +39,15 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils;
+import org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
+import org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.INDEX_FILE_NAME;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.INDEX_MAP_FILE_NAME;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_TREE_TEMP_DIR;
-import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
-import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -77,7 +82,7 @@ public class MultipleTreesBuilder {
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     _metadataProperties =
-        new PropertiesConfiguration(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+        CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     Preconditions
         .checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree v2 already exists");
     _buildMode = buildMode;
@@ -123,7 +128,11 @@ public class MultipleTreesBuilder {
       }
 
       // Save the metadata and index maps to the disk
-      _metadataProperties.save();
+      // Commons Configuration 1.10 does not support file path containing '%'. 
+      // Explicitly providing the output stream for the file bypasses the problem.       
+      try (FileOutputStream fileOutputStream = new FileOutputStream(_metadataProperties.getFile())) {
+        _metadataProperties.save(fileOutputStream);
+      }
       StarTreeIndexMapUtils.storeToFile(indexMaps, new File(_segmentDirectory, INDEX_MAP_FILE_NAME));
       FileUtils.forceDelete(starTreeIndexDir);
     }

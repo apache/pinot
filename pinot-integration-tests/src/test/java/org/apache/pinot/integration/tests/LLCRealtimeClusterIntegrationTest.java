@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.segment.ReadMode;
@@ -32,14 +35,14 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import com.fasterxml.jackson.databind.JsonNode;
 
 
 /**
@@ -72,15 +75,17 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @Override
   public void startController() {
-    ControllerConf controllerConfig = getDefaultControllerConfiguration();
-    controllerConfig.setHLCTablesAllowed(false);
-    controllerConfig.setSplitCommit(_enableSplitCommit);
-    startController(controllerConfig);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    
+    properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
+    properties.put(ControllerConf.ENABLE_SPLIT_COMMIT, _enableSplitCommit);
+    
+    startController(properties);
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
 
   @Override
-  protected void overrideServerConf(Configuration configuration) {
+  protected void overrideServerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
     if (_isConsumerDirConfigured) {

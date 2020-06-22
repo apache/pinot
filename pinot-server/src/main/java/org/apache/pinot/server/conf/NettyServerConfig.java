@@ -18,29 +18,26 @@
  */
 package org.apache.pinot.server.conf;
 
-import org.apache.commons.configuration.Configuration;
+import java.util.Optional;
+
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public class NettyServerConfig {
-
-  // Netty server port
   private static String NETTY_SERVER_PORT = "port";
 
-  private Configuration _serverNettyConfig;
+  private final int port;
 
-  public NettyServerConfig(Configuration serverNettyConfig)
-      throws ConfigurationException {
-    _serverNettyConfig = serverNettyConfig;
-    if (!_serverNettyConfig.containsKey(NETTY_SERVER_PORT)) {
-      throw new ConfigurationException("Cannot find Key : " + NETTY_SERVER_PORT);
-    }
+  public NettyServerConfig(PinotConfiguration serverNettyConfig) throws ConfigurationException {
+    this.port = Optional.ofNullable(serverNettyConfig.getProperty(NETTY_SERVER_PORT, Integer.class))
+        .orElseThrow(() -> new ConfigurationException("Cannot find Key : " + NETTY_SERVER_PORT));
   }
 
   /**
    * @return Netty server port
    */
   public int getPort() {
-    return _serverNettyConfig.getInt(NETTY_SERVER_PORT);
+    return port;
   }
 }

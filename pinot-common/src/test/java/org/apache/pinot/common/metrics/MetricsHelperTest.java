@@ -18,16 +18,17 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
+import static org.testng.Assert.assertTrue;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.MapConfiguration;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertTrue;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -57,10 +58,11 @@ public class MetricsHelperTest {
     listenerOneOkay = false;
     listenerTwoOkay = false;
 
-    Map<String, String> configKeys = new HashMap<String, String>();
-    configKeys.put("pinot.broker.metrics.metricsRegistryRegistrationListeners",
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("pinot.broker.metrics.metricsRegistryRegistrationListeners",
         ListenerOne.class.getName() + "," + ListenerTwo.class.getName());
-    Configuration configuration = new MapConfiguration(configKeys);
+    
+    PinotConfiguration configuration = new PinotConfiguration(properties);
 
     MetricsRegistry registry = new MetricsRegistry();
 

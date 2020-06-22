@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.core.query.scheduler.fcfs;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
 import java.util.concurrent.atomic.LongAccumulator;
+
 import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -31,6 +30,10 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
+import org.apache.pinot.spi.env.PinotConfiguration;
+
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 
 
 /**
@@ -40,7 +43,7 @@ import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
  */
 public class FCFSQueryScheduler extends QueryScheduler {
 
-  public FCFSQueryScheduler(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
+  public FCFSQueryScheduler(@Nonnull PinotConfiguration config, @Nonnull QueryExecutor queryExecutor,
       @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
     super(config, queryExecutor, new UnboundedResourceManager(config), serverMetrics, latestQueryTime);
   }

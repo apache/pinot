@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.controller.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Map;
+
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -37,6 +37,9 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 
 /**
@@ -58,9 +61,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void setUp()
       throws Exception {
     startZk();
-    ControllerConf config = getDefaultControllerConfiguration();
-    config.setTableMinReplicas(MIN_NUM_REPLICAS);
-    startController(config);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);
+    startController(properties);
     _createTableUrl = _controllerRequestURLBuilder.forTableCreate();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);

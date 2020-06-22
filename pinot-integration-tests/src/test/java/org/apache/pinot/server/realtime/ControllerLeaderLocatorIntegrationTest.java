@@ -65,9 +65,9 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     // After resource config is enabled, use the lead controller in the resource.
     validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
 
-    ControllerConf secondControllerConfig = getDefaultControllerConfiguration();
-    secondControllerConfig.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT + 1));
-    ControllerStarter secondControllerStarter = new ControllerStarter(secondControllerConfig);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CONTROLLER_PORT, DEFAULT_CONTROLLER_PORT + 1);
+    ControllerStarter secondControllerStarter = new ControllerStarter(new ControllerConf(properties));
     secondControllerStarter.start();
 
     TestUtils

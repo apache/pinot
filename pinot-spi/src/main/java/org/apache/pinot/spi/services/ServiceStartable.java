@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.spi.services;
 
-import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -31,7 +31,7 @@ public interface ServiceStartable {
 
   String getInstanceId();
 
-  Configuration getConfig();
+  PinotConfiguration getConfig();
 
   void start()
       throws Exception;

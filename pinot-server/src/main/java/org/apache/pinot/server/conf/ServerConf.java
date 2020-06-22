@@ -18,24 +18,23 @@
  */
 package org.apache.pinot.server.conf;
 
-import org.apache.commons.configuration.Configuration;
+import java.util.Arrays;
+import java.util.List;
+
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
  * The config used for Server.
  */
 public class ServerConf {
-
   private static final String PINOT_ = "pinot.";
   private static final String PINOT_SERVER_INSTANCE = "pinot.server.instance";
   private static final String PINOT_SERVER_METRICS = "pinot.server.metrics";
   private static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
   private static final String PINOT_SERVER_TABLE_LEVEL_METRICS = "pinot.server.enableTableLevelMetrics";
-  // List of metrics to always send table level metrics even if table level metrics is disabled
-  private static final String PINOT_SERVER_TABLE_LEVEL_METRICS_LIST = "pinot.server.tablelevel.metrics.whitelist";
   private static final String PINOT_SERVER_QUERY = "pinot.server.query.executor";
   private static final String PINOT_SERVER_REQUEST = "pinot.server.request";
   private static final String PINOT_SERVER_NETTY = "pinot.server.netty";
@@ -45,29 +44,29 @@ public class ServerConf {
 
   private static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
-  private Configuration _serverConf;
+  private PinotConfiguration _serverConf;
 
-  public ServerConf(Configuration serverConfig) {
+  public ServerConf(PinotConfiguration serverConfig) {
     _serverConf = serverConfig;
   }
 
-  public void init(Configuration serverConfig) {
+  public void init(PinotConfiguration serverConfig) {
     _serverConf = serverConfig;
   }
 
-  public Configuration getInstanceDataManagerConfig() {
+  public PinotConfiguration getInstanceDataManagerConfig() {
     return _serverConf.subset(PINOT_SERVER_INSTANCE);
   }
 
-  public Configuration getQueryExecutorConfig() {
+  public PinotConfiguration getQueryExecutorConfig() {
     return _serverConf.subset(PINOT_SERVER_QUERY);
   }
 
-  public Configuration getRequestConfig() {
+  public PinotConfiguration getRequestConfig() {
     return _serverConf.subset(PINOT_SERVER_REQUEST);
   }
 
-  public Configuration getMetricsConfig() {
+  public PinotConfiguration getMetricsConfig() {
     return _serverConf.subset(PINOT_SERVER_METRICS);
   }
 
@@ -76,35 +75,35 @@ public class ServerConf {
     return new NettyServerConfig(_serverConf.subset(PINOT_SERVER_NETTY));
   }
 
-  public Configuration getConfig(String component) {
+  public PinotConfiguration getConfig(String component) {
     return _serverConf.subset(PINOT_ + component);
   }
 
   public String getInstanceDataManagerClassName() {
-    return _serverConf.getString(PINOT_SERVER_INSTANCE_DATA_MANAGER_CLASS);
+    return _serverConf.getProperty(PINOT_SERVER_INSTANCE_DATA_MANAGER_CLASS);
   }
 
   public String getQueryExecutorClassName() {
-    return _serverConf.getString(PINOT_SERVER_QUERY_EXECUTOR_CLASS);
+    return _serverConf.getProperty(PINOT_SERVER_QUERY_EXECUTOR_CLASS);
   }
 
-  public Configuration getSchedulerConfig() {
+  public PinotConfiguration getSchedulerConfig() {
     return _serverConf.subset(PINOT_QUERY_SCHEDULER_PREFIX);
   }
 
   /**
-   * Returns an array of transform function names as defined in the config
-   * @return String array of transform functions
+   * Returns a list of transform function names as defined in the config
+   * @return List of transform functions
    */
-  public String[] getTransformFunctions() {
-    return _serverConf.getStringArray(PINOT_SERVER_TRANSFORM_FUNCTIONS);
+  public List<String> getTransformFunctions() {
+    return _serverConf.getProperty(PINOT_SERVER_TRANSFORM_FUNCTIONS, Arrays.asList());
   }
 
   public boolean emitTableLevelMetrics() {
-    return _serverConf.getBoolean(PINOT_SERVER_TABLE_LEVEL_METRICS, true);
+    return _serverConf.getProperty(PINOT_SERVER_TABLE_LEVEL_METRICS, true);
   }
 
   public String getMetricsPrefix() {
-    return _serverConf.getString(PINOT_SERVER_METRICS_PREFIX, CommonConstants.Server.DEFAULT_METRICS_PREFIX);
+    return _serverConf.getProperty(PINOT_SERVER_METRICS_PREFIX, CommonConstants.Server.DEFAULT_METRICS_PREFIX);
   }
 }

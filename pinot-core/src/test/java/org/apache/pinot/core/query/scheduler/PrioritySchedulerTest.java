@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.yammer.metrics.core.MetricsRegistry;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createServerQueryRequest;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -34,8 +39,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAccumulator;
+
 import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -48,14 +54,13 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
-import static org.apache.pinot.core.query.scheduler.TestHelper.createServerQueryRequest;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class PrioritySchedulerTest {
@@ -121,15 +126,15 @@ public class PrioritySchedulerTest {
   @Test
   public void testOneQuery()
       throws InterruptedException, ExecutionException, IOException, BrokenBarrierException {
-    PropertiesConfiguration conf = new PropertiesConfiguration();
-    conf.setProperty(ResourceLimitPolicy.THREADS_PER_QUERY_PCT, 50);
-    conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 40);
-    conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_SOFT_LIMIT, 20);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ResourceLimitPolicy.THREADS_PER_QUERY_PCT, 50);
+    properties.put(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 40);
+    properties.put(ResourceLimitPolicy.TABLE_THREADS_SOFT_LIMIT, 20);
     useBarrier = true;
     startupBarrier = new CyclicBarrier(2);
     validationBarrier = new CyclicBarrier(2);
 
-    TestPriorityScheduler scheduler = TestPriorityScheduler.create(conf);
+    TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
     int totalPermits = scheduler.getRunningQueriesSemaphore().availablePermits();
     scheduler.start();
     ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", metrics));
@@ -159,15 +164,15 @@ public class PrioritySchedulerTest {
   public void testMultiThreaded()
       throws InterruptedException {
     // add queries from multiple threads and verify that all those are executed
-    PropertiesConfiguration conf = new PropertiesConfiguration();
-    conf.setProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, 60);
-    conf.setProperty(ResourceManager.QUERY_RUNNER_CONFIG_KEY, 20);
-    conf.setProperty(ResourceLimitPolicy.THREADS_PER_QUERY_PCT, 50);
-    conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 60);
-    conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_SOFT_LIMIT, 40);
-    conf.setProperty(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 10);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, 60);
+    properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, 20);
+    properties.put(ResourceLimitPolicy.THREADS_PER_QUERY_PCT, 50);
+    properties.put(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 60);
+    properties.put(ResourceLimitPolicy.TABLE_THREADS_SOFT_LIMIT, 40);
+    properties.put(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 10);
 
-    final TestPriorityScheduler scheduler = TestPriorityScheduler.create(conf);
+    final TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
     scheduler.start();
     final Random random = new Random();
     final ConcurrentLinkedQueue<ListenableFuture<byte[]>> results = new ConcurrentLinkedQueue<>();
@@ -197,10 +202,10 @@ public class PrioritySchedulerTest {
   @Test(enabled = false)
   public void testOutOfCapacityResponse()
       throws Exception {
-    PropertiesConfiguration conf = new PropertiesConfiguration();
-    conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 5);
-    conf.setProperty(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 1);
-    TestPriorityScheduler scheduler = TestPriorityScheduler.create(conf);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 5);
+    properties.put(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 1);
+    TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
     scheduler.start();
     List<ListenableFuture<byte[]>> results = new ArrayList<>();
     results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
@@ -231,7 +236,7 @@ public class PrioritySchedulerTest {
     static TestSchedulerGroupFactory groupFactory;
     static LongAccumulator latestQueryTime;
 
-    public static TestPriorityScheduler create(Configuration config) {
+    public static TestPriorityScheduler create(PinotConfiguration config) {
       ResourceManager rm = new PolicyBasedResourceManager(config);
       QueryExecutor qe = new TestQueryExecutor();
       groupFactory = new TestSchedulerGroupFactory();
@@ -242,12 +247,11 @@ public class PrioritySchedulerTest {
     }
 
     public static TestPriorityScheduler create() {
-      PropertiesConfiguration conf = new PropertiesConfiguration();
-      return create(conf);
+      return create(new PinotConfiguration());
     }
 
     // store locally for easy access
-    public TestPriorityScheduler(@Nonnull Configuration config, @Nonnull ResourceManager resourceManager,
+    public TestPriorityScheduler(@Nonnull PinotConfiguration config, @Nonnull ResourceManager resourceManager,
         @Nonnull QueryExecutor queryExecutor, @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
         @Nonnull LongAccumulator latestQueryTime) {
       super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
@@ -282,7 +286,7 @@ public class PrioritySchedulerTest {
   static class TestQueryExecutor implements QueryExecutor {
 
     @Override
-    public void init(@Nonnull Configuration config, @Nonnull InstanceDataManager instanceDataManager,
+    public void init(@Nonnull PinotConfiguration config, @Nonnull InstanceDataManager instanceDataManager,
         @Nonnull ServerMetrics serverMetrics) {
     }
 

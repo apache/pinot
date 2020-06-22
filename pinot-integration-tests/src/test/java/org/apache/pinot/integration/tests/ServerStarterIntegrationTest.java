@@ -18,20 +18,26 @@
  */
 package org.apache.pinot.integration.tests;
 
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY;
+import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_INSTANCE_ID;
+import static org.testng.Assert.assertEquals;
+
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
-import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_INSTANCE_ID;
-import static org.testng.Assert.assertEquals;
 
 
 public class ServerStarterIntegrationTest extends ControllerTest {
@@ -51,7 +57,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
     stopZk();
   }
 
-  private void verifyInstanceConfig(Configuration serverConf, String expectedInstanceId, String expectedHost,
+  private void verifyInstanceConfig(PinotConfiguration serverConf, String expectedInstanceId, String expectedHost,
       int expectedPort)
       throws Exception {
     HelixServerStarter helixServerStarter =
@@ -69,56 +75,63 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   @Test
   public void testDefaultServerConf()
       throws Exception {
-    Configuration serverConf = new BaseConfiguration();
     String expectedHost = NetUtil.getHostAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
-    verifyInstanceConfig(serverConf, expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
+    
+    verifyInstanceConfig(new PinotConfiguration(), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
   public void testSetInstanceIdToHostname()
       throws Exception {
-    Configuration serverConf = new BaseConfiguration();
-    serverConf.addProperty(SET_INSTANCE_ID_TO_HOSTNAME_KEY, true);
     String expectedHost = NetUtil.getHostnameOrAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
-    verifyInstanceConfig(serverConf, expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
+    
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(SET_INSTANCE_ID_TO_HOSTNAME_KEY, true);
+    
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
   public void testCustomInstanceId()
-      throws Exception {
-    Configuration serverConf = new BaseConfiguration();
-    serverConf.addProperty(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
-    verifyInstanceConfig(serverConf, CUSTOM_INSTANCE_ID, NetUtil.getHostAddress(), DEFAULT_SERVER_NETTY_PORT);
+      throws Exception {    
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
+    
+    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, NetUtil.getHostAddress(), DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
   public void testCustomHost()
       throws Exception {
-    Configuration serverConf = new BaseConfiguration();
-    serverConf.addProperty(KEY_OF_SERVER_NETTY_HOST, CUSTOM_HOST);
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + CUSTOM_HOST + "_" + DEFAULT_SERVER_NETTY_PORT;
-    verifyInstanceConfig(serverConf, expectedInstanceId, CUSTOM_HOST, DEFAULT_SERVER_NETTY_PORT);
+    
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(KEY_OF_SERVER_NETTY_HOST, CUSTOM_HOST);
+    
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, CUSTOM_HOST, DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
   public void testCustomPort()
       throws Exception {
-    Configuration serverConf = new BaseConfiguration();
-    serverConf.addProperty(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
     String expectedHost = NetUtil.getHostAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + CUSTOM_PORT;
-    verifyInstanceConfig(serverConf, expectedInstanceId, expectedHost, CUSTOM_PORT);
+
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
+    
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, CUSTOM_PORT);
   }
 
   @Test
   public void testAllCustomServerConf()
       throws Exception {
-    Configuration serverConf = new BaseConfiguration();
-    serverConf.addProperty(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
-    serverConf.addProperty(KEY_OF_SERVER_NETTY_HOST, CUSTOM_HOST);
-    serverConf.addProperty(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
-    verifyInstanceConfig(serverConf, CUSTOM_INSTANCE_ID, CUSTOM_HOST, CUSTOM_PORT);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
+    properties.put(KEY_OF_SERVER_NETTY_HOST, CUSTOM_HOST);
+    properties.put(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
+    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, CUSTOM_HOST, CUSTOM_PORT);
   }
 }

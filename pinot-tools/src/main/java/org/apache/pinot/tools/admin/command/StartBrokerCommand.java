@@ -19,7 +19,8 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
-import org.apache.commons.configuration.Configuration;
+import java.util.Map;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -120,7 +121,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     }
   }
 
-  private Configuration getBrokerConf()
+  private Map<String, Object> getBrokerConf()
       throws ConfigurationException {
     if (_configFileName != null) {
       return PinotConfigUtils.readConfigFromFile(_configFileName);

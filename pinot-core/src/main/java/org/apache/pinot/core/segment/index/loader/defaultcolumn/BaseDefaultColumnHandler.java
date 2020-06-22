@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.StringUtil;
@@ -53,6 +53,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 
 public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
@@ -167,8 +169,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       FileUtils.copyFile(metadataFile, metadataBackUpFile);
     }
 
-    // Save the new metadata.
-    _segmentProperties.save();
+    // Save the new metadata. 
+    // 
+    // Commons Configuration 1.10 does not support file path containing '%'. 
+    // Explicitly providing the output stream for save bypasses the problem. */
+    try (FileOutputStream fileOutputStream = new FileOutputStream(_segmentProperties.getFile())) {
+      _segmentProperties.save(fileOutputStream);
+    }
   }
 
   /**

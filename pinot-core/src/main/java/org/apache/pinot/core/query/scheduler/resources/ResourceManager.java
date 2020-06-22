@@ -18,18 +18,20 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -73,9 +75,9 @@ public abstract class ResourceManager {
   /**
    * @param config configuration for initializing resource manager
    */
-  public ResourceManager(Configuration config) {
-    numQueryRunnerThreads = config.getInt(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
-    numQueryWorkerThreads = config.getInt(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
+  public ResourceManager(PinotConfiguration config) {
+    numQueryRunnerThreads = config.getProperty(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
+    numQueryWorkerThreads = config.getProperty(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
 
     LOGGER.info("Initializing with {} query runner threads and {} worker threads", numQueryRunnerThreads,
         numQueryWorkerThreads);
