@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.pinot.thirdeye.common.utils.MetricUtils;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -52,7 +53,6 @@ import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
-import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
@@ -101,7 +101,9 @@ public class DimensionWrapper extends DetectionPipeline {
   private final double minContribution;
   private final double minValue;
   private final double minValueHourly;
+  private final double maxValueHourly;
   private final double minValueDaily;
+  private final double maxValueDaily;
   private final double minLiveZone;
   private final double liveBucketPercentageThreshold;
   private final Period lookback;
@@ -122,10 +124,13 @@ public class DimensionWrapper extends DetectionPipeline {
 
     // the metric used in dimension exploration
     this.metricUrn = MapUtils.getString(config.getProperties(), "metricUrn", null);
+
     this.minContribution = MapUtils.getDoubleValue(config.getProperties(), "minContribution", Double.NaN);
     this.minValue = MapUtils.getDoubleValue(config.getProperties(), "minValue", Double.NaN);
     this.minValueHourly = MapUtils.getDoubleValue(config.getProperties(), "minValueHourly", Double.NaN);
+    this.maxValueHourly = MapUtils.getDoubleValue(config.getProperties(), "maxValueHourly", Double.NaN);
     this.minValueDaily = MapUtils.getDoubleValue(config.getProperties(), "minValueDaily", Double.NaN);
+    this.maxValueDaily = MapUtils.getDoubleValue(config.getProperties(), "maxValueDaily", Double.NaN);
     this.k = MapUtils.getIntValue(config.getProperties(), "k", -1);
     this.dimensions = ConfigUtils.getList(config.getProperties().get("dimensions"));
     this.lookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "lookback", "1w"));
@@ -168,6 +173,7 @@ public class DimensionWrapper extends DetectionPipeline {
       Period testPeriod = new Period(this.start, this.end);
 
       MetricEntity metric = MetricEntity.fromURN(this.metricUrn);
+      MetricConfigDTO metricConfig = this.provider.fetchMetrics(Collections.singleton(metric.getId())).get(metric.getId());
       MetricSlice slice = MetricSlice.from(metric.getId(), this.start.getMillis(), this.end.getMillis(), metric.getFilters());
 
       // We can push down the top k filter if min contribution is not defined.
@@ -195,14 +201,25 @@ public class DimensionWrapper extends DetectionPipeline {
         aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).gte(this.minValue)).dropNull();
       }
 
+      double hourlyMultiplier = MetricUtils.isAggCumulative(metricConfig) ?
+          (TimeUnit.HOURS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis()) : 1.0;
+      double dailyMultiplier = MetricUtils.isAggCumulative(metricConfig) ?
+              (TimeUnit.DAYS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis()) : 1.0;
+
       if (!Double.isNaN(this.minValueHourly)) {
-        double multiplier = TimeUnit.HOURS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueHourly)).dropNull();
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(hourlyMultiplier).gte(this.minValueHourly)).dropNull();
+      }
+
+      if (!Double.isNaN(this.maxValueHourly)) {
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(hourlyMultiplier).lte(this.maxValueHourly)).dropNull();
       }
 
       if (!Double.isNaN(this.minValueDaily)) {
-        double multiplier = TimeUnit.DAYS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueDaily)).dropNull();
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(dailyMultiplier).gte(this.minValueDaily)).dropNull();
+      }
+
+      if (!Double.isNaN(this.maxValueDaily)) {
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(dailyMultiplier).lte(this.maxValueDaily)).dropNull();
       }
 
       aggregates = aggregates.sortedBy(COL_VALUE).reverse();

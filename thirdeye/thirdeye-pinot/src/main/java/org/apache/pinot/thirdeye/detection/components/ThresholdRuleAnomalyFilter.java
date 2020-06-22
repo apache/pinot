@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.detection.components;
 
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.common.utils.MetricUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
@@ -57,11 +57,12 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
     double currentValue = anomaly.getAvgCurrentVal();
 
     Interval anomalyInterval = new Interval(anomaly.getStartTime(), anomaly.getEndTime());
+
     // apply multiplier if the metric is aggregated by SUM or COUNT
-    double hourlyMultiplier =
-        isAdditive(metric) ? (TimeUnit.HOURS.toMillis(1) / (double) anomalyInterval.toDurationMillis()) : 1.0;
-    double dailyMultiplier =
-        isAdditive(metric) ? (TimeUnit.DAYS.toMillis(1) / (double) anomalyInterval.toDurationMillis()) : 1.0;
+    double hourlyMultiplier = MetricUtils.isAggCumulative(metric) ?
+        (TimeUnit.HOURS.toMillis(1) / (double) anomalyInterval.toDurationMillis()) : 1.0;
+    double dailyMultiplier = MetricUtils.isAggCumulative(metric) ?
+        (TimeUnit.DAYS.toMillis(1) / (double) anomalyInterval.toDurationMillis()) : 1.0;
 
     if (!Double.isNaN(this.minValue) && currentValue < this.minValue
         || !Double.isNaN(this.maxValue) && currentValue > this.maxValue) {
@@ -80,11 +81,6 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
       return false;
     }
     return true;
-  }
-
-  private boolean isAdditive(MetricConfigDTO metric) {
-    MetricAggFunction aggFunction = metric.getDefaultAggFunction();
-    return aggFunction.equals(MetricAggFunction.SUM) || aggFunction.equals(MetricAggFunction.COUNT);
   }
 
   @Override
