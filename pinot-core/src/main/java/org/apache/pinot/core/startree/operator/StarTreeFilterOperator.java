@@ -32,11 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -45,6 +42,8 @@ import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.startree.StarTree;
 import org.apache.pinot.core.startree.StarTreeNode;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
@@ -95,8 +94,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     final Set<String> _remainingPredicateColumns;
     final Set<String> _remainingGroupByColumns;
 
-    SearchEntry(@Nonnull StarTreeNode starTreeNode, @Nonnull Set<String> remainingPredicateColumns,
-        @Nonnull Set<String> remainingGroupByColumns) {
+    SearchEntry(StarTreeNode starTreeNode, Set<String> remainingPredicateColumns, Set<String> remainingGroupByColumns) {
       _starTreeNode = starTreeNode;
       _remainingPredicateColumns = remainingPredicateColumns;
       _remainingGroupByColumns = remainingGroupByColumns;
@@ -110,7 +108,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     final ImmutableRoaringBitmap _matchedDocIds;
     final Set<String> _remainingPredicateColumns;
 
-    StarTreeResult(@Nonnull ImmutableRoaringBitmap matchedDocIds, @Nonnull Set<String> remainingPredicateColumns) {
+    StarTreeResult(ImmutableRoaringBitmap matchedDocIds, Set<String> remainingPredicateColumns) {
       _matchedDocIds = matchedDocIds;
       _remainingPredicateColumns = remainingPredicateColumns;
     }
@@ -133,18 +131,18 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   private final Map<String, String> _debugOptions;
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+  public StarTreeFilterOperator(StarTreeV2 starTreeV2, @Nullable FilterContext filter,
       @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _groupByColumns = groupByColumns != null ? new HashSet<>(groupByColumns) : Collections.emptySet();
     _debugOptions = debugOptions;
 
-    if (rootFilterNode != null) {
+    if (filter != null) {
       _predicateEvaluatorsMap = new HashMap<>();
       _matchingDictIdsMap = new HashMap<>();
 
       // Process the filter tree and get a map from column to a list of predicates applied to it
-      Map<String, List<Predicate>> predicatesMap = getPredicatesMap(rootFilterNode);
+      Map<String, List<Predicate>> predicatesMap = getPredicatesMap(filter);
 
       // Initialize the predicate evaluators map
       for (Map.Entry<String, List<Predicate>> entry : predicatesMap.entrySet()) {
@@ -181,20 +179,19 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   /**
    * Helper method to process the filter tree and get a map from column to a list of predicates applied to it.
    */
-  private Map<String, List<Predicate>> getPredicatesMap(@Nonnull FilterQueryTree rootFilterNode) {
+  private Map<String, List<Predicate>> getPredicatesMap(FilterContext filter) {
     Map<String, List<Predicate>> predicatesMap = new HashMap<>();
-    Queue<FilterQueryTree> queue = new LinkedList<>();
-    queue.add(rootFilterNode);
+    Queue<FilterContext> queue = new LinkedList<>();
+    queue.add(filter);
 
     while (!queue.isEmpty()) {
-      FilterQueryTree filterNode = queue.remove();
-      List<FilterQueryTree> children = filterNode.getChildren();
-      if (children == null) {
-        String columnName = filterNode.getColumn();
-        Predicate predicate = Predicate.newPredicate(filterNode);
-        predicatesMap.computeIfAbsent(columnName, k -> new ArrayList<>()).add(predicate);
+      FilterContext filterNode = queue.remove();
+      if (filterNode.getType() == FilterContext.Type.AND) {
+        queue.addAll(filterNode.getChildren());
       } else {
-        queue.addAll(children);
+        Predicate predicate = filterNode.getPredicate();
+        String columnName = predicate.getLhs().getIdentifier();
+        predicatesMap.computeIfAbsent(columnName, k -> new ArrayList<>()).add(predicate);
       }
     }
 
@@ -393,11 +390,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
             return 2;
           case RANGE:
             return 3;
+          case NOT_EQ:
           case NOT_IN:
-          case NEQ:
             return 4;
-          case REGEXP_LIKE:
-            return 5;
           default:
             throw new UnsupportedOperationException();
         }
