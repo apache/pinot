@@ -39,6 +39,7 @@
 
   <modules>
     <module>pinot-java-client</module>
+    <module>pinot-jdbc-client</module>
   </modules>
 
   <dependencies>

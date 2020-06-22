@@ -1,0 +1,383 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.client;
+
+import java.sql.Array;
+import java.sql.Blob;
+import java.sql.CallableStatement;
+import java.sql.Clob;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.NClob;
+import java.sql.PreparedStatement;
+import java.sql.SQLClientInfoException;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLWarning;
+import java.sql.SQLXML;
+import java.sql.Savepoint;
+import java.sql.Statement;
+import java.sql.Struct;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.Executor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public class PinotConnection implements Connection {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
+  private static org.apache.pinot.client.Connection _connection;
+
+  PinotConnection(List<String> brokerList, PinotClientTransport transport) {
+    _connection = new org.apache.pinot.client.Connection(brokerList, transport);
+  }
+
+  PinotConnection(org.apache.pinot.client.Connection connection) {
+    _connection = connection;
+  }
+
+  @Override
+  public Statement createStatement()
+      throws SQLException {
+    return new PinotStatement(_connection);
+  }
+
+  @Override
+  public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Statement createStatement(int resultSetType, int resultSetConcurrency)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String s)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public CallableStatement prepareCall(String s)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public String nativeSQL(String s)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setAutoCommit(boolean b)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public boolean getAutoCommit()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void commit()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void rollback()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void close()
+      throws SQLException {
+
+  }
+
+  @Override
+  public boolean isClosed()
+      throws SQLException {
+    return false;
+  }
+
+  @Override
+  public DatabaseMetaData getMetaData()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setReadOnly(boolean b)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public boolean isReadOnly()
+      throws SQLException {
+    return false;
+  }
+
+  @Override
+  public void setCatalog(String s)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public String getCatalog()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setTransactionIsolation(int i)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public int getTransactionIsolation()
+      throws SQLException {
+    return 0;
+  }
+
+  @Override
+  public SQLWarning getWarnings()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void clearWarnings()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String s, int i, int i1)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public CallableStatement prepareCall(String s, int i, int i1)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Map<String, Class<?>> getTypeMap()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setTypeMap(Map<String, Class<?>> map)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setHoldability(int i)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public int getHoldability()
+      throws SQLException {
+    return 0;
+  }
+
+  @Override
+  public Savepoint setSavepoint()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Savepoint setSavepoint(String s)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void rollback(Savepoint savepoint)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void releaseSavepoint(Savepoint savepoint)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+
+
+  @Override
+  public PreparedStatement prepareStatement(String s, int i, int i1, int i2)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public CallableStatement prepareCall(String s, int i, int i1, int i2)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String s, int i)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String s, int[] ints)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String s, String[] strings)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Clob createClob()
+      throws SQLException {
+    return null;
+  }
+
+  @Override
+  public Blob createBlob()
+      throws SQLException {
+    return null;
+  }
+
+  @Override
+  public NClob createNClob()
+      throws SQLException {
+    return null;
+  }
+
+  @Override
+  public SQLXML createSQLXML()
+      throws SQLException {
+    return null;
+  }
+
+  @Override
+  public boolean isValid(int i)
+      throws SQLException {
+    return false;
+  }
+
+  @Override
+  public void setClientInfo(String s, String s1)
+      throws SQLClientInfoException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void setClientInfo(Properties properties)
+      throws SQLClientInfoException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getClientInfo(String s)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Properties getClientInfo()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Array createArrayOf(String s, Object[] objects)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Struct createStruct(String s, Object[] objects)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setSchema(String s)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public String getSchema()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void abort(Executor executor)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setNetworkTimeout(Executor executor, int i)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public int getNetworkTimeout()
+      throws SQLException {
+    return 0;
+  }
+
+  @Override
+  public <T> T unwrap(Class<T> aClass)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public boolean isWrapperFor(Class<?> aClass)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+}
