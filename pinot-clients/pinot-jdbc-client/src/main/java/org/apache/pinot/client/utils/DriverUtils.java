@@ -20,13 +20,17 @@ package org.apache.pinot.client.utils;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 
 public class DriverUtils {
 
+  private DriverUtils() {
+  }
+
   public static List<String> getBrokersFromURL(String url) {
-    if (url.startsWith("jdbc:")) {
+    if (url.toLowerCase().startsWith("jdbc:")) {
       url = url.substring(5);
     }
     URI uri = URI.create(url);
@@ -34,8 +38,8 @@ public class DriverUtils {
   }
 
   public static List<String> getBrokersFromURI(URI uri) {
-    List<String> brokerList = new ArrayList<>();
-    brokerList.add(String.format("%s:%d", uri.getHost(), uri.getPort()));
+    String brokerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
+    List<String> brokerList = Collections.singletonList(brokerUrl);
     return brokerList;
   }
 }

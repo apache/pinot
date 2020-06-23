@@ -36,7 +36,7 @@ public class PinotDriver implements Driver {
   private final String SCHEME = "pinot";
 
   @Override
-  public Connection connect(String url, Properties properties)
+  public Connection connect(String url, Properties info)
       throws SQLException {
     try {
       PinotClientTransport pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
@@ -57,7 +57,7 @@ public class PinotDriver implements Driver {
   }
 
   @Override
-  public DriverPropertyInfo[] getPropertyInfo(String s, Properties properties)
+  public DriverPropertyInfo[] getPropertyInfo(String url, Properties info)
       throws SQLException {
     return new DriverPropertyInfo[0];
   }
@@ -74,7 +74,7 @@ public class PinotDriver implements Driver {
 
   @Override
   public boolean jdbcCompliant() {
-    return true;
+    return false;
   }
 
   @Override

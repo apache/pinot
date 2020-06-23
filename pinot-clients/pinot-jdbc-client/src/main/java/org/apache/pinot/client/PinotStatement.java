@@ -29,12 +29,11 @@ import java.sql.Statement;
 public class PinotStatement implements Statement {
 
   private final org.apache.pinot.client.Connection _connection;
-  private final String _queryFormat;
+  private static final String _queryFormat = "sql";
   private ResultSetGroup _resultSetGroup;
 
   public PinotStatement(org.apache.pinot.client.Connection connection) {
     _connection = connection;
-    _queryFormat = "sql";
   }
 
   @Override
@@ -50,12 +49,6 @@ public class PinotStatement implements Statement {
   }
 
   @Override
-  public int executeUpdate(String s)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
   public void close()
       throws SQLException {
 
@@ -68,39 +61,16 @@ public class PinotStatement implements Statement {
   }
 
   @Override
-  public void setMaxFieldSize(int i)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
   public int getMaxRows()
       throws SQLException {
     return 0;
   }
 
-  @Override
-  public void setMaxRows(int i)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void setEscapeProcessing(boolean b)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
 
   @Override
   public int getQueryTimeout()
       throws SQLException {
     return 0;
-  }
-
-  @Override
-  public void setQueryTimeout(int i)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
   }
 
   @Override
@@ -151,11 +121,6 @@ public class PinotStatement implements Statement {
     return false;
   }
 
-  @Override
-  public void setFetchDirection(int i)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
 
   @Override
   public int getFetchDirection()
@@ -163,11 +128,6 @@ public class PinotStatement implements Statement {
     return 0;
   }
 
-  @Override
-  public void setFetchSize(int i)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
 
   @Override
   public int getFetchSize()
@@ -185,12 +145,6 @@ public class PinotStatement implements Statement {
   public int getResultSetType()
       throws SQLException {
     return 0;
-  }
-
-  @Override
-  public void addBatch(String s)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
   }
 
   @Override
@@ -212,51 +166,9 @@ public class PinotStatement implements Statement {
   }
 
   @Override
-  public boolean getMoreResults(int i)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
   public ResultSet getGeneratedKeys()
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public int executeUpdate(String s, int i)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public int executeUpdate(String s, int[] ints)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public int executeUpdate(String s, String[] strings)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public boolean execute(String s, int i)
-      throws SQLException {
-    return false;
-  }
-
-  @Override
-  public boolean execute(String s, int[] ints)
-      throws SQLException {
-    return false;
-  }
-
-  @Override
-  public boolean execute(String s, String[] strings)
-      throws SQLException {
-    return false;
   }
 
   @Override
@@ -271,11 +183,6 @@ public class PinotStatement implements Statement {
     return false;
   }
 
-  @Override
-  public void setPoolable(boolean b)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
 
   @Override
   public boolean isPoolable()
@@ -296,14 +203,110 @@ public class PinotStatement implements Statement {
   }
 
   @Override
-  public <T> T unwrap(Class<T> aClass)
+  public <T> T unwrap(Class<T> iface)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public boolean isWrapperFor(Class<?> aClass)
+  public boolean isWrapperFor(Class<?> iface)
       throws SQLException {
     return false;
+  }
+
+  @Override
+  public int executeUpdate(String sql)
+      throws SQLException {
+    return 0;
+  }
+
+  @Override
+  public void setMaxFieldSize(int max)
+      throws SQLException {
+
+  }
+
+  @Override
+  public void setMaxRows(int max)
+      throws SQLException {
+
+  }
+
+  @Override
+  public void setEscapeProcessing(boolean enable)
+      throws SQLException {
+
+  }
+
+  @Override
+  public void setQueryTimeout(int seconds)
+      throws SQLException {
+
+  }
+
+  @Override
+  public void setFetchDirection(int direction)
+      throws SQLException {
+
+  }
+
+  @Override
+  public void setFetchSize(int rows)
+      throws SQLException {
+
+  }
+
+  @Override
+  public void addBatch(String sql)
+      throws SQLException {
+
+  }
+
+  @Override
+  public boolean getMoreResults(int current)
+      throws SQLException {
+    return false;
+  }
+
+  @Override
+  public int executeUpdate(String sql, int autoGeneratedKeys)
+      throws SQLException {
+    return 0;
+  }
+
+  @Override
+  public int executeUpdate(String sql, int[] columnIndexes)
+      throws SQLException {
+    return 0;
+  }
+
+  @Override
+  public int executeUpdate(String sql, String[] columnNames)
+      throws SQLException {
+    return 0;
+  }
+
+  @Override
+  public boolean execute(String sql, int autoGeneratedKeys)
+      throws SQLException {
+    return false;
+  }
+
+  @Override
+  public boolean execute(String sql, int[] columnIndexes)
+      throws SQLException {
+    return false;
+  }
+
+  @Override
+  public boolean execute(String sql, String[] columnNames)
+      throws SQLException {
+    return false;
+  }
+
+  @Override
+  public void setPoolable(boolean poolable)
+      throws SQLException {
+
   }
 }
