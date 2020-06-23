@@ -67,6 +67,7 @@ public class SegmentGeneratorConfig {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
+  private TableConfig _tableConfig;
   private Map<String, String> _customProperties = new HashMap<>();
   private Set<String> _rawIndexCreationColumns = new HashSet<>();
   private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
@@ -122,6 +123,8 @@ public class SegmentGeneratorConfig {
     Preconditions.checkNotNull(schema);
     Preconditions.checkNotNull(tableConfig);
     setSchema(schema);
+
+    _tableConfig = tableConfig;
 
     // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
     String timeColumnName = null;
@@ -198,7 +201,7 @@ public class SegmentGeneratorConfig {
   /**
    * Set time column details using the given time column
    */
-  public void setTime(@Nullable String timeColumnName, Schema schema) {
+  private void setTime(@Nullable String timeColumnName, Schema schema) {
     if (timeColumnName != null) {
       DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
       if (dateTimeFieldSpec != null) {
@@ -483,7 +486,11 @@ public class SegmentGeneratorConfig {
     return _schema;
   }
 
-  public void setSchema(Schema schema) {
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
+  private void setSchema(Schema schema) {
     Preconditions.checkNotNull(schema);
     _schema = schema;
 

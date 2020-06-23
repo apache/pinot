@@ -19,7 +19,8 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.util.Set;
-import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -96,8 +97,9 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();
-    StreamMessageDecoder streamMessageDecoder =
-        StreamDecoderProvider.create(streamConfig, SchemaUtils.extractSourceFields(pinotSchema));
+    TableConfig tableConfig = FakeStreamConfigUtils.getTableConfig();
+    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(streamConfig,
+        IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), pinotSchema));
     GenericRow decodedRow = new GenericRow();
     streamMessageDecoder.decode(messageBatch.getMessageAtIndex(0), decodedRow);
     System.out.println(decodedRow);

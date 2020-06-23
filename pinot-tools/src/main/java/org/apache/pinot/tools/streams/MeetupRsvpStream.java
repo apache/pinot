@@ -20,7 +20,6 @@ package org.apache.pinot.tools.streams;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -30,12 +29,8 @@ import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
-import org.apache.pinot.core.util.SchemaUtils;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
-import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.glassfish.tyrus.client.ClientManager;
@@ -43,14 +38,12 @@ import org.glassfish.tyrus.client.ClientManager;
 
 public class MeetupRsvpStream {
 
-  private Schema schema;
   private StreamDataProducer producer;
   private boolean keepPublishing = true;
   private ClientManager client;
 
-  public MeetupRsvpStream(File schemaFile)
+  public MeetupRsvpStream()
       throws Exception {
-    schema = Schema.fromFile(schemaFile);
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
@@ -67,9 +60,6 @@ public class MeetupRsvpStream {
   public void run() {
     try {
       ClientEndpointConfig cec = ClientEndpointConfig.Builder.create().build();
-      StreamMessageDecoder decoder =
-          PluginManager.get().createInstance(KafkaStarterUtils.KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME);
-      decoder.init(null, SchemaUtils.extractSourceFields(schema), null);
       client = ClientManager.createClient();
       client.connectToServer(new Endpoint() {
 

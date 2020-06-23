@@ -18,12 +18,9 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
@@ -50,8 +47,8 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      RecordTransformer recordTransformer =
-          CompositeTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
+      RecordTransformer recordTransformer = CompositeTransformer
+          .getDefaultTransformer(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
@@ -65,13 +62,13 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
         if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
           for (Object singleRow : (Collection) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
             GenericRow transformedRow = recordTransformer.transform((GenericRow) singleRow);
-            if (transformedRow != null) {
+            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
               collector.collectRow(transformedRow);
             }
           }
         } else {
           GenericRow transformedRow = recordTransformer.transform(reuse);
-          if (transformedRow != null) {
+          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             collector.collectRow(transformedRow);
           }
         }

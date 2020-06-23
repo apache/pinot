@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -124,9 +125,15 @@ public class TableConfigUtils {
       upsertConfig = JsonUtils.stringToObject(upsertConfigString, UpsertConfig.class);
     }
 
+    IngestionConfig ingestionConfig = null;
+    String ingestionConfigString = simpleFields.get(TableConfig.INGESTION_CONFIG_KEY);
+    if (ingestionConfigString != null) {
+      ingestionConfig = JsonUtils.stringToObject(ingestionConfigString, IngestionConfig.class);
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
-        upsertConfig);
+        upsertConfig, ingestionConfig);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -171,6 +178,10 @@ public class TableConfigUtils {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig != null) {
       simpleFields.put(TableConfig.UPSERT_CONFIG_KEY, JsonUtils.objectToString(upsertConfig));
+    }
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null) {
+      simpleFields.put(TableConfig.INGESTION_CONFIG_KEY, JsonUtils.objectToString(ingestionConfig));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -40,28 +38,6 @@ public class SchemaUtils {
   public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SchemaUtils.class);
-
-  /**
-   * Extracts the source fields and destination fields from the schema
-   * For field specs with a transform expression defined, use the arguments provided to the function
-   * By default, add the field spec name
-   *
-   * TODO: for now, we assume that arguments to transform function are in the source i.e. there's no columns which are derived from transformed columns
-   */
-  public static Set<String> extractSourceFields(Schema schema) {
-    Set<String> sourceFieldNames = new HashSet<>();
-
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-        if (functionEvaluator != null) {
-          sourceFieldNames.addAll(functionEvaluator.getArguments());
-        }
-        sourceFieldNames.add(fieldSpec.getName());
-      }
-    }
-    return sourceFieldNames;
-  }
 
   /**
    * Validates that for a field spec with transform function, the source column name and destination column name are exclusive

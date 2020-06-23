@@ -18,17 +18,12 @@
  */
 package org.apache.pinot.core.util;
 
-import com.google.common.collect.Lists;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -38,90 +33,6 @@ import org.testng.annotations.Test;
  * Tests that the source field names are extracted correctly
  */
 public class SchemaUtilsTest {
-
-  @Test
-  public void testSourceFieldExtractorName() {
-
-    Schema schema;
-
-    // from groovy function
-    schema = new Schema();
-    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("d1", FieldSpec.DataType.STRING, true);
-    dimensionFieldSpec.setTransformFunction("Groovy({function}, argument1, argument2)");
-    schema.addField(dimensionFieldSpec);
-    List<String> extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 3);
-    Assert.assertTrue(extract.containsAll(Arrays.asList("d1", "argument1", "argument2")));
-
-    // groovy function, no arguments
-    schema = new Schema();
-    dimensionFieldSpec = new DimensionFieldSpec("d1", FieldSpec.DataType.STRING, true);
-    dimensionFieldSpec.setTransformFunction("Groovy({function})");
-    schema.addField(dimensionFieldSpec);
-    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 1);
-    Assert.assertTrue(extract.contains("d1"));
-
-    // Map implementation for Avro - map__KEYS indicates map is source column
-    schema = new Schema();
-    dimensionFieldSpec = new DimensionFieldSpec("map__KEYS", FieldSpec.DataType.INT, false);
-    schema.addField(dimensionFieldSpec);
-    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Arrays.asList("map", "map__KEYS")));
-
-    // Map implementation for Avro - map__VALUES indicates map is source column
-    schema = new Schema();
-    dimensionFieldSpec = new DimensionFieldSpec("map__VALUES", FieldSpec.DataType.LONG, false);
-    schema.addField(dimensionFieldSpec);
-    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Arrays.asList("map", "map__VALUES")));
-
-    // Time field spec
-    // only incoming
-    schema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), null).build();
-    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 1);
-    Assert.assertTrue(extract.contains("time"));
-
-    // incoming and outgoing different column name
-    schema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "in"),
-            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "out")).build();
-    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Arrays.asList("in", "out")));
-
-    // inbuilt functions
-    schema = new Schema();
-    dimensionFieldSpec = new DimensionFieldSpec("hoursSinceEpoch", FieldSpec.DataType.LONG, true);
-    dimensionFieldSpec.setTransformFunction("toEpochHours(timestamp)");
-    schema.addField(dimensionFieldSpec);
-    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Arrays.asList("timestamp", "hoursSinceEpoch")));
-
-    // inbuilt functions with literal
-    schema = new Schema();
-    dimensionFieldSpec = new DimensionFieldSpec("tenMinutesSinceEpoch", FieldSpec.DataType.LONG, true);
-    dimensionFieldSpec.setTransformFunction("toEpochMinutesBucket(timestamp, 10)");
-    schema.addField(dimensionFieldSpec);
-    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestamp")));
-
-    // inbuilt functions on DateTimeFieldSpec
-    schema = new Schema();
-    DateTimeFieldSpec dateTimeFieldSpec =
-        new DateTimeFieldSpec("date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS");
-    dateTimeFieldSpec.setTransformFunction("toDateTime(timestamp, 'yyyy-MM-dd')");
-    schema.addField(dateTimeFieldSpec);
-    extract = new ArrayList<>(SchemaUtils.extractSourceFields(schema));
-    Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("date", "timestamp")));
-  }
 
   @Test
   public void testValidate() {

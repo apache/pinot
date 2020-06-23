@@ -77,7 +77,7 @@ public class RealtimeQuickStart {
     _kafkaStarter.start();
     _kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));
     printStatus(Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
-    MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream(schemaFile);
+    MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream();
     meetupRSVPProvider.run();
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, server and broker *****");
     runner.startAll();

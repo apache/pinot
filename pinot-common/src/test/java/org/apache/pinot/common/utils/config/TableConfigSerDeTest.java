@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -42,6 +43,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -249,6 +251,22 @@ public class TableConfigSerDeTest {
       checkSegmentsValidationAndRetentionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
       checkSegmentsValidationAndRetentionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
+    {
+      // With ingestion config
+      IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig("filterFunc(foo)"));
+      TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
+
+      checkIngestionConfig(tableConfig);
+
+      // Serialize then de-serialize
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      assertEquals(tableConfigToCompare, tableConfig);
+      checkIngestionConfig(tableConfigToCompare);
+
+      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      assertEquals(tableConfigToCompare, tableConfig);
+      checkIngestionConfig(tableConfigToCompare);
+    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
@@ -340,6 +358,12 @@ public class TableConfigSerDeTest {
     QueryConfig queryConfig = tableConfig.getQueryConfig();
     assertNotNull(queryConfig);
     assertEquals(queryConfig.getTimeoutMs(), Long.valueOf(1000L));
+  }
+
+  private void checkIngestionConfig(TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    assertNotNull(ingestionConfig);
+    assertEquals(ingestionConfig.getFilterConfig().getFilterFunction(), "filterFunc(foo)");
   }
 
   private void checkInstanceAssignmentConfig(TableConfig tableConfig) {

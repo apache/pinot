@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
@@ -34,6 +35,7 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class StatsCollectorConfig {
 
+  private final TableConfig _tableConfig;
   private final Schema _schema;
   private final SegmentPartitionConfig _segmentPartitionConfig;
 
@@ -42,8 +44,10 @@ public class StatsCollectorConfig {
    * @param schema Data schema
    * @param segmentPartitionConfig Segment partitioning config
    */
-  public StatsCollectorConfig(@Nonnull Schema schema, SegmentPartitionConfig segmentPartitionConfig) {
+  public StatsCollectorConfig(TableConfig tableConfig, Schema schema, @Nullable SegmentPartitionConfig segmentPartitionConfig) {
+    Preconditions.checkNotNull(tableConfig);
     Preconditions.checkNotNull(schema);
+    _tableConfig = tableConfig;
     _schema = schema;
     _segmentPartitionConfig = segmentPartitionConfig;
   }
@@ -76,8 +80,11 @@ public class StatsCollectorConfig {
         : SegmentPartitionConfig.INVALID_NUM_PARTITIONS;
   }
 
-  @Nonnull
   public Schema getSchema() {
     return _schema;
+  }
+
+  public TableConfig getTableConfig() {
+    return _tableConfig;
   }
 }

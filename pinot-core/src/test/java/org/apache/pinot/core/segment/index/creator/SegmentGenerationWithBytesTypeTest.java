@@ -331,7 +331,6 @@ public class SegmentGenerationWithBytesTypeTest {
     config.setInputFilePath(dirName + File.separator + avroName);
     config.setOutDir(dirName);
     config.setSegmentName(segmentName);
-    config.setSchema(schema);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
