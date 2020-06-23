@@ -82,21 +82,21 @@ public class RecordTransformerTest {
     tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt > 123}, svInt)")));
     RecordTransformer transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
-    Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.FILTER_RECORD_KEY));
+    Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // expression true, filtered
     genericRow = getRecord();
     tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svInt <= 123}, svInt)")));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
-    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.FILTER_RECORD_KEY));
+    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // value not found
     genericRow = getRecord();
     tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({notPresent == 123}, notPresent)")));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
-    Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.FILTER_RECORD_KEY));
+    Assert.assertFalse(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
     // invalid function
     tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy(svInt == 123)")));
@@ -112,7 +112,7 @@ public class RecordTransformerTest {
     tableConfig.setIngestionConfig(new IngestionConfig(new FilterConfig("Groovy({svFloat.max() < 500}, svFloat)")));
     transformer = new FilterTransformer(tableConfig);
     transformer.transform(genericRow);
-    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.FILTER_RECORD_KEY));
+    Assert.assertTrue(genericRow.getFieldToValueMap().containsKey(GenericRow.SKIP_RECORD_KEY));
 
   }
 

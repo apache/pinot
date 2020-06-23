@@ -19,20 +19,20 @@
 package org.apache.pinot.core.segment.index.creator;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang.math.RandomUtils;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -43,18 +43,14 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class SegmentGenerationWithFilterRecordsKey {
-  private static final String STRING_COLUMN = "col1";
-  private static final String[] STRING_VALUES = {"A", "B", "C", "D", "E"};
-  private static final String LONG_COLUMN = "col2";
-  private static final long[] LONG_VALUES =
-      {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
-  private static final String MV_INT_COLUMN = "col3";
-  private static final ArrayList[] MV_INT_VALUES =
-      {Lists.newArrayList(1, 2, 3), Lists.newArrayList(4), Lists.newArrayList(5, 1), Lists.newArrayList(
-          2), Lists.newArrayList(3, 4, 5)};
+/**
+ * Tests many to one flattening based on presence of MULTIPLE_RECORDS_KEY in GenericRow
+ */
+public class SegmentGenerationWithMultipleRecordsTest {
+  private static final String SUB_COLUMN_1 = "sub1";
+  private static final String SUB_COLUMN_2 = "sub2";
   private static final String SEGMENT_DIR_NAME =
-      FileUtils.getTempDirectoryPath() + File.separator + "segmentFilterRecordsTest";
+      System.getProperty("java.io.tmpdir") + File.separator + "segmentMultipleRecordsTest";
   private static final String SEGMENT_NAME = "testSegment";
 
   private Schema _schema;
@@ -62,12 +58,9 @@ public class SegmentGenerationWithFilterRecordsKey {
 
   @BeforeClass
   public void setup() {
-    String filterFunction = "Groovy({((col2 < 1589007600000L) &&  (col3.max() < 4)) || col1 == \"B\"}, col1, col2, col3)";
-    IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig(filterFunction));
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
-    _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
-        .addMetric(LONG_COLUMN, FieldSpec.DataType.LONG).addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
-        .build();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    _schema = new Schema.SchemaBuilder().addSingleValueDimension(SUB_COLUMN_1, FieldSpec.DataType.STRING)
+        .addMetric(SUB_COLUMN_2, FieldSpec.DataType.LONG).build();
   }
 
   @BeforeMethod
@@ -80,12 +73,8 @@ public class SegmentGenerationWithFilterRecordsKey {
       throws Exception {
     File segmentDir = buildSegment(_tableConfig, _schema);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
-    Assert.assertEquals(metadata.getTotalDocs(), 2);
-    PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(segmentDir);
-    GenericRow next = segmentRecordReader.next();
-    Assert.assertEquals(next.getValue(STRING_COLUMN), "C");
-    next = segmentRecordReader.next();
-    Assert.assertEquals(next.getValue(STRING_COLUMN), "E");
+    Assert.assertEquals(metadata.getTotalDocs(), 6);
+    Assert.assertTrue(metadata.getAllColumns().containsAll(Sets.newHashSet(SUB_COLUMN_1, SUB_COLUMN_2)));
   }
 
   private File buildSegment(final TableConfig tableConfig, final Schema schema)
@@ -95,18 +84,30 @@ public class SegmentGenerationWithFilterRecordsKey {
     config.setSegmentName(SEGMENT_NAME);
 
     List<GenericRow> rows = new ArrayList<>(3);
-    for (int i = 0; i < 5; i++) {
-      GenericRow row = new GenericRow();
-      row.putValue(STRING_COLUMN, STRING_VALUES[i]);
-      row.putValue(LONG_COLUMN, LONG_VALUES[i]);
-      row.putValue(MV_INT_COLUMN, MV_INT_VALUES[i]);
-      rows.add(row);
-    }
+
+    GenericRow genericRow1 = new GenericRow();
+    genericRow1.putValue(GenericRow.MULTIPLE_RECORDS_KEY,
+        Lists.newArrayList(getRandomArrayElement(), getRandomArrayElement(), getRandomArrayElement()));
+    rows.add(genericRow1);
+    GenericRow genericRow2 = new GenericRow();
+    genericRow2.putValue(GenericRow.MULTIPLE_RECORDS_KEY, Lists.newArrayList(getRandomArrayElement()));
+    rows.add(genericRow2);
+    GenericRow genericRow3 = new GenericRow();
+    genericRow3.putValue(GenericRow.MULTIPLE_RECORDS_KEY,
+        Lists.newArrayList(getRandomArrayElement(), getRandomArrayElement()));
+    rows.add(genericRow3);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     driver.getOutputDirectory().deleteOnExit();
     return driver.getOutputDirectory();
+  }
+
+  private GenericRow getRandomArrayElement() {
+    GenericRow element = new GenericRow();
+    element.putValue(SUB_COLUMN_1, RandomStringUtils.randomAlphabetic(4));
+    element.putValue(SUB_COLUMN_2, RandomUtils.nextLong());
+    return element;
   }
 }

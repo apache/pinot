@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.util;
 
-import com.google.common.collect.Sets;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -42,10 +40,10 @@ public class IngestionUtils {
    * 1. The schema
    * 2. The ingestion config in the table config. The ingestion config (e.g. filter) can have fields which are not in the schema.
    */
-  public static Set<String> getFieldsForRecordExtractor(IngestionConfig ingestionConfig, Schema schema) {
+  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
-    fieldsForRecordExtractor.addAll(getFieldsFromIngestionConfig(ingestionConfig));
-    fieldsForRecordExtractor.addAll(getFieldsFromSchema(schema));
+    extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
+    extractFieldsFromSchema(schema, fieldsForRecordExtractor);
     return fieldsForRecordExtractor;
   }
 
@@ -53,41 +51,37 @@ public class IngestionUtils {
    * Extracts all the fields needed by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given Schema
    * TODO: for now, we assume that arguments to transform function are in the source i.e. no columns are derived from transformed columns
    */
-  private static Set<String> getFieldsFromSchema(Schema schema) {
-    Set<String> fieldNames = new HashSet<>();
-
+  private static void extractFieldsFromSchema(Schema schema, Set<String> fields) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
         if (functionEvaluator != null) {
-          fieldNames.addAll(functionEvaluator.getArguments());
+          fields.addAll(functionEvaluator.getArguments());
         }
-        fieldNames.add(fieldSpec.getName());
+        fields.add(fieldSpec.getName());
       }
     }
-    return fieldNames;
   }
 
   /**
    * Extracts the fields needed by a RecordExtractor from given {@link IngestionConfig}
    */
-  private static Set<String> getFieldsFromIngestionConfig(@Nullable IngestionConfig ingestionConfig) {
+  private static void extractFieldsFromIngestionConfig(@Nullable IngestionConfig ingestionConfig, Set<String> fields) {
     if (ingestionConfig != null && ingestionConfig.getFilterConfig() != null) {
       String filterFunction = ingestionConfig.getFilterConfig().getFilterFunction();
       if (filterFunction != null) {
         FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
         if (functionEvaluator != null) {
-          return Sets.newHashSet(functionEvaluator.getArguments());
+          fields.addAll(functionEvaluator.getArguments());
         }
       }
     }
-    return Collections.emptySet();
   }
 
   /**
-   * Returns true if the record doesn not contain key {@link GenericRow#FILTER_RECORD_KEY} with value true
+   * Returns false if the record contains key {@link GenericRow#SKIP_RECORD_KEY} with value true
    */
   public static boolean shouldIngestRow(GenericRow genericRow) {
-    return !Boolean.TRUE.equals(genericRow.getValue(GenericRow.FILTER_RECORD_KEY));
+    return !Boolean.TRUE.equals(genericRow.getValue(GenericRow.SKIP_RECORD_KEY));
   }
 }

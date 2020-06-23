@@ -30,15 +30,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class FilterTransformer implements RecordTransformer {
 
-  private FunctionEvaluator _evaluator = null;
+  private final FunctionEvaluator _evaluator;
 
   public FilterTransformer(TableConfig tableConfig) {
+    String filterFunction = null;
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getFilterConfig() != null) {
-      String filterFunction = tableConfig.getIngestionConfig().getFilterConfig().getFilterFunction();
-      if (filterFunction != null) {
-        _evaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
-      }
+      filterFunction = tableConfig.getIngestionConfig().getFilterConfig().getFilterFunction();
     }
+    _evaluator = (filterFunction != null) ? FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction) : null;
   }
 
   @Override
@@ -46,7 +45,7 @@ public class FilterTransformer implements RecordTransformer {
     if (_evaluator != null) {
       Object result = _evaluator.evaluate(record);
       if (Boolean.TRUE.equals(result)) {
-        record.putValue(GenericRow.FILTER_RECORD_KEY, true);
+        record.putValue(GenericRow.SKIP_RECORD_KEY, true);
       }
     }
     return record;

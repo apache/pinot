@@ -56,10 +56,10 @@ public class GenericRow {
    */
   public static final String MULTIPLE_RECORDS_KEY = "$MULTIPLE_RECORDS_KEY$";
   /**
-   * This key is used by the FilterTransformer to handle filtering out of records during ingestion
-   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering out criteria, based on FilterConfig
+   * This key is used by the FilterTransformer to skip records during ingestion
+   * The FilterTransformer puts this key into the GenericRow with value true, if the record matches the filtering criteria, based on FilterConfig
    */
-  public static final String FILTER_RECORD_KEY = "$FILTER_RECORD_KEY$";
+  public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();

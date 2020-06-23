@@ -35,8 +35,8 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class StatsCollectorConfig {
 
-  private final Schema _schema;
   private final TableConfig _tableConfig;
+  private final Schema _schema;
   private final SegmentPartitionConfig _segmentPartitionConfig;
 
   /**
@@ -44,11 +44,11 @@ public class StatsCollectorConfig {
    * @param schema Data schema
    * @param segmentPartitionConfig Segment partitioning config
    */
-  public StatsCollectorConfig(Schema schema, TableConfig tableConfig, @Nullable SegmentPartitionConfig segmentPartitionConfig) {
-    Preconditions.checkNotNull(schema);
+  public StatsCollectorConfig(TableConfig tableConfig, Schema schema, @Nullable SegmentPartitionConfig segmentPartitionConfig) {
     Preconditions.checkNotNull(tableConfig);
-    _schema = schema;
+    Preconditions.checkNotNull(schema);
     _tableConfig = tableConfig;
+    _schema = schema;
     _segmentPartitionConfig = segmentPartitionConfig;
   }
 
