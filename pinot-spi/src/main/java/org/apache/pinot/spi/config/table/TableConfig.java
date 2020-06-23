@@ -80,7 +80,7 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "upsert related config")
   private UpsertConfig _upsertConfig;
 
-  @JsonPropertyDescription(value = "Config related to table ingestion")
+  @JsonPropertyDescription(value = "Config related to ingesting data into the table")
   private IngestionConfig _ingestionConfig;
 
   @JsonCreator

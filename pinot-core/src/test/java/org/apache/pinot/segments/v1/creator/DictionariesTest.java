@@ -447,7 +447,7 @@ public class DictionariesTest {
   private AbstractColumnStatisticsCollector buildStatsCollector(String column, DataType dataType) {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(column, dataType, true));
-    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(schema, _tableConfig, null);
+    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
 
     switch (dataType) {
       case INT:

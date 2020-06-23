@@ -143,7 +143,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     // Initialize stats collection
     segmentStats = dataSource
-        .gatherStats(new StatsCollectorConfig(dataSchema, config.getTableConfig(), config.getSegmentPartitionConfig()));
+        .gatherStats(new StatsCollectorConfig(config.getTableConfig(), dataSchema, config.getSegmentPartitionConfig()));
     totalDocs = segmentStats.getTotalDocCount();
 
     // Initialize index creation
