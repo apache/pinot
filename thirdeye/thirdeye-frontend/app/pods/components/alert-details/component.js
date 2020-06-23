@@ -30,17 +30,14 @@ import { getValueFromYaml } from 'thirdeye-frontend/utils/yaml-tools';
 import { inject as service } from '@ember/service';
 import { task } from 'ember-concurrency';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
-import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 import moment from 'moment';
 import _ from 'lodash';
 import config from 'thirdeye-frontend/config/environment';
 
 const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
-const DEFAULT_ACTIVE_DURATION = '1m'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TIME_RANGE_OPTIONS = ['48h', '1w', '1m', '3m'];
 const ANOMALY_LEGEND_THRESHOLD = 20; // If number of anomalies is larger than this threshold, don't show the legend
 
 export default Component.extend({
@@ -602,7 +599,7 @@ export default Component.extend({
       } = this.getProperties('anomaliesOld', 'anomaliesCurrent', 'analysisRange', 'stateOfAnomaliesAndTimeSeries');
       let tableData = [];
       const humanizedObject = {
-        queryDuration: (get(this, 'duration') || DEFAULT_ACTIVE_DURATION),
+        queryDuration: analysisRange[1] - analysisRange[0],
         queryStart: analysisRange[0],
         queryEnd: analysisRange[1]
       };
@@ -746,7 +743,7 @@ export default Component.extend({
         component: 'custom/anomalies-table/investigation-link',
         title: 'RCA',
         propertyName: 'id'
-      }]
+      }];
       return [...settingsColumn, ...startColumn, ...dimensionColumn,
         ...middleColumns, ...rightmostColumns, ...rcaColumn];
     }
@@ -831,24 +828,29 @@ export default Component.extend({
    * @type {Object[]} - array of objects, each of which represents each date pill
    */
   pill: computed(
-    'analysisRange', 'startDate', 'endDate', 'duration',
+    'analysisRange', 'startDate', 'endDate',
     function() {
       const analysisRange = get(this, 'analysisRange');
       const startDate = Number(analysisRange[0]);
       const endDate = Number(analysisRange[1]);
-      const duration = get(this, 'duration') || DEFAULT_ACTIVE_DURATION;
       const predefinedRanges = {
-        'Today': [moment().startOf('day'), moment().startOf('day').add(1, 'days')],
-        'Last 24 hours': [moment().subtract(1, 'day'), moment()],
-        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().startOf('day')],
-        'Last Week': [moment().subtract(1, 'week').startOf('day'), moment().startOf('day')]
+        'Last 48 Hours': [moment().subtract(48, 'hour').startOf('hour'), moment().startOf('hour')],
+        'Last Week': [moment().subtract(1, 'week').startOf('day'), moment().startOf('day')],
+        'Last 30 Days': [moment().subtract(1, 'month').startOf('day'), moment().startOf('day')],
+        'Last 3 Months': [moment().subtract(3, 'month').startOf('day'), moment().startOf('day')]
       };
-
+      if (!this.get('isPreviewMode')) {
+        const futureRanges = {
+          'Next 48 Hours': [moment().add(48, 'hour').startOf('hour'), moment().startOf('hour')],
+          'Next Week': [moment().add(1, 'week').startOf('day'), moment().startOf('day')],
+          'Next 30 Days': [moment().add(1, 'month').startOf('day'), moment().startOf('day')]
+        };
+        Object.assign(predefinedRanges, futureRanges);
+      }
       return {
         uiDateFormat: UI_DATE_FORMAT,
         activeRangeStart: moment(startDate).format(DISPLAY_DATE_FORMAT),
         activeRangeEnd: moment(endDate).format(DISPLAY_DATE_FORMAT),
-        timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration, !this.get('isPreviewMode')),
         timePickerIncrement: TIME_PICKER_INCREMENT,
         predefinedRanges
       };
@@ -952,7 +954,6 @@ export default Component.extend({
       this.setProperties({
         analysisRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
         displayRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
-        duration: (timeWindowSize === 172800000) ? '48h' : 'custom',
         selectedDimension: 'Choose a dimension',
         // For now, we will only show predicted and bounds on daily and minutely metrics with no dimensions, for the Alert Overview page
         selectedBaseline: (!dimensionExploration && ((granularity || '').includes('MINUTES') || (granularity || '').includes('DAYS'))) ? 'predicted' : 'wo1w',
@@ -966,7 +967,6 @@ export default Component.extend({
       this.setProperties({
         analysisRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
         displayRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
-        duration: 'custom',
         selectedBaseline: 'predicted'
       });
     }
@@ -1449,32 +1449,13 @@ export default Component.extend({
      * @method onRangeSelection
      * @param {Object} rangeOption - the user-selected time range to load
      */
-    onRangeSelection(timeRangeOptions) {
-      const {
-        start,
-        end,
-        value: duration
-      } = timeRangeOptions;
-
+    onRangeSelection(start, end) {
       const startDate = moment(start).valueOf();
       const endDate = moment(end).valueOf();
+
       //Update the time range option selected
       set(this, 'analysisRange', [startDate, endDate]);
       set(this, 'displayRange', [startDate, endDate]);
-      set(this, 'duration', duration);
-      // This makes sure we don't fetch if the preview is collapsed
-      if(get(this, 'showDetails') && get(this, 'dataIsCurrent')){
-        // With a new date range, we should reset the state of time series and anomalies for comparison
-        if (get(this, 'isPreviewMode')) {
-          this.setProperties({
-            anomaliesOld: [],
-            anomaliesOldSet: false,
-            anomaliesCurrent: [],
-            anomaliesCurrentSet: false
-          });
-        }
-        this._fetchAnomalies();
-      }
       // With a new date range, we should reset the state of time series and anomalies for comparison
       if (get(this, 'isPreviewMode')) {
         this.setProperties({
@@ -1483,6 +1464,10 @@ export default Component.extend({
           anomaliesCurrent: [],
           anomaliesCurrentSet: false
         });
+      }
+      // This makes sure we don't fetch if the preview is collapsed
+      if(get(this, 'showDetails') && get(this, 'dataIsCurrent')){
+        this._fetchAnomalies();
       }
     },
 
