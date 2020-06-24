@@ -45,90 +45,22 @@ import org.slf4j.LoggerFactory;
 public class PinotConnection implements Connection {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
-  private static org.apache.pinot.client.Connection _connection;
+  private static org.apache.pinot.client.Connection _session;
 
   PinotConnection(List<String> brokerList, PinotClientTransport transport) {
-    _connection = new org.apache.pinot.client.Connection(brokerList, transport);
+    _session = new org.apache.pinot.client.Connection(brokerList, transport);
   }
 
   PinotConnection(org.apache.pinot.client.Connection connection) {
-    _connection = connection;
+    _session = connection;
+  }
+
+  public org.apache.pinot.client.Connection getSession(){
+    return _session;
   }
 
   @Override
-  public Statement createStatement()
-      throws SQLException {
-    return new PinotStatement(_connection);
-  }
-
-  @Override
-  public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public Statement createStatement(int resultSetType, int resultSetConcurrency)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public boolean getAutoCommit()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void commit()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void rollback()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void close()
-      throws SQLException {
-
-  }
-
-  @Override
-  public boolean isClosed()
-      throws SQLException {
-    return false;
-  }
-
-  @Override
-  public DatabaseMetaData getMetaData()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public boolean isReadOnly()
-      throws SQLException {
-    return false;
-  }
-
-  @Override
-  public String getCatalog()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public int getTransactionIsolation()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public SQLWarning getWarnings()
+  public void abort(Executor executor)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
@@ -140,25 +72,31 @@ public class PinotConnection implements Connection {
   }
 
   @Override
-  public int getHoldability()
+  public void close()
+      throws SQLException {
+    _session = null;
+  }
+
+  @Override
+  public void commit()
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public Savepoint setSavepoint()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public Clob createClob()
+  public Array createArrayOf(String typeName, Object[] elements)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
   public Blob createBlob()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Clob createClob()
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
@@ -175,39 +113,32 @@ public class PinotConnection implements Connection {
     throw new SQLFeatureNotSupportedException();
   }
 
+  @Override
+  public Statement createStatement()
+      throws SQLException {
+    return new PinotStatement(this);
+  }
 
   @Override
-  public int getNetworkTimeout()
+  public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public <T> T unwrap(Class<T> iface)
+  public Statement createStatement(int resultSetType, int resultSetConcurrency)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public boolean isWrapperFor(Class<?> iface)
+  public Struct createStruct(String typeName, Object[] attributes)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public CallableStatement prepareCall(String sql)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public String nativeSQL(String sql)
+  public boolean getAutoCommit()
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
@@ -219,7 +150,7 @@ public class PinotConnection implements Connection {
   }
 
   @Override
-  public void setReadOnly(boolean readOnly)
+  public String getCatalog()
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
@@ -231,19 +162,67 @@ public class PinotConnection implements Connection {
   }
 
   @Override
+  public String getClientInfo(String name)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Properties getClientInfo()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setClientInfo(Properties properties)
+      throws SQLClientInfoException {
+
+  }
+
+  @Override
+  public int getHoldability()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setHoldability(int holdability)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public DatabaseMetaData getMetaData()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public int getNetworkTimeout()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public String getSchema()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void setSchema(String schema)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public int getTransactionIsolation()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
   public void setTransactionIsolation(int level)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
@@ -261,38 +240,80 @@ public class PinotConnection implements Connection {
   }
 
   @Override
-  public void setHoldability(int holdability)
+  public SQLWarning getWarnings()
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public Savepoint setSavepoint(String name)
+  public boolean isClosed()
+      throws SQLException {
+    return (_session == null);
+  }
+
+  @Override
+  public boolean isReadOnly()
+      throws SQLException {
+    return false;
+  }
+
+  @Override
+  public void setReadOnly(boolean readOnly)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public void rollback(Savepoint savepoint)
+  public boolean isValid(int timeout)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public void releaseSavepoint(Savepoint savepoint)
+  public boolean isWrapperFor(Class<?> iface)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
-      int resultSetHoldability)
+  public String nativeSQL(String sql)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public CallableStatement prepareCall(String sql)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
 
   @Override
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
+      int resultSetHoldability)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String sql)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
       int resultSetHoldability)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
@@ -317,7 +338,19 @@ public class PinotConnection implements Connection {
   }
 
   @Override
-  public boolean isValid(int timeout)
+  public void releaseSavepoint(Savepoint savepoint)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void rollback()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public void rollback(Savepoint savepoint)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }
@@ -329,55 +362,25 @@ public class PinotConnection implements Connection {
   }
 
   @Override
-  public void setClientInfo(Properties properties)
-      throws SQLClientInfoException {
-
-  }
-
-  @Override
-  public String getClientInfo(String name)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public Properties getClientInfo()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public Array createArrayOf(String typeName, Object[] elements)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public Struct createStruct(String typeName, Object[] attributes)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void setSchema(String schema)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public String getSchema()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void abort(Executor executor)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
   public void setNetworkTimeout(Executor executor, int milliseconds)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Savepoint setSavepoint()
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public Savepoint setSavepoint(String name)
+      throws SQLException {
+    throw new SQLFeatureNotSupportedException();
+  }
+
+  @Override
+  public <T> T unwrap(Class<T> iface)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
   }

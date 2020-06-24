@@ -52,7 +52,7 @@ import org.apache.commons.codec.binary.Hex;
 public class PinotResultSet implements ResultSet {
   public static final String TIMESTAMP_FORMAT = "dd-mm-yyyy HH:MM:SS";
   public static final String DATE_FORMAT = "dd-mm-yyyy";
-  private final org.apache.pinot.client.ResultSet _resultSet;
+  private org.apache.pinot.client.ResultSet _resultSet;
   private int _totalRows;
   private int _currentRow;
   private Map<String, Integer> _columns = new HashMap<>();
@@ -107,7 +107,10 @@ public class PinotResultSet implements ResultSet {
   @Override
   public void close()
       throws SQLException {
-
+      _resultSet = null;
+      _totalRows = 0;
+      _currentRow = -1;
+      _columns.clear();;
   }
 
   @Override
