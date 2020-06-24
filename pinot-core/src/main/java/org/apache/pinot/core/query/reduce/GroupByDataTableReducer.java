@@ -167,6 +167,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     List<Object[]> rows = new ArrayList<>(limit);
 
     if (_sqlQuery) {
+      // SQL query with SQL group-by mode and response format
       // NOTE: For SQL query, need to reorder the columns in the data table based on the select expressions.
 
       int[] selectExpressionIndexMap = getSelectExpressionIndexMap();
@@ -196,6 +197,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
         rows.add(reorderedValues);
       }
     } else {
+      // PQL query with SQL group-by mode and response format
+
       while (rows.size() < limit && sortedIterator.hasNext()) {
         Record nextRecord = sortedIterator.next();
         Object[] values = nextRecord.getValues();
