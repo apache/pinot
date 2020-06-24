@@ -22,8 +22,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -35,6 +33,8 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -53,11 +53,14 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   private int _numDocsScanned = 0;
 
-  public SelectionOrderByOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
+  public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
+      TransformOperator transformOperator) {
     _indexSegment = indexSegment;
     _transformOperator = transformOperator;
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    assert orderByExpressions != null;
     _expressions = SelectionOperatorUtils
-        .extractExpressions(selection.getSelectionColumns(), indexSegment, selection.getSelectionSortSequence());
+        .extractExpressions(queryContext.getSelectExpressions(), orderByExpressions, indexSegment);
 
     int numExpressions = _expressions.size();
     _expressionMetadata = new TransformResultMetadata[numExpressions];
@@ -73,14 +76,14 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    _numRowsToKeep = selection.getOffset() + selection.getSize();
+    _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getComparator(selection.getSelectionSortSequence()));
+        getComparator(orderByExpressions));
   }
 
-  private Comparator<Object[]> getComparator(List<SelectionSort> sortSequence) {
+  private Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions) {
     // Compare all single-value columns
-    int numOrderByExpressions = sortSequence.size();
+    int numOrderByExpressions = orderByExpressions.size();
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
     for (int i = 0; i < numOrderByExpressions; i++) {
       if (_expressionMetadata[i].isSingleValue()) {
@@ -97,7 +100,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
       dataTypes[i] = _expressionMetadata[valueIndex].getDataType();
-      multipliers[i] = sortSequence.get(valueIndex).isIsAsc() ? -1 : 1;
+      multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
     return (o1, o2) -> {

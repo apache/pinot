@@ -69,8 +69,12 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    ExpressionContext firstSelectExpression = query.getSelectExpressions().get(0);
-    return firstSelectExpression.getType() == ExpressionContext.Type.FUNCTION
-        && firstSelectExpression.getFunction().getType() == FunctionContext.Type.AGGREGATION;
+    for (ExpressionContext selectExpression : query.getSelectExpressions()) {
+      if (selectExpression.getType() == ExpressionContext.Type.FUNCTION
+          && selectExpression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
+        return true;
+      }
+    }
+    return false;
   }
 }

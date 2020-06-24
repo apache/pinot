@@ -20,8 +20,6 @@ package org.apache.pinot.perf;
 
 import com.google.common.base.Joiner;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,19 +36,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -77,10 +75,9 @@ public class BenchmarkCombineGroupBy {
   private static final int CARDINALITY_D2 = 500;
   private Random _random = new Random();
 
-  private DataSchema _dataSchema;
+  private QueryContext _queryContext;
   private AggregationFunction[] _aggregationFunctions;
-  private GroupBy _groupBy;
-  private List<SelectionSort> _orderBy;
+  private DataSchema _dataSchema;
 
   private List<String> _d1;
   private List<Integer> _d2;
@@ -103,20 +100,11 @@ public class BenchmarkCombineGroupBy {
       _d2.add(i);
     }
 
+    _queryContext = BrokerRequestToQueryContextConverter.convert(new Pql2Compiler()
+        .compileToBrokerRequest("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) TOP 500"));
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_queryContext.getBrokerRequest());
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
-
-    _aggregationFunctions =
-        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
-
-    _groupBy = new GroupBy();
-    _groupBy.setTopN(TOP_N);
-    _groupBy.setExpressions(Arrays.asList("d1", "d2"));
-
-    SelectionSort selectionSort = new SelectionSort();
-    selectionSort.setColumn("sum(m1)");
-    selectionSort.setIsAsc(true);
-    _orderBy = Collections.singletonList(selectionSort);
 
     _executorService = Executors.newFixedThreadPool(10);
   }
@@ -145,12 +133,11 @@ public class BenchmarkCombineGroupBy {
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void concurrentIndexedTableForCombineGroupBy()
       throws InterruptedException, ExecutionException, TimeoutException {
-
-    int capacity = GroupByUtils.getTableCapacity(_groupBy, _orderBy);
+    int capacity = GroupByUtils.getTableCapacity(_queryContext);
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable =
-        new ConcurrentIndexedTable(_dataSchema, _aggregationFunctions, _orderBy, capacity);
+        new ConcurrentIndexedTable(_dataSchema, _aggregationFunctions, _queryContext.getOrderByExpressions(), capacity);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 

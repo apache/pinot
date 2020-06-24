@@ -164,14 +164,12 @@ public class CombinePlanNode implements PlanNode {
       QueryOptions queryOptions = new QueryOptions(_queryContext.getQueryOptions());
       // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
       if (queryOptions.isGroupByModeSQL()) {
-        return new CombineGroupByOrderByOperator(operators, _queryContext.getBrokerRequest(), _executorService,
-            _timeOutMs);
+        return new CombineGroupByOrderByOperator(operators, _queryContext, _executorService, _timeOutMs);
       }
-      return new CombineGroupByOperator(operators, _queryContext.getBrokerRequest(), _executorService, _timeOutMs,
-          _numGroupsLimit);
+      return new CombineGroupByOperator(operators, _queryContext, _executorService, _timeOutMs, _numGroupsLimit);
     } else {
       // Selection or aggregation only query
-      return new CombineOperator(operators, _executorService, _timeOutMs, _queryContext.getBrokerRequest());
+      return new CombineOperator(operators, _queryContext, _executorService, _timeOutMs);
     }
   }
 }

@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
@@ -48,10 +48,11 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
   private int _numDocsScanned = 0;
 
-  public SelectionOnlyOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
+  public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
+      TransformOperator transformOperator) {
     _indexSegment = indexSegment;
     _transformOperator = transformOperator;
-    _expressions = SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment);
+    _expressions = SelectionOperatorUtils.extractExpressions(queryContext.getSelectExpressions(), indexSegment);
 
     int numExpressions = _expressions.size();
     _blockValSets = new BlockValSet[numExpressions];
@@ -66,7 +67,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    _numRowsToKeep = selection.getSize();
+    _numRowsToKeep = queryContext.getLimit();
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
   }
 

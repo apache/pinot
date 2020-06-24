@@ -26,14 +26,13 @@ import java.util.Map;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -49,12 +48,13 @@ import org.slf4j.LoggerFactory;
 public class SelectionDataTableReducer implements DataTableReducer {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionDataTableReducer.class);
 
-  private final Selection _selection;
+  private final QueryContext _queryContext;
   private final boolean _preserveType;
   private final boolean _responseFormatSql;
 
-  SelectionDataTableReducer(BrokerRequest brokerRequest, QueryOptions queryOptions) {
-    _selection = brokerRequest.getSelections();
+  SelectionDataTableReducer(QueryContext queryContext) {
+    _queryContext = queryContext;
+    QueryOptions queryOptions = new QueryOptions(queryContext.getQueryOptions());
     _preserveType = queryOptions.isPreserveType();
     _responseFormatSql = queryOptions.isResponseFormatSQL();
   }
@@ -69,9 +69,9 @@ public class SelectionDataTableReducer implements DataTableReducer {
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
       BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
-      // For empty data table map, construct empty result using the cached data schema for selection query if exists
+      // For empty data table map, construct empty result using the cached data schema for selection query
       List<String> selectionColumns =
-          SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
+          SelectionOperatorUtils.getSelectionColumns(_queryContext.getSelectExpressions(), dataSchema);
       if (_responseFormatSql) {
         DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
         brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
@@ -95,10 +95,10 @@ public class SelectionDataTableReducer implements DataTableReducer {
         }
       }
 
-      int selectionSize = _selection.getSize();
-      if (selectionSize > 0 && _selection.isSetSelectionSortSequence()) {
+      int limit = _queryContext.getLimit();
+      if (limit > 0 && _queryContext.getOrderByExpressions() != null) {
         // Selection order-by
-        SelectionOperatorService selectionService = new SelectionOperatorService(_selection, dataSchema);
+        SelectionOperatorService selectionService = new SelectionOperatorService(_queryContext, dataSchema);
         selectionService.reduceWithOrdering(dataTableMap.values());
         if (_responseFormatSql) {
           brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
@@ -108,8 +108,8 @@ public class SelectionDataTableReducer implements DataTableReducer {
       } else {
         // Selection only
         List<String> selectionColumns =
-            SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
-        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), selectionSize);
+            SelectionOperatorUtils.getSelectionColumns(_queryContext.getSelectExpressions(), dataSchema);
+        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit);
         if (_responseFormatSql) {
           brokerResponseNative
               .setResultTable(SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema));

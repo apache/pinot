@@ -102,15 +102,6 @@ public class AggregationFunctionUtils {
     return null;
   }
 
-  public static boolean[] getAggregationFunctionsSelectStatus(List<AggregationInfo> aggregationInfos) {
-    int numAggregationFunctions = aggregationInfos.size();
-    boolean[] aggregationFunctionsStatus = new boolean[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      aggregationFunctionsStatus[i] = aggregationInfos.get(i).isIsInSelectList();
-    }
-    return aggregationFunctionsStatus;
-  }
-
   public static String formatValue(Object value) {
     if (value instanceof Double) {
       double doubleValue = (double) value;

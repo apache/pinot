@@ -20,18 +20,18 @@ package org.apache.pinot.core.data.table;
 
 import java.util.Iterator;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.pinot.common.request.SelectionSort;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 
 
 /**
  * Base abstract implementation of Table
  */
+@SuppressWarnings("rawtypes")
 public abstract class BaseTable implements Table {
-  // TODO: After fixing the DistinctTable logic, make it final
-  protected DataSchema _dataSchema;
+  protected final DataSchema _dataSchema;
   protected final int _numColumns;
   protected final AggregationFunction[] _aggregationFunctions;
   protected final int _numAggregations;
@@ -47,19 +47,19 @@ public abstract class BaseTable implements Table {
   /**
    * Initializes the variables and comparators needed for the table
    */
-  public BaseTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions, List<SelectionSort> orderBy,
-      int capacity) {
+  public BaseTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions,
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int capacity) {
     _dataSchema = dataSchema;
     _numColumns = dataSchema.size();
     _aggregationFunctions = aggregationFunctions;
     _numAggregations = aggregationFunctions.length;
-    addCapacityAndOrderByInfo(orderBy, capacity);
+    addCapacityAndOrderByInfo(orderByExpressions, capacity);
   }
 
-  protected void addCapacityAndOrderByInfo(List<SelectionSort> orderBy, int capacity) {
-    _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
-    if (_isOrderBy) {
-      _tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, orderBy);
+  protected void addCapacityAndOrderByInfo(@Nullable List<OrderByExpressionContext> orderByExpressions, int capacity) {
+    if (orderByExpressions != null) {
+      _isOrderBy = true;
+      _tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, orderByExpressions);
 
       // TODO: tune these numbers and come up with a better formula (github ISSUE-4801)
       // Based on the capacity and maxCapacity, the resizer will smartly choose to evict/retain recors from the PQ
@@ -70,8 +70,9 @@ public abstract class BaseTable implements Table {
         _maxCapacity = (int) (capacity * 1.2);
       }
     } else {
-      _maxCapacity = capacity;
+      _isOrderBy = false;
       _tableResizer = null;
+      _maxCapacity = capacity;
     }
     _capacity = capacity;
   }

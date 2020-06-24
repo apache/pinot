@@ -25,12 +25,12 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -58,6 +58,7 @@ import org.apache.pinot.common.utils.DataTable;
  *   </li>
  * </ul>
  */
+@SuppressWarnings("rawtypes")
 public class SelectionOperatorService {
   private final List<String> _selectionColumns;
   private final DataSchema _dataSchema;
@@ -68,17 +69,18 @@ public class SelectionOperatorService {
   /**
    * Constructor for <code>SelectionOperatorService</code> with {@link DataSchema}. (Inter segment)
    *
-   * @param selection selection query.
+   * @param queryContext Selection order-by query
    * @param dataSchema data schema.
    */
-  public SelectionOperatorService(Selection selection, DataSchema dataSchema) {
-    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
+  public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema) {
+    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(queryContext.getSelectExpressions(), dataSchema);
     _dataSchema = dataSchema;
-    // Select rows from offset to offset + size.
-    _offset = selection.getOffset();
-    _numRowsToKeep = _offset + selection.getSize();
+    // Select rows from offset to offset + limit.
+    _offset = queryContext.getOffset();
+    _numRowsToKeep = _offset + queryContext.getLimit();
+    assert queryContext.getOrderByExpressions() != null;
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getTypeCompatibleComparator(selection.getSelectionSortSequence()));
+        getTypeCompatibleComparator(queryContext.getOrderByExpressions()));
   }
 
   /**
@@ -87,9 +89,9 @@ public class SelectionOperatorService {
    *
    * @return flexible {@link Comparator} for selection rows.
    */
-  private Comparator<Object[]> getTypeCompatibleComparator(List<SelectionSort> sortSequence) {
+  private Comparator<Object[]> getTypeCompatibleComparator(List<OrderByExpressionContext> orderByExpressions) {
     // Compare all single-value columns
-    int numOrderByExpressions = sortSequence.size();
+    int numOrderByExpressions = orderByExpressions.size();
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
     for (int i = 0; i < numOrderByExpressions; i++) {
       if (!_dataSchema.getColumnDataType(i).isArray()) {
@@ -106,7 +108,7 @@ public class SelectionOperatorService {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
       isNumber[i] = _dataSchema.getColumnDataType(valueIndex).isNumber();
-      multipliers[i] = sortSequence.get(valueIndex).isIsAsc() ? -1 : 1;
+      multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
     return (o1, o2) -> {

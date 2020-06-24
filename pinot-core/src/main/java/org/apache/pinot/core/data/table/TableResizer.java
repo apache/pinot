@@ -29,21 +29,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.function.Function;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 
 
 /**
  * Helper class for trimming and sorting records in the IndexedTable, based on the order by information
  */
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class TableResizer {
   private final OrderByValueExtractor[] _orderByValueExtractors;
   private final Comparator<IntermediateRecord> _intermediateRecordComparator;
-  private final int _numOrderBy;
+  private final int _numOrderByExpressions;
 
-  TableResizer(DataSchema dataSchema, AggregationFunction[] aggregationFunctions, List<SelectionSort> orderBy) {
+  TableResizer(DataSchema dataSchema, AggregationFunction[] aggregationFunctions,
+      List<OrderByExpressionContext> orderByExpressions) {
 
     // NOTE: the assumption here is that the key columns will appear before the aggregation columns in the data schema
     // This is handled in the only in the AggregationGroupByOrderByOperator for now
@@ -62,13 +63,13 @@ public class TableResizer {
       }
     }
 
-    _numOrderBy = orderBy.size();
-    _orderByValueExtractors = new OrderByValueExtractor[_numOrderBy];
-    Comparator[] comparators = new Comparator[_numOrderBy];
+    _numOrderByExpressions = orderByExpressions.size();
+    _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
+    Comparator[] comparators = new Comparator[_numOrderByExpressions];
 
-    for (int orderByIdx = 0; orderByIdx < _numOrderBy; orderByIdx++) {
-      SelectionSort selectionSort = orderBy.get(orderByIdx);
-      String column = selectionSort.getColumn();
+    for (int orderByIdx = 0; orderByIdx < _numOrderByExpressions; orderByIdx++) {
+      OrderByExpressionContext orderByExpression = orderByExpressions.get(orderByIdx);
+      String column = orderByExpression.getExpression().toString();
 
       if (columnIndexMap.containsKey(column)) {
         int index = columnIndexMap.get(column);
@@ -82,15 +83,12 @@ public class TableResizer {
         throw new IllegalStateException("Could not find column " + column + " in data schema");
       }
 
-      comparators[orderByIdx] = Comparator.naturalOrder();
-      if (!selectionSort.isIsAsc()) {
-        comparators[orderByIdx] = comparators[orderByIdx].reversed();
-      }
+      comparators[orderByIdx] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
     }
 
     _intermediateRecordComparator = (o1, o2) -> {
 
-      for (int i = 0; i < _numOrderBy; i++) {
+      for (int i = 0; i < _numOrderByExpressions; i++) {
         int result = comparators[i].compare(o1._values[i], o2._values[i]);
         if (result != 0) {
           return result;
@@ -108,8 +106,8 @@ public class TableResizer {
    */
   @VisibleForTesting
   IntermediateRecord getIntermediateRecord(Key key, Record record) {
-    Comparable[] intermediateRecordValues = new Comparable[_numOrderBy];
-    for (int i = 0; i < _numOrderBy; i++) {
+    Comparable[] intermediateRecordValues = new Comparable[_numOrderByExpressions];
+    for (int i = 0; i < _numOrderByExpressions; i++) {
       intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
     }
     return new IntermediateRecord(key, intermediateRecordValues);
