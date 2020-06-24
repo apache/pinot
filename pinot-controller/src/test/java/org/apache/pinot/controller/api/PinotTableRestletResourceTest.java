@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.controller.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -37,6 +38,9 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 
 /**
@@ -258,6 +262,28 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
         RebalanceResult.class);
     Assert.assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+  }
+  
+  @Test
+  public void testTruncateTable() throws IOException {
+    // Case 1: Create a REALTIME and OFFLINE table and truncate it directly
+    String tableName = "truncateTable0";
+    TableConfig realtimeTableConfig = _realtimeBuilder.setTableName(tableName).build();
+    String creationResponse = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table truncateTable0_REALTIME succesfully added\"}");
+
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName).build();
+    String offlineCreationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    Assert.assertEquals(offlineCreationResponse, "{\"status\":\"Table truncateTable0_OFFLINE succesfully added\"}");
+
+    // truncate request parameters
+    Map<String, String> headers = new HashMap<String, String>();
+    headers.put("type", TableType.REALTIME.toString());
+    String truncateResponse =
+        sendPostRequest(String.join("/", this._controllerBaseApiUrl, "tables", tableName, "truncate"), "{}", headers);
+
+    Assert.assertEquals(truncateResponse, "{\"status\":\"Table " + tableName + " successfully truncated\"}");
+    
   }
 
   @Test

@@ -345,6 +345,14 @@ public class PinotTableRestletResource {
     return new SuccessResponse("Table config updated for " + tableName);
   }
   
+  /**
+   * Truncate table, delete all contents of table without removing table configuration and schema. 
+   * 
+   * @param tableName , name of the table to truncate
+   * @param tableTypeStr, type of the table i.e 'offline|realtime'
+   * @return response of truncate operation.
+   * @throws Exception
+   */
   @POST
   @Path("/tables/{tableName}/truncate")
   @Produces(MediaType.APPLICATION_JSON)
