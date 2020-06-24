@@ -731,7 +731,7 @@ public class CalciteSqlParser {
       if (functionCall.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
         return isLiteralOnlyExpression(functionCall.getOperands().get(0));
       }
-      return true;
+      return false;
     }
     return false;
   }
