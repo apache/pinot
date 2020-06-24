@@ -263,13 +263,17 @@ public class AlertSearcher {
 
     // join detections with subscription groups
     Multimap<Long, String> detectionIdToSubscriptionGroups = ArrayListMultimap.create();
+    Multimap<Long, String> detectionIdToApplications = ArrayListMultimap.create();
     for (DetectionAlertConfigDTO subscriptionGroup : subscriptionGroups) {
       for (long detectionConfigId : subscriptionGroup.getVectorClocks().keySet()) {
         detectionIdToSubscriptionGroups.put(detectionConfigId, subscriptionGroup.getName());
+        detectionIdToApplications.put(detectionConfigId, subscriptionGroup.getApplication());
       }
     }
     for (Map<String, Object> alert : alerts) {
-      alert.put("subscriptionGroup", detectionIdToSubscriptionGroups.get(MapUtils.getLong(alert, "id")));
+      long id = MapUtils.getLong(alert, "id");
+      alert.put("subscriptionGroup", detectionIdToSubscriptionGroups.get(id));
+      alert.put("application", new TreeSet<>(detectionIdToApplications.get(id)));
     }
 
     return ImmutableMap.of("count", count, "limit", searchQuery.limit, "offset", searchQuery.offset, "elements",
