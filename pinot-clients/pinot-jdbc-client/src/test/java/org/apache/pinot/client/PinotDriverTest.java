@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
 public class PinotDriverTest {
   static final String DB_URL = "jdbc:pinot://localhost:8000/";
 
-  @Test
+  @Test(enabled = false)
   public void testDriver() throws Exception {
     DriverManager.registerDriver(new PinotDriver());
     Connection conn = DriverManager.getConnection(DB_URL);
