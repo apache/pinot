@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
-  private static final boolean PRINT_QUERY_PLAN = false;
 
   private InstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
@@ -205,17 +205,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         metadata.put(DataTable.NUM_SEGMENTS_MATCHED, "0");
       } else {
         TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-        Plan globalQueryPlan = _planMaker
-            .makeInterSegmentPlan(segmentDataManagers, queryContext.getBrokerRequest(), executorService,
-                remainingTimeMs);
-        planBuildTimer.stopAndRecord();
-
-        if (PRINT_QUERY_PLAN) {
-          LOGGER.debug("***************************** Query Plan for Request {} ***********************************",
-              queryRequest.getRequestId());
-          globalQueryPlan.print();
-          LOGGER.debug("*********************************** End Query Plan ***********************************");
+        List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsMatchedAfterPruning);
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          indexSegments.add(segmentDataManager.getSegment());
         }
+        Plan globalQueryPlan =
+            _planMaker.makeInstancePlan(indexSegments, queryContext, executorService, remainingTimeMs);
+        planBuildTimer.stopAndRecord();
 
         TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
         dataTable = globalQueryPlan.execute();

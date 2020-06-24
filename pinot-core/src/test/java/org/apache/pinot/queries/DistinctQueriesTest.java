@@ -40,8 +40,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -51,6 +49,8 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -95,7 +95,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
   private IndexSegment _indexSegment;
-  private List<SegmentDataManager> _segmentDataManagers;
+  private List<IndexSegment> _indexSegments;
 
   @Override
   protected String getFilter() {
@@ -108,8 +108,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   }
 
   @Override
-  protected List<SegmentDataManager> getSegmentDataManagers() {
-    return _segmentDataManagers;
+  protected List<IndexSegment> getIndexSegments() {
+    return _indexSegments;
   }
 
   @BeforeClass
@@ -351,8 +351,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       throws Exception {
     ImmutableSegment segment0 = createSegment(0, generateRecords(0));
     ImmutableSegment segment1 = createSegment(1, generateRecords(1000));
-    _segmentDataManagers =
-        Arrays.asList(new ImmutableSegmentDataManager(segment0), new ImmutableSegmentDataManager(segment1));
+    _indexSegments = Arrays.asList(segment0, segment1);
     try {
       {
         // Test selecting all columns
@@ -605,10 +604,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             "SELECT DISTINCT longColumn FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5";
 
         BrokerRequest pqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(pqlQuery);
-        BrokerResponseNative pqlResponse = queryServersWithDifferentSegments(pqlBrokerRequest, segment0, segment1);
+        QueryContext pqlQueryContext = BrokerRequestToQueryContextConverter.convert(pqlBrokerRequest);
+        BrokerResponseNative pqlResponse = queryServersWithDifferentSegments(pqlQueryContext, segment0, segment1);
         BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(sqlQuery);
         sqlBrokerRequest.setQueryOptions(Collections.singletonMap("responseFormat", "sql"));
-        BrokerResponseNative sqlResponse = queryServersWithDifferentSegments(sqlBrokerRequest, segment0, segment1);
+        QueryContext sqlQueryContext = BrokerRequestToQueryContextConverter.convert(sqlBrokerRequest);
+        BrokerResponseNative sqlResponse = queryServersWithDifferentSegments(sqlQueryContext, segment0, segment1);
 
         // Check data schema
         SelectionResults selectionResults = pqlResponse.getSelectionResults();
@@ -636,8 +637,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         }
       }
     } finally {
-      for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
-        segmentDataManager.destroy();
+      for (IndexSegment indexSegment : _indexSegments) {
+        indexSegment.destroy();
       }
     }
   }
@@ -646,24 +647,21 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Helper method to query 2 servers with different segments. Server0 will have 2 copies of segment0; Server1 will have
    * 2 copies of segment1.
    */
-  private BrokerResponseNative queryServersWithDifferentSegments(BrokerRequest brokerRequest, ImmutableSegment segment0,
+  private BrokerResponseNative queryServersWithDifferentSegments(QueryContext queryContext, ImmutableSegment segment0,
       ImmutableSegment segment1) {
-    List<SegmentDataManager> segmentDataManagers0 =
-        Arrays.asList(new ImmutableSegmentDataManager(segment0), new ImmutableSegmentDataManager(segment0));
-    List<SegmentDataManager> segmentDataManagers1 =
-        Arrays.asList(new ImmutableSegmentDataManager(segment1), new ImmutableSegmentDataManager(segment1));
-
     // Server side
-    DataTable instanceResponse0 = PLAN_MAKER.makeInterSegmentPlan(segmentDataManagers0, brokerRequest, EXECUTOR_SERVICE,
-        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
-    DataTable instanceResponse1 = PLAN_MAKER.makeInterSegmentPlan(segmentDataManagers1, brokerRequest, EXECUTOR_SERVICE,
-        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
+    DataTable instanceResponse0 = PLAN_MAKER
+        .makeInstancePlan(Arrays.asList(segment0, segment0), queryContext, EXECUTOR_SERVICE,
+            CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
+    DataTable instanceResponse1 = PLAN_MAKER
+        .makeInstancePlan(Arrays.asList(segment1, segment1), queryContext, EXECUTOR_SERVICE,
+            CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS).execute();
 
     // Broker side
     BrokerReduceService brokerReduceService = new BrokerReduceService();
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE), instanceResponse0);
     dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME), instanceResponse1);
-    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
+    return brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), dataTableMap, null);
   }
 }

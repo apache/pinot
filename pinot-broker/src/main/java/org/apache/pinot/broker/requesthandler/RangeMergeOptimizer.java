@@ -21,11 +21,11 @@ package org.apache.pinot.broker.requesthandler;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.core.common.predicate.RangePredicate;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 
 
 /**
@@ -39,7 +39,7 @@ import org.apache.pinot.core.common.predicate.RangePredicate;
  * </ul>
  */
 public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
-  private static final String DUMMY_STRING = "__dummy_string__";
+  private static final ExpressionContext DUMMY_EXPRESSION = ExpressionContext.forIdentifier("dummy");
 
   @Override
   public FilterQueryTree optimize(FilterQueryOptimizerRequest request) {
@@ -53,8 +53,7 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
    * @param timeColumn Name of time column
    * @return Returns the optimized filter query tree
    */
-  @Nonnull
-  private static FilterQueryTree optimizeRanges(@Nonnull FilterQueryTree current, @Nullable String timeColumn) {
+  private static FilterQueryTree optimizeRanges(FilterQueryTree current, @Nullable String timeColumn) {
     if (timeColumn == null) {
       return current;
     }
@@ -77,23 +76,28 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
     // After this point, since the node has children, it can only be an 'AND' node (only OR/AND supported).
     assert operator == FilterOperator.AND;
     List<FilterQueryTree> newChildren = new ArrayList<>();
-    List<String> intersect = null;
-
+    String mergedRange = null;
     for (FilterQueryTree child : children) {
       FilterQueryTree newChild = optimizeRanges(child, timeColumn);
       if (newChild.getOperator() == FilterOperator.RANGE && newChild.getColumn().equals(timeColumn)) {
-        List<String> value = newChild.getValue();
-        intersect = (intersect == null) ? value : intersectRanges(intersect, value);
+        String range = newChild.getValue().get(0);
+        if (mergedRange == null) {
+          mergedRange = range;
+        } else {
+          mergedRange = intersectRanges(mergedRange, range);
+        }
       } else {
         newChildren.add(newChild);
       }
     }
 
+    FilterQueryTree rangeFilter =
+        new FilterQueryTree(timeColumn, Collections.singletonList(mergedRange), FilterOperator.RANGE, null);
     if (newChildren.isEmpty()) {
-      return new FilterQueryTree(timeColumn, intersect, FilterOperator.RANGE, null);
+      return rangeFilter;
     } else {
-      if (intersect != null) {
-        newChildren.add(new FilterQueryTree(timeColumn, intersect, FilterOperator.RANGE, null));
+      if (mergedRange != null) {
+        newChildren.add(rangeFilter);
       }
       return new FilterQueryTree(null, null, FilterOperator.AND, newChildren);
     }
@@ -107,63 +111,66 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
    * @param range2 Second range
    * @return Intersection of the given ranges.
    */
-  public static List<String> intersectRanges(List<String> range1, List<String> range2) {
-
+  public static String intersectRanges(String range1, String range2) {
     // Build temporary range predicates to parse the string range values.
-    RangePredicate predicate1 = new RangePredicate(DUMMY_STRING, range1);
-    RangePredicate predicate2 = new RangePredicate(DUMMY_STRING, range2);
+    RangePredicate predicate1 = new RangePredicate(DUMMY_EXPRESSION, range1);
+    RangePredicate predicate2 = new RangePredicate(DUMMY_EXPRESSION, range2);
+    StringBuilder stringBuilder = new StringBuilder();
 
-    String lowerString1 = predicate1.getLowerBoundary();
-    String upperString1 = predicate1.getUpperBoundary();
-
-    long lower1 = (lowerString1.equals(RangePredicate.UNBOUNDED)) ? Long.MIN_VALUE : Long.valueOf(lowerString1);
-    long upper1 = (upperString1.equals(RangePredicate.UNBOUNDED)) ? Long.MAX_VALUE : Long.valueOf(upperString1);
-
-    String lowerString2 = predicate2.getLowerBoundary();
-    String upperString2 = predicate2.getUpperBoundary();
-
-    long lower2 = (lowerString2.equals(RangePredicate.UNBOUNDED)) ? Long.MIN_VALUE : Long.valueOf(lowerString2);
-    long upper2 = (upperString2.equals(RangePredicate.UNBOUNDED)) ? Long.MAX_VALUE : Long.valueOf(upperString2);
-
-    final StringBuilder stringBuilder = new StringBuilder();
-    if (lower1 > lower2) {
-      stringBuilder.append(
-          (predicate1.includeLowerBoundary() ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE));
-      stringBuilder.append(lower1);
-    } else if (lower1 < lower2) {
-      stringBuilder.append(
-          (predicate2.includeLowerBoundary() ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE));
-      stringBuilder.append(lower2);
+    String lowerBound1 = predicate1.getLowerBound();
+    String lowerBound2 = predicate2.getLowerBound();
+    if (lowerBound1.equals(RangePredicate.UNBOUNDED)) {
+      stringBuilder
+          .append(predicate2.isLowerInclusive() ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE)
+          .append(lowerBound2);
+    } else if (lowerBound2.equals(RangePredicate.UNBOUNDED)) {
+      stringBuilder
+          .append(predicate1.isLowerInclusive() ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE)
+          .append(lowerBound1);
     } else {
-      if (lower1 == Long.MIN_VALUE) { // lower1 == lower2
-        stringBuilder.append(RangePredicate.LOWER_EXCLUSIVE + RangePredicate.UNBOUNDED); // * always has '('
+      long lowerValue1 = Long.parseLong(lowerBound1);
+      long lowerValue2 = Long.parseLong(lowerBound2);
+      if (lowerValue1 < lowerValue2) {
+        stringBuilder
+            .append(predicate2.isLowerInclusive() ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE)
+            .append(lowerBound2);
+      } else if (lowerValue1 > lowerValue2) {
+        stringBuilder
+            .append(predicate1.isLowerInclusive() ? RangePredicate.LOWER_INCLUSIVE : RangePredicate.LOWER_EXCLUSIVE)
+            .append(lowerBound1);
       } else {
         stringBuilder.append(
-            (predicate1.includeLowerBoundary() && predicate2.includeLowerBoundary()) ? RangePredicate.LOWER_INCLUSIVE
-                : RangePredicate.LOWER_EXCLUSIVE);
-        stringBuilder.append(lower1);
+            predicate1.isLowerInclusive() && predicate2.isLowerInclusive() ? RangePredicate.LOWER_INCLUSIVE
+                : RangePredicate.LOWER_EXCLUSIVE).append(lowerBound1);
       }
     }
 
     stringBuilder.append(RangePredicate.DELIMITER);
-    if (upper1 < upper2) {
-      stringBuilder.append(upper1);
-      stringBuilder.append(
-          (predicate1.includeUpperBoundary() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE));
-    } else if (upper1 > upper2) {
-      stringBuilder.append(upper2);
-      stringBuilder.append(
-          (predicate2.includeUpperBoundary() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE));
+
+    String upperBound1 = predicate1.getUpperBound();
+    String upperBound2 = predicate2.getUpperBound();
+    if (upperBound1.equals(RangePredicate.UNBOUNDED)) {
+      stringBuilder.append(upperBound2)
+          .append(predicate2.isUpperInclusive() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE);
+    } else if (upperBound2.equals(RangePredicate.UNBOUNDED)) {
+      stringBuilder.append(upperBound1)
+          .append(predicate1.isUpperInclusive() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE);
     } else {
-      if (upper1 == Long.MAX_VALUE) { // upper1 == upper2
-        stringBuilder.append(RangePredicate.UNBOUNDED + RangePredicate.UPPER_EXCLUSIVE); // * always has ')'
+      long upperValue1 = Long.parseLong(upperBound1);
+      long upperValue2 = Long.parseLong(upperBound2);
+      if (upperValue1 < upperValue2) {
+        stringBuilder.append(upperBound1)
+            .append(predicate1.isUpperInclusive() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE);
+      } else if (upperValue1 > upperValue2) {
+        stringBuilder.append(upperBound2)
+            .append(predicate2.isUpperInclusive() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE);
       } else {
-        stringBuilder.append(upper1);
-        stringBuilder.append(
-            (predicate1.includeUpperBoundary() && predicate2.includeUpperBoundary()) ? RangePredicate.UPPER_INCLUSIVE
+        stringBuilder.append(upperBound1).append(
+            predicate1.isUpperInclusive() && predicate2.isUpperInclusive() ? RangePredicate.UPPER_INCLUSIVE
                 : RangePredicate.UPPER_EXCLUSIVE);
       }
     }
-    return Collections.singletonList(stringBuilder.toString());
+
+    return stringBuilder.toString();
   }
 }

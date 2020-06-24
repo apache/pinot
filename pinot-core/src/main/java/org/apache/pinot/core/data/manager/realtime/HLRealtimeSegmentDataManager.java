@@ -44,7 +44,7 @@ import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.core.util.IngestionUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -108,7 +108,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       throws Exception {
     super();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     _serverMetrics = serverMetrics;
     _segmentName = realtimeSegmentZKMetadata.getSegmentName();
     _tableNameWithType = tableConfig.getTableName();
@@ -169,9 +169,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // create and init stream level consumer
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
-    _streamLevelConsumer = streamConsumerFactory
-        .createStreamLevelConsumer(clientId, _tableNameWithType, SchemaUtils.extractSourceFields(schema),
-            instanceMetadata.getGroupId(_tableNameWithType));
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), schema);
+    _streamLevelConsumer = streamConsumerFactory.createStreamLevelConsumer(clientId, _tableNameWithType, fieldsToRead,
+        instanceMetadata.getGroupId(_tableNameWithType));
     _streamLevelConsumer.start();
     _tableStreamName = _tableNameWithType + "_" + _streamConfig.getTopicName();
 
@@ -245,7 +245,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             if (consumedRow != null) {
               try {
                 GenericRow transformedRow = _recordTransformer.transform(consumedRow);
-                if (transformedRow != null) {
+                // FIXME: handle MULTIPLE_RECORDS_KEY for HLL
+                if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
                   // we currently do not get ingestion data through stream-consumer
                   notFull = _realtimeSegment.index(transformedRow, null);
                   exceptionSleepMillis = 50L;

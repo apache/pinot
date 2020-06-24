@@ -26,11 +26,14 @@ import java.util.List;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -41,6 +44,7 @@ public class MutableSegmentImplNullValueVectorTest {
   private static final String DATA_FILE = "data/test_null_value_vector_data.json";
   private static CompositeTransformer _recordTransformer;
   private static Schema _schema;
+  private static TableConfig _tableConfig;
   private static MutableSegmentImpl _mutableSegmentImpl;
   private static List<String> _finalNullColumns;
 
@@ -50,7 +54,8 @@ public class MutableSegmentImplNullValueVectorTest {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(PINOT_SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(_schema);
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),

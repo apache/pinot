@@ -19,20 +19,17 @@
 package org.apache.pinot.core.plan;
 
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 
 /**
  * Instance level query plan.
  */
+@InterfaceAudience.Private
 public interface Plan {
 
   /**
    * Execute the query plan and get the instance response.
    */
   DataTable execute();
-
-  /**
-   * Print the query plan (for debugging only).
-   */
-  void print();
 }

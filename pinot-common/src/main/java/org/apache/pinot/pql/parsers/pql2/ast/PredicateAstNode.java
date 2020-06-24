@@ -20,7 +20,6 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.HavingQueryTree;
 
 
 /**
@@ -28,7 +27,6 @@ import org.apache.pinot.common.utils.request.HavingQueryTree;
  */
 public abstract class PredicateAstNode extends BaseAstNode {
   protected String _identifier;
-  protected FunctionCallAstNode _function;
 
   /**
    * Create the query tree for the where clause
@@ -43,33 +41,6 @@ public abstract class PredicateAstNode extends BaseAstNode {
    * @return
    */
   public abstract Expression buildFilterExpression();
-
-  /**
-   * Create the query tree for the having clause
-   * It is different than FilterQuery because here we deal with function call comparison with literals
-   * @return
-   */
-  public abstract HavingQueryTree buildHavingQueryTree();
-
-  /**
-   * Returns true if this predicate pertains to a function call (such as HAVING SUM(foo) = 5)
-   *
-   * @return true if this predicate pertains to a function call (such as HAVING SUM(foo) = 5)
-   */
-  public boolean isItFunctionCallComparison() {
-    return _function != null;
-  }
-
-  /**
-   * Returns the function call AST node for the function call on the left hand side of this predicate, or null if the
-   * predicate is not based on a function call.
-   *
-   * @return The function call AST node for this predicate or null if there is no function call on the left hand side
-   * of this predicate
-   */
-  public FunctionCallAstNode getFunction() {
-    return _function;
-  }
 
   /**
    * Returns the name of the identifier on the left hand side of this predicate, or null if the predicate is not based

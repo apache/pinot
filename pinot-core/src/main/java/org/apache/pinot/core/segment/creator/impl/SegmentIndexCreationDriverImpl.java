@@ -25,14 +25,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -55,7 +53,8 @@ import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.CrcUtils;
-import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -100,9 +99,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     Preconditions.checkState(dataFile.exists(), "Input file: " + dataFile.getAbsolutePath() + " does not exist");
 
     Schema schema = segmentGeneratorConfig.getSchema();
+    TableConfig tableConfig = segmentGeneratorConfig.getTableConfig();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
-    Set<String> sourceFields = SchemaUtils.extractSourceFields(segmentGeneratorConfig.getSchema());
+    Set<String> sourceFields = IngestionUtils
+        .getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), segmentGeneratorConfig.getSchema());
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -128,7 +129,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader) {
     init(config, new RecordReaderSegmentCreationDataSource(recordReader),
-        CompositeTransformer.getDefaultTransformer(config.getSchema()));
+        CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
@@ -141,7 +142,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     _recordTransformer = recordTransformer;
 
     // Initialize stats collection
-    segmentStats = dataSource.gatherStats(new StatsCollectorConfig(dataSchema, config.getSegmentPartitionConfig()));
+    segmentStats = dataSource
+        .gatherStats(new StatsCollectorConfig(config.getTableConfig(), dataSchema, config.getSegmentPartitionConfig()));
     totalDocs = segmentStats.getTotalDocCount();
 
     // Initialize index creation
@@ -193,7 +195,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
             GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
             recordReadStopTime = System.currentTimeMillis();
             totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-            if (transformedRow != null) {
+            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
               indexCreator.indexRow(transformedRow);
               indexStopTime = System.currentTimeMillis();
               totalIndexTime += (indexStopTime - recordReadStopTime);
@@ -203,7 +205,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           GenericRow transformedRow = _recordTransformer.transform(decodedRow);
           recordReadStopTime = System.currentTimeMillis();
           totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
-          if (transformedRow != null) {
+          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             indexCreator.indexRow(transformedRow);
             indexStopTime = System.currentTimeMillis();
             totalIndexTime += (indexStopTime - recordReadStopTime);

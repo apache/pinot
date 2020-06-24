@@ -20,12 +20,10 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.TreeSet;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
@@ -58,36 +56,17 @@ public class InPredicateAstNode extends PredicateAstNode {
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
-      if (_identifier == null && _function == null) {
-        IdentifierAstNode node = (IdentifierAstNode) childNode;
-        _identifier = node.getName();
-      } else if (_identifier != null) {
-        throw new Pql2CompilationException("IN predicate has more than one identifier.");
-      } else {
-        throw new Pql2CompilationException("IN predicate has both identifier and function.");
+      if (_identifier != null) {
+        throw new Pql2CompilationException("IN predicate has more than one column/function");
       }
+      _identifier = ((IdentifierAstNode) childNode).getName();
     } else if (childNode instanceof FunctionCallAstNode) {
-      if (_function == null && _identifier == null) {
-        _function = (FunctionCallAstNode) childNode;
-        _identifier = TransformExpressionTree.getStandardExpression(childNode);
-      } else if (_function != null) {
-        throw new Pql2CompilationException("IN predicate has more than one function.");
-      } else {
-        throw new Pql2CompilationException("IN predicate has both identifier and function.");
+      if (_identifier != null) {
+        throw new Pql2CompilationException("IN predicate has more than one column/function");
       }
+      _identifier = TransformExpressionTree.getStandardExpression(childNode);
     } else {
       super.addChild(childNode);
-    }
-  }
-
-  @Override
-  public String toString() {
-    if (_identifier != null) {
-      return "InPredicateAstNode{" + "_identifier='" + _identifier + '\'' + '}';
-    } else if (_function != null) {
-      return "InPredicateAstNode{" + "_function='" + _function.toString() + '\'' + '}';
-    } else {
-      return "InPredicateAstNode{_identifier/_function= null";
     }
   }
 
@@ -130,23 +109,5 @@ public class InPredicateAstNode extends PredicateAstNode {
     Expression functionExpression = RequestUtils.getFunctionExpression(filterKind.name());
     functionExpression.getFunctionCall().setOperands(operands);
     return functionExpression;
-  }
-
-  @Override
-  public HavingQueryTree buildHavingQueryTree() {
-    if (_function == null) {
-      throw new Pql2CompilationException("IN predicate has no function");
-    }
-
-    TreeSet<String> values = new TreeSet<>();
-    for (AstNode astNode : getChildren()) {
-      if (astNode instanceof LiteralAstNode) {
-        LiteralAstNode node = (LiteralAstNode) astNode;
-        values.add(node.getValueAsString());
-      }
-    }
-
-    FilterOperator filterOperator = _isNotInClause ? FilterOperator.NOT_IN : FilterOperator.IN;
-    return new HavingQueryTree(_function.buildAggregationInfo(), new ArrayList<>(values), filterOperator, null);
   }
 }

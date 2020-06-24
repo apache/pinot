@@ -28,6 +28,7 @@ function renderEntitySelector() {
     getData("/thirdeye/entity/" + entityType, "admin").done(function (data) {
       entityData = data;
       var select = "<option value='select'>Select</option>";
+      select += "<option> Create New </option>";
       for (var i in data) {
         select += "<option value='" + data[i].id + "'>" + buildNameForEntity(data[i], entityType)
             + "</option>";

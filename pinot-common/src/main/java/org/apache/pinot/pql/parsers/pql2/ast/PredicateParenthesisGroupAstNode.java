@@ -20,13 +20,13 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.HavingQueryTree;
 
 
 /**
  * AST node for a predicate surrounded by parentheses.
  */
 public class PredicateParenthesisGroupAstNode extends PredicateAstNode {
+
   @Override
   public FilterQueryTree buildFilterQueryTree() {
     return ((PredicateAstNode) getChildren().get(0)).buildFilterQueryTree();
@@ -35,10 +35,5 @@ public class PredicateParenthesisGroupAstNode extends PredicateAstNode {
   @Override
   public Expression buildFilterExpression() {
     return ((PredicateAstNode) getChildren().get(0)).buildFilterExpression();
-  }
-
-  @Override
-  public HavingQueryTree buildHavingQueryTree() {
-    return ((PredicateAstNode) getChildren().get(0)).buildHavingQueryTree();
   }
 }

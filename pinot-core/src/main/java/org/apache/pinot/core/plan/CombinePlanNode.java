@@ -25,24 +25,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.CombineGroupByOperator;
 import org.apache.pinot.core.operator.CombineGroupByOrderByOperator;
 import org.apache.pinot.core.operator.CombineOperator;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.core.util.trace.TraceCallable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments.
  */
 public class CombinePlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
-
   // Use at most 10 or half of the processors threads for each query.
   // If there are less than 2 processors, use 1 thread.
   // Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
@@ -54,7 +52,7 @@ public class CombinePlanNode implements PlanNode {
   private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 10_000;
 
   private final List<PlanNode> _planNodes;
-  private final BrokerRequest _brokerRequest;
+  private final QueryContext _queryContext;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
   private final int _numGroupsLimit;
@@ -63,22 +61,23 @@ public class CombinePlanNode implements PlanNode {
    * Constructor for the class.
    *
    * @param planNodes List of underlying plan nodes
-   * @param brokerRequest Broker request
+   * @param queryContext Query context
    * @param executorService Executor service
    * @param timeOutMs Time out in milliseconds for query execution (not for planning phase)
    * @param numGroupsLimit Limit of number of groups stored in each segment
    */
-  public CombinePlanNode(List<PlanNode> planNodes, BrokerRequest brokerRequest, ExecutorService executorService,
+  public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
       long timeOutMs, int numGroupsLimit) {
     _planNodes = planNodes;
-    _brokerRequest = brokerRequest;
+    _queryContext = queryContext;
     _executorService = executorService;
     _timeOutMs = timeOutMs;
     _numGroupsLimit = numGroupsLimit;
   }
 
+  @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
-  public Operator run() {
+  public Operator<IntermediateResultsBlock> run() {
     int numPlanNodes = _planNodes.size();
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
@@ -160,29 +159,19 @@ public class CombinePlanNode implements PlanNode {
     }
 
     // TODO: use the same combine operator for both aggregation and selection query.
-    if (_brokerRequest.isSetAggregationsInfo() && _brokerRequest.getGroupBy() != null) {
+    if (QueryContextUtils.isAggregationQuery(_queryContext) && _queryContext.getGroupByExpressions() != null) {
       // Aggregation group-by query
-      QueryOptions queryOptions = new QueryOptions(_brokerRequest.getQueryOptions());
+      QueryOptions queryOptions = new QueryOptions(_queryContext.getQueryOptions());
       // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
       if (queryOptions.isGroupByModeSQL()) {
-        return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs);
+        return new CombineGroupByOrderByOperator(operators, _queryContext.getBrokerRequest(), _executorService,
+            _timeOutMs);
       }
-      return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
+      return new CombineGroupByOperator(operators, _queryContext.getBrokerRequest(), _executorService, _timeOutMs,
+          _numGroupsLimit);
     } else {
       // Selection or aggregation only query
-      return new CombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);
-    }
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Instance Level Inter-Segments Combine Plan Node:");
-    LOGGER.debug(prefix + "Operator: CombineOperator/CombineGroupByOperator");
-    LOGGER.debug(prefix + "Argument 0: BrokerRequest - " + _brokerRequest);
-    int i = 1;
-    for (PlanNode planNode : _planNodes) {
-      LOGGER.debug(prefix + "Argument " + (i++) + ":");
-      planNode.showTree(prefix + "    ");
+      return new CombineOperator(operators, _executorService, _timeOutMs, _queryContext.getBrokerRequest());
     }
   }
 }

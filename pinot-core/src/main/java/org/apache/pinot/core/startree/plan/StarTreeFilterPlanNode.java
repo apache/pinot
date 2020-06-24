@@ -21,40 +21,28 @@ package org.apache.pinot.core.startree.plan;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.startree.operator.StarTreeFilterOperator;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class StarTreeFilterPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeFilterPlanNode.class);
-
   private final StarTreeV2 _starTreeV2;
-  private final FilterQueryTree _rootFilterNode;
+  private final FilterContext _filter;
   private final Set<String> _groupByColumns;
   private final Map<String, String> _debugOptions;
 
-  public StarTreeFilterPlanNode(StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+  public StarTreeFilterPlanNode(StarTreeV2 starTreeV2, @Nullable FilterContext filter,
       @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
-    _rootFilterNode = rootFilterNode;
+    _filter = filter;
     _groupByColumns = groupByColumns;
     _debugOptions = debugOptions;
   }
 
   @Override
   public StarTreeFilterOperator run() {
-    return new StarTreeFilterOperator(_starTreeV2, _rootFilterNode, _groupByColumns, _debugOptions);
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "StarTree Filter Plan Node:");
-    LOGGER.debug(prefix + "Operator: StarTreeFilterOperator");
-    LOGGER.debug(prefix + "Argument 0: Filters - " + _rootFilterNode);
-    LOGGER.debug(prefix + "Argument 1: Group-by Columns - " + _groupByColumns);
+    return new StarTreeFilterOperator(_starTreeV2, _filter, _groupByColumns, _debugOptions);
   }
 }

@@ -19,13 +19,9 @@
 package org.apache.pinot.core.plan;
 
 import org.apache.pinot.core.operator.InstanceResponseOperator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class InstanceResponsePlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponsePlanNode.class);
-
   private final CombinePlanNode _combinePlanNode;
 
   public InstanceResponsePlanNode(CombinePlanNode combinePlanNode) {
@@ -34,18 +30,6 @@ public class InstanceResponsePlanNode implements PlanNode {
 
   @Override
   public InstanceResponseOperator run() {
-    long start = System.currentTimeMillis();
-    InstanceResponseOperator instanceResponseOperator = new InstanceResponseOperator(_combinePlanNode.run());
-    long end = System.currentTimeMillis();
-    LOGGER.debug("InstanceResponsePlanNode.run took: {}ms", end - start);
-    return instanceResponseOperator;
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Instance Level Inter-Segments Query Plan Node:");
-    LOGGER.debug(prefix + "Operator: InstanceResponseOperator");
-    LOGGER.debug(prefix + "Argument 0: Combine -");
-    _combinePlanNode.showTree(prefix + "    ");
+    return new InstanceResponseOperator(_combinePlanNode.run());
   }
 }

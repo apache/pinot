@@ -50,6 +50,7 @@ public class MonitorJobScheduler {
     monitorJobContext = new MonitorJobContext();
     monitorJobContext.setTaskDAO(anomalyTaskDAO);
     monitorJobContext.setMonitorConfiguration(monitorConfiguration);
+    monitorJobContext.setJobDAO(DAO_REGISTRY.getJobDAO());
 
     monitorJobRunner = new MonitorJobRunner(monitorJobContext);
     scheduledExecutorService

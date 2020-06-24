@@ -21,35 +21,23 @@ package org.apache.pinot.core.startree.plan;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class StarTreeDocIdSetPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeDocIdSetPlanNode.class);
-
   private final StarTreeFilterPlanNode _starTreeFilterPlanNode;
 
-  public StarTreeDocIdSetPlanNode(StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+  public StarTreeDocIdSetPlanNode(StarTreeV2 starTreeV2, @Nullable FilterContext filter,
       @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
-    _starTreeFilterPlanNode = new StarTreeFilterPlanNode(starTreeV2, rootFilterNode, groupByColumns, debugOptions);
+    _starTreeFilterPlanNode = new StarTreeFilterPlanNode(starTreeV2, filter, groupByColumns, debugOptions);
   }
 
   @Override
   public DocIdSetOperator run() {
     return new DocIdSetOperator(_starTreeFilterPlanNode.run(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "StarTree Document Id Set Plan Node:");
-    LOGGER.debug(prefix + "Operator: DocIdSetOperator");
-    LOGGER.debug(prefix + "Argument 0: StarTreeFilterPlanNode -");
-    _starTreeFilterPlanNode.showTree(prefix + "    ");
   }
 }

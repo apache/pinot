@@ -25,12 +25,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 
@@ -45,6 +48,7 @@ public class FakeStreamConfigUtils {
   // This avro schema file must be in sync with the avro data
   private static final String AVRO_SCHEMA_FILE = "fake_stream_avro_schema.avsc";
   private static final String PINOT_SCHEMA_FILE = "fake_stream_pinot_schema.json";
+  private static final String TIME_COLUMN_NAME = "DaysSinceEpoch";
 
   private static final LongMsgOffset SMALLEST_OFFSET = new LongMsgOffset(0);
   private static final LongMsgOffset LARGEST_OFFSET = new LongMsgOffset(Integer.MAX_VALUE);
@@ -109,6 +113,14 @@ public class FakeStreamConfigUtils {
   static Schema getPinotSchema() throws IOException {
     File schemaFile = getResourceFile(PINOT_SCHEMA_FILE);
     return Schema.fromFile(schemaFile);
+  }
+
+  /**
+   * Gets pinot table
+   */
+  static TableConfig getTableConfig() {
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME_WITH_TYPE)
+        .setTimeColumnName(TIME_COLUMN_NAME).build();
   }
 
   private static File getResourceFile(String fileName) {

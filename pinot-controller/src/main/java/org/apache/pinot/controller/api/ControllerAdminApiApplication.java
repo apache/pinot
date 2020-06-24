@@ -18,43 +18,48 @@
  */
 package org.apache.pinot.controller.api;
 
-import com.google.common.base.Preconditions;
-import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+
+import org.apache.pinot.controller.api.listeners.ListenerConfig;
+import org.apache.pinot.controller.api.listeners.TlsConfiguration;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.http.server.NetworkListener;
+import org.glassfish.grizzly.ssl.SSLContextConfigurator;
+import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.glassfish.jersey.internal.guava.ThreadFactoryBuilder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
+import org.glassfish.jersey.process.JerseyProcessingUncaughtExceptionHandler;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
+
+import io.swagger.jaxrs.config.BeanConfig;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerAdminApiApplication.class);
 
-  private HttpServer httpServer;
-  private URI baseUri;
-  private boolean started = false;
+  private HttpServer _httpServer;
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.controller.api.resources";
-  private static String CONSOLE_WEB_PATH;
-  private final boolean _useHttps;
-
-  public ControllerAdminApiApplication(String consoleWebPath, boolean useHttps) {
+  
+  public ControllerAdminApiApplication() {
     super();
-    CONSOLE_WEB_PATH = consoleWebPath;
-    _useHttps = useHttps;
-    if (!CONSOLE_WEB_PATH.endsWith("/")) {
-      CONSOLE_WEB_PATH += "/";
-    }
+    
     packages(RESOURCE_PACKAGE);
     // TODO See ControllerResponseFilter
 //    register(new LoggingFeature());
@@ -62,29 +67,61 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(MultiPartFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
-    register(new ContainerResponseFilter() {
-      @Override
-      public void filter(ContainerRequestContext containerRequestContext,
-          ContainerResponseContext containerResponseContext)
-          throws IOException {
-        containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
-      }
-    });
+    register(new CorsFilter());
     // property("jersey.config.server.tracing.type", "ALL");
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
+  }
+
+  private SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfiguration tlsConfiguration) {
+    SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
+
+    sslContextConfigurator.setKeyStoreFile(tlsConfiguration.getKeyStorePath());
+    sslContextConfigurator.setKeyStorePass(tlsConfiguration.getKeyStorePassword());
+    sslContextConfigurator.setTrustStoreFile(tlsConfiguration.getTrustStorePath());
+    sslContextConfigurator.setTrustStorePass(tlsConfiguration.getTrustStorePassword());
+
+    return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
+        .setWantClientAuth(tlsConfiguration.isRequiresClientAuth()).setEnabledProtocols(new String[] { "TLSv1.2 " });
   }
 
   public void registerBinder(AbstractBinder binder) {
     register(binder);
   }
+  
+  private void configureListener(ListenerConfig listenerConfig, HttpServer httpServer) {
+    final NetworkListener listener = new NetworkListener(listenerConfig.getName() + "-" + listenerConfig.getPort(),
+        listenerConfig.getHost(), listenerConfig.getPort());
 
-  public boolean start(int httpPort) {
+    listener.getTransport().getWorkerThreadPoolConfig()
+        .setThreadFactory(new ThreadFactoryBuilder().setNameFormat("grizzly-http-server-%d")
+            .setUncaughtExceptionHandler(new JerseyProcessingUncaughtExceptionHandler()).build());
+
+    listener.setSecure(listenerConfig.getTlsConfiguration() != null);
+    if (listener.isSecure()) {
+      listener.setSSLEngineConfig(buildSSLEngineConfigurator(listenerConfig.getTlsConfiguration()));
+    }
+    httpServer.addListener(listener);
+  }
+
+  public void start(List<ListenerConfig> listenerConfigs, boolean advertiseHttps) {
     // ideally greater than reserved port but then port 80 is also valid
-    Preconditions.checkArgument(httpPort > 0);
-    baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
-    httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, this);
+    Preconditions.checkNotNull(listenerConfigs);
+    
+    // The URI is irrelevant since the default listener will be manually rewritten.
+    _httpServer = GrizzlyHttpServerFactory.createHttpServer(URI.create("http://0.0.0.0/"), this, false);
+    
+    // Listeners cannot be configured with the factory. Manual overrides is required as instructed by Javadoc.
+    _httpServer.removeListener("grizzly");
 
-    setupSwagger(httpServer);
+    listenerConfigs.forEach(listenerConfig->configureListener(listenerConfig, _httpServer));
+    
+    try {
+      _httpServer.start();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to start Http Server", e);
+    }
+    
+    setupSwagger(_httpServer, advertiseHttps);
 
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
 
@@ -94,34 +131,29 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // So, we setup specific handlers for static resource directory. index.html is served directly
     // by a jersey handler
 
-    httpServer.getServerConfiguration()
+    _httpServer.getServerConfiguration()
         .addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/query/"), "/query/");
-    httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/css/"), "/css/");
-    httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/js/"), "/js/");
+    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/css/"), "/css/");
+    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/js/"), "/js/");
     // without this explicit request to /index.html will not work
-    httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/"), "/index.html");
+    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/"), "/index.html");
 
-    started = true;
-    LOGGER.info("Start jersey admin API on port: {}", httpPort);
-    return true;
+    LOGGER.info("Admin API started on ports: {}", listenerConfigs.stream().map(ListenerConfig::getPort)
+        .map(port -> port.toString()).collect(Collectors.joining(",")));
   }
 
-  public URI getBaseUri() {
-    return baseUri;
-  }
-
-  private void setupSwagger(HttpServer httpServer) {
+  private void setupSwagger(HttpServer httpServer, boolean advertiseHttps) {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Controller API");
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
-    if (_useHttps) {
+    if (advertiseHttps) {
       beanConfig.setSchemes(new String[]{"https"});
     } else {
       beanConfig.setSchemes(new String[]{"http"});
     }
-    beanConfig.setBasePath(baseUri.getPath());
+    beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 
@@ -137,9 +169,18 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   }
 
   public void stop() {
-    if (!started) {
+    if (!_httpServer.isStarted()) {
       return;
     }
-    httpServer.shutdownNow();
+    _httpServer.shutdownNow();
+  }
+  
+  private class CorsFilter implements ContainerResponseFilter {
+    @Override
+    public void filter(ContainerRequestContext containerRequestContext,
+        ContainerResponseContext containerResponseContext)
+        throws IOException {
+      containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
+    }
   }
 }

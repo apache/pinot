@@ -24,12 +24,15 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -55,11 +58,12 @@ public class RecordReaderSampleDataTest {
       .addSingleValueDimension("unknown_dimension", FieldSpec.DataType.STRING)
       .addMetric("met_impressionCount", FieldSpec.DataType.LONG).addMetric("unknown_metric", FieldSpec.DataType.DOUBLE)
       .build();
+  private final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
   @Test
   public void testRecordReaders()
       throws Exception {
-    CompositeTransformer defaultTransformer = CompositeTransformer.getDefaultTransformer(SCHEMA);
+    CompositeTransformer defaultTransformer = CompositeTransformer.getDefaultTransformer(TABLE_CONFIG, SCHEMA);
     try (RecordReader avroRecordReader = RecordReaderFactory
         .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null);
         RecordReader csvRecordReader = RecordReaderFactory

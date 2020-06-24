@@ -20,44 +20,37 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>AggregationPlanNode</code> class provides the execution plan for aggregation only query on a single
  * segment.
  */
+@SuppressWarnings("rawtypes")
 public class AggregationPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AggregationPlanNode.class);
-
   private final IndexSegment _indexSegment;
-  private final List<AggregationInfo> _aggregationInfos;
   private final AggregationFunction[] _aggregationFunctions;
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
 
-  public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+  public AggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext.getBrokerRequest());
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {
-      if (!StarTreeUtils.isStarTreeDisabled(brokerRequest)) {
+      if (!StarTreeUtils.isStarTreeDisabled(queryContext)) {
         int numAggregationFunctions = _aggregationFunctions.length;
         AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
             new AggregationFunctionColumnPair[numAggregationFunctions];
@@ -73,14 +66,14 @@ public class AggregationPlanNode implements PlanNode {
           }
         }
         if (!hasUnsupportedAggregationFunction) {
-          FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(brokerRequest);
+          FilterContext filter = queryContext.getFilter();
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils
-                .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null, rootFilterNode)) {
+                .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null, filter)) {
               _transformPlanNode = null;
               _starTreeTransformPlanNode =
-                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null, rootFilterNode,
-                      brokerRequest.getDebugOptions());
+                  new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null, filter,
+                      queryContext.getDebugOptions());
               return;
             }
           }
@@ -90,7 +83,7 @@ public class AggregationPlanNode implements PlanNode {
 
     Set<TransformExpressionTree> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, null);
-    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest, expressionsToTransform);
+    _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform);
     _starTreeTransformPlanNode = null;
   }
 
@@ -103,21 +96,6 @@ public class AggregationPlanNode implements PlanNode {
     } else {
       // Use star-tree
       return new AggregationOperator(_aggregationFunctions, _starTreeTransformPlanNode.run(), numTotalDocs, true);
-    }
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Aggregation Plan Node:");
-    LOGGER.debug(prefix + "Operator: AggregationOperator");
-    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    LOGGER.debug(prefix + "Argument 1: Aggregations - " + _aggregationInfos);
-    if (_transformPlanNode != null) {
-      LOGGER.debug(prefix + "Argument 2: TransformPlanNode -");
-      _transformPlanNode.showTree(prefix + "    ");
-    } else {
-      LOGGER.debug(prefix + "Argument 2: StarTreeTransformPlanNode -");
-      _starTreeTransformPlanNode.showTree(prefix + "    ");
     }
   }
 }

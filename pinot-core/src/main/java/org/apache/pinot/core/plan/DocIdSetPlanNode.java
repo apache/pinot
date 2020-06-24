@@ -19,45 +19,25 @@
 package org.apache.pinot.core.plan;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.DocIdSetOperator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class DocIdSetPlanNode implements PlanNode {
   public static int MAX_DOC_PER_CALL = 10000;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(DocIdSetPlanNode.class);
-
-  private final IndexSegment _indexSegment;
   private final FilterPlanNode _filterPlanNode;
   private final int _maxDocPerCall;
 
-  public DocIdSetPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest, int maxDocPerCall) {
+  public DocIdSetPlanNode(IndexSegment indexSegment, QueryContext queryContext, int maxDocPerCall) {
     Preconditions.checkState(maxDocPerCall > 0 && maxDocPerCall <= MAX_DOC_PER_CALL);
-    _indexSegment = indexSegment;
-    _filterPlanNode = new FilterPlanNode(_indexSegment, brokerRequest);
+    _filterPlanNode = new FilterPlanNode(indexSegment, queryContext);
     _maxDocPerCall = maxDocPerCall;
-  }
-
-  public DocIdSetPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
-    this(indexSegment, brokerRequest, MAX_DOC_PER_CALL);
   }
 
   @Override
   public DocIdSetOperator run() {
     return new DocIdSetOperator(_filterPlanNode.run(), _maxDocPerCall);
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "DocIdSetPlanNode Plan Node :");
-    LOGGER.debug(prefix + "Operator: DocIdSetOperator");
-    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    LOGGER.debug(prefix + "Argument 1: FilterPlanNode:");
-    _filterPlanNode.showTree(prefix + "    ");
   }
 }

@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import joptsimple.internal.Strings;
 import org.apache.commons.io.FileUtils;
@@ -37,8 +36,6 @@ import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -68,21 +65,20 @@ import org.testng.annotations.Test;
  * </ul>
  */
 public class DistinctCountThetaSketchTest extends BaseQueriesTest {
-  protected static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DistinctCountThetaSketchTest");
-  protected static final String TABLE_NAME = "testTable";
-  protected static final String SEGMENT_NAME = "testSegment";
-
-  protected static final int NUM_ROWS = 1001;
-  protected static final long RANDOM_SEED = System.nanoTime();
-
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DistinctCountThetaSketchTest");
+  private static final String TABLE_NAME = "testTable";
+  private static final String SEGMENT_NAME = "testSegment";
   private static final String THETA_SKETCH_COLUMN = "colTS";
   private static final String DISTINCT_COLUMN = "distinctColumn";
 
-  private static Random RANDOM = new Random(RANDOM_SEED);
-  protected static final int MAX_CARDINALITY = 5; // 3 columns will lead to at most 125 groups
+  private static final int NUM_ROWS = 1001;
+  private static final int MAX_CARDINALITY = 5; // 3 columns will lead to at most 125 groups
 
-  private ImmutableSegment _indexSegment;
-  private List<SegmentDataManager> _segmentDataManagers;
+  private static final long RANDOM_SEED = System.nanoTime();
+  private static final Random RANDOM = new Random(RANDOM_SEED);
+
+  private IndexSegment _indexSegment;
+  private List<IndexSegment> _indexSegments;
 
   @BeforeClass
   public void setup()
@@ -90,9 +86,9 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     File segmentFile = buildSegment(buildSchema());
-    _indexSegment = ImmutableSegmentLoader.load(segmentFile, ReadMode.mmap);
-    _segmentDataManagers =
-        Arrays.asList(new ImmutableSegmentDataManager(_indexSegment), new ImmutableSegmentDataManager(_indexSegment));
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(segmentFile, ReadMode.mmap);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
   @AfterClass
@@ -179,12 +175,11 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
   }
 
   private void testQuery(String tsQuery, String distinctQuery, boolean groupBy, boolean sql, boolean raw) {
-    Map<String, String> queryOptions = Collections.emptyMap();
     BrokerResponseNative actualResponse =
-        (sql) ? getBrokerResponseForSqlQuery(tsQuery) : getBrokerResponseForPqlQuery(tsQuery, queryOptions);
+        (sql) ? getBrokerResponseForSqlQuery(tsQuery) : getBrokerResponseForPqlQuery(tsQuery);
 
     BrokerResponseNative expectedResponse =
-        (sql) ? getBrokerResponseForSqlQuery(distinctQuery) : getBrokerResponseForPqlQuery(distinctQuery, queryOptions);
+        (sql) ? getBrokerResponseForSqlQuery(distinctQuery) : getBrokerResponseForPqlQuery(distinctQuery);
 
     if (groupBy) {
       compareGroupBy(actualResponse, expectedResponse, sql, raw);
@@ -328,8 +323,8 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
   }
 
   @Override
-  protected List<SegmentDataManager> getSegmentDataManagers() {
-    return _segmentDataManagers;
+  protected List<IndexSegment> getIndexSegments() {
+    return _indexSegments;
   }
 
   protected File buildSegment(Schema schema)

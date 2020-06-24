@@ -250,6 +250,21 @@ public class DataResource {
   }
 
   /**
+   * Gets datasets where name like.
+   *
+   * @param name the name
+   * @return the dataset where name like
+   */
+  @GET
+  @Path("autocomplete/dataset")
+  public List<DatasetConfigDTO> getDatasetsWhereNameLike(@QueryParam("name") String name) {
+    List<DatasetConfigDTO> result = this.datasetConfigDAO.findByPredicate(Predicate.LIKE("dataset", "%" + name.trim() + "%"));
+    result.sort(Comparator.comparing(DatasetConfigDTO::getDataset));
+    return result;
+  }
+
+
+  /**
    * Gets detection config creators where name like.
    *
    * @param name the name

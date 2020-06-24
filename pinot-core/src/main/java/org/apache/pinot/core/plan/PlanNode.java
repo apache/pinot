@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.plan;
 
+import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 
 /**
  * The <code>PlanNode</code> is a single execution plan node inside the {@link Plan} tree.
  */
+@InterfaceAudience.Private
 public interface PlanNode {
 
   /**
@@ -31,12 +34,5 @@ public interface PlanNode {
    *
    * @return execution operator.
    */
-  Operator run();
-
-  /**
-   * Log the tree structure under the plan node.
-   *
-   * @param prefix prefix for each line logged.
-   */
-  void showTree(String prefix);
+  Operator<? extends Block> run();
 }

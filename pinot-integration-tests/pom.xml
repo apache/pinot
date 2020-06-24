@@ -72,7 +72,7 @@
   </build>
   <profiles>
     <profile>
-      <id>travis-integration-tests-only</id>
+      <id>integration-tests-only</id>
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
@@ -95,7 +95,7 @@
       </build>
     </profile>
     <profile>
-      <id>travis-no-integration-tests</id>
+      <id>no-integration-tests</id>
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>

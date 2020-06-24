@@ -22,9 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.ExpressionFilterDocIdSet;
@@ -32,6 +30,8 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
 
 
 public class ExpressionFilterOperator extends BaseFilterOperator {
@@ -42,17 +42,18 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
 
-  public ExpressionFilterOperator(IndexSegment segment, TransformExpressionTree expression, Predicate predicate) {
-    _numDocs = segment.getSegmentMetadata().getTotalDocs();
+  public ExpressionFilterOperator(IndexSegment segment, Predicate predicate, int numDocs) {
+    _numDocs = numDocs;
 
     _dataSourceMap = new HashMap<>();
     Set<String> columns = new HashSet<>();
-    expression.getColumns(columns);
+    ExpressionContext lhs = predicate.getLhs();
+    lhs.getColumns(columns);
     for (String column : columns) {
       _dataSourceMap.put(column, segment.getDataSource(column));
     }
 
-    _transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    _transformFunction = TransformFunctionFactory.get(lhs.toTransformExpressionTree(), _dataSourceMap);
     _predicateEvaluator = PredicateEvaluatorProvider
         .getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
             _transformFunction.getResultMetadata().getDataType());

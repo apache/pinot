@@ -35,8 +35,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.common.DataSource;
@@ -50,6 +48,9 @@ import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
@@ -181,6 +182,7 @@ abstract class BaseStarTreeV2Test<R, A> {
   @SuppressWarnings("unchecked")
   void testQuery(String query) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
+    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
 
     // Aggregations
     AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
@@ -204,15 +206,15 @@ abstract class BaseStarTreeV2Test<R, A> {
     int numGroupByColumns = groupByColumnSet.size();
     List<String> groupByColumns = new ArrayList<>(groupByColumnSet);
 
-    // Filters
-    FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(brokerRequest);
+    // Filter
+    FilterContext filter = queryContext.getFilter();
 
     // Extract values with star-tree
     PlanNode starTreeFilterPlanNode;
     if (groupByColumns.isEmpty()) {
-      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, rootFilterNode, null, null);
+      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, filter, null, null);
     } else {
-      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, rootFilterNode, groupByColumnSet, null);
+      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, filter, groupByColumnSet, null);
     }
     List<SingleValueSet> starTreeAggregationColumnValueSets = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : functionColumnPairs) {
@@ -230,7 +232,7 @@ abstract class BaseStarTreeV2Test<R, A> {
             starTreeGroupByColumnValueSets);
 
     // Extract values without star-tree
-    PlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(_indexSegment, brokerRequest);
+    PlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(_indexSegment, queryContext);
     List<SingleValueSet> nonStarTreeAggregationColumnValueSets = new ArrayList<>(numAggregations);
     List<Dictionary> nonStarTreeAggregationColumnDictionaries = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : functionColumnPairs) {

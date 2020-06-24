@@ -85,7 +85,7 @@ public class FunctionEvaluatorFactory {
     return functionEvaluator;
   }
 
-  private static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
+  public static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
     FunctionEvaluator functionEvaluator;
     try {
       if (transformExpression.startsWith(GroovyFunctionEvaluator.getGroovyExpressionPrefix())) {

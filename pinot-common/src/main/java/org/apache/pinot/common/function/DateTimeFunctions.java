@@ -241,6 +241,17 @@ public class DateTimeFunctions {
     return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern);
   }
 
+
+  /**
+   * Round the given time value to nearest multiple
+   * @return the original value but rounded to the nearest multiple of @param roundToNearest
+   */
+  @ScalarFunction
+  static Long round(Long timeValue, Number roundToNearest) {
+    long roundingValue = roundToNearest.longValue();
+    return (timeValue / roundingValue) * roundingValue;
+  }
+
   /**
    * Return current time as epoch millis
    */

@@ -25,23 +25,12 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -53,6 +42,13 @@ import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -61,8 +57,14 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+
 
 public class TransformQueriesTest extends BaseQueriesTest {
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TransformQueriesTest");
+  private static final String TABLE_NAME = "testTable";
+  private static final String SEGMENT_NAME = "testSegment";
 
   private static final String D1 = "STRING_COL";
   private static final String M1 = "INT_COL1";
@@ -70,225 +72,11 @@ public class TransformQueriesTest extends BaseQueriesTest {
   private static final String M3 = "LONG_COL1";
   private static final String M4 = "LONG_COL2";
   private static final String TIME = "T";
-  private static final String TABLE_NAME = "FOO";
-  private static final String SEGMENT_NAME_1 = "FOO_SEGMENT_1";
-  private static final String SEGMENT_NAME_2 = "FOO_SEGMENT_2";
 
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TransformQueriesTest");
+  private static final int NUM_ROWS = 10;
 
-  private Schema _schema;
-  private TableConfig _tableConfig;
-  private List<IndexSegment> _indexSegments = new ArrayList<>();
-  private List<SegmentDataManager> _segmentDataManagers;
-
-  @BeforeClass
-  public void setUp() {
-    _schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(M1, FieldSpec.DataType.INT).addSingleValueDimension(M2, FieldSpec.DataType.INT)
-            .addSingleValueDimension(M3, FieldSpec.DataType.LONG).addSingleValueDimension(M4, FieldSpec.DataType.LONG)
-            .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME), null)
-            .build();
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME).build();
-  }
-
-  @AfterClass
-  public void tearDown() {
-    FileUtils.deleteQuietly(INDEX_DIR);
-  }
-
-  private void destroySegments() {
-    for (IndexSegment indexSegment : _indexSegments) {
-      if (indexSegment != null) {
-        indexSegment.destroy();
-      }
-    }
-    _indexSegments.clear();
-  }
-
-  @Test
-  public void testTransformWithAvgInnerSegment()
-      throws Exception {
-    try {
-      final List<GenericRow> rows = createDataSet(10);
-      try (final RecordReader recordReader = new GenericRowRecordReader(rows)) {
-        createSegment(_tableConfig, _schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
-        final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
-        _indexSegments.add(segment);
-
-        String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM foo";
-        runAndVerifyInnerSegmentQuery(query, -10000.00, 10);
-
-        query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM foo";
-        runAndVerifyInnerSegmentQuery(query, 4990000.00, 10);
-
-        query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM foo";
-        runAndVerifyInnerSegmentQuery(query, 5000000.00, 10);
-
-        query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM foo";
-        runAndVerifyInnerSegmentQuery(query, 30000.00, 10);
-
-        query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM foo";
-        runAndVerifyInnerSegmentQuery(query, 5010000.00, 10);
-
-        query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM foo";
-        runAndVerifyInnerSegmentQuery(query, 15000000.00, 10);
-
-        query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM foo";
-        runAndVerifyInnerSegmentQuery(query, 10.00, 10);
-
-        try {
-          query = "SELECT AVG(SUB(INT_COL1, STRING_COL)) FROM foo";
-          runAndVerifyInnerSegmentQuery(query, -10000.00, 10);
-          Assert.fail("Query should have failed");
-        } catch (Exception e) {
-        }
-
-        try {
-          query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, STRING_COL))) FROM foo";
-          runAndVerifyInnerSegmentQuery(query, 10.00, 10);
-          Assert.fail("Query should have failed");
-        } catch (Exception e) {
-        }
-      }
-    } finally {
-      destroySegments();
-    }
-  }
-
-  @Test
-  public void testTransformWithDateTruncInnerSegment()
-      throws Exception {
-    Object[] columns = new Object[]{"Pinot", 1000, 2000, 500000, 1000000};
-    long start = new DateTime(1973, 1, 8, 14, 6, 4, 3, DateTimeZone.UTC).getMillis();
-
-    List<GenericRow> rows = new ArrayList<>();
-    for (int i = 0; i < 7; i++) {
-      GenericRow row = new GenericRow();
-      row.putField(D1, columns[0]);
-      row.putField(M1, columns[1]);
-      row.putField(M2, columns[2]);
-      row.putField(M3, columns[3]);
-      row.putField(M4, columns[4]);
-      row.putField(TIME, ThreadLocalRandom.current().nextLong(start, start + 5000));
-      rows.add(row);
-    }
-
-    try (final RecordReader recordReader = new GenericRowRecordReader(rows)) {
-      createSegment(_tableConfig, _schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
-      final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
-      _indexSegments.add(segment);
-
-      String query =
-          "SELECT COUNT(*) FROM foo GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin')";
-      verifyDateTruncationResult(query, rows.size(), "95295600");
-
-      query =
-          "SELECT COUNT(*) FROM foo GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
-      verifyDateTruncationResult(query, rows.size(), "95295600000");
-
-      query = "SELECT COUNT(*) FROM foo GROUP BY DATETRUNC('quarter', T, 'MILLISECONDS')";
-      verifyDateTruncationResult(query, rows.size(), "94694400000");
-    } finally {
-      destroySegments();
-    }
-  }
-
-  private void verifyDateTruncationResult(String query, long countResult, String stringKey) {
-    AggregationGroupByOperator aggregtionGroupByOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregtionGroupByOperator.nextBlock();
-    final AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
-    Assert.assertEquals(groupKeys.size(), 1);
-    Assert.assertEquals(groupKeys.get(0)._stringKey, stringKey);
-    Object resultForKey = aggregationGroupByResult.getResultForKey(groupKeys.get(0), 0);
-    Assert.assertEquals(resultForKey, countResult);
-  }
-
-  @Test
-  public void testTransformWithAvgInterSegmentInterServer()
-      throws Exception {
-    try {
-      final List<GenericRow> segmentOneRows = createDataSet(10);
-      final List<GenericRow> segmentTwoRows = createDataSet(10);
-
-      try (final RecordReader recordReaderOne = new GenericRowRecordReader(segmentOneRows);
-          final RecordReader recordReaderTwo = new GenericRowRecordReader(segmentTwoRows)) {
-        createSegment(_tableConfig, _schema, recordReaderOne, SEGMENT_NAME_1, TABLE_NAME);
-        createSegment(_tableConfig, _schema, recordReaderTwo, SEGMENT_NAME_2, TABLE_NAME);
-
-        final ImmutableSegment segmentOne = loadSegment(SEGMENT_NAME_1);
-        final ImmutableSegment segmentTwo = loadSegment(SEGMENT_NAME_2);
-
-        _indexSegments.add(segmentOne);
-        _indexSegments.add(segmentTwo);
-
-        _segmentDataManagers =
-            Arrays.asList(new ImmutableSegmentDataManager(segmentOne), new ImmutableSegmentDataManager(segmentTwo));
-
-        String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM foo";
-        runAndVerifyInterSegmentQuery(query, "-1000.00000");
-
-        query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM foo";
-        runAndVerifyInterSegmentQuery(query, "499000.00000");
-
-        query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM foo";
-        runAndVerifyInterSegmentQuery(query, "500000.00000");
-
-        query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM foo";
-        runAndVerifyInterSegmentQuery(query, "3000.00000");
-
-        query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM foo";
-        runAndVerifyInterSegmentQuery(query, "501000.00000");
-
-        query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM foo";
-        runAndVerifyInterSegmentQuery(query, "1500000.00000");
-
-        query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM foo";
-        runAndVerifyInterSegmentQuery(query, "1.00000");
-      }
-    } finally {
-      destroySegments();
-    }
-  }
-
-  private List<GenericRow> createDataSet(final int numRows) {
-    final ThreadLocalRandom random = ThreadLocalRandom.current();
-    final List<GenericRow> rows = new ArrayList<>(numRows);
-    Object[] columns;
-
-    // ROW
-    GenericRow row = new GenericRow();
-    columns = new Object[]{"Pinot", 1000, 2000, 500000, 1000000};
-    row.putField(D1, columns[0]);
-    row.putField(M1, columns[1]);
-    row.putField(M2, columns[2]);
-    row.putField(M3, columns[3]);
-    row.putField(M4, columns[4]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
-
-    for (int i = 0; i < numRows; i++) {
-      rows.add(row);
-    }
-    return rows;
-  }
-
-  private void runAndVerifyInnerSegmentQuery(String query, double sum, long count) {
-    AggregationOperator aggregationOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    final List<Object> aggregationResult = resultsBlock.getAggregationResult();
-    AvgPair avgPair = (AvgPair) aggregationResult.get(0);
-    Assert.assertEquals(avgPair.getSum(), sum);
-    Assert.assertEquals(avgPair.getCount(), count);
-  }
-
-  private void runAndVerifyInterSegmentQuery(String query, String serialized) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    Assert.assertEquals(aggregationResults.size(), 1);
-    Serializable value = aggregationResults.get(0).getValue();
-    Assert.assertEquals(value.toString(), serialized);
-  }
+  private IndexSegment _indexSegment;
+  private List<IndexSegment> _indexSegments;
 
   @Override
   protected String getFilter() {
@@ -297,34 +85,171 @@ public class TransformQueriesTest extends BaseQueriesTest {
 
   @Override
   protected IndexSegment getIndexSegment() {
-    return _indexSegments.get(0);
+    return _indexSegment;
   }
 
   @Override
-  protected List<SegmentDataManager> getSegmentDataManagers() {
-    return _segmentDataManagers;
+  protected List<IndexSegment> getIndexSegments() {
+    return _indexSegments;
   }
 
-  private void createSegment(TableConfig tableConfig, Schema schema, RecordReader recordReader, String segmentName,
-      String tableName)
+  @BeforeClass
+  public void setUp()
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    segmentGeneratorConfig.setTableName(tableName);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setSegmentName(segmentName);
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    buildSegment();
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+  }
+
+  protected void buildSegment()
+      throws Exception {
+    GenericRow row = new GenericRow();
+    row.putValue(D1, "Pinot");
+    row.putValue(M1, 1000);
+    row.putValue(M2, 2000);
+    row.putValue(M3, 500000);
+    row.putValue(M4, 1000000);
+    row.putValue(TIME, new DateTime(1973, 1, 8, 14, 6, 4, 3, DateTimeZone.UTC).getMillis());
+
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      rows.add(row);
+    }
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME).build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
+            .addSingleValueDimension(M1, FieldSpec.DataType.INT).addSingleValueDimension(M2, FieldSpec.DataType.INT)
+            .addSingleValueDimension(M3, FieldSpec.DataType.LONG).addSingleValueDimension(M4, FieldSpec.DataType.LONG)
+            .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME), null).build();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(INDEX_DIR.getPath());
+    config.setTableName(TABLE_NAME);
+    config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, recordReader);
-    driver.build();
-
-    File segmentIndexDir = new File(INDEX_DIR.getAbsolutePath(), segmentName);
-    if (!segmentIndexDir.exists()) {
-      throw new IllegalStateException("Segment generation failed");
+    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
+      driver.init(config, recordReader);
+      driver.build();
     }
   }
 
-  private ImmutableSegment loadSegment(String segmentName)
-      throws Exception {
-    return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), ReadMode.heap);
+  @AfterClass
+  public void tearDown() {
+    _indexSegment.destroy();
+    FileUtils.deleteQuietly(INDEX_DIR);
+  }
+
+  @Test
+  public void testTransformWithAvgInnerSegment() {
+    String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM testTable";
+    runAndVerifyInnerSegmentQuery(query, -10000.0, 10);
+
+    query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM testTable";
+    runAndVerifyInnerSegmentQuery(query, 4990000.0, 10);
+
+    query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM testTable";
+    runAndVerifyInnerSegmentQuery(query, 5000000.0, 10);
+
+    query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM testTable";
+    runAndVerifyInnerSegmentQuery(query, 30000.0, 10);
+
+    query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM testTable";
+    runAndVerifyInnerSegmentQuery(query, 5010000.0, 10);
+
+    query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM testTable";
+    runAndVerifyInnerSegmentQuery(query, 15000000.0, 10);
+
+    query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM testTable";
+    runAndVerifyInnerSegmentQuery(query, 10.0, 10);
+
+    try {
+      query = "SELECT AVG(SUB(INT_COL1, STRING_COL)) FROM testTable";
+      runAndVerifyInnerSegmentQuery(query, -10000.0, 10);
+      Assert.fail("Query should have failed");
+    } catch (Exception e) {
+      // Expected
+    }
+
+    try {
+      query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, STRING_COL))) FROM testTable";
+      runAndVerifyInnerSegmentQuery(query, 10.00, 10);
+      Assert.fail("Query should have failed");
+    } catch (Exception e) {
+      // Expected
+    }
+  }
+
+  private void runAndVerifyInnerSegmentQuery(String query, double expectedSum, int expectedCount) {
+    AggregationOperator aggregationOperator = getOperatorForQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    AvgPair avgPair = (AvgPair) aggregationResult.get(0);
+    assertEquals(avgPair.getSum(), expectedSum);
+    assertEquals(avgPair.getCount(), expectedCount);
+  }
+
+  @Test
+  public void testTransformWithDateTruncInnerSegment() {
+    String query =
+        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin')";
+    verifyDateTruncationResult(query, "95295600");
+
+    query =
+        "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
+    verifyDateTruncationResult(query, "95295600000");
+
+    query = "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('quarter', T, 'MILLISECONDS')";
+    verifyDateTruncationResult(query, "94694400000");
+  }
+
+  private void verifyDateTruncationResult(String query, String expectedStringKey) {
+    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
+    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    assertNotNull(aggregationGroupByResult);
+    List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
+    assertEquals(groupKeys.size(), 1);
+    assertEquals(groupKeys.get(0)._stringKey, expectedStringKey);
+    Object resultForKey = aggregationGroupByResult.getResultForKey(groupKeys.get(0), 0);
+    assertEquals(resultForKey, (long) NUM_ROWS);
+  }
+
+  @Test
+  public void testTransformWithAvgInterSegmentInterServer() {
+    String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM testTable";
+    runAndVerifyInterSegmentQuery(query, "-1000.00000");
+
+    query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM testTable";
+    runAndVerifyInterSegmentQuery(query, "499000.00000");
+
+    query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM testTable";
+    runAndVerifyInterSegmentQuery(query, "500000.00000");
+
+    query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM testTable";
+    runAndVerifyInterSegmentQuery(query, "3000.00000");
+
+    query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM testTable";
+    runAndVerifyInterSegmentQuery(query, "501000.00000");
+
+    query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM testTable";
+    runAndVerifyInterSegmentQuery(query, "1500000.00000");
+
+    query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM testTable";
+    runAndVerifyInterSegmentQuery(query, "1.00000");
+  }
+
+  private void runAndVerifyInterSegmentQuery(String query, String expectedValue) {
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    assertEquals(aggregationResults.size(), 1);
+    Serializable value = aggregationResults.get(0).getValue();
+    assertEquals(value, expectedValue);
   }
 }

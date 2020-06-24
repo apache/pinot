@@ -31,6 +31,7 @@ import org.apache.commons.io.IOUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -40,8 +41,8 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
 
-@Test(enabled = false)
-//@Listeners(com.adobe.testing.s3mock.testng.S3MockListener.class)
+@Test
+@Listeners(com.adobe.testing.s3mock.testng.S3MockListener.class)
 public class S3PinotFSTest {
   final String DELIMITER = "/";
   S3PinotFS _s3PinotFS;
@@ -73,7 +74,7 @@ public class S3PinotFSTest {
         .putObject(S3TestUtils.getPutObjectRequest(BUCKET, fileNameWithFolder), RequestBody.fromBytes(new byte[0]));
   }
 
-  @Test(enabled = false)
+  @Test
   public void testTouchFileInBucket()
       throws Exception {
 
@@ -92,7 +93,7 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(response, originalFiles));
   }
 
-  @Test(enabled = false)
+  @Test
   public void testTouchFilesInFolder()
       throws Exception {
 
@@ -113,7 +114,7 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(response, Arrays.stream(originalFiles).map(x -> folder + DELIMITER + x).toArray()));
   }
 
-  @Test(enabled = false)
+  @Test
   public void testListFilesInBucketNonRecursive()
       throws Exception {
     String[] originalFiles = new String[]{"a-list.txt", "b-list.txt", "c-list.txt"};
@@ -130,7 +131,7 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(actualFiles, originalFiles));
   }
 
-  @Test(enabled = false)
+  @Test
   public void testListFilesInFolderNonRecursive()
       throws Exception {
     String folder = "list-files";
@@ -148,7 +149,7 @@ public class S3PinotFSTest {
         Arrays.equals(Arrays.stream(originalFiles).map(x -> folder + DELIMITER + x).toArray(), actualFiles));
   }
 
-  @Test(enabled = false)
+  @Test
   public void testListFilesInFolderRecursive()
       throws Exception {
     String folder = "list-files-rec";
@@ -170,7 +171,7 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(expectedResultList.toArray(), actualFiles));
   }
 
-  @Test(enabled = false)
+  @Test
   public void testDeleteFile()
       throws Exception {
     String[] originalFiles = new String[]{"a-delete.txt", "b-delete.txt", "c-delete.txt"};
@@ -196,7 +197,7 @@ public class S3PinotFSTest {
     Assert.assertTrue(Arrays.equals(actualResponse, expectedResultList.toArray()));
   }
 
-  @Test(enabled = false)
+  @Test
   public void testDeleteFolder()
       throws Exception {
     String[] originalFiles = new String[]{"a-delete-2.txt", "b-delete-2.txt", "c-delete-2.txt"};
@@ -217,7 +218,7 @@ public class S3PinotFSTest {
     Assert.assertEquals(0, actualResponse.length);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testIsDirectory()
       throws Exception {
     String[] originalFiles = new String[]{"a-dir.txt", "b-dir.txt", "c-dir.txt"};
@@ -241,7 +242,7 @@ public class S3PinotFSTest {
     Assert.assertFalse(notIsDir);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testExists()
       throws Exception {
     String[] originalFiles = new String[]{"a-ex.txt", "b-ex.txt", "c-ex.txt"};
@@ -269,7 +270,7 @@ public class S3PinotFSTest {
     Assert.assertFalse(fileNotExists);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testCopyFromAndToLocal()
       throws Exception {
     String fileName = "copyFile.txt";
@@ -289,7 +290,7 @@ public class S3PinotFSTest {
     fileToDownload.deleteOnExit();
   }
 
-  @Test(enabled = false)
+  @Test
   public void testOpenFile()
       throws Exception {
     String fileName = "sample.txt";
@@ -302,7 +303,7 @@ public class S3PinotFSTest {
     Assert.assertEquals(actualContents, fileContent);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testMkdir()
       throws Exception {
     String folderName = "my-test-folder";

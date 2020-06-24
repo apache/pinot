@@ -22,42 +22,29 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class StarTreeProjectionPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeProjectionPlanNode.class);
-
   private final Map<String, DataSource> _dataSourceMap;
   private final StarTreeDocIdSetPlanNode _starTreeDocIdSetPlanNode;
 
   public StarTreeProjectionPlanNode(StarTreeV2 starTreeV2, Set<String> projectionColumns,
-      @Nullable FilterQueryTree rootFilterNode, @Nullable Set<String> groupByColumns,
+      @Nullable FilterContext filter, @Nullable Set<String> groupByColumns,
       @Nullable Map<String, String> debugOptions) {
     _dataSourceMap = new HashMap<>(projectionColumns.size());
     for (String projectionColumn : projectionColumns) {
       _dataSourceMap.put(projectionColumn, starTreeV2.getDataSource(projectionColumn));
     }
-    _starTreeDocIdSetPlanNode = new StarTreeDocIdSetPlanNode(starTreeV2, rootFilterNode, groupByColumns, debugOptions);
+    _starTreeDocIdSetPlanNode = new StarTreeDocIdSetPlanNode(starTreeV2, filter, groupByColumns, debugOptions);
   }
 
   @Override
   public ProjectionOperator run() {
     return new ProjectionOperator(_dataSourceMap, _starTreeDocIdSetPlanNode.run());
-  }
-
-  @Override
-  public void showTree(String prefix) {
-    LOGGER.debug(prefix + "StarTree Projection Plan Node:");
-    LOGGER.debug(prefix + "Operator: ProjectionOperator");
-    LOGGER.debug(prefix + "Argument 0: Data Sources - " + _dataSourceMap.keySet());
-    LOGGER.debug(prefix + "Argument 1: StarTreeDocIdSetPlanNode -");
-    _starTreeDocIdSetPlanNode.showTree(prefix + "    ");
   }
 }

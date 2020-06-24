@@ -22,10 +22,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 
@@ -37,10 +38,10 @@ public class StarTreeUtils {
   public static final String USE_STAR_TREE_KEY = "useStarTree";
 
   /**
-   * Returns whether star-tree is disabled in broker request.
+   * Returns whether star-tree is disabled for the query.
    */
-  public static boolean isStarTreeDisabled(BrokerRequest brokerRequest) {
-    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
+  public static boolean isStarTreeDisabled(QueryContext queryContext) {
+    Map<String, String> debugOptions = queryContext.getDebugOptions();
     return debugOptions != null && "false".equalsIgnoreCase(debugOptions.get(USE_STAR_TREE_KEY));
   }
 
@@ -55,7 +56,7 @@ public class StarTreeUtils {
    */
   public static boolean isFitForStarTree(StarTreeV2Metadata starTreeV2Metadata,
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs,
-      @Nullable TransformExpressionTree[] groupByExpressions, @Nullable FilterQueryTree rootFilterNode) {
+      @Nullable TransformExpressionTree[] groupByExpressions, @Nullable FilterContext filter) {
     // Check aggregations
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       if (!starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)) {
@@ -76,27 +77,43 @@ public class StarTreeUtils {
     }
 
     // Check filters
-    return rootFilterNode == null || checkFilters(rootFilterNode, starTreeDimensions);
+    return filter == null || checkFilters(filter, starTreeDimensions);
   }
 
   /**
    * Helper method to check whether all columns in predicates are star-tree dimensions, and all predicates are
    * conjoined by AND.
    */
-  private static boolean checkFilters(FilterQueryTree filterNode, Set<String> starTreeDimensions) {
-    FilterOperator operator = filterNode.getOperator();
-    if (operator == FilterOperator.OR) {
-      return false;
-    }
-    if (operator == FilterOperator.AND) {
-      for (FilterQueryTree child : filterNode.getChildren()) {
-        if (!checkFilters(child, starTreeDimensions)) {
+  private static boolean checkFilters(FilterContext filter, Set<String> starTreeDimensions) {
+    switch (filter.getType()) {
+      case AND:
+        for (FilterContext child : filter.getChildren()) {
+          if (!checkFilters(child, starTreeDimensions)) {
+            return false;
+          }
+        }
+        return true;
+      case OR:
+        return false;
+      case PREDICATE:
+        Predicate predicate = filter.getPredicate();
+        ExpressionContext lhs = predicate.getLhs();
+        if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
           return false;
         }
-      }
-      return true;
+        switch (predicate.getType()) {
+          // NOTE: Do not use star-tree for the following predicates because:
+          //       - REGEXP_LIKE: Need to scan the whole dictionary to gather the matching dictionary ids
+          //       - TEXT_MATCH/IS_NULL/IS_NOT_NULL: No way to gather the matching dictionary ids
+          case REGEXP_LIKE:
+          case TEXT_MATCH:
+          case IS_NULL:
+          case IS_NOT_NULL:
+            return false;
+        }
+        return starTreeDimensions.contains(lhs.getIdentifier());
+      default:
+        throw new IllegalStateException();
     }
-    String column = filterNode.getColumn();
-    return starTreeDimensions.contains(column);
   }
 }

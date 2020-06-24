@@ -20,8 +20,13 @@ package org.apache.pinot.controller;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Collectors;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -29,21 +34,18 @@ import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
 import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
 
 public class ControllerConf extends PropertiesConfiguration {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerConf.class);
-
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   private static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
+  private static final String CONTROLLER_ACCESS_PROTOCOLS = "controller.access.protocols";
   private static final String DATA_DIR = "controller.data.dir";
   // Potentially same as data dir if local
   private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
@@ -171,6 +173,15 @@ public class ControllerConf extends PropertiesConfiguration {
     super();
   }
 
+  public ControllerConf(Configuration conf) {
+    super();
+    Iterator<String> keysIterator = conf.getKeys();
+    while(keysIterator.hasNext()) {
+      String key = keysIterator.next();
+      this.setProperty(key, conf.getProperty(key));
+    }
+  }
+
   public void setLocalTempDir(String localTempDir) {
     setProperty(LOCAL_TEMP_DIR, localTempDir);
   }
@@ -273,6 +284,23 @@ public class ControllerConf extends PropertiesConfiguration {
     return (String) getProperty(CONTROLLER_PORT);
   }
 
+  public List<String> getControllerAccessProtocols() {
+    return Optional.ofNullable(getStringArray(CONTROLLER_ACCESS_PROTOCOLS))
+
+        .map(protocols -> Arrays.stream(protocols).collect(Collectors.toList()))
+
+        // http will be defaulted only if the legacy controller.port property is not defined.
+        .orElseGet(() -> getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
+  }
+
+  public String getControllerAccessProtocolProperty(String protocol, String property) {
+    return getString(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property);
+  }
+
+  public String getControllerAccessProtocolProperty(String protocol, String property, String defaultValue) {
+    return getString(CONTROLLER_ACCESS_PROTOCOLS + "." + protocol + "." + property, defaultValue);
+  }
+
   public String getDataDir() {
     return (String) getProperty(DATA_DIR);
   }
@@ -336,7 +364,22 @@ public class ControllerConf extends PropertiesConfiguration {
     if (containsKey(CONTROLLER_VIP_PORT) && ((String) getProperty(CONTROLLER_VIP_PORT)).length() > 0) {
       return (String) getProperty(CONTROLLER_VIP_PORT);
     }
-    return getControllerPort();
+
+    // Vip port is not explicitly defined. Initiate discovery from the configured protocols.
+    return getControllerAccessProtocols().stream()
+
+        .filter(protocol -> Boolean.parseBoolean(getControllerAccessProtocolProperty(protocol, "vip", "false")))
+
+        .map(protocol -> Optional.ofNullable(getControllerAccessProtocolProperty(protocol, "port")))
+
+        .filter(Optional::isPresent)
+
+        .map(Optional::get)
+
+        .findFirst()
+
+        // No protocol defines a port as VIP. Fallback on legacy controller.port property.
+        .orElseGet(this::getControllerPort);
   }
 
   public String getControllerVipProtocol() {

@@ -90,8 +90,8 @@ Pinot also provides k8s integration with interactive query engine [Presto](kuber
 ## Documentation
 Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete description of Pinot's features.
 - [Quick Demo](https://docs.pinot.apache.org/getting-started/running-pinot-locally)
-- [Pinot Architecture](https://docs.pinot.apache.org/concepts/architecture)
-- [Pinot Query Language](https://docs.pinot.apache.org/pinot-user-guide/pinot-query-language)
+- [Pinot Architecture](https://docs.pinot.apache.org/basics/architecture)
+- [Pinot Query Language](https://docs.pinot.apache.org/users/user-guide-query/pinot-query-language)
 
 ## Pinot Query Clients
 

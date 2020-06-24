@@ -41,7 +41,6 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -49,9 +48,11 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ThetaSketchParams;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.predicate.Predicate;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.parsers.utils.ParserUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
-import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -512,33 +513,30 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
         // FIXME: Standardize predicate string?
 
         Expression expression = CalciteSqlParser.compileToExpression(predicateString);
+        FilterContext filter = QueryContextConverterUtils.getFilter(expression);
 
         // TODO: Add support for complex predicates with AND/OR.
-        String filterColumn = ParserUtils.getFilterColumn(expression);
-        Predicate predicate = Predicate
-            .newPredicate(ParserUtils.getFilterType(expression), filterColumn, ParserUtils.getFilterValues(expression));
-        TransformExpressionTree filterExpression =
-            new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER, filterColumn, null);
-
-        _predicateInfoSet.add(new PredicateInfo(predicateString, filterExpression, predicate));
+        Preconditions.checkState(filter.getType() == FilterContext.Type.PREDICATE, "Illegal predicate string");
+        Predicate predicate = filter.getPredicate();
+        TransformExpressionTree lhs = predicate.getLhs().toTransformExpressionTree();
+        _predicateInfoSet.add(new PredicateInfo(predicateString, lhs, predicate));
         _expressionMap.put(expression, predicateString);
-        _inputExpressions.add(new TransformExpressionTree(new IdentifierAstNode(filterColumn)));
+        _inputExpressions.add(lhs);
       }
     } else {
       // Auto-derive predicates from postAggregationExpression.
       Set<Expression> predicateExpressions = extractPredicatesFromString(postAggrExpressionString);
       for (Expression predicateExpression : predicateExpressions) {
-        String filterColumn = ParserUtils.getFilterColumn(predicateExpression);
-        Predicate predicate = Predicate.newPredicate(ParserUtils.getFilterType(predicateExpression), filterColumn,
-            ParserUtils.getFilterValues(predicateExpression));
-        TransformExpressionTree filterExpression =
-            new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER, filterColumn, null);
-
         String predicateString = ParserUtils.standardizeExpression(predicateExpression, false);
         _predicateStrings.add(predicateString);
-        _predicateInfoSet.add(new PredicateInfo(predicateString, filterExpression, predicate));
+
+        FilterContext filter = QueryContextConverterUtils.getFilter(predicateExpression);
+        Preconditions.checkState(filter.getType() == FilterContext.Type.PREDICATE, "Illegal predicate string");
+        Predicate predicate = filter.getPredicate();
+        TransformExpressionTree lhs = predicate.getLhs().toTransformExpressionTree();
+        _predicateInfoSet.add(new PredicateInfo(predicateString, lhs, predicate));
         _expressionMap.put(predicateExpression, predicateString);
-        _inputExpressions.add(filterExpression);
+        _inputExpressions.add(lhs);
       }
     }
   }
@@ -628,11 +626,11 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
     return evalPostAggregationExpression(_postAggregationExpression, intermediateResult);
   }
 
-    /**
-     * Returns the theta-sketch SetOperation builder properly configured.
-     * Currently, only setting of nominalEntries is supported.
-     * @return SetOperationBuilder
-     */
+  /**
+   * Returns the theta-sketch SetOperation builder properly configured.
+   * Currently, only setting of nominalEntries is supported.
+   * @return SetOperationBuilder
+   */
   private SetOperationBuilder getSetOperationBuilder() {
     return (_thetaSketchParams == null) ? SetOperation.builder()
         : SetOperation.builder().setNominalEntries(_thetaSketchParams.getNominalEntries());
@@ -651,7 +649,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
   private static class PredicateInfo {
     private final String _stringVal;
     private final TransformExpressionTree _expression; // LHS
-    // FIXME: Predicate does not have equals() and hashCode() implemented
     private final Predicate _predicate;
     private PredicateEvaluator _predicateEvaluator;
 

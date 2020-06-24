@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -30,8 +29,8 @@ import org.apache.pinot.core.query.exception.BadQueryRequestException;
 /**
  * Factory class to create instances of aggregation function of the given name.
  */
+@SuppressWarnings("rawtypes")
 public class AggregationFunctionFactory {
-
   private AggregationFunctionFactory() {
   }
 
@@ -42,7 +41,7 @@ public class AggregationFunctionFactory {
    * passed down to function.
    */
   public static AggregationFunction getAggregationFunction(AggregationInfo aggregationInfo,
-      @Nullable BrokerRequest brokerRequest) {
+      BrokerRequest brokerRequest) {
     String functionName = aggregationInfo.getAggregationType();
     List<String> arguments = AggregationFunctionUtils.getArguments(aggregationInfo);
 

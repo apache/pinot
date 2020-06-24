@@ -25,8 +25,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.function.BiFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -34,8 +32,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.HavingFilterQuery;
-import org.apache.pinot.common.request.HavingFilterQueryMap;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -149,8 +145,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
       boolean[] aggregationFunctionSelectStatus =
           AggregationFunctionUtils.getAggregationFunctionsSelectStatus(_brokerRequest.getAggregationsInfo());
-      setGroupByHavingResults(brokerResponseNative, aggregationFunctionSelectStatus, dataTables,
-          _brokerRequest.getHavingFilterQuery(), _brokerRequest.getHavingFilterSubQueryMap());
+      setGroupByResults(brokerResponseNative, aggregationFunctionSelectStatus, dataTables);
 
       if (_responseFormatSql) {
         resultSize = brokerResponseNative.getResultTable().getRows().size();
@@ -448,13 +443,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
    *
    * @param brokerResponseNative broker response.
    * @param dataTables Collection of data tables
-   * @param havingFilterQuery having filter query
-   * @param havingFilterQueryMap having filter query map
    */
   @SuppressWarnings("unchecked")
-  private void setGroupByHavingResults(BrokerResponseNative brokerResponseNative,
-      boolean[] aggregationFunctionsSelectStatus, Collection<DataTable> dataTables, HavingFilterQuery havingFilterQuery,
-      HavingFilterQueryMap havingFilterQueryMap) {
+  private void setGroupByResults(BrokerResponseNative brokerResponseNative, boolean[] aggregationFunctionsSelectStatus,
+      Collection<DataTable> dataTables) {
 
     // Merge results from all data tables.
     String[] columnNames = new String[_numAggregationFunctions];
@@ -492,41 +484,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
         finalResultMap.put(groupKey, _aggregationFunctions[i].extractFinalResult(intermediateResult));
       }
       finalResultMaps[i] = finalResultMap;
-    }
-    //If HAVING clause is set, we further filter the group by results based on the HAVING predicate
-    if (havingFilterQuery != null) {
-      HavingClauseComparisonTree havingClauseComparisonTree =
-          HavingClauseComparisonTree.buildHavingClauseComparisonTree(havingFilterQuery, havingFilterQueryMap);
-      //Applying close policy
-      //We just keep those groups (from different aggregation functions) that are exist in the result set of all aggregation functions.
-      //In other words, we just keep intersection of groups of different aggregation functions.
-      //Here we calculate the intersection of group key sets of different aggregation functions
-      Set<String> intersectionOfKeySets = finalResultMaps[0].keySet();
-      for (int i = 1; i < _numAggregationFunctions; i++) {
-        intersectionOfKeySets.retainAll(finalResultMaps[i].keySet());
-      }
-
-      //Now it is time to remove those groups that do not validate HAVING clause predicate
-      //We use TreeMap which supports CASE_INSENSITIVE_ORDER
-      Map<String, Comparable> singleGroupAggResults = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-      Map<String, Comparable>[] finalFilteredResultMaps = new Map[_numAggregationFunctions];
-      for (int i = 0; i < _numAggregationFunctions; i++) {
-        finalFilteredResultMaps[i] = new HashMap<>();
-      }
-
-      for (String groupKey : intersectionOfKeySets) {
-        for (int i = 0; i < _numAggregationFunctions; i++) {
-          singleGroupAggResults.put(columnNames[i], finalResultMaps[i].get(groupKey));
-        }
-        //if this group validate HAVING predicate keep it in the new map
-        if (havingClauseComparisonTree.isThisGroupPassPredicates(singleGroupAggResults)) {
-          for (int i = 0; i < _numAggregationFunctions; i++) {
-            finalFilteredResultMaps[i].put(groupKey, singleGroupAggResults.get(columnNames[i]));
-          }
-        }
-      }
-      //update the final results
-      finalResultMaps = finalFilteredResultMaps;
     }
 
     int aggregationNumsInFinalResult = 0;
