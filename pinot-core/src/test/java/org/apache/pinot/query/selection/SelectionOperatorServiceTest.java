@@ -26,19 +26,15 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
-import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -82,21 +78,19 @@ public class SelectionOperatorServiceTest {
 
   @BeforeClass
   public void setUp() {
-    _queryContext = BrokerRequestToQueryContextConverter.convert(new Pql2Compiler().compileToBrokerRequest(
-        "SELECT " + String.join(", ", _columnNames) + " FROM testTable ORDER BY int DESC LIMIT 1, 2"));
+    _queryContext = QueryContextConverterUtils.getQueryContextFromPQL(
+        "SELECT " + String.join(", ", _columnNames) + " FROM testTable ORDER BY int DESC LIMIT 1, 2");
   }
 
   @Test
   public void testExtractExpressions() {
-    // For non 'SELECT *' select only queries, should return deduplicated selection expressions
-    List<ExpressionContext> selectExpressions = Arrays.asList(QueryContextConverterUtils.getExpression("add(foo,'1')"),
-        QueryContextConverterUtils.getExpression("foo"), QueryContextConverterUtils.getExpression("sub(bar,'2')"),
-        QueryContextConverterUtils.getExpression("bar"), QueryContextConverterUtils.getExpression("foo"),
-        QueryContextConverterUtils.getExpression("foobar"), QueryContextConverterUtils.getExpression("bar"));
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getColumnNames()).thenReturn(new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
-    List<TransformExpressionTree> expressions =
-        SelectionOperatorUtils.extractExpressions(selectExpressions, indexSegment);
+
+    // For non 'SELECT *' select only queries, should return deduplicated selection expressions
+    QueryContext queryContext = QueryContextConverterUtils
+        .getQueryContextFromPQL("SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable");
+    List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 5);
     assertEquals(expressions.get(0).toString(), "add(foo,'1')");
     assertEquals(expressions.get(1).toString(), "foo");
@@ -105,8 +99,8 @@ public class SelectionOperatorServiceTest {
     assertEquals(expressions.get(4).toString(), "foobar");
 
     // For 'SELECT *' select only queries, should return all physical columns in alphabetical order
-    expressions = SelectionOperatorUtils
-        .extractExpressions(Collections.singletonList(SelectionOperatorUtils.IDENTIFIER_STAR), indexSegment);
+    queryContext = QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM testTable");
+    expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 3);
     assertEquals(expressions.get(0).toString(), "bar");
     assertEquals(expressions.get(1).toString(), "foo");
@@ -114,10 +108,9 @@ public class SelectionOperatorServiceTest {
 
     // For non 'SELECT *' select order-by queries, should return deduplicated order-by expressions followed by selection
     // expressions
-    List<OrderByExpressionContext> orderByExpressions = Arrays
-        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("foo"), true),
-            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sub(bar,'2')"), false));
-    expressions = SelectionOperatorUtils.extractExpressions(selectExpressions, orderByExpressions, indexSegment);
+    queryContext = QueryContextConverterUtils.getQueryContextFromPQL(
+        "SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable ORDER BY foo, sub(bar, 2)");
+    expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 5);
     assertEquals(expressions.get(0).toString(), "foo");
     assertEquals(expressions.get(1).toString(), "sub(bar,'2')");
@@ -127,9 +120,9 @@ public class SelectionOperatorServiceTest {
 
     // For 'SELECT *' select order-by queries, should return deduplicated order-by expressions followed by all physical
     // columns in alphabetical order
-    expressions = SelectionOperatorUtils
-        .extractExpressions(Collections.singletonList(SelectionOperatorUtils.IDENTIFIER_STAR), orderByExpressions,
-            indexSegment);
+    queryContext =
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM testTable ORDER BY foo, sub(bar, 2)");
+    expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 4);
     assertEquals(expressions.get(0).toString(), "foo");
     assertEquals(expressions.get(1).toString(), "sub(bar,'2')");

@@ -20,16 +20,16 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
-  public MaxMVAggregationFunction(String column) {
-    super(column);
+  public MaxMVAggregationFunction(ExpressionContext expression) {
+    super(expression);
   }
 
   @Override
@@ -44,7 +44,7 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     double max = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
@@ -59,7 +59,7 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
@@ -75,7 +75,7 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];

@@ -21,12 +21,12 @@ package org.apache.pinot.core.operator.query;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -40,6 +40,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  * For min value, we use the first value from the dictionary
  * For max value we use the last value from dictionary
  */
+@SuppressWarnings("rawtypes")
 public class DictionaryBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "DictionaryBasedAggregationOperator";
 
@@ -59,7 +60,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
     int numAggregationFunctions = _aggregationFunctions.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
     for (AggregationFunction aggregationFunction : _aggregationFunctions) {
-      String column = ((TransformExpressionTree) aggregationFunction.getInputExpressions().get(0)).getValue();
+      String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
       Dictionary dictionary = _dictionaryMap.get(column);
       switch (aggregationFunction.getType()) {
         case MAX:

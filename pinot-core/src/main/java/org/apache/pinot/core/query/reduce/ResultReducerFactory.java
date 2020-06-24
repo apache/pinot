@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.reduce;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
@@ -40,13 +41,12 @@ public final class ResultReducerFactory {
       return new SelectionDataTableReducer(queryContext);
     } else {
       // Aggregation query
-      AggregationFunction[] aggregationFunctions =
-          AggregationFunctionUtils.getAggregationFunctions(queryContext.getBrokerRequest());
+      AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
       if (queryContext.getGroupByExpressions() == null) {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
           // Distinct query
-          return new DistinctDataTableReducer(queryContext);
+          return new DistinctDataTableReducer(queryContext, (DistinctAggregationFunction) aggregationFunctions[0]);
         } else {
           return new AggregationDataTableReducer(queryContext, aggregationFunctions);
         }

@@ -19,15 +19,13 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.Collections;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
@@ -38,7 +36,6 @@ import static org.mockito.Mockito.when;
 
 
 public class ColumnValueSegmentPrunerTest {
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private static final ColumnValueSegmentPruner PRUNER = new ColumnValueSegmentPruner();
 
   @Test
@@ -118,8 +115,7 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
     ServerQueryRequest queryRequest = mock(ServerQueryRequest.class);
     when(queryRequest.getQueryContext()).thenReturn(queryContext);
     return PRUNER.prune(indexSegment, queryRequest);

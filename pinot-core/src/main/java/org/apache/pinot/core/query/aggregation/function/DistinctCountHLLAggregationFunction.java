@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -32,23 +31,21 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
   protected final int _log2m;
 
-  public DistinctCountHLLAggregationFunction(List<String> arguments) {
+  public DistinctCountHLLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     int numExpressions = arguments.size();
     // This function expects 1 or 2 arguments.
     Preconditions
-        .checkArgument(numExpressions <= 2 && numExpressions >= 1, "DistinctCountHLL expects 1 or 2 arguments, got: %s",
-            numExpressions);
+        .checkArgument(numExpressions <= 2, "DistinctCountHLL expects 1 or 2 arguments, got: %s", numExpressions);
     if (arguments.size() == 2) {
-      // TODO: Currently PinotQuery2BrokerRequestConverter enforces single quoted non-string literal
-      //       in ParserUtils.standardizeExpression(...).
-      _log2m = Integer.valueOf(arguments.get(1).replace("'", ""));
+      _log2m = Integer.parseInt(arguments.get(1).getLiteral());
     } else {
       _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
     }
@@ -76,7 +73,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
 
@@ -141,7 +138,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
 
@@ -201,7 +198,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
 

@@ -26,14 +26,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -45,12 +44,12 @@ import org.apache.pinot.core.util.QueryOptions;
  * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
  */
 public class DistinctDataTableReducer implements DataTableReducer {
-  private final BrokerRequest _brokerRequest;
+  private final DistinctAggregationFunction _distinctAggregationFunction;
   private final boolean _responseFormatSql;
 
   // TODO: queryOptions.isPreserveType() is ignored for DISTINCT queries.
-  DistinctDataTableReducer(QueryContext queryContext) {
-    _brokerRequest = queryContext.getBrokerRequest();
+  DistinctDataTableReducer(QueryContext queryContext, DistinctAggregationFunction distinctAggregationFunction) {
+    _distinctAggregationFunction = distinctAggregationFunction;
     _responseFormatSql = new QueryOptions(queryContext.getQueryOptions()).isResponseFormatSQL();
   }
 
@@ -81,19 +80,23 @@ public class DistinctDataTableReducer implements DataTableReducer {
 
     if (nonEmptyDistinctTables.isEmpty()) {
       // All the DistinctTables are empty, construct an empty response
+      String[] columns = _distinctAggregationFunction.getColumns();
       if (_responseFormatSql) {
         // TODO: This returns schema with all STRING data types.
-        //  There's no way currently to get the data types of the distinct columns for empty results
-        DataSchema finalDataSchema = getEmptyResultTableDataSchema();
-        brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, Collections.emptyList()));
+        //       There's no way currently to get the data types of the distinct columns for empty results
+
+        int numColumns = columns.length;
+        DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
+        Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
+        brokerResponseNative
+            .setResultTable(new ResultTable(new DataSchema(columns, columnDataTypes), Collections.emptyList()));
       } else {
-        brokerResponseNative.setSelectionResults(new SelectionResults(getDistinctColumns(), Collections.emptyList()));
+        brokerResponseNative.setSelectionResults(new SelectionResults(Arrays.asList(columns), Collections.emptyList()));
       }
     } else {
       // Construct a main DistinctTable and merge all non-empty DistinctTables into it
-      DistinctTable mainDistinctTable =
-          new DistinctTable(nonEmptyDistinctTables.get(0).getDataSchema(), _brokerRequest.getOrderBy(),
-              _brokerRequest.getLimit());
+      DistinctTable mainDistinctTable = new DistinctTable(nonEmptyDistinctTables.get(0).getDataSchema(),
+          _distinctAggregationFunction.getOrderByExpressions(), _distinctAggregationFunction.getLimit());
       for (DistinctTable distinctTable : nonEmptyDistinctTables) {
         mainDistinctTable.mergeDeserializedDistinctTable(distinctTable);
       }
@@ -143,18 +146,5 @@ public class DistinctDataTableReducer implements DataTableReducer {
       rows.add(row);
     }
     return new ResultTable(dataSchema, rows);
-  }
-
-  private List<String> getDistinctColumns() {
-    return AggregationFunctionUtils.getArguments(_brokerRequest.getAggregationsInfo().get(0));
-  }
-
-  private DataSchema getEmptyResultTableDataSchema() {
-    List<String> distinctColumns = getDistinctColumns();
-    int numColumns = distinctColumns.size();
-    String[] columnNames = distinctColumns.toArray(new String[numColumns]);
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
-    Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
-    return new DataSchema(columnNames, columnDataTypes);
   }
 }

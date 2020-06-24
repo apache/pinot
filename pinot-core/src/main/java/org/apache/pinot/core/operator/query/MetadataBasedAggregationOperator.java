@@ -34,6 +34,7 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 /**
  * Aggregation operator that utilizes metadata for serving aggregation queries.
  */
+@SuppressWarnings("rawtypes")
 public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "MetadataBasedAggregationOperator";
 

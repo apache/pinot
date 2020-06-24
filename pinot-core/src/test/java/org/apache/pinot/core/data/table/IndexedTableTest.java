@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
@@ -53,8 +54,8 @@ public class IndexedTableTest {
       throws InterruptedException, TimeoutException, ExecutionException {
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    AggregationFunction[] aggregationFunctions =
-        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction(
+        ExpressionContext.forIdentifier("m1")), new MaxAggregationFunction(ExpressionContext.forIdentifier("m2"))};
     List<OrderByExpressionContext> orderByExpressions = Collections
         .singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sum(m1)"), true));
     IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationFunctions, orderByExpressions, 5);
@@ -123,8 +124,8 @@ public class IndexedTableTest {
   public void testNonConcurrentIndexedTable(List<OrderByExpressionContext> orderByExpressions, List<String> survivors) {
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "d4", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    AggregationFunction[] aggregationFunctions =
-        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction(
+        ExpressionContext.forIdentifier("m1")), new MaxAggregationFunction(ExpressionContext.forIdentifier("m2"))};
 
     // Test SimpleIndexedTable
     IndexedTable simpleIndexedTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderByExpressions, 5);
@@ -272,8 +273,8 @@ public class IndexedTableTest {
   public void testNoMoreNewRecords() {
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    AggregationFunction[] aggregationFunctions =
-        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction(
+        ExpressionContext.forIdentifier("m1")), new MaxAggregationFunction(ExpressionContext.forIdentifier("m2"))};
 
     IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, null, 5);
     testNoMoreNewRecordsInTable(indexedTable);

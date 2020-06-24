@@ -32,7 +32,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
@@ -41,6 +40,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.util.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -88,59 +88,26 @@ public class SelectionOperatorUtils {
       ThreadLocal.withInitial(() -> new DecimalFormat(DOUBLE_PATTERN, DECIMAL_FORMAT_SYMBOLS));
 
   /**
-   * Extracts the expressions from a selection-only query, expands {@code 'SELECT *'} to all physical columns if
-   * applies.
-   * <p>The expressions returned are deduplicated.
+   * Extracts the expressions from a selection query, expands {@code 'SELECT *'} to all physical columns if applies.
+   * <p>Order-by expressions will be put at the front if exist. The expressions returned are deduplicated.
    * <p>NOTE: DO NOT change the order of the expressions returned because broker relies on that to process the query.
    */
-  public static List<TransformExpressionTree> extractExpressions(List<ExpressionContext> selectExpressions,
-      IndexSegment indexSegment) {
-    int numSelectExpressions = selectExpressions.size();
-    if (numSelectExpressions == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR)) {
-      // For 'SELECT *', sort all columns (ignore columns that start with '$') so that the order is deterministic
-      Set<String> allColumns = indexSegment.getColumnNames();
-      List<String> selectColumns = new ArrayList<>(allColumns.size());
-      for (String column : allColumns) {
-        if (column.charAt(0) != '$') {
-          selectColumns.add(column);
-        }
-      }
-      selectColumns.sort(null);
-      List<TransformExpressionTree> expressions = new ArrayList<>(selectColumns.size());
-      for (String column : selectColumns) {
-        expressions.add(new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER, column, null));
-      }
-      return expressions;
-    } else {
-      Set<ExpressionContext> expressionSet = new HashSet<>();
-      List<TransformExpressionTree> expressions = new ArrayList<>(numSelectExpressions);
-      for (ExpressionContext selectExpression : selectExpressions) {
-        if (expressionSet.add(selectExpression)) {
-          expressions.add(selectExpression.toTransformExpressionTree());
-        }
-      }
-      return expressions;
-    }
-  }
-
-  /**
-   * Extracts the expressions from a selection order-by query, expands {@code 'SELECT *'} to all physical columns if
-   * applies.
-   * <p>Order-by expressions will be put at the front. The expressions returned are deduplicated.
-   * <p>NOTE: DO NOT change the order of the expressions returned because broker relies on that to process the query.
-   */
-  public static List<TransformExpressionTree> extractExpressions(List<ExpressionContext> selectExpressions,
-      List<OrderByExpressionContext> orderByExpressions, IndexSegment indexSegment) {
+  public static List<ExpressionContext> extractExpressions(QueryContext queryContext, IndexSegment indexSegment) {
     Set<ExpressionContext> expressionSet = new HashSet<>();
-    List<TransformExpressionTree> expressions = new ArrayList<>();
+    List<ExpressionContext> expressions = new ArrayList<>();
 
-    for (OrderByExpressionContext orderByExpression : orderByExpressions) {
-      ExpressionContext expression = orderByExpression.getExpression();
-      if (expressionSet.add(expression)) {
-        expressions.add(expression.toTransformExpressionTree());
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    if (orderByExpressions != null && queryContext.getLimit() > 0) {
+      // NOTE: Order-by expressions are ignored for queries with LIMIT 0.
+      for (OrderByExpressionContext orderByExpression : orderByExpressions) {
+        ExpressionContext expression = orderByExpression.getExpression();
+        if (expressionSet.add(expression)) {
+          expressions.add(expression);
+        }
       }
     }
 
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     if (selectExpressions.size() == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR)) {
       // For 'SELECT *', sort all columns (ignore columns that start with '$') so that the order is deterministic
       Set<String> allColumns = indexSegment.getColumnNames();
@@ -154,13 +121,13 @@ public class SelectionOperatorUtils {
       for (String column : selectColumns) {
         ExpressionContext expression = ExpressionContext.forIdentifier(column);
         if (!expressionSet.contains(expression)) {
-          expressions.add(expression.toTransformExpressionTree());
+          expressions.add(expression);
         }
       }
     } else {
       for (ExpressionContext selectExpression : selectExpressions) {
         if (expressionSet.add(selectExpression)) {
-          expressions.add(selectExpression.toTransformExpressionTree());
+          expressions.add(selectExpression);
         }
       }
     }

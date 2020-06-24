@@ -19,8 +19,6 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.util.Map;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
@@ -28,6 +26,7 @@ import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.docvalsets.TransformBlockValSet;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 /**
@@ -36,10 +35,10 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
  */
 public class TransformBlock implements Block {
   private final ProjectionBlock _projectionBlock;
-  private final Map<TransformExpressionTree, TransformFunction> _transformFunctionMap;
+  private final Map<ExpressionContext, TransformFunction> _transformFunctionMap;
 
-  public TransformBlock(@Nonnull ProjectionBlock projectionBlock,
-      @Nonnull Map<TransformExpressionTree, TransformFunction> transformFunctionMap) {
+  public TransformBlock(ProjectionBlock projectionBlock,
+      Map<ExpressionContext, TransformFunction> transformFunctionMap) {
     _projectionBlock = projectionBlock;
     _transformFunctionMap = transformFunctionMap;
   }
@@ -48,9 +47,9 @@ public class TransformBlock implements Block {
     return _projectionBlock.getNumDocs();
   }
 
-  public BlockValSet getBlockValueSet(TransformExpressionTree expression) {
-    if (expression.isColumn()) {
-      return _projectionBlock.getBlockValueSet(expression.getValue());
+  public BlockValSet getBlockValueSet(ExpressionContext expression) {
+    if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
+      return _projectionBlock.getBlockValueSet(expression.getIdentifier());
     } else {
       return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expression));
     }
@@ -80,7 +79,7 @@ public class TransformBlock implements Block {
     throw new UnsupportedOperationException();
   }
 
-  public DocIdSetBlock getDocIdSetBlock(){
+  public DocIdSetBlock getDocIdSetBlock() {
     return _projectionBlock.getDocIdSetBlock();
   }
 }

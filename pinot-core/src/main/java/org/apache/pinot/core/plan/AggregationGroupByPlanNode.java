@@ -20,7 +20,6 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -44,7 +43,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final AggregationFunction[] _aggregationFunctions;
-  private final TransformExpressionTree[] _groupByExpressions;
+  private final ExpressionContext[] _groupByExpressions;
   private final TransformPlanNode _transformPlanNode;
   private final StarTreeTransformPlanNode _starTreeTransformPlanNode;
 
@@ -53,14 +52,10 @@ public class AggregationGroupByPlanNode implements PlanNode {
     _indexSegment = indexSegment;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext.getBrokerRequest());
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    int numGroupByExpressions = groupByExpressions.size();
-    _groupByExpressions = new TransformExpressionTree[numGroupByExpressions];
-    for (int i = 0; i < numGroupByExpressions; i++) {
-      _groupByExpressions[i] = groupByExpressions.get(i).toTransformExpressionTree();
-    }
+    _groupByExpressions = groupByExpressions.toArray(new ExpressionContext[0]);
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {
@@ -96,7 +91,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
       }
     }
 
-    Set<TransformExpressionTree> expressionsToTransform =
+    Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, _groupByExpressions);
     _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform);
     _starTreeTransformPlanNode = null;

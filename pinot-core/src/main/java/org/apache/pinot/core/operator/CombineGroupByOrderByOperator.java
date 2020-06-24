@@ -98,8 +98,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
    */
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    AggregationFunction[] aggregationFunctions =
-        AggregationFunctionUtils.getAggregationFunctions(_queryContext.getBrokerRequest());
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_queryContext);
     int numAggregationFunctions = aggregationFunctions.length;
     assert _queryContext.getGroupByExpressions() != null;
     int numGroupByExpressions = _queryContext.getGroupByExpressions().size();

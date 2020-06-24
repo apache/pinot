@@ -26,7 +26,9 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -53,43 +55,48 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   private final ExecutableNode _rootNode;
   private final List<String> _arguments;
 
-  public InbuiltFunctionEvaluator(String expression)
+  public InbuiltFunctionEvaluator(String functionExpression)
       throws Exception {
     _arguments = new ArrayList<>();
-    _rootNode = planExecution(TransformExpressionTree.compileToExpressionTree(expression));
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(functionExpression);
+    Preconditions
+        .checkArgument(expression.getType() == ExpressionContext.Type.FUNCTION, "Invalid function expression: %s",
+            functionExpression);
+    _rootNode = planExecution(expression.getFunction());
   }
 
-  private ExecutableNode planExecution(TransformExpressionTree expressionTree)
+  private ExecutableNode planExecution(FunctionContext function)
       throws Exception {
-    String transformName = expressionTree.getValue();
-    List<TransformExpressionTree> children = expressionTree.getChildren();
-    Class<?>[] argumentTypes = new Class<?>[children.size()];
-    ExecutableNode[] childNodes = new ExecutableNode[children.size()];
-    for (int i = 0; i < children.size(); i++) {
-      TransformExpressionTree childExpression = children.get(i);
+    List<ExpressionContext> arguments = function.getArguments();
+    int numArguments = arguments.size();
+    Class<?>[] argumentTypes = new Class<?>[numArguments];
+    ExecutableNode[] childNodes = new ExecutableNode[numArguments];
+    for (int i = 0; i < numArguments; i++) {
+      ExpressionContext argument = arguments.get(i);
       ExecutableNode childNode;
-      switch (childExpression.getExpressionType()) {
+      switch (argument.getType()) {
         case FUNCTION:
-          childNode = planExecution(childExpression);
+          childNode = planExecution(argument.getFunction());
           break;
         case IDENTIFIER:
-          String columnName = childExpression.getValue();
+          String columnName = argument.getIdentifier();
           childNode = new ColumnExecutionNode(columnName);
           _arguments.add(columnName);
           break;
         case LITERAL:
-          childNode = new ConstantExecutionNode(childExpression.getValue());
+          childNode = new ConstantExecutionNode(argument.getLiteral());
           break;
         default:
-          throw new UnsupportedOperationException("Unsupported expression type:" + childExpression.getExpressionType());
+          throw new IllegalStateException();
       }
       childNodes[i] = childNode;
       argumentTypes[i] = childNode.getReturnType();
     }
 
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(transformName);
+    String functionName = function.getFunctionName();
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionByName(functionName);
     Preconditions.checkState(functionInfo != null && functionInfo.isApplicable(argumentTypes),
-        "Failed to find function of name: %s with argument types: %s", transformName, Arrays.toString(argumentTypes));
+        "Failed to find function of name: %s with argument types: %s", functionName, Arrays.toString(argumentTypes));
     return new FunctionExecutionNode(functionInfo, childNodes);
   }
 

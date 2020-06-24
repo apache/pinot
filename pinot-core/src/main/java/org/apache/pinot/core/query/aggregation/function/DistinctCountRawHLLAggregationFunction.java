@@ -22,24 +22,24 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.SerializedHLL;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, SerializedHLL> {
   private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
-  public DistinctCountRawHLLAggregationFunction(List<String> arguments) {
+  public DistinctCountRawHLLAggregationFunction(List<ExpressionContext> arguments) {
     this(arguments.get(0), new DistinctCountHLLAggregationFunction(arguments));
   }
 
-  DistinctCountRawHLLAggregationFunction(String column,
+  DistinctCountRawHLLAggregationFunction(ExpressionContext expression,
       DistinctCountHLLAggregationFunction distinctCountHLLAggregationFunction) {
-    super(column);
+    super(expression);
     _distinctCountHLLAggregationFunction = distinctCountHLLAggregationFunction;
   }
 
@@ -65,19 +65,19 @@ public class DistinctCountRawHLLAggregationFunction extends BaseSingleInputAggre
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     _distinctCountHLLAggregationFunction.aggregate(length, aggregationResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     _distinctCountHLLAggregationFunction.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     _distinctCountHLLAggregationFunction
         .aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
   }

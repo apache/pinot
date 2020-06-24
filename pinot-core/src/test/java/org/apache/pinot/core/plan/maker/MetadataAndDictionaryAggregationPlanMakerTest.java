@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -37,10 +36,9 @@ import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -66,7 +64,6 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "MetadataAndDictionaryAggregationPlanMakerTest");
 
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private static final InstancePlanMakerImplV2 PLAN_MAKER = new InstancePlanMakerImplV2();
   private IndexSegment _indexSegment = null;
 
@@ -132,8 +129,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
 
   @Test(dataProvider = "testPlanNodeMakerDataProvider")
   public void testInstancePlanMakerForMetadataAndDictionaryPlan(String query, Class<? extends PlanNode> planNodeClass) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
     PlanNode plan = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext);
     assertTrue(planNodeClass.isInstance(plan));
   }
@@ -176,8 +172,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   @Test(dataProvider = "isFitForPlanDataProvider")
   public void testIsFitFor(String query, IndexSegment indexSegment, boolean expectedIsFitForMetadata,
       boolean expectedIsFitForDictionary) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
     assertEquals(InstancePlanMakerImplV2.isFitForMetadataBasedPlan(queryContext), expectedIsFitForMetadata);
     assertEquals(InstancePlanMakerImplV2.isFitForDictionaryBasedPlan(queryContext, indexSegment),
         expectedIsFitForDictionary);

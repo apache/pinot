@@ -21,39 +21,39 @@ package org.apache.pinot.core.startree.plan;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 
 
 public class StarTreeTransformPlanNode implements PlanNode {
-  private final Set<TransformExpressionTree> _groupByExpressions;
+  private final List<ExpressionContext> _groupByExpressions;
   private final StarTreeProjectionPlanNode _starTreeProjectionPlanNode;
 
   public StarTreeTransformPlanNode(StarTreeV2 starTreeV2,
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs,
-      @Nullable TransformExpressionTree[] groupByExpressions, @Nullable FilterContext filter,
-      @Nullable Map<String, String> debugOptions) {
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
+      @Nullable FilterContext filter, @Nullable Map<String, String> debugOptions) {
     Set<String> projectionColumns = new HashSet<>();
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
     }
     Set<String> groupByColumns;
     if (groupByExpressions != null) {
-      _groupByExpressions = new HashSet<>(Arrays.asList(groupByExpressions));
+      _groupByExpressions = Arrays.asList(groupByExpressions);
       groupByColumns = new HashSet<>();
-      for (TransformExpressionTree groupByExpression : groupByExpressions) {
+      for (ExpressionContext groupByExpression : groupByExpressions) {
         groupByExpression.getColumns(groupByColumns);
       }
       projectionColumns.addAll(groupByColumns);
     } else {
-      _groupByExpressions = Collections.emptySet();
+      _groupByExpressions = Collections.emptyList();
       groupByColumns = null;
     }
     _starTreeProjectionPlanNode =

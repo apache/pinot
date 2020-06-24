@@ -22,8 +22,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -36,7 +37,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   @Test(dataProvider = "testJsonPathTransformFunctionArguments")
   public void testJsonPathTransformFunction(String expressionStr, FieldSpec.DataType resultsDataType,
       boolean isSingleValue) {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(expressionStr);
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -104,7 +105,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   public void testJsonPathTransformFunctionWithPredicate() {
     String jsonPathExpressionStr =
         String.format("jsonExtractScalar(json,'[?($.stringSV==''%s'')]','STRING')", _stringSVValues[0]);
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(jsonPathExpressionStr);
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(jsonPathExpressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -118,7 +119,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
             Assert.assertEquals(_intMVValues[i][j], ((List) resultMap.get(0).get("intMV")).get(j));
           }
           Assert.assertEquals(_longSVValues[i], resultMap.get(0).get("longSV"));
-          Assert.assertEquals(Float.compare(_floatSVValues[i], ((Double) resultMap.get(0).get("floatSV")).floatValue()), 0);
+          Assert.assertEquals(Float.compare(_floatSVValues[i], ((Double) resultMap.get(0).get("floatSV")).floatValue()),
+              0);
           Assert.assertEquals(_doubleSVValues[i], resultMap.get(0).get("doubleSV"));
           Assert.assertEquals(_stringSVValues[i], resultMap.get(0).get("stringSV"));
         } catch (IOException e) {
@@ -132,8 +134,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testJsonPathTransformFunctionForIntMV() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.intMV','INT_ARRAY')");
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression("jsonExtractScalar(json,'$.intMV','INT_ARRAY')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -148,8 +150,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testJsonPathTransformFunctionForLong() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.longSV','LONG')");
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression("jsonExtractScalar(json,'$.longSV','LONG')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -161,8 +163,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testJsonPathTransformFunctionForFloat() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.floatSV','FLOAT')");
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression("jsonExtractScalar(json,'$.floatSV','FLOAT')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -174,8 +176,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testJsonPathTransformFunctionForDouble() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.doubleSV','DOUBLE')");
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression("jsonExtractScalar(json,'$.doubleSV','DOUBLE')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -187,8 +189,8 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testJsonPathTransformFunctionForString() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("jsonExtractScalar(json,'$.stringSV','STRING')");
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression("jsonExtractScalar(json,'$.stringSV','STRING')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
@@ -200,7 +202,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testJsonPathKeyTransformFunction() {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree("jsonExtractKey(json,'$.*')");
+    ExpressionContext expression = QueryContextConverterUtils.getExpression("jsonExtractKey(json,'$.*')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractKeyTransformFunction.FUNCTION_NAME);
@@ -219,7 +221,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(expressionStr);
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

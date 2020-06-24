@@ -284,19 +284,20 @@ public class DistinctCountThetaSketchTest extends BaseQueriesTest {
 
       sb.append("'");
       if (thetaSketchParams != null) {
-        sb.append(thetaSketchParams);
+        sb.append(thetaSketchParams.replace("'", "''"));
       }
       sb.append("', ");
 
       for (String predicate : thetaSketchPredicates) {
-        sb.append("\"");
-        sb.append(predicate);
-        sb.append("\"");
+        sb.append('\'');
+        sb.append(predicate.replace("'", "''"));
+        sb.append('\'');
         sb.append(", ");
       }
-      sb.append("\"");
-      sb.append(postAggregationExpression);
-      sb.append("\"");
+
+      sb.append('\'');
+      sb.append(postAggregationExpression.replace("'", "''"));
+      sb.append('\'');
     }
 
     sb.append(") from ");

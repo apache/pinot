@@ -21,17 +21,17 @@ package org.apache.pinot.core.query.aggregation.function;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class DistinctCountMVAggregationFunction extends DistinctCountAggregationFunction {
 
-  public DistinctCountMVAggregationFunction(String column) {
-    super(column);
+  public DistinctCountMVAggregationFunction(ExpressionContext expression) {
+    super(expression);
   }
 
   @Override
@@ -46,7 +46,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     IntOpenHashSet valueSet = getValueSet(aggregationResultHolder);
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
@@ -98,7 +98,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     FieldSpec.DataType valueType = blockValSet.getValueType();
 
@@ -155,7 +155,7 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     FieldSpec.DataType valueType = blockValSet.getValueType();
 

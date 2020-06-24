@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -28,6 +27,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 /**
@@ -65,14 +65,13 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    * @param transformOperator Transform operator
    */
-  public DefaultGroupByExecutor(AggregationFunction[] aggregationFunctions,
-      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      TransformOperator transformOperator) {
+  public DefaultGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator) {
     _aggregationFunctions = aggregationFunctions;
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
-    for (TransformExpressionTree groupByExpression : groupByExpressions) {
+    for (ExpressionContext groupByExpression : groupByExpressions) {
       TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
       hasMVGroupByExpression |= !transformResultMetadata.isSingleValue();
       hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
@@ -134,7 +133,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   protected void aggregate(TransformBlock transformBlock, int length, int functionIndex) {
     AggregationFunction aggregationFunction = _aggregationFunctions[functionIndex];
-    Map<TransformExpressionTree, BlockValSet> blockValSetMap =
+    Map<ExpressionContext, BlockValSet> blockValSetMap =
         AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, transformBlock);
 
     GroupByResultHolder groupByResultHolder = _groupByResultHolders[functionIndex];

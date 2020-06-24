@@ -111,10 +111,11 @@ public class BrokerRequestToQueryContextConverter {
           List<String> stringExpressions = aggregationInfo.getExpressions();
           int numArguments = stringExpressions.size();
           List<ExpressionContext> arguments = new ArrayList<>(numArguments);
-          if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH.getName())) {
-            // NOTE: For DistinctCountThetaSketch, because of the legacy behavior of PQL compiler treating string
-            //       literal as identifier in aggregation, here we treat all expressions except for the first one as
-            //       string literal.
+          if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH.getName()) || functionName
+              .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH.getName())) {
+            // NOTE: For DistinctCountThetaSketch and DistinctCountRawThetaSketch, because of the legacy behavior of PQL
+            //       compiler treating string literal as identifier in aggregation, here we treat all expressions except
+            //       for the first one as string literal.
             arguments.add(QueryContextConverterUtils.getExpression(stringExpressions.get(0)));
             for (int i = 1; i < numArguments; i++) {
               arguments.add(ExpressionContext.forLiteral(stringExpressions.get(i)));

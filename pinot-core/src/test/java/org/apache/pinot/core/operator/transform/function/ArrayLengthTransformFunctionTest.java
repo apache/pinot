@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -30,8 +31,8 @@ public class ArrayLengthTransformFunctionTest extends BaseTransformFunctionTest 
 
   @Test
   public void testLengthTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("arrayLength(%s)", INT_MV_COLUMN));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("arrayLength(%s)", INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ArrayLengthTransformFunction);
     Assert.assertEquals(transformFunction.getName(), ArrayLengthTransformFunction.FUNCTION_NAME);
@@ -47,15 +48,14 @@ public class ArrayLengthTransformFunctionTest extends BaseTransformFunctionTest 
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(expressionStr);
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{
-        new Object[]{String.format("arrayLength(%s,1)", INT_MV_COLUMN)},
-        new Object[]{"arrayLength(2)"},
-        new Object[]{String.format("arrayLength(%s)", LONG_SV_COLUMN)}};
+    return new Object[][]{new Object[]{String.format("arrayLength(%s,1)",
+        INT_MV_COLUMN)}, new Object[]{"arrayLength(2)"}, new Object[]{String.format("arrayLength(%s)",
+        LONG_SV_COLUMN)}};
   }
 }

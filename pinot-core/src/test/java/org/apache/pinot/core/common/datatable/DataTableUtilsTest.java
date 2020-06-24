@@ -20,33 +20,33 @@ package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.util.Collections;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
 public class DataTableUtilsTest {
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
 
   @Test
   public void testBuildEmptyDataTable()
       throws IOException {
     // Selection
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest("SELECT * FROM table WHERE foo = 'bar'");
-    DataTable dataTable = DataTableUtils.buildEmptyDataTable(brokerRequest);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table WHERE foo = 'bar'");
+    DataTable dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     DataSchema dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"*"});
     assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
     assertEquals(dataTable.getNumberOfRows(), 0);
 
     // Aggregation
-    brokerRequest = COMPILER.compileToBrokerRequest("SELECT COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar'");
-    dataTable = DataTableUtils.buildEmptyDataTable(brokerRequest);
+    queryContext = QueryContextConverterUtils
+        .getQueryContextFromPQL("SELECT COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar'");
+    dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"count_star", "sum_a", "max_b"});
     assertEquals(dataSchema.getColumnDataTypes(),
@@ -57,9 +57,9 @@ public class DataTableUtilsTest {
     assertEquals(dataTable.getDouble(0, 2), Double.NEGATIVE_INFINITY);
 
     // PQL group-by
-    brokerRequest =
-        COMPILER.compileToBrokerRequest("SELECT COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar' GROUP BY c, d");
-    dataTable = DataTableUtils.buildEmptyDataTable(brokerRequest);
+    queryContext = QueryContextConverterUtils
+        .getQueryContextFromPQL("SELECT COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar' GROUP BY c, d");
+    dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"functionName", "GroupByResultMap"});
     assertEquals(dataSchema.getColumnDataTypes(),
@@ -73,10 +73,9 @@ public class DataTableUtilsTest {
     assertEquals(dataTable.getObject(2, 1), Collections.emptyMap());
 
     // SQL group-by
-    brokerRequest = COMPILER
-        .compileToBrokerRequest("SELECT c, d, COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar' GROUP BY c, d");
-    brokerRequest.setQueryOptions(Collections.singletonMap(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL));
-    dataTable = DataTableUtils.buildEmptyDataTable(brokerRequest);
+    queryContext = QueryContextConverterUtils.getQueryContextFromPQL(
+        "SELECT c, d, COUNT(*), SUM(a), MAX(b) FROM table WHERE foo = 'bar' GROUP BY c, d OPTION(groupByMode=sql)");
+    dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"c", "d", "count(*)", "sum(a)", "max(b)"});
     assertEquals(dataSchema.getColumnDataTypes(),

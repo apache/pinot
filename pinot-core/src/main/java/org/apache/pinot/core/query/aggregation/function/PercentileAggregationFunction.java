@@ -22,13 +22,13 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 public class PercentileAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, Double> {
@@ -36,8 +36,8 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
 
   protected final int _percentile;
 
-  public PercentileAggregationFunction(String column, int percentile) {
-    super(column);
+  public PercentileAggregationFunction(ExpressionContext expression, int percentile) {
+    super(expression);
     _percentile = percentile;
   }
 
@@ -48,12 +48,12 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
 
   @Override
   public String getColumnName() {
-    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + _column;
+    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + _expression;
   }
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILE.getName().toLowerCase() + _percentile + "(" + _column + ")";
+    return AggregationFunctionType.PERCENTILE.getName().toLowerCase() + _percentile + "(" + _expression + ")";
   }
 
   @Override
@@ -73,7 +73,7 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     DoubleArrayList valueList = getValueList(aggregationResultHolder);
     double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
@@ -83,7 +83,7 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
@@ -93,7 +93,7 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];

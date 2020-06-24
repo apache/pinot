@@ -30,12 +30,12 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -74,7 +74,7 @@ public class DistinctTable {
   /**
    * Constructor of the main DistinctTable which can be used to add records and merge other DistinctTables.
    */
-  public DistinctTable(DataSchema dataSchema, @Nullable List<SelectionSort> orderBy, int limit) {
+  public DistinctTable(DataSchema dataSchema, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit) {
     _dataSchema = dataSchema;
     _limit = limit;
 
@@ -82,20 +82,20 @@ public class DistinctTable {
     // NOTE: When LIMIT is smaller than or equal to the MAX_INITIAL_CAPACITY, no resize is required.
     int initialCapacity = Math.min(limit, MAX_INITIAL_CAPACITY);
     _uniqueRecords = new ObjectOpenHashSet<>(initialCapacity);
-    if (orderBy != null) {
+    if (orderByExpressions != null) {
       String[] columns = dataSchema.getColumnNames();
       int numColumns = columns.length;
       Object2IntOpenHashMap<String> columnIndexMap = new Object2IntOpenHashMap<>(numColumns);
       for (int i = 0; i < numColumns; i++) {
         columnIndexMap.put(columns[i], i);
       }
-      int numOrderByColumns = orderBy.size();
+      int numOrderByColumns = orderByExpressions.size();
       int[] orderByColumnIndexes = new int[numOrderByColumns];
       boolean[] orderByAsc = new boolean[numOrderByColumns];
       for (int i = 0; i < numOrderByColumns; i++) {
-        SelectionSort selectionSort = orderBy.get(i);
-        orderByColumnIndexes[i] = columnIndexMap.getInt(selectionSort.getColumn());
-        orderByAsc[i] = selectionSort.isIsAsc();
+        OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
+        orderByColumnIndexes[i] = columnIndexMap.getInt(orderByExpression.getExpression().toString());
+        orderByAsc[i] = orderByExpression.isAsc();
       }
       _sortedRecords = new PriorityQueue<>(initialCapacity, (record1, record2) -> {
         Object[] values1 = record1.getValues();

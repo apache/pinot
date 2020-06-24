@@ -22,7 +22,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -55,8 +54,8 @@ public class StarTreeUtils {
    * </ul>
    */
   public static boolean isFitForStarTree(StarTreeV2Metadata starTreeV2Metadata,
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs,
-      @Nullable TransformExpressionTree[] groupByExpressions, @Nullable FilterContext filter) {
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
+      @Nullable FilterContext filter) {
     // Check aggregations
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       if (!starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)) {
@@ -68,7 +67,7 @@ public class StarTreeUtils {
     Set<String> starTreeDimensions = new HashSet<>(starTreeV2Metadata.getDimensionsSplitOrder());
     if (groupByExpressions != null) {
       Set<String> groupByColumns = new HashSet<>();
-      for (TransformExpressionTree groupByExpression : groupByExpressions) {
+      for (ExpressionContext groupByExpression : groupByExpressions) {
         groupByExpression.getColumns(groupByColumns);
       }
       if (!starTreeDimensions.containsAll(groupByColumns)) {

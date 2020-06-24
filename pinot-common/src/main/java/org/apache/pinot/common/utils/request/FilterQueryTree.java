@@ -20,12 +20,10 @@ package org.apache.pinot.common.utils.request;
 
 import java.util.List;
 import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 
 
 public class FilterQueryTree {
   private final String column;
-  private final TransformExpressionTree _expression;
   private final List<String> value;
   private final FilterOperator operator;
   private final List<FilterQueryTree> children;
@@ -35,19 +33,10 @@ public class FilterQueryTree {
     this.value = value;
     this.operator = operator;
     this.children = children;
-    if (column != null) {
-      _expression = TransformExpressionTree.compileToExpressionTree(column);
-    } else {
-      _expression = null;
-    }
   }
 
   public String getColumn() {
     return column;
-  }
-
-  public TransformExpressionTree getExpression() {
-    return _expression;
   }
 
   public List<String> getValue() {

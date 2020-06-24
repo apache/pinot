@@ -466,7 +466,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (functionCall == null) {
       return;
     }
-    switch (functionCall.getOperator()) {
+    switch (functionCall.getOperator().toUpperCase()) {
       case "DISTINCTCOUNTHLL":
       case "DISTINCTCOUNTHLLMV":
       case "DISTINCTCOUNTRAWHLL":

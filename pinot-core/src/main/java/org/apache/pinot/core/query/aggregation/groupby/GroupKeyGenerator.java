@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Iterator;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
@@ -46,7 +45,7 @@ public interface GroupKeyGenerator {
    * @param transformBlock Transform block
    * @param groupKeys Buffer to return the results
    */
-  void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] groupKeys);
+  void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys);
 
   /**
    * Generate group keys on the given transform block and returns the result to the given buffer.
@@ -55,7 +54,7 @@ public interface GroupKeyGenerator {
    * @param transformBlock Transform block
    * @param groupKeys Buffer to return the results
    */
-  void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] groupKeys);
+  void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys);
 
   /**
    * Get the current upper bound of the group key. All group keys already generated should be less than this value. This

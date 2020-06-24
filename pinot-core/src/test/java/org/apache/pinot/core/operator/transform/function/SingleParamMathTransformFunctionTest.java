@@ -18,11 +18,15 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.*;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -30,8 +34,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
 
   @Test
   public void testAbsTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("abs(%s)", INT_SV_COLUMN));
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("abs(%s)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
     Assert.assertEquals(transformFunction.getName(), AbsTransformFunction.FUNCTION_NAME);
@@ -41,8 +44,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("abs(%s)", LONG_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("abs(%s)", LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -50,8 +52,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("abs(%s)", FLOAT_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("abs(%s)", FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -59,8 +60,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("abs(%s)", DOUBLE_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("abs(%s)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -68,8 +68,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("abs(%s)", STRING_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("abs(%s)", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -80,8 +79,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
 
   @Test
   public void testCeilTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ceil(%s)", INT_SV_COLUMN));
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("ceil(%s)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
     Assert.assertEquals(transformFunction.getName(), CeilTransformFunction.FUNCTION_NAME);
@@ -91,8 +89,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ceil(%s)", LONG_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("ceil(%s)", LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -100,8 +97,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ceil(%s)", FLOAT_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("ceil(%s)", FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -109,8 +105,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("ceil(%s)", DOUBLE_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("ceil(%s)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -118,8 +113,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ceil(%s)", STRING_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("ceil(%s)", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -130,8 +124,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
 
   @Test
   public void testExpTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("exp(%s)", INT_SV_COLUMN));
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("exp(%s)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
     Assert.assertEquals(transformFunction.getName(), ExpTransformFunction.FUNCTION_NAME);
@@ -141,8 +134,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("exp(%s)", LONG_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("exp(%s)", LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -150,8 +142,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("exp(%s)", FLOAT_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("exp(%s)", FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -159,8 +150,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("exp(%s)", DOUBLE_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("exp(%s)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -168,8 +158,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("exp(%s)", STRING_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("exp(%s)", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -177,11 +166,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
   }
-  
+
   @Test
   public void testFloorTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("floor(%s)", INT_SV_COLUMN));
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("floor(%s)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), FloorTransformFunction.FUNCTION_NAME);
@@ -191,8 +179,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("floor(%s)", LONG_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("floor(%s)", LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -200,8 +187,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("floor(%s)", FLOAT_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("floor(%s)", FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -209,8 +195,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("floor(%s)", DOUBLE_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("floor(%s)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -218,8 +203,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("floor(%s)", STRING_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("floor(%s)", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -230,8 +214,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
 
   @Test
   public void testLnTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ln(%s)", INT_SV_COLUMN));
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("ln(%s)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof LnTransformFunction);
     Assert.assertEquals(transformFunction.getName(), LnTransformFunction.FUNCTION_NAME);
@@ -241,8 +224,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ln(%s)", LONG_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("ln(%s)", LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof LnTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -250,8 +232,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ln(%s)", FLOAT_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("ln(%s)", FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof LnTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -259,8 +240,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("ln(%s)", DOUBLE_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("ln(%s)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof LnTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -268,8 +248,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ln(%s)", STRING_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("ln(%s)", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof LnTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -280,8 +259,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
 
   @Test
   public void testSqrtTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("sqrt(%s)", INT_SV_COLUMN));
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("sqrt(%s)", INT_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     Assert.assertEquals(transformFunction.getName(), SqrtTransformFunction.FUNCTION_NAME);
@@ -291,8 +269,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("sqrt(%s)", LONG_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("sqrt(%s)", LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -300,8 +277,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("sqrt(%s)", FLOAT_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("sqrt(%s)", FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -309,8 +285,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("sqrt(%s)", DOUBLE_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("sqrt(%s)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -318,8 +293,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("sqrt(%s)", STRING_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("sqrt(%s)", STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {

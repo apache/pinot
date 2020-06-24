@@ -21,14 +21,10 @@ package org.apache.pinot.query.aggregation;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
@@ -45,16 +41,16 @@ import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -74,9 +70,9 @@ import org.testng.annotations.Test;
  * test other functions as well.
  * Asserts that aggregation results returned by the executor are as expected.
  */
+@SuppressWarnings("rawtypes")
 public class DefaultAggregationExecutorTest {
-  protected static Logger LOGGER = LoggerFactory.getLogger(DefaultAggregationExecutorTest.class);
-  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "AggregationExecutorTest");
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DefaultAggregationExecutorTest");
   private static final String SEGMENT_NAME = "TestAggregation";
 
   private static final String METRIC_PREFIX = "metric_";
@@ -89,7 +85,7 @@ public class DefaultAggregationExecutorTest {
   public static IndexSegment _indexSegment;
   private Random _random;
   private String[] _columns;
-  private BrokerRequest _brokerRequest;
+  private QueryContext _queryContext;
   private double[][] _inputData;
 
   /**
@@ -118,7 +114,7 @@ public class DefaultAggregationExecutorTest {
       }
     }
     queryBuilder.append(" FROM testTable");
-    _brokerRequest = new Pql2Compiler().compileToBrokerRequest(queryBuilder.toString());
+    _queryContext = QueryContextConverterUtils.getQueryContextFromPQL(queryBuilder.toString());
   }
 
   /**
@@ -128,18 +124,18 @@ public class DefaultAggregationExecutorTest {
   @Test
   void testAggregation() {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
-    Set<TransformExpressionTree> expressionTrees = new HashSet<>();
+    List<ExpressionContext> expressions = new ArrayList<>();
     for (String column : _indexSegment.getPhysicalColumnNames()) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
-      expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
+      expressions.add(ExpressionContext.forIdentifier(column));
     }
     int totalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     MatchAllFilterOperator matchAllFilterOperator = new MatchAllFilterOperator(totalDocs);
     DocIdSetOperator docIdSetOperator = new DocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
-    TransformOperator transformOperator = new TransformOperator(projectionOperator, expressionTrees);
+    TransformOperator transformOperator = new TransformOperator(projectionOperator, expressions);
     TransformBlock transformBlock = transformOperator.nextBlock();
-    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_brokerRequest);
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_queryContext);
     AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
     aggregationExecutor.aggregate(transformBlock);
     List<Object> result = aggregationExecutor.getResult();

@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
@@ -31,6 +30,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
@@ -40,7 +40,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
   private final IndexSegment _indexSegment;
   private final TransformOperator _transformOperator;
-  private final List<TransformExpressionTree> _expressions;
+  private final List<ExpressionContext> _expressions;
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
@@ -49,17 +49,17 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   private int _numDocsScanned = 0;
 
   public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
-      TransformOperator transformOperator) {
+      List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
     _transformOperator = transformOperator;
-    _expressions = SelectionOperatorUtils.extractExpressions(queryContext.getSelectExpressions(), indexSegment);
+    _expressions = expressions;
 
     int numExpressions = _expressions.size();
     _blockValSets = new BlockValSet[numExpressions];
     String[] columnNames = new String[numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
-      TransformExpressionTree expression = _expressions.get(i);
+      ExpressionContext expression = _expressions.get(i);
       TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
       columnNames[i] = expression.toString();
       columnDataTypes[i] =

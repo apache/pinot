@@ -20,11 +20,12 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 public class DistinctCountRawHLLMVAggregationFunction extends DistinctCountRawHLLAggregationFunction {
 
-  public DistinctCountRawHLLMVAggregationFunction(List<String> arguments) {
+  public DistinctCountRawHLLMVAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0), new DistinctCountHLLMVAggregationFunction(arguments));
   }
 

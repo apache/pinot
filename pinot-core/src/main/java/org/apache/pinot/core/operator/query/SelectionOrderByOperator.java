@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
@@ -33,6 +32,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -45,7 +45,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   private final IndexSegment _indexSegment;
   private final TransformOperator _transformOperator;
-  private final List<TransformExpressionTree> _expressions;
+  private final List<ExpressionContext> _expressions;
   private final TransformResultMetadata[] _expressionMetadata;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
@@ -54,20 +54,17 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private int _numDocsScanned = 0;
 
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
-      TransformOperator transformOperator) {
+      List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
     _transformOperator = transformOperator;
-    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-    assert orderByExpressions != null;
-    _expressions = SelectionOperatorUtils
-        .extractExpressions(queryContext.getSelectExpressions(), orderByExpressions, indexSegment);
+    _expressions = expressions;
 
     int numExpressions = _expressions.size();
     _expressionMetadata = new TransformResultMetadata[numExpressions];
     String[] columnNames = new String[numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
-      TransformExpressionTree expression = _expressions.get(i);
+      ExpressionContext expression = _expressions.get(i);
       TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
       _expressionMetadata[i] = expressionMetadata;
       columnNames[i] = expression.toString();
@@ -76,6 +73,8 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    assert orderByExpressions != null;
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         getComparator(orderByExpressions));
@@ -149,7 +148,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       int numExpressions = _expressions.size();
       BlockValSet[] blockValSets = new BlockValSet[numExpressions];
       for (int i = 0; i < numExpressions; i++) {
-        TransformExpressionTree expression = _expressions.get(i);
+        ExpressionContext expression = _expressions.get(i);
         blockValSets[i] = transformBlock.getBlockValueSet(expression);
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
