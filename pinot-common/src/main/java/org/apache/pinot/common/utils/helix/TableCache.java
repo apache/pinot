@@ -64,11 +64,11 @@ public class TableCache {
   }
 
   public String getActualTableName(String tableName) {
-    return _tableConfigChangeListener._tableNameMap.getOrDefault(tableName.toLowerCase(), tableName);
+    return _tableConfigChangeListener._tableNameMap.getOrDefault(canonicalize(tableName), tableName);
   }
 
   public String getActualColumnName(String tableName, String columnName) {
-    String schemaName = _tableConfigChangeListener._table2SchemaConfigMap.get(tableName.toLowerCase());
+    String schemaName = _tableConfigChangeListener._table2SchemaConfigMap.get(canonicalize(tableName));
     if (schemaName != null) {
       String actualColumnName = _schemaChangeListener.getColumnName(schemaName, columnName);
       // If actual column name doesn't exist in schema, then return the origin column name.
@@ -78,6 +78,14 @@ public class TableCache {
       return actualColumnName;
     }
     return columnName;
+  }
+
+  public TableConfig getTableConfig(String tableName) {
+    return _tableConfigChangeListener._tableConfigMap.get(canonicalize(tableName));
+  }
+
+  private String canonicalize(String name) {
+    return name.toLowerCase();
   }
 
   class TableConfigChangeListener implements IZkChildListener, IZkDataListener {
@@ -98,14 +106,14 @@ public class TableCache {
             try {
               TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
               String tableNameWithType = tableConfig.getTableName();
-              _tableConfigMap.put(tableNameWithType, tableConfig);
+              _tableConfigMap.put(canonicalize(tableNameWithType), tableConfig);
               String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
               //create case insensitive mapping
-              _tableNameMap.put(tableNameWithType.toLowerCase(), tableNameWithType);
-              _tableNameMap.put(rawTableName.toLowerCase(), rawTableName);
+              _tableNameMap.put(canonicalize(tableNameWithType), tableNameWithType);
+              _tableNameMap.put(canonicalize(rawTableName), rawTableName);
               //create case insensitive mapping between table name and schemaName
-              _table2SchemaConfigMap.put(tableNameWithType.toLowerCase(), rawTableName);
-              _table2SchemaConfigMap.put(rawTableName.toLowerCase(), rawTableName);
+              _table2SchemaConfigMap.put(canonicalize(tableNameWithType), rawTableName);
+              _table2SchemaConfigMap.put(canonicalize(rawTableName), rawTableName);
             } catch (Exception e) {
               LOGGER.warn("Exception loading table config for: {}: {}", znRecord.getId(), e.getMessage());
               //ignore
@@ -151,12 +159,12 @@ public class TableCache {
           for (ZNRecord znRecord : children) {
             try {
               Schema schema = SchemaUtils.fromZNRecord(znRecord);
-              String schemaNameLowerCase = schema.getSchemaName().toLowerCase();
+              String schemaNameLowerCase = canonicalize(schema.getSchemaName());
               Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
               ConcurrentHashMap<String, String> columnNameMap = new ConcurrentHashMap<>();
               _schemaColumnMap.put(schemaNameLowerCase, columnNameMap);
               for (FieldSpec fieldSpec : allFieldSpecs) {
-                columnNameMap.put(fieldSpec.getName().toLowerCase(), fieldSpec.getName());
+                columnNameMap.put(canonicalize(fieldSpec.getName()), fieldSpec.getName());
               }
             } catch (Exception e) {
               LOGGER.warn("Exception loading schema for: {}: {}", znRecord.getId(), e.getMessage());
@@ -171,9 +179,9 @@ public class TableCache {
     }
 
     String getColumnName(String schemaName, String columnName) {
-      Map<String, String> columnNameMap = _schemaColumnMap.get(schemaName.toLowerCase());
+      Map<String, String> columnNameMap = _schemaColumnMap.get(canonicalize(schemaName));
       if (columnNameMap != null) {
-        return columnNameMap.get(columnName.toLowerCase());
+        return columnNameMap.get(canonicalize(columnName));
       }
       return columnName;
     }

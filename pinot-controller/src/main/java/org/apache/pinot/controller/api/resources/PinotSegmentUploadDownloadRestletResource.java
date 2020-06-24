@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.google.common.base.Strings;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -54,6 +55,8 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -71,7 +74,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
 import org.apache.pinot.core.metadata.MetadataExtractorFactory;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
-import org.apache.pinot.spi.crypt.NoOpPinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -177,13 +179,13 @@ public class PinotSegmentUploadDownloadRestletResource {
   private SuccessResponse uploadSegment(@Nullable String tableName, FormDataMultiPart multiPart,
       boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
     String uploadTypeStr = null;
-    String crypterClassName = null;
+    String crypterClassNameInHeader = null;
     String downloadUri = null;
     if (headers != null) {
       extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
       extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
       uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
-      crypterClassName = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
+      crypterClassNameInHeader = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
       downloadUri = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
     }
 
@@ -194,37 +196,31 @@ public class PinotSegmentUploadDownloadRestletResource {
       ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
       String tempFileName = TMP_DIR_PREFIX + System.nanoTime();
       tempDecryptedFile = new File(provider.getFileUploadTempDir(), tempFileName);
+      tempEncryptedFile = new File(provider.getFileUploadTempDir(), tempFileName + ENCRYPTED_SUFFIX);
       tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
 
-      // Set default crypter to the noop crypter when no crypter header is sent
-      // In this case, the noop crypter will not do any operations, so the encrypted and decrypted file will have the same
-      // file path.
-      if (crypterClassName == null) {
-        crypterClassName = NoOpPinotCrypter.class.getSimpleName();
-        tempEncryptedFile = new File(provider.getFileUploadTempDir(), tempFileName);
-      } else {
-        tempEncryptedFile = new File(provider.getFileUploadTempDir(), tempFileName + ENCRYPTED_SUFFIX);
-      }
+      boolean uploadedSegmentIsEncrypted = !Strings.isNullOrEmpty(crypterClassNameInHeader);
 
-      // TODO: Change when metadata upload added
-      String metadataProviderClass = DefaultMetadataExtractor.class.getName();
-
-      SegmentMetadata segmentMetadata;
+      File dstFile = uploadedSegmentIsEncrypted ? tempEncryptedFile : tempDecryptedFile;
       FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
       switch (uploadType) {
         case URI:
-          segmentMetadata =
-              getMetadataForURI(crypterClassName, downloadUri, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
-                  metadataProviderClass);
+          getSegmentFileFromURI(downloadUri, dstFile);
           break;
         case SEGMENT:
-          getFileFromMultipart(multiPart, tempEncryptedFile);
-          segmentMetadata = getSegmentMetadata(crypterClassName, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
-              metadataProviderClass);
+          getSegmentFileFromMultipart(multiPart, dstFile);
           break;
         default:
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
+
+      if (uploadedSegmentIsEncrypted) {
+        decryptFile(crypterClassNameInHeader, tempEncryptedFile, tempDecryptedFile);
+      }
+
+      // TODO: Change when metadata upload added
+      String metadataProviderClass = DefaultMetadataExtractor.class.getName();
+      SegmentMetadata segmentMetadata = getSegmentMetadata(tempDecryptedFile, tempSegmentDir, metadataProviderClass);
 
       // Fetch segment name
       String segmentName = segmentMetadata.getName();
@@ -251,6 +247,20 @@ public class PinotSegmentUploadDownloadRestletResource {
           _controllerMetrics, _leadControllerManager.isLeaderForTable(offlineTableName))
           .validateOfflineSegment(offlineTableName, segmentMetadata, tempSegmentDir);
 
+      Pair<Boolean, String> encryptionInfo =
+          encryptSegmentIfNeeded(offlineTableName, tempDecryptedFile, tempEncryptedFile, uploadedSegmentIsEncrypted);
+
+      // crypter class name
+      String crypterClassNameInTableConfig = encryptionInfo.getRight();
+      String crypterClassName = Strings.isNullOrEmpty(crypterClassNameInTableConfig) ? crypterClassNameInHeader
+          : crypterClassNameInTableConfig;
+
+      // final segment file
+      Boolean segmentGotEncrypted = encryptionInfo.getLeft();
+      File finalSegmentFile =
+          (uploadedSegmentIsEncrypted || segmentGotEncrypted) ? tempEncryptedFile : tempDecryptedFile;
+
+      // ZK download URI
       String zkDownloadUri;
       // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
       // We will deprecate this behavior eventually.
@@ -264,8 +274,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       }
 
       // Zk operations
-      completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, rawTableName, segmentMetadata,
-          segmentName, zkDownloadUri, moveSegmentToFinalLocation);
+      completeZkOperations(enableParallelPushProtection, headers, finalSegmentFile, rawTableName, segmentMetadata,
+          segmentName, zkDownloadUri, moveSegmentToFinalLocation, crypterClassName);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + rawTableName);
     } catch (WebApplicationException e) {
@@ -290,6 +300,28 @@ public class PinotSegmentUploadDownloadRestletResource {
     return value;
   }
 
+  private Pair<Boolean, String> encryptSegmentIfNeeded(String offlineTableName, File tempDecryptedFile, File tempEncryptedFile,
+      boolean uploadedSegmentIsEncrypted) {
+
+    // get crypter class name from table config
+    String crypterClassName = _pinotHelixResourceManager.getCrypterClassNameFromTableConfig(offlineTableName);
+
+    boolean segmentNeedsEncryption = !Strings.isNullOrEmpty(crypterClassName);
+    if (segmentNeedsEncryption && uploadedSegmentIsEncrypted) {
+      throw new ControllerApplicationException(LOGGER, String.format(
+          "Uploaded segment is encrypted while non-empty crypterClassName in table config '%s' triggers segment encryption.",
+          crypterClassName), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    if (segmentNeedsEncryption) {
+      PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassName);
+      LOGGER.info("Using crypter class {} for encryption.", pinotCrypter.getClass().getName());
+      pinotCrypter.encrypt(tempDecryptedFile, tempEncryptedFile);
+    }
+
+    return ImmutablePair.of(segmentNeedsEncryption, crypterClassName);
+  }
+
   private String getZkDownloadURIForSegmentUpload(String rawTableName, String segmentName) {
     ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
     URI dataDirURI = provider.getDataDirURI();
@@ -303,46 +335,37 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
   }
 
-  private SegmentMetadata getMetadataForURI(String crypterClassHeader, String currentSegmentLocationURI,
-      File tempEncryptedFile, File tempDecryptedFile, File tempSegmentDir, String metadataProviderClass)
+  private void getSegmentFileFromURI(String currentSegmentLocationURI, File destFile)
       throws Exception {
-    SegmentMetadata segmentMetadata;
     if (currentSegmentLocationURI == null || currentSegmentLocationURI.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Failed to get downloadURI, needed for URI upload",
           Response.Status.BAD_REQUEST);
     }
-    LOGGER.info("Downloading segment from {} to {}", currentSegmentLocationURI, tempEncryptedFile.getAbsolutePath());
-    SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
-    segmentMetadata = getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
-        metadataProviderClass);
-    return segmentMetadata;
+    LOGGER.info("Downloading segment from {} to {}", currentSegmentLocationURI, destFile.getAbsolutePath());
+    SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, destFile);
   }
 
-  private SegmentMetadata getSegmentMetadata(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile,
-      File tempSegmentDir, String metadataProviderClass)
+  private SegmentMetadata getSegmentMetadata(File tempDecryptedFile, File tempSegmentDir, String metadataProviderClass)
       throws Exception {
-
-    decryptFile(crypterClassHeader, tempEncryptedFile, tempDecryptedFile);
-
     // Call metadata provider to extract metadata with file object uri
     return MetadataExtractorFactory.create(metadataProviderClass).extractMetadata(tempDecryptedFile, tempSegmentDir);
   }
 
-  private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempEncryptedFile,
+  private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File uploadedSegmentFile,
       String rawTableName, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation)
+      boolean moveSegmentToFinalLocation, String crypter)
       throws Exception {
     URI finalSegmentLocationURI = URIUtils
         .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
             URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-    zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, tempEncryptedFile,
-        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation);
+    zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, uploadedSegmentFile,
+        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, crypter);
   }
 
-  private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {
-    PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassHeader);
-    LOGGER.info("Using crypter class {}", pinotCrypter.getClass().getName());
+  private void decryptFile(String crypterClassName, File tempEncryptedFile, File tempDecryptedFile) {
+    PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassName);
+    LOGGER.info("Using crypter class {} for decryption.", pinotCrypter.getClass().getName());
     pinotCrypter.decrypt(tempEncryptedFile, tempDecryptedFile);
   }
 
@@ -422,7 +445,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
   }
 
-  private File getFileFromMultipart(FormDataMultiPart multiPart, File dstFile)
+  private File getSegmentFileFromMultipart(FormDataMultiPart multiPart, File dstFile)
       throws IOException {
     // Read segment file or segment metadata file and directly use that information to update zk
     Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();

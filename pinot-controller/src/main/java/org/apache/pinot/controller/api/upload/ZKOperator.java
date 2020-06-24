@@ -59,7 +59,7 @@ public class ZKOperator {
 
   public void completeSegmentOperations(String rawTableName, SegmentMetadata segmentMetadata,
       URI finalSegmentLocationURI, File currentSegmentLocation, boolean enableParallelPushProtection,
-      HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation)
+      HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation, String crypter)
       throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
@@ -69,7 +69,6 @@ public class ZKOperator {
         _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
     if (segmentMetadataZnRecord == null) {
       LOGGER.info("Adding new segment {} from table {}", segmentName, rawTableName);
-      String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, crypter,
           rawTableName, segmentName, moveSegmentToFinalLocation);
       return;
@@ -78,13 +77,14 @@ public class ZKOperator {
     LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, rawTableName);
 
     processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
-        enableParallelPushProtection, headers, zkDownloadURI, offlineTableName, segmentName, segmentMetadataZnRecord,
-        moveSegmentToFinalLocation);
+        enableParallelPushProtection, headers, zkDownloadURI, crypter, offlineTableName, segmentName,
+        segmentMetadataZnRecord, moveSegmentToFinalLocation);
   }
 
   private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
       File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI,
-      String offlineTableName, String segmentName, ZNRecord znRecord, boolean moveSegmentToFinalLocation)
+      String crypter, String offlineTableName, String segmentName, ZNRecord znRecord,
+      boolean moveSegmentToFinalLocation)
       throws Exception {
 
     OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
@@ -170,7 +170,6 @@ public class ZKOperator {
               zkDownloadURI);
         }
 
-        String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
         _pinotHelixResourceManager
             .refreshSegment(offlineTableName, segmentMetadata, existingSegmentZKMetadata, zkDownloadURI, crypter);
       }

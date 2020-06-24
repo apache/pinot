@@ -267,6 +267,14 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkIngestionConfig(tableConfigToCompare);
     }
+    {
+      // with crypter class name
+      TableConfig origTableConfig = tableConfigBuilder.setCrypterClassName("AdvancedCrypter").build();
+      TableConfig serDeTableConfig = JsonUtils.stringToObject(origTableConfig.toJsonString(), TableConfig.class);
+      assertEquals(serDeTableConfig.getCrypterClassName(), "AdvancedCrypter");
+      serDeTableConfig = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(origTableConfig));
+      assertEquals(serDeTableConfig.getCrypterClassName(), "AdvancedCrypter");
+    }
   }
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {

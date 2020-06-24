@@ -47,6 +47,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String FIELD_CONFIG_LIST_KEY = "fieldConfigList";
   public static final String UPSERT_CONFIG_KEY = "upsertConfig";
   public static final String INGESTION_CONFIG_KEY = "ingestionConfig";
+  public static final String CRYPTER_CLASS_NAME_KEY = "crypterClassName";
 
   // Double underscore is reserved for real-time segment name delimiter
   private static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -83,6 +84,8 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Config related to ingesting data into the table")
   private IngestionConfig _ingestionConfig;
 
+  private String _crypterClassName;
+
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
       @JsonProperty(value = TABLE_TYPE_KEY, required = true) String tableType,
@@ -97,7 +100,8 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
       @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
-      @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig) {
+      @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig,
+      @JsonProperty(CRYPTER_CLASS_NAME_KEY) @Nullable String crypterClassName) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -122,6 +126,7 @@ public class TableConfig extends BaseJsonConfig {
     _fieldConfigList = fieldConfigList;
     _upsertConfig = upsertConfig;
     _ingestionConfig = ingestionConfig;
+    _crypterClassName = crypterClassName;
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -248,5 +253,15 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setIngestionConfig(IngestionConfig ingestionConfig) {
     _ingestionConfig = ingestionConfig;
+  }
+
+  @JsonProperty(CRYPTER_CLASS_NAME_KEY)
+  @Nullable
+  public String getCrypterClassName() {
+    return _crypterClassName;
+  }
+
+  public void setCrypterClassName(String crypterClassName) {
+    _crypterClassName = crypterClassName;
   }
 }

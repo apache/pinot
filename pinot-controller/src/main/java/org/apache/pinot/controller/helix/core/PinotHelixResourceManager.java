@@ -458,6 +458,18 @@ public class PinotHelixResourceManager {
   public String getActualColumnName(String tableName, String columnName) {
     return _tableCache.getActualColumnName(tableName, columnName);
   }
+
+  /**
+   * Given a table name in any case, returns crypter class name defined in table config
+   * @param tableName table name in any case
+   * @return crypter class name
+   */
+  public String getCrypterClassNameFromTableConfig(String tableName) {
+    TableConfig tableConfig = _tableCache.getTableConfig(tableName);
+    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableName);
+    return tableConfig.getCrypterClassName();
+  }
+
   /**
    * Table related APIs
    */

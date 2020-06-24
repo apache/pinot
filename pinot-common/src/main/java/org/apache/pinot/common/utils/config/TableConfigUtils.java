@@ -131,9 +131,11 @@ public class TableConfigUtils {
       ingestionConfig = JsonUtils.stringToObject(ingestionConfigString, IngestionConfig.class);
     }
 
+    String crypterClassName = simpleFields.get(TableConfig.CRYPTER_CLASS_NAME_KEY);
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
-        upsertConfig, ingestionConfig);
+        upsertConfig, ingestionConfig, crypterClassName);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -182,6 +184,10 @@ public class TableConfigUtils {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null) {
       simpleFields.put(TableConfig.INGESTION_CONFIG_KEY, JsonUtils.objectToString(ingestionConfig));
+    }
+    String crypterClassName = tableConfig.getCrypterClassName();
+    if (crypterClassName != null) {
+      simpleFields.put(TableConfig.CRYPTER_CLASS_NAME_KEY, crypterClassName);
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

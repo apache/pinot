@@ -97,6 +97,7 @@ public class TableConfigBuilder {
 
   private UpsertConfig _upsertConfig;
   private IngestionConfig _ingestionConfig;
+  private String _crypterClassName;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -300,6 +301,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setCrypterClassName(String crypterClassName) {
+    _crypterClassName = crypterClassName;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -344,6 +350,6 @@ public class TableConfigBuilder {
 
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _ingestionConfig);
+        _fieldConfigList, _upsertConfig, _ingestionConfig, _crypterClassName);
   }
 }
