@@ -23,7 +23,7 @@ import { defaultDetectionYaml, redundantParse } from 'thirdeye-frontend/utils/ya
 import RSVP from "rsvp";
 import fetch from 'fetch';
 import {
-  selfServeApiGraph, selfServeApiCommon
+  selfServeApiGraph, autocompleteAPI
 } from 'thirdeye-frontend/utils/api/self-serve';
 import {inject as service} from '@ember/service';
 import config from 'thirdeye-frontend/config/environment';
@@ -83,7 +83,7 @@ export default Component.extend({
     let defaultReturn = Promise.resolve(noResultsArray);
     // when metric is being autocompleted, entire text field will be replaced and metricId stored in editor
     if (yamlAsObject.metric === prefix) {
-      return fetch(selfServeApiCommon.metricAutoComplete(prefix))
+      return fetch(autocompleteAPI.metric(prefix))
         .then(checkStatus)
         .then(metrics => {
           if (metrics && metrics.length > 0) {

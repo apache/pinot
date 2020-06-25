@@ -81,7 +81,7 @@ export function isIterable(obj) {
  * @see isIterable(obj)
  */
 export function makeIterable(obj) {
-  if (obj === null) {
+  if (obj === null || obj === undefined) {
     return [];
   }
   return isIterable(obj) ? [...obj] : [obj];

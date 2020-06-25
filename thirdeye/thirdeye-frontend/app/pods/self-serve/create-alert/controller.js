@@ -21,7 +21,7 @@ import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import {toastOptions} from 'thirdeye-frontend/utils/constants';
 import {
   selfServeApiGraph,
-  selfServeApiCommon
+  autocompleteAPI
 } from 'thirdeye-frontend/utils/api/self-serve';
 import {
   buildMetricDataUrl,
@@ -230,7 +230,7 @@ export default Controller.extend({
    */
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
-    const autoCompleteResults = yield fetch(selfServeApiCommon.metricAutoComplete(metric)).then(checkStatus);
+    const autoCompleteResults = yield fetch(autocompleteAPI.metric(metric)).then(checkStatus);
     this.get('metricLookupCache').push(...autoCompleteResults);
     return autoCompleteResults;
   }),
@@ -257,7 +257,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchFunctionById(functionId) {
-    const url = selfServeApiCommon.alertById(functionId);
+    const url = autocompleteAPI.getAlertById(functionId);
     return fetch(url).then(checkStatus);
   },
 
@@ -269,7 +269,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchAlertsByName(functionName) {
-    const url = selfServeApiCommon.alertFunctionByName(functionName);
+    const url = autocompleteAPI.alertByName(functionName);
     return fetch(url).then(checkStatus);
   },
 

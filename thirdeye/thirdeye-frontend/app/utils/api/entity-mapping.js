@@ -1,4 +1,4 @@
-import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
+import { autocompleteAPI } from 'thirdeye-frontend/utils/api/self-serve';
 
 /**
  * Endpoints for entity mapping modal
@@ -8,9 +8,10 @@ export const entityMappingApi = {
   deleteUrl: `/entityMapping/delete`,
   getRelatedEntitiesUrl: `/entityMapping/view/fromURN`,
   getDatasetsUrl: `/data/datasets`,
+  getRulesUrl: '/detection/rule',
   getServicesUrl: `/external/services/all`,
   metricAutoCompleteUrl(str) {
-    return selfServeApiCommon.metricAutoComplete(str);
+    return autocompleteAPI.metric(str);
   },
   getRelatedEntitiesDataUrl(urns) {
     return `/rootcause/raw?framework=identity&urns=${urns}`;

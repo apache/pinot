@@ -71,11 +71,10 @@ module('Integration | Component | entity-filter', function(hooks) {
 
     $filterList.each((index, item) => {
       let itemName = this.filterBlocksGlobal[0].filterKeys[index];
-      let itemTotal = this.filterBlocksGlobal[0].totals[index];
       assert.equal(
         item.innerText.trim(),
-        `${itemName} (${itemTotal})`,
-        `correctly displays filter item "${itemName}" and its count`
+        `${itemName}`,
+        `correctly displays filter item "${itemName}"`
       );
     });
 

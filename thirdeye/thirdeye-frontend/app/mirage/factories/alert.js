@@ -3,6 +3,7 @@ import { Factory } from 'ember-cli-mirage';
 export default Factory.extend({
   metric(i) { return `test_metric_${i+1}`; },
   functionName(i) { return `test_function_${i+1}`; },
+  subscriptionGroup(i) { return [`test_sub_${i+1}`]; },
   createdBy : null,
   name(i) { return `test_function_${i+1}`; },
   rules : [ {

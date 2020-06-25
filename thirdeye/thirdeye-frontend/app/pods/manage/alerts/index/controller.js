@@ -13,13 +13,21 @@ import {
   setProperties
 } from '@ember/object';
 import moment from 'moment';
-import { once } from '@ember/runloop';
-import { isPresent, isBlank } from '@ember/utils';
+import { isPresent } from '@ember/utils';
 import Controller from '@ember/controller';
 import { reads } from '@ember/object/computed';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import { powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
-import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
+import {
+  autocompleteAPI,
+  yamlAPI
+} from 'thirdeye-frontend/utils/api/self-serve';
+import { task, timeout } from 'ember-concurrency';
+import {
+  enrichAlertResponseObject,
+  filterToParamsMap,
+  populateFiltersLocal
+} from 'thirdeye-frontend/utils/yaml-tools';
 
 export default Controller.extend({
   queryParams: ['testMode'],
@@ -27,11 +35,9 @@ export default Controller.extend({
   /**
    * One-way CP to store all sub groups
    */
-  originalAlerts: reads('model.alerts'),
-  ownedAlerts: reads('model.ownedAlerts'),
-  subscribedAlerts: reads('model.subscribedAlerts'),
-  initialFiltersLocal: reads('model.initialFiltersLocal'),
-  initialFiltersGlobal: reads('model.initialFiltersGlobal'),
+  totalNumberOfAlerts: 0,
+  user: reads('model.user'),
+  rules: reads('model.rules'),
 
   /**
    * Used to help display filter settings in page header
@@ -39,6 +45,11 @@ export default Controller.extend({
   primaryFilterVal: 'All Alerts',
   isFilterStrLenMax: false,
   maxFilterStrngLength: 84,
+
+  //
+  // internal
+  //
+  mostRecentSearches: null, // promise
 
   /**
    * Used to trigger re-render of alerts list
@@ -59,6 +70,7 @@ export default Controller.extend({
    * Default Sort Mode
    */
   selectedSortMode: 'Edited:last',
+  selectedGlobalFilter: ['All alerts'],
 
   /**
    * Filter settings
@@ -66,7 +78,6 @@ export default Controller.extend({
   alertFilters: {},
   resetFiltersGlobal: null,
   resetFiltersLocal: null,
-  alertFoundByName: null,
 
   /**
    * The first and broadest entity search property
@@ -78,6 +89,57 @@ export default Controller.extend({
 
   // Alerts to display per PAge
   pageSize: 10,
+
+  originalAlerts: [],
+
+  ownedAlerts: computed(
+    'originalAlerts',
+    function() {
+      const {
+        originalAlerts,
+        user
+      } = this.getProperties('originalAlerts', 'user');
+
+      return originalAlerts.filter(alert => alert.createdBy === user);
+    }
+  ),
+
+  filterBlocksGlobal: computed(
+    'ownedAlerts',
+    'originalAlerts',
+    'selectedGlobalFilter',
+    function() {
+      const {
+        selectedGlobalFilter
+      } = this.getProperties('selectedGlobalFilter');
+
+      // This filter category is "global" in nature. When selected, they reset the rest of the filters
+      return [
+        {
+          name: 'primary',
+          type: 'link',
+          preventCollapse: true,
+          selected: selectedGlobalFilter,
+          filterKeys: ['Alerts I subscribe to', 'Alerts I own', 'All alerts']
+        }
+      ];
+    }
+  ),
+
+  initialFiltersLocal: computed(
+    'rules',
+    'originalAlerts',
+    function() {
+      const {
+        originalAlerts,
+        rules
+      } = this.getProperties('originalAlerts', 'rules');
+
+      // This filter category is "secondary". To add more, add an entry here and edit the controller's "filterToPropertyMap"
+      const filterBlocksLocal = populateFiltersLocal(originalAlerts, rules);
+      return filterBlocksLocal;
+    }
+  ),
 
   // Number of pages to display
   paginationSize: computed(
@@ -93,11 +155,11 @@ export default Controller.extend({
 
   // Total Number of pages to display
   pagesNum: computed(
-    'totalFilteredAlerts',
+    'totalNumberOfAlerts',
     'pageSize',
     function() {
-      const { pageSize, totalFilteredAlerts } = getProperties(this, 'pageSize', 'totalFilteredAlerts');
-      return Math.ceil(totalFilteredAlerts/pageSize);
+      const { pageSize, totalNumberOfAlerts } = getProperties(this, 'pageSize', 'totalNumberOfAlerts');
+      return Math.ceil(totalNumberOfAlerts/pageSize);
     }
   ),
 
@@ -123,96 +185,27 @@ export default Controller.extend({
     }
   ),
 
-  // Performs all filters when needed before pagination
-  selectedAlerts: computed(
-    'filtersTriggered',
-    'alertFoundByName',
-    'alertFilters',
-    function() {
-      const {
-        alertFilters,
-        topSearchKeyName,
-        filterBlocksLocal,
-        alertFoundByName,
-        filterToPropertyMap,
-        originalAlerts: initialAlerts
-      } = getProperties(this, 'alertFilters', 'topSearchKeyName', 'filterBlocksLocal', 'alertFoundByName', 'filterToPropertyMap', 'originalAlerts');
-      const filterBlocksCopy = _.cloneDeep(filterBlocksLocal);
-      const selectFieldKeys = Object.keys(filterToPropertyMap);
-      const fieldsByState = (state) => alertFilters ? selectFieldKeys.filter((key) => {
-        return (state === 'active') ? isPresent(alertFilters[key]) : isBlank(alertFilters[key]);
-      }) : [];
-      const inactiveFields = fieldsByState('inactive');
-      const activeFields = fieldsByState('active');
-      // Recalculate only 'select' filters when we have a change in them
-      const canRecalcFilterOptions = alertFilters && alertFilters.triggerType !== 'checkbox';
-      const filtersToRecalculate = filterBlocksCopy.filter(block => block.type === 'select');
-      const nonSelectFilters = filterBlocksCopy.filter(block => block.type !== 'select');
-      let filteredAlerts = initialAlerts;
-
-      if (alertFoundByName) {
-        filteredAlerts = [alertFoundByName];
-      } else if (alertFilters) {
-        // Do the filtering of alerts using the original model-fetched alerts array
-        filteredAlerts = this._filterAlerts(initialAlerts, alertFilters);
-        // Recalculate each select filter's options (based on available filters from current selection)
-        if (canRecalcFilterOptions) {
-          filtersToRecalculate.forEach((blockItem) => {
-            Object.assign(blockItem, { selected: alertFilters[blockItem.name] });
-            // We are recalculating each field where options have not been selected
-            if (inactiveFields.includes(blockItem.name) || !inactiveFields.length) {
-              Object.assign(blockItem, { filterKeys: this._recalculateFilterKeys(filteredAlerts, blockItem) });
-            }
-            // For better UX: restore top field options if its the only active field. In our case the top field is 'applications'
-            if (blockItem.name === topSearchKeyName && activeFields.join('') === topSearchKeyName) {
-              Object.assign(blockItem, { filterKeys: this._recalculateFilterKeys(initialAlerts, blockItem) });
-            }
-          });
-          // Preserve selected state for filters that initially have a "selected" property
-          if (nonSelectFilters.length) {
-            nonSelectFilters.forEach((filter) => {
-              filter.selected = alertFilters[filter.name] ? alertFilters[filter.name] : filter.selected;
-            });
-          }
-          // Be sure to update the filter options object once per pass
-          once(() => {
-            set(this, 'filterBlocksLocal', filterBlocksCopy);
-          });
-        }
-      }
-
-      setProperties(this, {
-        filtersTriggered: false, // reset filter trigger
-        alertFoundByName: false // reset single found alert var
-      });
-
-      return filteredAlerts;
-    }
-  ),
-
   // Total displayed alerts
   totalFilteredAlerts: computed(
-    'selectedAlerts.@each',
+    'originalAlerts.@each',
     function() {
-      return this.get('selectedAlerts').length;
+      return this.get('originalAlerts').length;
     }
   ),
 
   // alerts with pagination
   paginatedSelectedAlerts: computed(
-    'selectedAlerts.@each',
+    'originalAlerts.@each',
     'filtersTriggered',
     'pageSize',
     'currentPage',
     'selectedSortMode',
     function() {
       const {
-        pageSize,
-        currentPage,
         selectedSortMode
-      } = getProperties(this, 'pageSize', 'currentPage', 'selectedSortMode');
+      } = getProperties(this, 'selectedSortMode');
       // Initial set of alerts
-      let alerts = this.get('selectedAlerts');
+      let alerts = this.get('originalAlerts');
       // Alpha sort accounting for spaces in function name
       let alphaSortedAlerts = powerSort(alerts, 'functionName');
       // Handle selected sort order
@@ -235,7 +228,7 @@ export default Controller.extend({
         }
       }
       // Return one page of sorted alerts
-      return alerts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+      return alerts;
     }
   ),
 
@@ -263,7 +256,7 @@ export default Controller.extend({
         set(this, 'primaryFilterVal', filterStr);
         let filterArr = [get(this, 'primaryFilterVal')];
         Object.keys(alertFilters).forEach((filterKey) => {
-          if (filterKey !== 'primary') {
+          if (filterKey !== 'primary' && filterKey != 'names') {
             const value = alertFilters[filterKey];
             const isStatusAll = filterKey === 'status' && Array.isArray(value) && value.length > 1;
             // Only display valid search filters
@@ -281,147 +274,15 @@ export default Controller.extend({
   ),
 
   /**
-   * We are recalculating the options of each selection field. The values come from the aggregated
-   * properties across all filtered alerts. For example, it returns all possible values for 'application'
-   * @method _recalculateFilterKeys
-   * @param {Array} alertsCollection - array of alerts we are extracting values from
-   * @param {Object} blockItem - the current search filter object
-   * @returns {Array} - a deduped array of values to use as select options
-   * @private
+   * flag meaning alerts are loading for current page
+   * @type {Boolean}
    */
-  _recalculateFilterKeys(alertsCollection, blockItem) {
-    const filterToPropertyMap = get(this, 'filterToPropertyMap');
-    // Aggregate all existing values for our target properties in the current array collection
-    let alertPropsAsKeys = [];
-    // Make sure subscription groups are not bundled for filter parameters
-    if (blockItem.name === 'subscription') {
-      alertsCollection.forEach(alert => {
-        let groups = alert[filterToPropertyMap[blockItem.name]];
-        if (groups) {
-          groups.split(", ").forEach(g => {
-            alertPropsAsKeys.push(g);
-          });
-        }
-      });
-    } else if (blockItem.name === 'application') {
-      // Make sure applications are not bundled for filter parameters
-      alertsCollection.forEach(alert => {
-        let applications = alert[filterToPropertyMap[blockItem.name]];
-        if (applications) {
-          applications.split(", ").forEach(a => {
-            alertPropsAsKeys.push(a);
-          });
-        }
-      });
-    } else {
-      alertPropsAsKeys = alertsCollection.map(alert => alert[filterToPropertyMap[blockItem.name]]);
+  isLoading: computed(
+    '_getAlerts.isIdle',
+    function() {
+      return !get(this, '_getAnomalies.isIdle');
     }
-    // Add 'none' select option if allowed
-    const canInsertNullOption = alertPropsAsKeys.includes(undefined) && blockItem.hasNullOption;
-    if (canInsertNullOption) { alertPropsAsKeys.push('none'); }
-    // Return a deduped array containing all of the values for this property in the current set of alerts
-    return [ ...new Set(powerSort(alertPropsAsKeys.filter(val => isPresent(val)), null)) ];
-  },
-
-  /**
-   * This is the core filtering method which acts upon a set of initial alerts to return a subset
-   * @method _filterAlerts
-   * @param {Array} initialAlerts - array of all alerts to start with
-   * @param {Object} filters - filter key/values to process
-   * @example
-   * {
-   *   application: ['app name a', 'app name b'],
-   *   status: ['active'],
-   *   owner: ['person1@linkedin.com, person2@linkedin.com'],
-   *   type: null
-   * }
-   * @returns {undefined}
-   * @private
-   */
-  _filterAlerts(initialAlerts, filters) {
-    const filterToPropertyMap = get(this, 'filterToPropertyMap');
-    // A click on a primary alert filter will reset 'filteredAlerts'
-    if (filters.primary) {
-      this._processPrimaryFilters(initialAlerts, filters.primary);
-    }
-    // Pick up cached alert array for the secondary filters
-    let filteredAlerts = get(this, 'filteredAlerts');
-    // If there is a secondary filter present, filter by it, using the keys we've set up in our filter map
-    Object.keys(filterToPropertyMap).forEach((filterKey) => {
-      let filterValueArray = filters[filterKey];
-      if (filterValueArray && filterValueArray.length) {
-        let newAlerts = filteredAlerts.filter(alert => {
-          // See 'filterToPropertyMap' in route. For filterKey = 'owner' this would map alerts by alert['createdBy'] = x
-          const targetAlertPropertyValue = alert[filterToPropertyMap[filterKey]];
-          let alertMeetsCriteria = false;
-          // In the cases for subscription and application, there can be multiple values.  We just need to match on one
-          if (filterKey === "subscription") {
-            if (targetAlertPropertyValue) {
-              filterValueArray.forEach(val => {
-                if (targetAlertPropertyValue.includes(val)) {
-                  alertMeetsCriteria = true;
-                }
-              });
-            }
-          } else if (filterKey === "application") {
-            if (targetAlertPropertyValue) {
-              filterValueArray.forEach(val => {
-                if (targetAlertPropertyValue.includes(val)) {
-                  alertMeetsCriteria = true;
-                }
-              });
-            }
-          } else {
-            alertMeetsCriteria = targetAlertPropertyValue && filterValueArray.includes(targetAlertPropertyValue);
-          }
-          const isMatchForNone = !alert.hasOwnProperty(filterToPropertyMap[filterKey]) && filterValueArray.includes('none');
-          return alertMeetsCriteria || isMatchForNone;
-        });
-        filteredAlerts = newAlerts;
-      }
-    });
-
-    // If status filter is present, we re-build the results array to contain only active alerts, inactive alerts, or both.
-    if (filters.status) {
-      const concatStatus = filters.status.length ? filters.status.join().toLowerCase() : 'active';
-      const requireAll = filters.status.includes('Active') && filters.status.includes('Inactive');
-      const alertsByState = {
-        active: filteredAlerts.filter(alert => alert.active),
-        inactive: filteredAlerts.filter(alert => !alert.active)
-      };
-      filteredAlerts = requireAll ? [ ...alertsByState.active, ...alertsByState.inactive ] : alertsByState[concatStatus];
-    }
-
-    return filteredAlerts;
-  },
-
-  /**
-   * Simply select the appropriate set of alerts called for by primary filter
-   * @method _processPrimaryFilters
-   * @param {Array} originalAlerts - array of all alerts from model
-   * @param {Object} primaryFilter - filter key/value for primary filter selections
-   * @returns {undefined}
-   * @private
-   */
-  _processPrimaryFilters (originalAlerts, primaryFilter) {
-    const { ownedAlerts, subscribedAlerts } = getProperties(this, 'ownedAlerts', 'subscribedAlerts');
-
-    let newAlerts = [];
-    switch(primaryFilter) {
-      case 'Alerts I subscribe to': {
-        newAlerts = subscribedAlerts;
-        break;
-      }
-      case 'Alerts I own': {
-        newAlerts = ownedAlerts;
-        break;
-      }
-      default: {
-        newAlerts = originalAlerts;
-      }
-    }
-    set(this, 'filteredAlerts', newAlerts);
-  },
+  ),
 
   /**
    * When user chooses to either find an alert by name, or use a global filter,
@@ -431,24 +292,12 @@ export default Controller.extend({
    * @returns {undefined}
    * @private
    */
-  _resetLocalFilters(alert) {
+  _resetLocalFilters() {
     let alertFilters = {};
-    const filterToPropertyMap = get(this, 'filterToPropertyMap');
     const newFilterBlocksLocal = _.cloneDeep(get(this, 'initialFiltersLocal'));
-
-    // Set new select field options (filterKeys) to our found alert properties
-    Object.keys(filterToPropertyMap).forEach((filterKey) => {
-      let targetAlertProp = alert[filterToPropertyMap[filterKey]];
-      alertFilters[filterKey] = targetAlertProp ? [ targetAlertProp ] : ['none'];
-      newFilterBlocksLocal.find(filter => filter.name === filterKey).filterKeys = alertFilters[filterKey];
-    });
 
     // Do not highlight any of the primary filters
     Object.assign(alertFilters, { primary: 'none' });
-
-    // Set correct status on current alert
-    const alertStatus = alert.active ? 'Active' : 'Inactive';
-    newFilterBlocksLocal.find(filter => filter.name === 'status').selected = [ alertStatus ];
 
     // Reset local (secondary) filters, and set select fields to 'disabled'
     setProperties(this, {
@@ -459,12 +308,109 @@ export default Controller.extend({
     });
   },
 
+  _getAlerts: task (function * (params) {
+    const alerts = yield fetch(yamlAPI.getPaginatedAlertsUrl(params)).then(checkStatus);
+    const enrichedAlerts = enrichAlertResponseObject((alerts || {}).elements);
+    set(this, 'originalAlerts', enrichedAlerts);
+    set(this, 'totalNumberOfAlerts', (alerts || {}).count);
+    // Reset secondary filters
+    setProperties(this, {
+      filterBlocksLocal: _.cloneDeep(get(this, 'initialFiltersLocal')),
+      resetFiltersLocal: moment().valueOf()
+    });
+  }).keepLatest(),
+
+  /**
+   * Ember concurrency task that triggers alert names autocomplete
+   */
+  _searchAlertNames: task(function* (text) {
+    yield timeout(1000);
+    return fetch(autocompleteAPI.alertByName(text))
+      .then(checkStatus);
+  }),
+
+  _fetchAlerts() {
+    const paramsForAlerts = get(this, 'paramsForAlerts');
+    return this.get('_getAlerts').perform(paramsForAlerts);
+  },
+
+  _handlePrimaryFilter(primaryFilter, paramsForAlerts) {
+    switch(primaryFilter) {
+      case 'Alerts I subscribe to': {
+        const user = this.get('user');
+        paramsForAlerts['subscribedBy'] = user;
+        set(this, 'paramsForAlerts', paramsForAlerts);
+        break;
+      }
+      case 'Alerts I own': {
+        paramsForAlerts['createdBy'] = this.get('user');
+        set(this, 'selectedGlobalFilter', [primaryFilter]);
+        break;
+      }
+      case 'All alerts': {
+        set(this, 'selectedGlobalFilter', [primaryFilter]);
+        break;
+      }
+    }
+  },
+
+  _updateParamsWithFilters() {
+    const paramsForAlerts = {};
+    const alertFilters = this.get('alertFilters');
+    const filterFields = Object.keys(filterToParamsMap);
+    filterFields.forEach(field => {
+      if (Array.isArray(alertFilters[field]) && alertFilters[field].length > 0) {
+        if (field === 'status') {
+          if (alertFilters[field].length < 2) {
+            switch (alertFilters[field][0]) {
+              case 'Inactive':
+                paramsForAlerts[filterToParamsMap[field]] = false;
+                break;
+              case 'Active':
+                paramsForAlerts[filterToParamsMap[field]] = true;
+                break;
+            }
+          } else {
+            delete paramsForAlerts[filterToParamsMap[field]];
+          }
+        } else {
+          paramsForAlerts[filterToParamsMap[field]] = alertFilters[field];
+        }
+      } else {
+        delete paramsForAlerts[filterToParamsMap[field]];
+      }
+    });
+    if (alertFilters.primary) {
+      this._handlePrimaryFilter(alertFilters.primary, paramsForAlerts);
+    }
+    set(this, 'paramsForAlerts', paramsForAlerts);
+  },
+
   actions: {
     // Handles alert selection from single alert typeahead
     onSelectAlertByName(alert) {
       if (!alert) { return; }
-      set(this, 'alertFoundByName', alert);
-      this._resetLocalFilters(alert);
+      set(this, 'alertFilters', { names: [alert.name] });
+      this._updateParamsWithFilters();
+      this._fetchAlerts();
+      this.set('currentPage', 1);
+    },
+
+
+    /**
+     * Performs a search task while cancelling the previous one
+     * @param {String} text
+     */
+    onSearch(text) {
+      const searchCache = this.get('mostRecentSearches');
+      if (searchCache) {
+        searchCache.cancel();
+      }
+      const task = this.get('_searchAlertNames');
+      const taskInstance = task.perform(text);
+      set(this, 'searchCache', taskInstance);
+
+      return taskInstance;
     },
 
     // Handles filter selections (receives array of filter options)
@@ -476,15 +422,9 @@ export default Controller.extend({
         allowFilterSummary: true,
         alertFilters: updatedAlertFilters
       });
-      // Reset secondary filters component instance if a primary filter was selected
-      if (Object.keys(filterObj).includes('primary')) {
-        setProperties(this, {
-          filterBlocksLocal: _.cloneDeep(get(this, 'initialFiltersLocal')),
-          resetFiltersLocal: moment().valueOf()
-        });
-      }
-      // Reset current page
-      set(this, 'currentPage', 1);
+      this._updateParamsWithFilters();
+      this._fetchAlerts();
+      this.set('currentPage', 1);
     },
 
     /**
@@ -499,7 +439,7 @@ export default Controller.extend({
         method: 'delete',
         headers: { 'content-type': 'text/plain' }
       };
-      const url = selfServeApiCommon.deleteAlert(functionId);
+      const url = autocompleteAPI.deleteAlert(functionId);
       fetch(url, postProps).then(checkStatus).then(() => {
         this.send('refreshModel');
       });
@@ -535,6 +475,11 @@ export default Controller.extend({
           break;
       }
 
+      const offset = this.get('pageSize') * (newPage - 1);
+      let paramsForAlerts = get(this, 'paramsForAlerts');
+      Object.assign(paramsForAlerts, { offset });
+      set(this, 'paramsForAlerts', paramsForAlerts);
+      this._fetchAlerts();
       this.set('currentPage', newPage);
     }
   }
