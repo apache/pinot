@@ -194,15 +194,23 @@ public class AlertSearcher {
     Set<Long> metricIds = new HashSet<>();
     if (!searchFilter.getMetrics().isEmpty()) {
       for (String metric : searchFilter.getMetrics()) {
-        metricIds =
-            this.metricDAO.findByMetricName(metric).stream().map(AbstractDTO::getId).collect(Collectors.toSet());
+        metricIds.addAll(
+            this.metricDAO.findByMetricName(metric).stream().map(AbstractDTO::getId).collect(Collectors.toSet()));
       }
     }
 
     if (!searchFilter.getDatasets().isEmpty()) {
+      Set<Long> metricIdsFromDataset = new HashSet<>();
       for (String dataset : searchFilter.getDatasets()) {
-        metricIds.retainAll(
-            this.metricDAO.findByDataset(dataset).stream().map(AbstractDTO::getId).collect(Collectors.toSet()));
+        metricIdsFromDataset.addAll(this.metricDAO.findByPredicate(Predicate.LIKE("dataset", "%" + dataset + "%"))
+            .stream()
+            .map(AbstractDTO::getId)
+            .collect(Collectors.toSet()));
+      }
+      if (!searchFilter.getMetrics().isEmpty()) {
+        metricIds.retainAll(metricIdsFromDataset);
+      } else {
+        metricIds = metricIdsFromDataset;
       }
     }
 
