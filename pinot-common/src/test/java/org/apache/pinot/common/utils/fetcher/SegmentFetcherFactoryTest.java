@@ -21,6 +21,8 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.List;
+import javax.ws.rs.NotSupportedException;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.testng.annotations.Test;
@@ -87,6 +89,12 @@ public class SegmentFetcherFactoryTest {
         throws Exception {
       assertEquals(uri, new URI(TEST_URI));
       _fetchFileToLocalCalled++;
+    }
+
+    @Override
+    public void fetchSegmentToLocal(List<URI> uri, File dest)
+        throws Exception {
+      throw new UnsupportedOperationException();
     }
   }
 }
