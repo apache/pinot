@@ -23,6 +23,8 @@ alerterConfiguration:
   smtpConfiguration:
     smtpHost: localhost
     smtpPort: 25
+logging:
+  type: external
 server:
   type: default
   applicationConnectors:
@@ -31,6 +33,8 @@ server:
   adminConnectors:
     - type: http
       port: 1427
+  requestLog:
+    type: external
 whitelistDatasets: []
 swagger:
   resourcePackage: "org.apache.pinot.thirdeye.dashboard.resources,org.apache.pinot.thirdeye.dashboard.resources.v2,org.apache.pinot.thirdeye.anomaly.onboard,org.apache.pinot.thirdeye.detection,org.apache.pinot.thirdeye.detection.yaml"
