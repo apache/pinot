@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,9 +48,11 @@ public class PeerServerSegmentFinderTest {
   private static final String CLUSTER_NAME = "dummyCluster";
   private static final String INSTANCE_ID1 = "Server_localhost_1000";
   private static final String INSTANCE_ID2 = "Server_localhost_1001";
+  private static final String INSTANCE_ID3 = "Server_localhost_1003";
   public static final String ADMIN_PORT = "1008";
   public static final String HOST_1_NAME = "s1";
   public static final String HOST_2_NAME = "s2";
+  public static final String HOST_3_NAME = "s3";
   private HelixManager _helixManager;
 
   @BeforeClass
@@ -60,6 +63,7 @@ public class PeerServerSegmentFinderTest {
       ExternalView ev = new ExternalView(TABLE_NAME_WITH_TYPE);
       ev.setState(SEGMENT_1, INSTANCE_ID1, "ONLINE");
       ev.setState(SEGMENT_1, INSTANCE_ID2, "OFFLINE");
+      ev.setState(SEGMENT_1, INSTANCE_ID3, "ONLINE");
       ev.setState(SEGMENT_2, INSTANCE_ID1, "OFFLINE");
       ev.setState(SEGMENT_2, INSTANCE_ID2, "OFFLINE");
       _helixManager = mock(HelixManager.class);
@@ -80,22 +84,34 @@ public class PeerServerSegmentFinderTest {
       instanceConfig2.setHostName(HOST_2_NAME);
       instanceConfig2.setPort("1000");
       when(helixAdmin.getInstanceConfig(any(String.class), eq(INSTANCE_ID2))).thenReturn(instanceConfig2);
+
+      InstanceConfig instanceConfig3 = new InstanceConfig(INSTANCE_ID3);
+      instanceConfig3.setHostName(HOST_3_NAME);
+      instanceConfig3.setPort("1000");
+      when(helixAdmin.getInstanceConfig(any(String.class), eq(INSTANCE_ID3))).thenReturn(instanceConfig3);
     }
   }
 
   @Test
   public void testSegmentFoundSuccessfully()
       throws Exception {
-    // SEGMENT_1 has only 1 online replica.
-    assertEquals(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_1, CommonConstants.HTTP_PROTOCOL, _helixManager),
-        StringUtil.join("/", "http://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1));
-    assertEquals(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_1, CommonConstants.HTTPS_PROTOCOL, _helixManager), StringUtil
-        .join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1));
+    // SEGMENT_1 has only 2 online replicas.
+    List<URI> httpServerURIs =
+        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTP_PROTOCOL, _helixManager);
+    assertEquals(2, httpServerURIs.size());
+    httpServerURIs.contains(new URI(StringUtil.join("/", "http://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(StringUtil.join("/", "http://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    List<URI> httpsServerURIs =
+        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTPS_PROTOCOL, _helixManager);
+    assertEquals(2, httpsServerURIs.size());
+    httpServerURIs.contains(new URI(StringUtil.join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(StringUtil.join("/", "https://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
   }
 
   @Test
   public void testSegmentNotFound()
       throws Exception {
-    Assert.assertNull(PeerServerSegmentFinder.getPeerServerURI(SEGMENT_2, CommonConstants.HTTP_PROTOCOL, _helixManager));
+    Assert.assertEquals(0,
+        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_2, CommonConstants.HTTP_PROTOCOL, _helixManager).size());
   }
 }

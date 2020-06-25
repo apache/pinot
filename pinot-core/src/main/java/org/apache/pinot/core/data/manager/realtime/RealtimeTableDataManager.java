@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -64,6 +65,7 @@ import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 @ThreadSafe
 public class RealtimeTableDataManager extends BaseTableDataManager {
+  private static final String EMPTY_URL = "";
   private final ExecutorService _segmentAsyncExecutorService =
       Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
@@ -276,7 +278,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   public void downloadAndReplaceSegment(String segmentName, LLCRealtimeSegmentZKMetadata llcSegmentMetadata,
       IndexLoadingConfig indexLoadingConfig, TableConfig tableConfig) {
     final String uri = llcSegmentMetadata.getDownloadUrl();
-    if (!"PEER".equalsIgnoreCase(uri)) {
+    if (uri != null && !uri.isEmpty()) {
       try {
         downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, uri);
       } catch (Exception e) {
@@ -312,6 +314,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
+  // Uncompressed a tared tempFile into tmp dir tempSegmentFolder and replace the existing segment.
   private void untarAndMoveSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, File tempSegmentFolder,
       File tempFile)
       throws IOException, ArchiveException {
@@ -337,11 +340,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       RetryPolicies.exponentialBackoffRetryPolicy(RETRY_COUNT, RETRY_WAIT_MS, RETRY_DELAY_SCALE_FACTOR).attempt(() -> {
         try {
-          // First found a server hosting the segment.
-          String peerSegmentURI = PeerServerSegmentFinder.getPeerServerURI(segmentName, downloadScheme, _helixManager);
+          // First find servers hosting the segment in a ONLINE state.
+          List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
           // Next download the segment from the server using configured scheme.
-          SegmentFetcherFactory.fetchSegmentToLocal(peerSegmentURI, tempFile);
-          _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURI, tempFile, tempFile.length());
+          SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, tempFile);
+          _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, tempFile, tempFile.length());
           return true;
         } catch (Exception e) {
           _logger.warn("Caught exception while downloading segment {} from peer with scheme {}", segmentName, downloadScheme);

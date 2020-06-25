@@ -20,6 +20,8 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
+import java.util.List;
+import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
@@ -73,6 +75,16 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
         return false;
       }
     });
+  }
+
+  @Override
+  public void fetchSegmentToLocal(List<URI> uris, File dest)
+      throws Exception {
+    if (uris == null) {
+      throw new IllegalArgumentException("The input uri list is empty");
+    }
+    Random r = new Random();
+    fetchSegmentToLocal(uris.get(r.nextInt(uris.size())), dest);
   }
 
   /**

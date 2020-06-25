@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.core.util;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+
+import org.apache.commons.collections.ListUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -37,8 +40,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * PeerServerSegmentFinder discovers the server having the input segment in a ONLINE state through external view of a
- * Pinot table.
+ * PeerServerSegmentFinder discovers all the servers having the input segment in a ONLINE state through external view of
+ * a Pinot table.
  */
 public class PeerServerSegmentFinder {
   private static final Logger _logger = LoggerFactory.getLogger(PeerServerSegmentFinder.class);
@@ -47,10 +50,10 @@ public class PeerServerSegmentFinder {
    * @param segmentName
    * @param downloadScheme Can be either http or https.
    * @param helixManager
-   * @return the download uri string of format http(s)://hostname:port/segments/tablenameWithType/segmentName; null if
-   * no such server found.
+   * @return a list of uri strings of the form http(s)://hostname:port/segments/tablenameWithType/segmentName
+   * for the servers hosting ONLINE segments; empty list if no such server found.
    */
-  public static String getPeerServerURI(String segmentName, String downloadScheme, HelixManager helixManager) {
+  public static List<URI> getPeerServerURIs(String segmentName, String downloadScheme, HelixManager helixManager) {
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     String tableNameWithType =
         TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(llcSegmentName.getTableName());
@@ -59,14 +62,15 @@ public class PeerServerSegmentFinder {
     String clusterName = helixManager.getClusterName();
     if (clusterName == null) {
       _logger.error("ClusterName not found");
-      return null;
+      return ListUtils.EMPTY_LIST;
     }
     ExternalView externalViewForResource =
         HelixHelper.getExternalViewForResource(helixAdmin, clusterName, tableNameWithType);
     if (externalViewForResource == null) {
       _logger.warn("External View not found for table {}", tableNameWithType);
-      return null;
+      return ListUtils.EMPTY_LIST;
     }
+    List<URI> onlineServerURIs = new ArrayList<>();
     // Find out the ONLINE server serving the segment.
     for (String segment : externalViewForResource.getPartitionSet()) {
       if (!segmentName.equals(segment)) {
@@ -76,35 +80,32 @@ public class PeerServerSegmentFinder {
       Map<String, String> instanceToStateMap = externalViewForResource.getStateMap(segmentName);
 
       // Randomly pick a server from the list of on-line server hosting the given segment.
-      List<String> availableServers = new ArrayList<>();
       for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
         if ("ONLINE".equals(instanceState.getValue())) {
-          _logger.info("Found ONLINE server {} for segment {}.", instanceState.getKey(), segmentName);
           String instanceId = instanceState.getKey();
-          availableServers.add(instanceId);
+          _logger.info("Found ONLINE server {} for segment {}.", instanceId, segmentName);
+          InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, instanceId);
+          String hostName = instanceConfig.getHostName();
+          int port = getServerAdminPort(helixAdmin, clusterName, instanceId);
+          try {
+            onlineServerURIs.add(new URI(StringUtil
+                .join("/",  downloadScheme + "://" + hostName + ":" + port, "segments", tableNameWithType, segmentName)));
+          } catch (URISyntaxException e) {
+            _logger.warn("Error in uri syntax: ", e);
+          }
         }
       }
-      if (availableServers.isEmpty()) {
-        return null;
-      }
-      Random r = new Random();
-      String instanceId = availableServers.get(r.nextInt(availableServers.size()));
-
-      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, instanceId);
-      String hostName = instanceConfig.getHostName();
-
-      int port;
-      try {
-        HelixHelper.getInstanceConfigsMapFor(instanceId, clusterName, helixAdmin);
-        port = Integer.parseInt(HelixHelper.getInstanceConfigsMapFor(instanceId, clusterName, helixAdmin)
-            .get(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
-      } catch (Exception e) {
-        port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
-      }
-
-      return StringUtil
-          .join("/",  downloadScheme + "://" + hostName + ":" + port, "segments", tableNameWithType, segmentName);
     }
-    return null;
+    return onlineServerURIs;
+  }
+
+  private static int getServerAdminPort(HelixAdmin helixAdmin, String clusterName, String instanceId) {
+    try {
+      return Integer.parseInt(HelixHelper.getInstanceConfigsMapFor(instanceId, clusterName, helixAdmin)
+          .get(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
+    } catch (Exception e) {
+      _logger.warn("Failed to retrieve ADMIN PORT for instanceId {} in the cluster {} ", instanceId, clusterName, e);
+      return CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+    }
   }
 }
