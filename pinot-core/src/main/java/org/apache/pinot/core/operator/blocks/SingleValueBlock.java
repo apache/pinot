@@ -32,13 +32,14 @@ import org.apache.pinot.spi.data.FieldSpec;
 @SuppressWarnings("rawtypes")
 public final class SingleValueBlock implements Block {
   private final SingleColumnSingleValueReader _reader;
-  private final BlockValSet _blockValSet;
+  private final FieldSpec.DataType _dataType;
   private final BlockMetadata _blockMetadata;
+  private BlockValSet _blockValSet;
 
   public SingleValueBlock(SingleColumnSingleValueReader reader, int numDocs, FieldSpec.DataType dataType,
       Dictionary dictionary) {
     _reader = reader;
-    _blockValSet = new SingleValueSet(reader, dataType);
+    _dataType = dataType;
     _blockMetadata = new BlockMetadataImpl(numDocs, true, 0, dataType, dictionary);
   }
 
@@ -53,6 +54,9 @@ public final class SingleValueBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
+    if (_blockValSet == null) {
+      _blockValSet = new SingleValueSet(_reader, _dataType);
+    }
     return _blockValSet;
   }
 
