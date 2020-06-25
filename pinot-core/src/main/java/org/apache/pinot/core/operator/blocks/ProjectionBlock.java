@@ -25,7 +25,9 @@ import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
+import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -33,12 +35,12 @@ import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
  * It provides DocIdSetBlock for a given column.
  */
 public class ProjectionBlock implements Block {
-  private final Map<String, Block> _blockMap;
+  private final Map<String, DataSourceMetadata> _dataSourceMetadataMap;
   private final DocIdSetBlock _docIdSetBlock;
   private final DataBlockCache _dataBlockCache;
 
-  public ProjectionBlock(Map<String, Block> blockMap, DataBlockCache dataBlockCache, DocIdSetBlock docIdSetBlock) {
-    _blockMap = blockMap;
+  public ProjectionBlock(Map<String, DataSourceMetadata> dataSourceMetadataMap, DataBlockCache dataBlockCache, DocIdSetBlock docIdSetBlock) {
+    _dataSourceMetadataMap = dataSourceMetadataMap;
     _docIdSetBlock = docIdSetBlock;
     _dataBlockCache = dataBlockCache;
   }
@@ -64,9 +66,9 @@ public class ProjectionBlock implements Block {
   }
 
   public BlockValSet getBlockValueSet(String column) {
-    BlockMetadata blockMetadata = _blockMap.get(column).getMetadata();
-    return new ProjectionBlockValSet(_dataBlockCache, column, blockMetadata.getDataType(),
-        blockMetadata.isSingleValue());
+    FieldSpec fieldSpec = _dataSourceMetadataMap.get(column).getFieldSpec();
+    return new ProjectionBlockValSet(_dataBlockCache, column, fieldSpec.getDataType(),
+        fieldSpec.isSingleValueField());
   }
 
   public DocIdSetBlock getDocIdSetBlock() {

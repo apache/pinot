@@ -31,12 +31,15 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 @SuppressWarnings("rawtypes")
 public final class MultiValueBlock implements Block {
-  private final BlockValSet _blockValSet;
+  private final SingleColumnMultiValueReader _reader;
+  private final FieldSpec.DataType _dataType;
   private final BlockMetadata _blockMetadata;
+  private BlockValSet _blockValSet;
 
   public MultiValueBlock(SingleColumnMultiValueReader reader, int numDocs, int maxNumMultiValues,
       FieldSpec.DataType dataType, Dictionary dictionary) {
-    _blockValSet = new MultiValueSet(reader, dataType);
+    _reader = reader;
+    _dataType = dataType;
     _blockMetadata = new BlockMetadataImpl(numDocs, false, maxNumMultiValues, dataType, dictionary);
   }
 
@@ -47,6 +50,9 @@ public final class MultiValueBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
+    if (_blockValSet == null) {
+      _blockValSet = new MultiValueSet(_reader, _dataType);
+    }
     return _blockValSet;
   }
 
