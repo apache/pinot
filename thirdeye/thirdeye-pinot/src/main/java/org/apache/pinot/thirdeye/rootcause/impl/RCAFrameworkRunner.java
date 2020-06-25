@@ -75,12 +75,6 @@ public class RCAFrameworkRunner {
   private static final String CLI_INTERACTIVE = "interactive";
   private static final String CLI_VERBOSE = "verbose";
   private static final String CLI_FRAMEWORK = "framework";
-  private static final String CLI_LOG = "log";
-  private static final String CLI_LOG_DEBUG = "log-debug";
-  private static final String CLI_LOG_INFO = "log-info";
-  private static final String CLI_LOG_WARN = "log-warn";
-  private static final String CLI_LOG_ERROR = "log-error";
-
   private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
 
   private static final long DAY_IN_MS = 24 * 3600 * 1000;
