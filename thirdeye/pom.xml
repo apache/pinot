@@ -35,7 +35,7 @@
     <revision>1.0.0</revision>
     <sha1>-SNAPSHOT</sha1>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <pinot.version>0.1.0</pinot.version>
+    <pinot.version>0.4.0</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.8</jdk.version>
     <dropwizard.version>1.3.12</dropwizard.version>
@@ -170,7 +170,7 @@
       <!-- project dependencies -->
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-api</artifactId>
+        <artifactId>pinot-java-client</artifactId>
         <version>${pinot.version}</version>
           <exclusions>
             <exclusion>
@@ -200,6 +200,17 @@
               <artifactId>jersey-server</artifactId>
             </exclusion>
           </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spi</artifactId>
+        <version>${pinot.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.glassfish.jersey.core</groupId>
+            <artifactId>jersey-server</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <!-- hadoop specific -->

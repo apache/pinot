@@ -320,12 +320,12 @@ public class SqlUtils {
     return datasetName.substring(tableComponents[0].length()+tableComponents[1].length()+2);
   }
 
-  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec, String sourceName) {
-    TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
+  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeSpec, String sourceName) {
+    TimeGranularity dataGranularity = timeSpec.getDataGranularity();
     long dataGranularityMillis = dataGranularity.toMillis();
 
-    String timeField = timeFieldSpec.getColumnName();
-    String timeFormat = timeFieldSpec.getFormat();
+    String timeField = timeSpec.getColumnName();
+    String timeFormat = timeSpec.getFormat();
 
     // epoch case
     if (TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {

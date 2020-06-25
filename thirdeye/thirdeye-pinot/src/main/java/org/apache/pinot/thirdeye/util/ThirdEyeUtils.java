@@ -55,7 +55,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
@@ -83,7 +83,7 @@ import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.*;
+import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.PROP_DETECTOR_COMPONENT_NAME;
 
 
 public abstract class ThirdEyeUtils {
@@ -238,7 +238,7 @@ public abstract class ThirdEyeUtils {
 
   private static String getTimeFormatString(DatasetConfigDTO datasetConfig) {
     String timeFormat = datasetConfig.getTimeFormat();
-    if (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
+    if (timeFormat.startsWith(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
       timeFormat = getSDFPatternFromTimeFormat(timeFormat);
     }
     return timeFormat;

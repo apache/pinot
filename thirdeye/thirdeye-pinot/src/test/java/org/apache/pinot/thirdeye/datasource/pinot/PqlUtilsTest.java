@@ -76,8 +76,8 @@ public class PqlUtilsTest {
   }
 
   @Test(dataProvider = "betweenClauseArgs")
-  public void getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec, String expected) throws ExecutionException {
-    String betweenClause = PqlUtils.getBetweenClause(start, end, timeFieldSpec, "collection");
+  public void getBetweenClause(DateTime start, DateTime end, TimeSpec timeSpec, String expected) throws ExecutionException {
+    String betweenClause = PqlUtils.getBetweenClause(start, end, timeSpec, "collection");
     Assert.assertEquals(betweenClause, expected);
   }
 

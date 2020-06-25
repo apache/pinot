@@ -17,27 +17,26 @@
 package org.apache.pinot.thirdeye.auto.onboard;
 
 import com.google.common.collect.Sets;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.common.data.TimeGranularitySpec;
-import org.apache.pinot.thirdeye.common.metric.MetricType;
-import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
-import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.thirdeye.common.metric.MetricType;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -47,6 +46,8 @@ public class AutoOnboardPinotMetricsServiceTest {
 
   private AutoOnboardPinotMetadataSource testAutoLoadPinotMetricsService;
   private String dataset = "test-collection";
+  private String oldTimeColumnName = "time";
+  private String newTimeColumnName = "timestampInEpoch";
   private Schema schema;
 
   private DAOTestBase testDAOProvider;
@@ -64,7 +65,7 @@ public class AutoOnboardPinotMetricsServiceTest {
     Map<String, String> pinotCustomConfigs = new HashMap<>();
     pinotCustomConfigs.put("configKey1", "configValue1");
     pinotCustomConfigs.put("configKey2", "configValue2");
-    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, pinotCustomConfigs, null);
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, oldTimeColumnName, pinotCustomConfigs, null);
   }
 
   @AfterMethod(alwaysRun = true)
@@ -78,11 +79,12 @@ public class AutoOnboardPinotMetricsServiceTest {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     Assert.assertEquals(datasetConfig.getDataset(), dataset);
     Assert.assertEquals(datasetConfig.getDimensions(), schema.getDimensionNames());
-    Assert.assertEquals(datasetConfig.getTimeColumn(), schema.getTimeColumnName());
-    TimeGranularitySpec timeGranularitySpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
-    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getUnit(), timeGranularitySpec.getTimeType());
-    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getSize(), timeGranularitySpec.getTimeUnitSize());
-    Assert.assertEquals(datasetConfig.getTimeFormat(), timeGranularitySpec.getTimeFormat());
+    Assert.assertEquals(datasetConfig.getTimeColumn(), oldTimeColumnName);
+    DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(oldTimeColumnName);
+    DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getUnit(), formatSpec.getColumnUnit());
+    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getSize(), formatSpec.getColumnSize());
+    Assert.assertEquals(datasetConfig.getTimeFormat(), "EPOCH");
     Assert.assertEquals(datasetConfig.getTimezone(), "US/Pacific");
     Assert.assertEquals(datasetConfig.getExpectedDelay().getUnit(), TimeUnit.HOURS);
 
@@ -105,23 +107,23 @@ public class AutoOnboardPinotMetricsServiceTest {
   @Test (dependsOnMethods={"testAddNewDataset"})
   public void testRefreshDataset() throws Exception {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
-    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("newDimension", DataType.STRING, true);
+    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("newDimension", FieldSpec.DataType.STRING, true);
     schema.addField(dimensionFieldSpec);
     Map<String, String> pinotCustomConfigs = new HashMap<>();
     pinotCustomConfigs.put("configKey1", "configValue1");
     pinotCustomConfigs.put("configKey2", "configValue2");
-    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, new HashMap<>(pinotCustomConfigs), datasetConfig);
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, oldTimeColumnName, new HashMap<>(pinotCustomConfigs), datasetConfig);
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     DatasetConfigDTO newDatasetConfig1 = datasetConfigDAO.findByDataset(dataset);
     Assert.assertEquals(newDatasetConfig1.getDataset(), dataset);
     Assert.assertEquals(Sets.newHashSet(newDatasetConfig1.getDimensions()), Sets.newHashSet(schema.getDimensionNames()));
     Assert.assertEquals(newDatasetConfig1.getProperties(), pinotCustomConfigs);
 
-    MetricFieldSpec metricFieldSpec = new MetricFieldSpec("newMetric", DataType.LONG);
+    MetricFieldSpec metricFieldSpec = new MetricFieldSpec("newMetric", FieldSpec.DataType.LONG);
     schema.addField(metricFieldSpec);
     pinotCustomConfigs.put("configKey3", "configValue3");
     pinotCustomConfigs.remove("configKey2");
-    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, new HashMap<>(pinotCustomConfigs), newDatasetConfig1);
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, oldTimeColumnName, new HashMap<>(pinotCustomConfigs), newDatasetConfig1);
 
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
@@ -143,18 +145,17 @@ public class AutoOnboardPinotMetricsServiceTest {
       Assert.assertEquals(datasetCustomConfigs.get(configKey), configValue);
     }
 
-    TimeFieldSpec timeFieldSpec = new TimeFieldSpec("timestampInEpoch", DataType.LONG, TimeUnit.MILLISECONDS);
-    schema.removeField(schema.getTimeColumnName());
-    schema.addField(timeFieldSpec);
-    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, new HashMap<>(pinotCustomConfigs), newDatasetConfig1);
+    DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec(newTimeColumnName, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
+    schema.removeField(oldTimeColumnName);
+    schema.addField(dateTimeFieldSpec);
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, newTimeColumnName, new HashMap<>(pinotCustomConfigs), newDatasetConfig1);
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     datasetConfig = datasetConfigDAO.findByDataset(dataset);
-    TimeGranularitySpec timeGranularitySpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
     Assert.assertEquals(datasetConfig.bucketTimeGranularity().getUnit(), TimeUnit.MINUTES);
     Assert.assertEquals(datasetConfig.bucketTimeGranularity().getSize(), 5);
-    Assert.assertEquals(datasetConfig.getTimeUnit(), timeGranularitySpec.getTimeType());
-    Assert.assertEquals(datasetConfig.getTimeDuration().intValue(), timeGranularitySpec.getTimeUnitSize());
-    Assert.assertEquals(datasetConfig.getTimeFormat(), timeGranularitySpec.getTimeFormat());
+    Assert.assertEquals(datasetConfig.getTimeUnit(), TimeUnit.MILLISECONDS);
+    Assert.assertEquals(datasetConfig.getTimeDuration().intValue(), 1);
+    Assert.assertEquals(datasetConfig.getTimeFormat(), "EPOCH");
     Assert.assertEquals(datasetConfig.getTimezone(), "US/Pacific");
     Assert.assertEquals(datasetConfig.getExpectedDelay().getUnit(), TimeUnit.HOURS);
   }

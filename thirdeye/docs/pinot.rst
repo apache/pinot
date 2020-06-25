@@ -69,7 +69,7 @@ Update the `thirdeye-pinot/config/detector.yml` file to enable auto onboarding o
     ./run-backend.sh
 
 
-Note: This process may take some time. The worker process will print log messages for each data set schema being processed. Schemas must contain a `timeFieldSpec` in order for ThirdEye to onboard it automatically
+Note: This process may take some time. The worker process will print log messages for each data set schema being processed. Schemas must contain a `timeFieldSpec` or a `dateTimeFieldSpec` in order for ThirdEye to onboard it automatically
 
 
 **4: Stop the backend worker**
