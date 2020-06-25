@@ -276,14 +276,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String offlineCreationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
     Assert.assertEquals(offlineCreationResponse, "{\"status\":\"Table truncateTable0_OFFLINE succesfully added\"}");
 
-    // truncate request parameters
-    Map<String, String> headers = new HashMap<String, String>();
-    headers.put("type", TableType.REALTIME.toString());
+    // truncate request
+    String tableType = TableType.REALTIME.toString();
     String truncateResponse =
-        sendPostRequest(String.join("/", this._controllerBaseApiUrl, "tables", tableName, "truncate"), "{}", headers);
+        sendPostRequest(_controllerRequestURLBuilder.forTruncateTable(tableName, tableType), null);
 
     Assert.assertEquals(truncateResponse, "{\"status\":\"Table " + tableName + " successfully truncated\"}");
-    
+
   }
 
   @Test
