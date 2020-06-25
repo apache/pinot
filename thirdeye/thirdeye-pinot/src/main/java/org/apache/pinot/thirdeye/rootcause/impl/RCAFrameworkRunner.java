@@ -19,8 +19,6 @@
 
 package org.apache.pinot.thirdeye.rootcause.impl;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
 import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
@@ -55,7 +53,6 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -78,12 +75,6 @@ public class RCAFrameworkRunner {
   private static final String CLI_INTERACTIVE = "interactive";
   private static final String CLI_VERBOSE = "verbose";
   private static final String CLI_FRAMEWORK = "framework";
-  private static final String CLI_LOG = "log";
-  private static final String CLI_LOG_DEBUG = "log-debug";
-  private static final String CLI_LOG_INFO = "log-info";
-  private static final String CLI_LOG_WARN = "log-warn";
-  private static final String CLI_LOG_ERROR = "log-error";
-
   private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
 
   private static final long DAY_IN_MS = 24 * 3600 * 1000;
@@ -103,12 +94,6 @@ public class RCAFrameworkRunner {
     options.addOption(null, CLI_INTERACTIVE, false, "enters interacive REPL mode (specified entities will be added automatically)");
     options.addOption("v",  CLI_VERBOSE, false, "verbose output mode (set RCA log level to DEBUG)");
 
-    options.addOption(null, CLI_LOG, true, "default log level (default: INFO)");
-    options.addOption(null, CLI_LOG_DEBUG, true, "debug loggers (packages, separated by comma)");
-    options.addOption(null, CLI_LOG_INFO, true, "info loggers (packages, separated by comma)");
-    options.addOption(null, CLI_LOG_WARN, true, "warn loggers (packages, separated by comma)");
-    options.addOption(null, CLI_LOG_ERROR, true, "error loggers (packages, separated by comma)");
-
     Parser parser = new BasicParser();
     CommandLine cmd = null;
     try {
@@ -123,23 +108,6 @@ public class RCAFrameworkRunner {
       System.out.println(String.format("--%s and --%s mutually exclusive", CLI_WINDOW_SIZE, CLI_TIME_START));
       System.exit(1);
     }
-
-    // runtime logger config
-    setLogger(Logger.ROOT_LOGGER_NAME, Level.INFO);
-
-    if (cmd.hasOption(CLI_LOG))
-      setLogger(Logger.ROOT_LOGGER_NAME, Level.valueOf(cmd.getOptionValue(CLI_LOG)));
-    if (cmd.hasOption(CLI_LOG_DEBUG))
-      setLogger(cmd.getOptionValue(CLI_LOG_DEBUG), Level.DEBUG);
-    if (cmd.hasOption(CLI_LOG_INFO))
-      setLogger(cmd.getOptionValue(CLI_LOG_INFO), Level.INFO);
-    if (cmd.hasOption(CLI_LOG_WARN))
-      setLogger(cmd.getOptionValue(CLI_LOG_WARN), Level.WARN);
-    if (cmd.hasOption(CLI_LOG_ERROR))
-      setLogger(cmd.getOptionValue(CLI_LOG_ERROR), Level.ERROR);
-
-    if(cmd.hasOption(CLI_VERBOSE))
-      setLogger(Logger.ROOT_LOGGER_NAME, Level.DEBUG);
 
     // config
     File config = new File(cmd.getOptionValue(CLI_THIRDEYE_CONFIG));
@@ -326,9 +294,4 @@ public class RCAFrameworkRunner {
     options.addOption(optConfig);
   }
 
-  private static void setLogger(String loggerString, Level level) {
-    for (String logger : loggerString.split(",")) {
-      ((Logger)LoggerFactory.getLogger(logger)).setLevel(level);
-    }
-  }
 }

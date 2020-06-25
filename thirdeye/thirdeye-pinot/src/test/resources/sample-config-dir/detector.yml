@@ -1,9 +1,7 @@
 client: pinot
 configStoreType: database
 logging:
-  level: DEBUG
-  loggers:
-    org.hibernate.engine.internal: WARN
+  type: external  # use log4j2 for logging: https://logging.apache.org/log4j/2.x/manual/configuration.html
 # Runs the application in standard config
 server:
   type: simple
