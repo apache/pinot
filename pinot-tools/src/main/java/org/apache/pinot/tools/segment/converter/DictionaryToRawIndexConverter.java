@@ -30,13 +30,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.common.ColumnValueReader;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
+import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -303,13 +303,13 @@ public class DictionaryToRawIndexConverter {
     FieldSpec.DataType dataType = dataSourceMetadata.getDataType();
     int totalDocs = segment.getSegmentMetadata().getTotalDocs();
     int lengthOfLongestEntry = (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
-    SingleValueSet valueSet = (SingleValueSet) dataSource.nextBlock().getBlockValueSet();
+    ColumnValueReader valueReader = dataSource.getValueReader();
 
     try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
         .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, totalDocs, lengthOfLongestEntry,
-            false, BaseChunkSingleValueWriter.DEFAULT_VERSION)) {
+            false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION)) {
       for (int docId = 0; docId < totalDocs; docId++) {
-        int dictId = valueSet.getIntValue(docId);
+        int dictId = valueReader.getIntValue(docId);
         Object value = dictionary.get(dictId);
         rawIndexCreator.index(docId++, value);
 

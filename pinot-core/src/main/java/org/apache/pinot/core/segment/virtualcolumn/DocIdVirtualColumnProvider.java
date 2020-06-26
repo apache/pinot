@@ -20,11 +20,9 @@ package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import org.apache.pinot.core.io.reader.ForwardIndexReader;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.SortedIndexReader;
 import org.apache.pinot.core.segment.index.column.BaseVirtualColumnProvider;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -33,13 +31,14 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 /**
- * Virtual column provider that returns the current document id.
+ * Virtual column provider that returns the document id.
  */
 public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
+  private static final DocIdSortedIndexReader DOC_ID_SORTED_INDEX_READER = new DocIdSortedIndexReader();
 
   @Override
-  public DataFileReader buildReader(VirtualColumnContext context) {
-    return new DocIdSingleValueReader();
+  public ForwardIndexReader<?> buildForwardIndex(VirtualColumnContext context) {
+    return DOC_ID_SORTED_INDEX_READER;
   }
 
   @Override
@@ -56,78 +55,30 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
   }
 
   @Override
-  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
-    return new DocIdInvertedIndex();
+  public InvertedIndexReader<?> buildInvertedIndex(VirtualColumnContext context) {
+    return DOC_ID_SORTED_INDEX_READER;
   }
 
-  private class DocIdSingleValueReader extends BaseSingleColumnSingleValueReader<ChunkReaderContext> {
+  private static class DocIdSortedIndexReader implements SortedIndexReader<ReaderContext> {
+
     @Override
-    public ChunkReaderContext createContext() {
-      return null;
+    public int getInt(int docId) {
+      return docId;
     }
 
     @Override
-    public int getInt(int row) {
-      return row;
+    public void readValues(int[] docIds, int length, int[] values) {
+      System.arraycopy(docIds, 0, values, 0, length);
     }
 
-    @Override
-    public int getInt(int rowId, ChunkReaderContext context) {
-      return rowId;
-    }
-
-    @Override
-    public long getLong(int row) {
-      return row;
-    }
-
-    @Override
-    public long getLong(int rowId, ChunkReaderContext context) {
-      return rowId;
-    }
-
-    @Override
-    public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
-      System.arraycopy(rows, rowStartPos, values, valuesStartPos, rowSize);
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-    }
-  }
-
-  private class DocIdInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
     @Override
     public Pairs.IntPair getDocIds(int dictId) {
       return new Pairs.IntPair(dictId, dictId);
     }
 
     @Override
-    public Pairs.IntPair getDocIds(Object value) {
-      // This should not be called from anywhere. If it happens, there is a bug
-      // and that's why we throw illegal state exception
-      throw new IllegalStateException("sorted inverted index reader supports lookup only using dictionary id");
-    }
-
-    @Override
     public void close()
         throws IOException {
-    }
-
-    @Override
-    public SortedIndexReaderImpl.Context createContext() {
-      return null;
-    }
-
-    @Override
-    public int getInt(int row) {
-      return row;
-    }
-
-    @Override
-    public int getInt(int rowId, SortedIndexReaderImpl.Context context) {
-      return rowId;
     }
   }
 }

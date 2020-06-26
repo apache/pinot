@@ -21,19 +21,16 @@ package org.apache.pinot.index.reader;
 import java.io.File;
 import java.util.Random;
 import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import org.apache.pinot.core.io.reader.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 @Test
 public class SortedForwardIndexReaderTest {
-  private static Logger LOGGER = LoggerFactory.getLogger(SortedForwardIndexReaderTest.class);
 
   public void testSimple()
       throws Exception {
@@ -65,25 +62,18 @@ public class SortedForwardIndexReaderTest {
 
     try (SortedIndexReader reader = new SortedIndexReaderImpl(PinotDataBuffer.loadBigEndianFile(file), cardinality)) {
       // without using context
-      long start, end;
-      start = System.currentTimeMillis();
       for (int i = 0; i < cardinality; i++) {
         for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {
           Assert.assertEquals(reader.getInt(docId), i);
         }
       }
-      end = System.currentTimeMillis();
-      System.out.println("Took " + (end - start) + " to scan " + totalDocs + " docs without using context");
       // with context
       ReaderContext context = reader.createContext();
-      start = System.currentTimeMillis();
       for (int i = 0; i < cardinality; i++) {
         for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {
           Assert.assertEquals(reader.getInt(docId, context), i);
         }
       }
-      end = System.currentTimeMillis();
-      LOGGER.debug("Took " + (end - start) + " to scan " + totalDocs + " with context");
     }
 
     file.delete();

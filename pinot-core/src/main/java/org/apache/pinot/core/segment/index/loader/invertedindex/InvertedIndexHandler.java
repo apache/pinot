@@ -24,10 +24,9 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import org.apache.pinot.core.io.reader.ForwardIndexReader;
+import org.apache.pinot.core.io.reader.impl.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.io.reader.impl.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -106,21 +105,17 @@ public class InvertedIndexHandler {
     try (OffHeapBitmapInvertedIndexCreator creator = new OffHeapBitmapInvertedIndexCreator(_indexDir,
         columnMetadata.getFieldSpec(), columnMetadata.getCardinality(), numDocs,
         columnMetadata.getTotalNumberOfEntries())) {
-      try (DataFileReader fwdIndex = getForwardIndexReader(columnMetadata, _segmentWriter)) {
+      try (ForwardIndexReader<?> forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter)) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column.
-
-          FixedBitSingleValueReader svFwdIndex = (FixedBitSingleValueReader) fwdIndex;
           for (int i = 0; i < numDocs; i++) {
-            creator.add(svFwdIndex.getInt(i));
+            creator.add(forwardIndexReader.getInt(i));
           }
         } else {
           // Multi-value column.
-
-          SingleColumnMultiValueReader mvFwdIndex = (SingleColumnMultiValueReader) fwdIndex;
           int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
           for (int i = 0; i < numDocs; i++) {
-            int length = mvFwdIndex.getIntArray(i, dictIds);
+            int length = forwardIndexReader.getIntArray(i, dictIds);
             creator.add(dictIds, length);
           }
         }
@@ -139,15 +134,17 @@ public class InvertedIndexHandler {
     LOGGER.info("Created inverted index for segment: {}, column: {}", _segmentName, column);
   }
 
-  private DataFileReader getForwardIndexReader(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
+  private ForwardIndexReader<?> getForwardIndexReader(ColumnMetadata columnMetadata,
+      SegmentDirectory.Writer segmentWriter)
       throws IOException {
     PinotDataBuffer buffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
     int numRows = columnMetadata.getTotalDocs();
     int numBitsPerValue = columnMetadata.getBitsPerElement();
     if (columnMetadata.isSingleValue()) {
-      return new FixedBitSingleValueReader(buffer, numRows, numBitsPerValue);
+      return new FixedBitSVForwardIndexReader(buffer, numRows, numBitsPerValue);
     } else {
-      return new FixedBitMultiValueReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(), numBitsPerValue);
+      return new FixedBitMVForwardIndexReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(),
+          numBitsPerValue);
     }
   }
 }

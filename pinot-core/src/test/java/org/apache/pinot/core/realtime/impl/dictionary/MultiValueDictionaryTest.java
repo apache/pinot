@@ -20,7 +20,7 @@ package org.apache.pinot.core.realtime.impl.dictionary;
 
 import java.util.Random;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import org.apache.pinot.core.io.readerwriter.impl.FixedByteMVForwardIndexReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,7 +50,7 @@ public class MultiValueDictionaryTest {
   public void testMultiValueIndexing() {
     long seed = System.nanoTime();
     try (LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
-        FixedByteSingleColumnMultiValueReaderWriter indexer = new FixedByteSingleColumnMultiValueReaderWriter(
+        FixedByteMVForwardIndexReaderWriter indexer = new FixedByteMVForwardIndexReaderWriter(
             MAX_N_VALUES, MAX_N_VALUES / 2, NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer")) {
       // Insert rows into the indexer and dictionary
       Random random = new Random(seed);

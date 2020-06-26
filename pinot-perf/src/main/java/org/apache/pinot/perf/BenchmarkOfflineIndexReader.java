@@ -28,9 +28,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import org.apache.pinot.core.io.reader.impl.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.io.reader.impl.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.io.reader.impl.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
@@ -84,9 +84,9 @@ public class BenchmarkOfflineIndexReader {
 
   // Forward index
   private int _numDocs;
-  private FixedBitSingleValueReader _fixedBitSingleValueReader;
+  private FixedBitSVForwardIndexReader _fixedBitSingleValueReader;
   private SortedIndexReaderImpl _sortedForwardIndexReader;
-  private FixedBitMultiValueReader _fixedBitMultiValueReader;
+  private FixedBitMVForwardIndexReader _fixedBitMultiValueReader;
   private int[] _buffer;
 
   // Dictionary
@@ -118,16 +118,16 @@ public class BenchmarkOfflineIndexReader {
 
     // Forward index
     _numDocs = segmentMetadata.getTotalDocs();
-    _fixedBitSingleValueReader =
-        new FixedBitSingleValueReader(segmentReader.getIndexFor(SV_UNSORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
-            _numDocs, segmentMetadata.getColumnMetadataFor(SV_UNSORTED_COLUMN_NAME).getBitsPerElement());
+    _fixedBitSingleValueReader = new FixedBitSVForwardIndexReader(
+        segmentReader.getIndexFor(SV_UNSORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX), _numDocs,
+        segmentMetadata.getColumnMetadataFor(SV_UNSORTED_COLUMN_NAME).getBitsPerElement());
     _sortedForwardIndexReader =
         new SortedIndexReaderImpl(segmentReader.getIndexFor(SV_SORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
             segmentMetadata.getColumnMetadataFor(SV_SORTED_COLUMN_NAME).getCardinality());
     ColumnMetadata mvColumnMetadata = segmentMetadata.getColumnMetadataFor(MV_COLUMN_NAME);
     _fixedBitMultiValueReader =
-        new FixedBitMultiValueReader(segmentReader.getIndexFor(MV_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX), _numDocs,
-            mvColumnMetadata.getTotalNumberOfEntries(), mvColumnMetadata.getBitsPerElement());
+        new FixedBitMVForwardIndexReader(segmentReader.getIndexFor(MV_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
+            _numDocs, mvColumnMetadata.getTotalNumberOfEntries(), mvColumnMetadata.getBitsPerElement());
     _buffer = new int[mvColumnMetadata.getMaxNumberOfMultiValues()];
 
     // Dictionary
@@ -184,7 +184,7 @@ public class BenchmarkOfflineIndexReader {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int fixedBitMultiValueReaderSequential() {
-    FixedBitMultiValueReader.Context context = _fixedBitMultiValueReader.createContext();
+    FixedBitMVForwardIndexReader.Context context = _fixedBitMultiValueReader.createContext();
     int ret = 0;
     for (int i = 0; i < _numDocs; i++) {
       ret += _fixedBitMultiValueReader.getIntArray(i, _buffer, context);
@@ -196,7 +196,7 @@ public class BenchmarkOfflineIndexReader {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int fixedBitMultiValueReaderRandom() {
-    FixedBitMultiValueReader.Context context = _fixedBitMultiValueReader.createContext();
+    FixedBitMVForwardIndexReader.Context context = _fixedBitMultiValueReader.createContext();
     int ret = 0;
     for (int i = 0; i < _numDocs; i++) {
       ret += _fixedBitMultiValueReader.getIntArray(RANDOM.nextInt(_numDocs), _buffer, context);

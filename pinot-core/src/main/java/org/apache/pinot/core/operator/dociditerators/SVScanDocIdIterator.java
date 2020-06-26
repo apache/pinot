@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import org.apache.pinot.core.common.ColumnValueReader;
 import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -32,16 +32,16 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
-  private final SingleValueSet _valueSet;
+  private final ColumnValueReader _valueReader;
   private final int _numDocs;
   private final ValueMatcher _valueMatcher;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, SingleValueSet valueSet, int numDocs) {
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ColumnValueReader valueReader, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _valueSet = valueSet;
+    _valueReader = valueReader;
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher();
   }
@@ -114,7 +114,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_valueSet.getIntValue(docId));
+      return _predicateEvaluator.applySV(_valueReader.getIntValue(docId));
     }
   }
 
@@ -122,7 +122,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_valueSet.getLongValue(docId));
+      return _predicateEvaluator.applySV(_valueReader.getLongValue(docId));
     }
   }
 
@@ -130,7 +130,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_valueSet.getFloatValue(docId));
+      return _predicateEvaluator.applySV(_valueReader.getFloatValue(docId));
     }
   }
 
@@ -138,7 +138,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_valueSet.getDoubleValue(docId));
+      return _predicateEvaluator.applySV(_valueReader.getDoubleValue(docId));
     }
   }
 
@@ -146,7 +146,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_valueSet.getStringValue(docId));
+      return _predicateEvaluator.applySV(_valueReader.getStringValue(docId));
     }
   }
 
@@ -154,7 +154,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_valueSet.getBytesValue(docId));
+      return _predicateEvaluator.applySV(_valueReader.getBytesValue(docId));
     }
   }
 }

@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.core.common.BaseBlockValSet;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -31,7 +31,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
  * block.
  * <p>Caller is responsible for calling the correct method based on the data source metadata for the block value set.
  */
-public class TransformBlockValSet extends BaseBlockValSet {
+public class TransformBlockValSet implements BlockValSet {
   private final ProjectionBlock _projectionBlock;
   private final TransformFunction _transformFunction;
 

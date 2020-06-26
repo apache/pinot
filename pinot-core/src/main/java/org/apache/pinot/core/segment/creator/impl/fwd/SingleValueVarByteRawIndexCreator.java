@@ -22,8 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
-import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
+import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
+import org.apache.pinot.core.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
@@ -32,7 +32,7 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
-  private final VarByteChunkSingleValueWriter _indexWriter;
+  private final VarByteChunkSVForwardIndexWriter _indexWriter;
 
   /**
    * Create a var-byte raw index creator for the given column
@@ -47,7 +47,7 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
       String column, int totalDocs, int maxLength)
       throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, maxLength, false,
-        BaseChunkSingleValueWriter.DEFAULT_VERSION);
+        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
   }
 
   /**
@@ -67,12 +67,12 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
     _indexWriter =
-        new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion);
+        new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion);
   }
 
   @VisibleForTesting
   public static int getNumDocsPerChunk(int lengthOfLongestEntry) {
-    int overheadPerEntry = lengthOfLongestEntry + VarByteChunkSingleValueWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+    int overheadPerEntry = lengthOfLongestEntry + VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
     return Math.max(TARGET_MAX_CHUNK_SIZE / overheadPerEntry, 1);
   }
 

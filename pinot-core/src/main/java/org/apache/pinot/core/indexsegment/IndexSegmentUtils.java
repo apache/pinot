@@ -18,13 +18,10 @@
  */
 package org.apache.pinot.core.indexsegment;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
-import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.io.reader.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class IndexSegmentUtils {
@@ -41,16 +38,16 @@ public class IndexSegmentUtils {
    * @param maxNumMultiValues Max number of multi-values for the column (apply to multi-valued column)
    * @return Value for the given document Id
    */
-  public static Object getValue(int docId, @Nonnull FieldSpec fieldSpec, @Nonnull DataFileReader forwardIndex,
+  public static Object getValue(int docId, FieldSpec fieldSpec, ForwardIndexReader<?> forwardIndex,
       @Nullable Dictionary dictionary, int maxNumMultiValues) {
     if (dictionary != null) {
       // Dictionary based
       if (fieldSpec.isSingleValueField()) {
-        int dictId = ((SingleColumnSingleValueReader) forwardIndex).getInt(docId);
+        int dictId = forwardIndex.getInt(docId);
         return dictionary.get(dictId);
       } else {
         int[] dictIds = new int[maxNumMultiValues];
-        int numValues = ((SingleColumnMultiValueReader) forwardIndex).getIntArray(docId, dictIds);
+        int numValues = forwardIndex.getIntArray(docId, dictIds);
         Object[] value = new Object[numValues];
         for (int i = 0; i < numValues; i++) {
           value[i] = dictionary.get(dictIds[i]);
@@ -60,18 +57,17 @@ public class IndexSegmentUtils {
     } else {
       // Raw index based
       // TODO: support multi-valued column
-      SingleColumnSingleValueReader singleValueReader = (SingleColumnSingleValueReader) forwardIndex;
       switch (fieldSpec.getDataType()) {
         case INT:
-          return singleValueReader.getInt(docId);
+          return forwardIndex.getInt(docId);
         case LONG:
-          return singleValueReader.getLong(docId);
+          return forwardIndex.getLong(docId);
         case FLOAT:
-          return singleValueReader.getFloat(docId);
+          return forwardIndex.getFloat(docId);
         case DOUBLE:
-          return singleValueReader.getDouble(docId);
+          return forwardIndex.getDouble(docId);
         case STRING:
-          return singleValueReader.getString(docId);
+          return forwardIndex.getString(docId);
         default:
           throw new IllegalStateException();
       }

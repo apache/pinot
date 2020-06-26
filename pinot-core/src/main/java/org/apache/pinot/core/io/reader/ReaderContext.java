@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.io.reader;
 
+/**
+ * Marker interface for the context of a reader. The reader itself is always stateless because it needs to be accessed
+ * by multiple threads. The context can be passed when reading the values from the reader so that reader can store some
+ * states inside the context in order to accelerate the following reads.
+ */
 public interface ReaderContext {
-
 }

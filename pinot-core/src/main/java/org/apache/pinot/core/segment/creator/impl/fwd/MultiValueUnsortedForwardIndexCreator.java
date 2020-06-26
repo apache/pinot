@@ -21,20 +21,20 @@ package org.apache.pinot.core.segment.creator.impl.fwd;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
-import org.apache.pinot.core.io.writer.SingleColumnMultiValueWriter;
-import org.apache.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
+import org.apache.pinot.core.io.writer.ForwardIndexWriter;
+import org.apache.pinot.core.io.writer.impl.FixedBitMVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.MultiValueForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardIndexCreator {
-  private final SingleColumnMultiValueWriter _writer;
+  private final ForwardIndexWriter _writer;
 
   public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs,
       int totalNumValues)
       throws Exception {
     File indexFile = new File(outputDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
-    _writer = new FixedBitMultiValueWriter(indexFile, numDocs, totalNumValues,
+    _writer = new FixedBitMVForwardIndexWriter(indexFile, numDocs, totalNumValues,
         PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
   }
 

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import org.apache.pinot.core.common.ColumnValueReader;
 import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -32,17 +32,17 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
-  private final MultiValueSet _valueSet;
+  private final ColumnValueReader _valueReader;
   private final int _numDocs;
   private final int[] _dictIdBuffer;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, MultiValueSet valueSet, int numDocs,
+  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ColumnValueReader valueReader, int numDocs,
       int maxNumEntriesPerValue) {
     _predicateEvaluator = predicateEvaluator;
-    _valueSet = valueSet;
+    _valueReader = valueReader;
     _numDocs = numDocs;
     _dictIdBuffer = new int[maxNumEntriesPerValue];
   }
@@ -51,7 +51,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   public int next() {
     while (_nextDocId < _numDocs) {
       int nextDocId = _nextDocId++;
-      int length = _valueSet.getIntValues(nextDocId, _dictIdBuffer);
+      int length = _valueReader.getIntValues(nextDocId, _dictIdBuffer);
       _numEntriesScanned += length;
       if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
         return nextDocId;
@@ -72,7 +72,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     IntIterator docIdIterator = docIds.getIntIterator();
     int nextDocId;
     while (docIdIterator.hasNext() && (nextDocId = docIdIterator.next()) < _numDocs) {
-      int length = _valueSet.getIntValues(nextDocId, _dictIdBuffer);
+      int length = _valueReader.getIntValues(nextDocId, _dictIdBuffer);
       _numEntriesScanned += length;
       if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
         result.add(nextDocId);

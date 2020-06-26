@@ -21,19 +21,19 @@ package org.apache.pinot.core.segment.creator.impl.fwd;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
-import org.apache.pinot.core.io.writer.SingleColumnSingleValueWriter;
-import org.apache.pinot.core.io.writer.impl.v1.FixedBitSingleValueWriter;
+import org.apache.pinot.core.io.writer.ForwardIndexWriter;
+import org.apache.pinot.core.io.writer.impl.FixedBitSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class SingleValueUnsortedForwardIndexCreator implements SingleValueForwardIndexCreator {
-  private final SingleColumnSingleValueWriter _writer;
+  private final ForwardIndexWriter _writer;
 
   public SingleValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs)
       throws Exception {
     File indexFile = new File(outputDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-    _writer = new FixedBitSingleValueWriter(indexFile, numDocs, PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
+    _writer = new FixedBitSVForwardIndexWriter(indexFile, numDocs, PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
   }
 
   @Override

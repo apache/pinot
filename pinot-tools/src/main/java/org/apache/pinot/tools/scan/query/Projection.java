@@ -26,9 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.pinot.core.common.ColumnValueReader;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -78,21 +77,17 @@ public class Projection {
 
     for (Pair pair : _columnList) {
       String column = (String) pair.getFirst();
+      ColumnValueReader valueReader = _immutableSegment.getDataSource(column).getValueReader();
       if (!_mvColumns.contains(column)) {
-        SingleValueSet valueSet =
-            (SingleValueSet) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet();
-
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {
-          resultTable.add(rowId++, valueSet.getIntValue(docId));
+          resultTable.add(rowId++, valueReader.getIntValue(docId));
         }
       } else {
-        MultiValueSet valueSet = (MultiValueSet) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet();
-
         int rowId = 0;
         for (int docId : _filteredDocIds) {
           int[] dictIds = _mvColumnArrayMap.get(column);
-          int numMVValues = valueSet.getIntValues(docId, dictIds);
+          int numMVValues = valueReader.getIntValues(docId, dictIds);
 
           dictIds = Arrays.copyOf(dictIds, numMVValues);
           resultTable.add(rowId++, ArrayUtils.toObject(dictIds));

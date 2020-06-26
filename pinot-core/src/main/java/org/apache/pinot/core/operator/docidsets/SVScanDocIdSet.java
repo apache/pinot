@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.common.ColumnValueReader;
 import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 
 public final class SVScanDocIdSet implements FilterBlockDocIdSet {
   private final SVScanDocIdIterator _docIdIterator;
 
-  public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, SingleValueSet valueSet, int numDocs) {
-    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, valueSet, numDocs);
+  public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, ColumnValueReader valueReader, int numDocs) {
+    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, valueReader, numDocs);
   }
 
   @Override

@@ -24,13 +24,12 @@ import java.util.Collections;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.common.ColumnValueReader;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
@@ -146,11 +145,11 @@ public class MutableSegmentImplTest {
           continue;
         }
 
-        SingleValueSet actualValueSet = (SingleValueSet) actualDataSource.nextBlock().getBlockValueSet();
-        SingleValueSet expectedValueSet = (SingleValueSet) expectedDataSource.nextBlock().getBlockValueSet();
+        ColumnValueReader actualValueReader = actualDataSource.getValueReader();
+        ColumnValueReader expectedValueReader = expectedDataSource.getValueReader();
         for (int docId = 0; docId < expectedNumDocs; docId++) {
-          int actualDictId = actualValueSet.getIntValue(docId);
-          int expectedDictId = expectedValueSet.getIntValue(docId);
+          int actualDictId = actualValueReader.getIntValue(docId);
+          int expectedDictId = expectedValueReader.getIntValue(docId);
           assertEquals(actualDictionary.get(actualDictId), expectedDictionary.get(expectedDictId));
         }
       }
@@ -177,11 +176,11 @@ public class MutableSegmentImplTest {
         int[] actualDictIds = new int[maxNumValuesPerMVEntry];
         int[] expectedDictIds = new int[maxNumValuesPerMVEntry];
 
-        MultiValueSet actualValueSet = (MultiValueSet) actualDataSource.nextBlock().getBlockValueSet();
-        MultiValueSet expectedValueSet = (MultiValueSet) expectedDataSource.nextBlock().getBlockValueSet();
+        ColumnValueReader actualValueReader = actualDataSource.getValueReader();
+        ColumnValueReader expectedValueReader = expectedDataSource.getValueReader();
         for (int docId = 0; docId < expectedNumDocs; docId++) {
-          int actualLength = actualValueSet.getIntValues(docId, actualDictIds);
-          int expectedLength = expectedValueSet.getIntValues(docId, expectedDictIds);
+          int actualLength = actualValueReader.getIntValues(docId, actualDictIds);
+          int expectedLength = expectedValueReader.getIntValues(docId, expectedDictIds);
           assertEquals(actualLength, expectedLength);
 
           for (int i = 0; i < expectedLength; i++) {

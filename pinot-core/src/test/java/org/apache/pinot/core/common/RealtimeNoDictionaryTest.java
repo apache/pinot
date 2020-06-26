@@ -24,12 +24,13 @@ import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
-import org.apache.pinot.core.io.readerwriter.impl.VarByteSingleColumnSingleValueReaderWriter;
+import org.apache.pinot.core.io.readerwriter.impl.FixedByteSVForwardIndexReaderWriter;
+import org.apache.pinot.core.io.readerwriter.impl.VarByteSVForwardIndexReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -67,30 +68,27 @@ public class RealtimeNoDictionaryTest {
   }
 
   private DataFetcher makeDataFetcher(long seed) {
-    FieldSpec intSpec = new MetricFieldSpec(INT_COL_NAME, FieldSpec.DataType.INT);
-    FieldSpec longSpec = new MetricFieldSpec(LONG_COL_NAME, FieldSpec.DataType.LONG);
-    FieldSpec floatSpec = new MetricFieldSpec(FLOAT_COL_NAME, FieldSpec.DataType.FLOAT);
-    FieldSpec doubleSpec = new MetricFieldSpec(DOUBLE_COL_NAME, FieldSpec.DataType.DOUBLE);
-    FieldSpec stringSpec = new DimensionFieldSpec(STRING_COL_NAME, FieldSpec.DataType.STRING, true);
-    FieldSpec bytesSpec = new DimensionFieldSpec(BYTES_COL_NAME, FieldSpec.DataType.BYTES, true);
+    FieldSpec intSpec = new MetricFieldSpec(INT_COL_NAME, DataType.INT);
+    FieldSpec longSpec = new MetricFieldSpec(LONG_COL_NAME, DataType.LONG);
+    FieldSpec floatSpec = new MetricFieldSpec(FLOAT_COL_NAME, DataType.FLOAT);
+    FieldSpec doubleSpec = new MetricFieldSpec(DOUBLE_COL_NAME, DataType.DOUBLE);
+    FieldSpec stringSpec = new DimensionFieldSpec(STRING_COL_NAME, DataType.STRING, true);
+    FieldSpec bytesSpec = new DimensionFieldSpec(BYTES_COL_NAME, DataType.BYTES, true);
     _random = new Random(seed);
 
-    FixedByteSingleColumnSingleValueReaderWriter intRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Integer.BYTES, _memoryManager,
-            "int");
-    FixedByteSingleColumnSingleValueReaderWriter longRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Long.BYTES, _memoryManager,
-            "long");
-    FixedByteSingleColumnSingleValueReaderWriter floatRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Float.BYTES, _memoryManager,
-            "float");
-    FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Double.BYTES, _memoryManager,
+    FixedByteSVForwardIndexReaderWriter intRawIndex =
+        new FixedByteSVForwardIndexReaderWriter(DataType.INT, _random.nextInt(NUM_ROWS) + 1, _memoryManager, "int");
+    FixedByteSVForwardIndexReaderWriter longRawIndex =
+        new FixedByteSVForwardIndexReaderWriter(DataType.LONG, _random.nextInt(NUM_ROWS) + 1, _memoryManager, "long");
+    FixedByteSVForwardIndexReaderWriter floatRawIndex =
+        new FixedByteSVForwardIndexReaderWriter(DataType.FLOAT, _random.nextInt(NUM_ROWS) + 1, _memoryManager, "float");
+    FixedByteSVForwardIndexReaderWriter doubleRawIndex =
+        new FixedByteSVForwardIndexReaderWriter(DataType.DOUBLE, _random.nextInt(NUM_ROWS) + 1, _memoryManager,
             "double");
-    VarByteSingleColumnSingleValueReaderWriter stringRawIndex =
-        new VarByteSingleColumnSingleValueReaderWriter(_memoryManager, "StringColumn", 512, 30);
-    VarByteSingleColumnSingleValueReaderWriter bytesRawIndex =
-        new VarByteSingleColumnSingleValueReaderWriter(_memoryManager, "BytesColumn", 512, 30);
+    VarByteSVForwardIndexReaderWriter stringRawIndex =
+        new VarByteSVForwardIndexReaderWriter(DataType.STRING, _memoryManager, "StringColumn", 512, 30);
+    VarByteSVForwardIndexReaderWriter bytesRawIndex =
+        new VarByteSVForwardIndexReaderWriter(DataType.BYTES, _memoryManager, "BytesColumn", 512, 30);
 
     for (int i = 0; i < NUM_ROWS; i++) {
       _intVals[i] = _random.nextInt();

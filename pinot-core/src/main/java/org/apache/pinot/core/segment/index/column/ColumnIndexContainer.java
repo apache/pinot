@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.index.column;
 
 import java.io.Closeable;
-import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
@@ -34,7 +34,7 @@ public interface ColumnIndexContainer extends Closeable {
   /**
    * Returns the forward index for the column.
    */
-  DataFileReader getForwardIndex();
+  ForwardIndexReader getForwardIndex();
 
   /**
    * Returns the inverted index for the column, or {@code null} if it does not exist.

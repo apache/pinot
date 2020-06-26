@@ -35,7 +35,7 @@ import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
-import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
+import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
@@ -230,11 +230,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<String, String> properties = columnProperties.get(columnName);
       String version = properties.get(FieldConfig.RAW_INDEX_WRITER_VERSION);
       if (version == null) {
-        return BaseChunkSingleValueWriter.DEFAULT_VERSION;
+        return BaseChunkSVForwardIndexWriter.DEFAULT_VERSION;
       }
       return Integer.parseInt(version);
     }
-    return BaseChunkSingleValueWriter.DEFAULT_VERSION;
+    return BaseChunkSVForwardIndexWriter.DEFAULT_VERSION;
   }
 
   /**

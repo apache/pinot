@@ -21,14 +21,13 @@ package org.apache.pinot.core.segment.index.column;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
-import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import org.apache.pinot.core.io.reader.ForwardIndexReader;
+import org.apache.pinot.core.io.reader.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.io.reader.impl.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.io.reader.impl.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.io.reader.impl.SortedIndexReaderImpl;
+import org.apache.pinot.core.io.reader.impl.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
@@ -60,7 +59,7 @@ import org.slf4j.LoggerFactory;
 public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
-  private final DataFileReader _forwardIndex;
+  private final ForwardIndexReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
   private final InvertedIndexReader _rangeIndex;
   private final BaseImmutableDictionary _dictionary;
@@ -116,13 +115,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         } else {
           // Unsorted
           _forwardIndex =
-              new FixedBitSingleValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
+              new FixedBitSVForwardIndexReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
         }
       } else {
         // Multi-value
-        _forwardIndex =
-            new FixedBitMultiValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
-                metadata.getBitsPerElement());
+        _forwardIndex = new FixedBitMVForwardIndexReader(fwdIndexBuffer, metadata.getTotalDocs(),
+            metadata.getTotalNumberOfEntries(), metadata.getBitsPerElement());
       }
       if (loadInvertedIndex) {
         _invertedIndex =
@@ -153,7 +151,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public DataFileReader getForwardIndex() {
+  public ForwardIndexReader getForwardIndex() {
     return _forwardIndex;
   }
 
@@ -224,18 +222,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
   }
 
-  private static SingleColumnSingleValueReader loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
+  private static ForwardIndexReader loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
       FieldSpec.DataType dataType) {
-
     switch (dataType) {
       case INT:
       case LONG:
       case FLOAT:
       case DOUBLE:
-        return new FixedByteChunkSingleValueReader(forwardIndexBuffer);
+        return new FixedByteChunkSVForwardIndexReader(forwardIndexBuffer, dataType);
       case STRING:
       case BYTES:
-        return new VarByteChunkSingleValueReader(forwardIndexBuffer);
+        return new VarByteChunkSVForwardIndexReader(forwardIndexBuffer, dataType);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }

@@ -25,7 +25,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
-import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -68,7 +68,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public DataFileReader getForwardIndex(String column) {
+  public ForwardIndexReader getForwardIndex(String column) {
     return _indexContainerMap.get(column).getForwardIndex();
   }
 

@@ -21,9 +21,9 @@ package org.apache.pinot.core.segment.creator.impl.fwd;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
+import org.apache.pinot.core.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
-import org.apache.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
 import org.apache.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
@@ -38,7 +38,7 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndexCreator {
   private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
 
-  final FixedByteChunkSingleValueWriter _indexWriter;
+  private final FixedByteChunkSVForwardIndexWriter _indexWriter;
 
   /**
    * Constructor for the class
@@ -53,7 +53,7 @@ public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndex
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
       String column, int totalDocs, int sizeOfEntry)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, sizeOfEntry, BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    this(baseIndexDir, compressionType, column, totalDocs, sizeOfEntry, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
   }
 
   /**
@@ -72,7 +72,8 @@ public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndex
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     _indexWriter =
-        new FixedByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, sizeOfEntry, writerVersion);
+        new FixedByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, sizeOfEntry,
+            writerVersion);
   }
 
   @Override

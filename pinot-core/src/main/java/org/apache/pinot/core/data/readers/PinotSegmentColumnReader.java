@@ -18,94 +18,74 @@
  */
 package org.apache.pinot.core.data.readers;
 
+import org.apache.pinot.core.common.ColumnValueReader;
+import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
-import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
-import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
-import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-@SuppressWarnings("unchecked")
 public class PinotSegmentColumnReader {
+  private final ColumnValueReader _valueReader;
   private final Dictionary _dictionary;
-  private final DataFileReader _reader;
-  private final ReaderContext _readerContext;
   private final int[] _mvBuffer;
 
   public PinotSegmentColumnReader(ImmutableSegment immutableSegment, String column) {
-    _dictionary = immutableSegment.getDictionary(column);
-    _reader = immutableSegment.getForwardIndex(column);
-    _readerContext = _reader.createContext();
-    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) immutableSegment.getSegmentMetadata();
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-    if (columnMetadata.isSingleValue()) {
+    DataSource dataSource = immutableSegment.getDataSource(column);
+    _valueReader = dataSource.getValueReader();
+    _dictionary = dataSource.getDictionary();
+    if (_valueReader.isSingleValue()) {
       _mvBuffer = null;
     } else {
-      _mvBuffer = new int[columnMetadata.getMaxNumberOfMultiValues()];
+      _mvBuffer = new int[dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry()];
     }
   }
 
   public Object readInt(int docId) {
-    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
-      int dictId = svReader.getInt(docId, _readerContext);
-      return _dictionary.get(dictId);
+      return _dictionary.get(_valueReader.getIntValue(docId));
     } else {
-      return svReader.getInt(docId, _readerContext);
+      return _valueReader.getIntValue(docId);
     }
   }
 
   public Object readLong(int docId) {
-    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
-      int dictId = svReader.getInt(docId, _readerContext);
-      return _dictionary.get(dictId);
+      return _dictionary.get(_valueReader.getIntValue(docId));
     } else {
-      return svReader.getLong(docId, _readerContext);
+      return _valueReader.getLongValue(docId);
     }
   }
 
   public Object readFloat(int docId) {
-    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
-      int dictId = svReader.getInt(docId, _readerContext);
-      return _dictionary.get(dictId);
+      return _dictionary.get(_valueReader.getIntValue(docId));
     } else {
-      return svReader.getFloat(docId, _readerContext);
+      return _valueReader.getFloatValue(docId);
     }
   }
 
   public Object readDouble(int docId) {
-    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
-      int dictId = svReader.getInt(docId, _readerContext);
-      return _dictionary.get(dictId);
+      return _dictionary.get(_valueReader.getIntValue(docId));
     } else {
-      return svReader.getDouble(docId, _readerContext);
+      return _valueReader.getDoubleValue(docId);
     }
   }
 
   public Object readString(int docId) {
-    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
-      int dictId = svReader.getInt(docId, _readerContext);
-      return _dictionary.get(dictId);
+      return _dictionary.get(_valueReader.getIntValue(docId));
     } else {
-      return svReader.getString(docId, _readerContext);
+      return _valueReader.getStringValue(docId);
     }
   }
 
   public Object readBytes(int docId) {
-    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
-      int dictId = svReader.getInt(docId, _readerContext);
-      return _dictionary.get(dictId);
+      return _dictionary.get(_valueReader.getIntValue(docId));
     } else {
-      return svReader.getBytes(docId, _readerContext);
+      return _valueReader.getBytesValue(docId);
     }
   }
 
@@ -129,8 +109,7 @@ public class PinotSegmentColumnReader {
   }
 
   public Object[] readMV(int docId) {
-    SingleColumnMultiValueReader mvReader = (SingleColumnMultiValueReader) _reader;
-    int numValues = mvReader.getIntArray(docId, _mvBuffer, _readerContext);
+    int numValues = _valueReader.getIntValues(docId, _mvBuffer);
     Object[] values = new Object[numValues];
     for (int i = 0; i < numValues; i++) {
       values[i] = _dictionary.get(_mvBuffer[i]);
@@ -139,15 +118,7 @@ public class PinotSegmentColumnReader {
   }
 
   public int getDictionaryId(int docId) {
-    if (_mvBuffer != null) {
-      throw new IllegalStateException("Multi value column is not supported");
-    }
-    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
-    if (_dictionary != null) {
-      return svReader.getInt(docId, _readerContext);
-    } else {
-      throw new IllegalStateException("No dictionary column is not supported");
-    }
+    return _valueReader.getIntValue(docId);
   }
 
   public boolean hasDictionary() {

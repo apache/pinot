@@ -19,6 +19,7 @@
 package org.apache.pinot.core.io.reader.impl;
 
 import java.nio.ByteBuffer;
+import org.apache.pinot.core.io.reader.ReaderContext;
 
 
 /**
@@ -30,7 +31,7 @@ import java.nio.ByteBuffer;
  *   <li> Id for the chunk </li>
  * </ul>
  */
-public class ChunkReaderContext extends UnSortedValueReaderContext {
+public class ChunkReaderContext implements ReaderContext {
   int _chunkId;
   ByteBuffer _chunkBuffer;
 

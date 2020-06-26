@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.segment.virtualcolumn;
 
-import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -30,7 +30,7 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
  * comprise a proper column.
  */
 public interface VirtualColumnProvider {
-  DataFileReader buildReader(VirtualColumnContext context);
+  ForwardIndexReader buildForwardIndex(VirtualColumnContext context);
 
   Dictionary buildDictionary(VirtualColumnContext context);
 
