@@ -365,13 +365,11 @@ public class PinotHelixResourceManager {
    * Update a given instance for the specified Instance ID
    */
   public synchronized PinotResourceManagerResponse updateInstance(String instanceIdToUpdate, Instance newInstance) {
-    List<String> instances = getAllInstances();
-    if (!instances.contains(instanceIdToUpdate)) {
+    if (getHelixInstanceConfig(instanceIdToUpdate) == null) {
       return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
     } else {
       InstanceConfig newConfig = InstanceUtils.toHelixInstanceConfig(newInstance);
-      if(!_helixZkManager.getHelixDataAccessor().setProperty(
-          _helixZkManager.getHelixDataAccessor().keyBuilder().instanceConfig(instanceIdToUpdate), newConfig)) {
+      if(!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceIdToUpdate), newConfig)) {
         return PinotResourceManagerResponse.failure("Unable to update instance: " + instanceIdToUpdate);
       }
       return PinotResourceManagerResponse.SUCCESS;
