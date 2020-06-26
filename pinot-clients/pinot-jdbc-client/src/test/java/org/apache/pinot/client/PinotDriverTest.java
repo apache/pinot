@@ -19,13 +19,10 @@
 package org.apache.pinot.client;
 
 import java.sql.Connection;
-import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import org.testng.Assert;
 import org.testng.annotations.Test;
