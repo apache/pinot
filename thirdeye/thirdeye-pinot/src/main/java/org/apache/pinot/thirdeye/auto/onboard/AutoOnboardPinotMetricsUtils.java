@@ -217,7 +217,7 @@ public class AutoOnboardPinotMetricsUtils {
 
   public String extractTimeColumnFromPinotTable(JsonNode tableConfigJson) {
     JsonNode timeColumnNode = tableConfigJson.get("segmentsConfig").get("timeColumnName");
-    return (timeColumnNode != null && !timeColumnNode.isNull()) ? timeColumnNode.toString() : null;
+    return (timeColumnNode != null && !timeColumnNode.isNull()) ? timeColumnNode.asText() : null;
   }
 
   /**
