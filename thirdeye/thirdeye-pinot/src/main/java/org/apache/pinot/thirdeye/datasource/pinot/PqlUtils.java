@@ -24,7 +24,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
@@ -246,13 +246,13 @@ public class PqlUtils {
     return builder.toString();
   }
 
-  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec, String dataset)
+  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeSpec, String dataset)
       throws ExecutionException {
-    TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
+    TimeGranularity dataGranularity = timeSpec.getDataGranularity();
     long dataGranularityMillis = dataGranularity.toMillis();
 
-    String timeField = timeFieldSpec.getColumnName();
-    String timeFormat = timeFieldSpec.getFormat();
+    String timeField = timeSpec.getColumnName();
+    String timeFormat = timeSpec.getFormat();
 
     // epoch case
     if (timeFormat == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
@@ -360,7 +360,7 @@ public class PqlUtils {
     if (aggregationGranularity != null && !groups.contains(timeColumnName)) {
       // Convert the time column to 1 minute granularity if it is epoch.
       // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','1:MINUTES')
-      if (timeSpec.getFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
+      if (timeSpec.getFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())
           && !timeSpec.getDataGranularity().equals(aggregationGranularity)) {
         String groupByTimeColumnName = convertEpochToMinuteAggGranularity(timeColumnName, timeSpec);
         groups.add(groupByTimeColumnName);

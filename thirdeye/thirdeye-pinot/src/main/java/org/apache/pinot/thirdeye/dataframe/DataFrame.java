@@ -19,8 +19,6 @@
 
 package org.apache.pinot.thirdeye.dataframe;
 
-import org.apache.pinot.client.ResultSet;
-import org.apache.pinot.client.ResultSetGroup;
 import com.udojava.evalex.Expression;
 import java.io.IOException;
 import java.io.Reader;
@@ -41,6 +39,8 @@ import java.util.regex.Pattern;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.client.ResultSetGroup;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;

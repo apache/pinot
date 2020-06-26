@@ -2,7 +2,7 @@
 
 # [Optional] Uncomment below lines to build with latest Pinot changes
 # cd ..
-# mvn install -DskipTests -pl pinot-common,pinot-core,pinot-api -am -Pbuild-shaded-jar || exit 1
+# mvn install -DskipTests -pl pinot-common,pinot-core,pinot-spi,pinot-java-client -am -Pbuild-shaded-jar || exit 1
 # cd thirdeye
 
 echo "*******************************************************"
