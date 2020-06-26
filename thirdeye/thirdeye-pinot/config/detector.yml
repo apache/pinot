@@ -11,6 +11,8 @@ server:
   adminConnectors:
     - type: http
       port: 1868
+  requestLog:
+    type: external
 alert: false
 autoload: false
 classifier: false
