@@ -204,7 +204,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
    */
   private void refreshOldDataset(String dataset, Schema schema, String timeColumnName,
       Map<String, String> customConfigs, DatasetConfigDTO datasetConfig) {
-    checkDimensionChanges(dataset, datasetConfig, schema, timeColumnName);
+    checkDimensionChanges(dataset, datasetConfig, schema);
     checkMetricChanges(dataset, datasetConfig, schema);
     checkTimeFieldChanges(datasetConfig, schema, timeColumnName);
     appendNewCustomConfigs(datasetConfig, customConfigs);
@@ -212,15 +212,9 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     datasetConfig.setActive(true);
   }
 
-  private void checkDimensionChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema,
-      String timeColumnName) {
+  private void checkDimensionChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
     LOG.info("Checking for dimensions changes in {}", dataset);
-    List<String> schemaDimensions = new ArrayList<>(schema.getDimensionNames());
-     for (String dateTimeColumn : schema.getDateTimeNames()) { // treat all dateTimeFields specs as dimensions, except the primary time column
-      if (!dateTimeColumn.equals(timeColumnName)) {
-        schemaDimensions.add(dateTimeColumn);
-      }
-    }
+    List<String> schemaDimensions = schema.getDimensionNames();
     List<String> datasetDimensions = datasetConfig.getDimensions();
 
     // remove blacklisted dimensions
