@@ -1796,16 +1796,16 @@ public class PinotHelixResourceManager {
     }
 
     // Set all partitions to online so that they load the new segment data
-    do {
-      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
+      assert idealState != null;
       final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
       LOGGER.info("Found {} instances for segment '{}', in ideal state", instanceSet.size(), segmentName);
       for (final String instance : instanceSet) {
         idealState.setPartitionState(segmentName, instance, "ONLINE");
         LOGGER.info("Setting Ideal State for segment '{}' to ONLINE for instance '{}'", segmentName, instance);
       }
-      updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
-    } while (!updateSuccessful);
+      return idealState;
+    });
 
     // Check that the ideal state has been written to ZK
     updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
