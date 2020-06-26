@@ -27,6 +27,12 @@ import java.util.Map;
 
 public abstract class AbstractBaseResultSet implements ResultSet {
 
+  protected abstract void validateState()
+      throws SQLException;
+
+  protected abstract void validateColumn(int columnIndex)
+      throws SQLException;
+
   @Override
   public void cancelRowUpdates()
       throws SQLException {
@@ -150,6 +156,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   @Override
   public int getConcurrency()
       throws SQLException {
+    validateState();
     return ResultSet.CONCUR_READ_ONLY;
   }
 
@@ -186,6 +193,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   @Override
   public int getFetchDirection()
       throws SQLException {
+    validateState();
     return ResultSet.FETCH_FORWARD;
   }
 
@@ -216,6 +224,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   @Override
   public int getHoldability()
       throws SQLException {
+    validateState();
     return ResultSet.HOLD_CURSORS_OVER_COMMIT;
   }
 
@@ -402,6 +411,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   @Override
   public int getType()
       throws SQLException {
+    validateState();
     return ResultSet.TYPE_FORWARD_ONLY;
   }
 

@@ -46,20 +46,40 @@ public class PinotResultSet extends AbstractBaseResultSet {
   private org.apache.pinot.client.ResultSet _resultSet;
   private int _totalRows;
   private int _currentRow;
+  private int _totalColumns;
   private Map<String, Integer> _columns = new HashMap<>();
 
   public PinotResultSet(org.apache.pinot.client.ResultSet resultSet) {
     _resultSet = resultSet;
     _totalRows = _resultSet.getRowCount();
+    _totalColumns = _resultSet.getColumnCount();
     _currentRow = -1;
-    for (int i = 0; i < _resultSet.getColumnCount(); i++) {
+    for (int i = 0; i < _totalColumns; i++) {
       _columns.put(_resultSet.getColumnName(i), i);
+    }
+  }
+
+  protected void validateState()
+      throws SQLException {
+    if (_resultSet == null) {
+      throw new SQLException("Not allowed to operate on closed result sets");
+    }
+  }
+
+  protected void validateColumn(int columnIndex)
+      throws SQLException {
+    validateState();
+
+    if (columnIndex > _totalColumns) {
+      throw new SQLException("Column Index should be less than " + (_totalColumns + 1) + ". Found " + columnIndex);
     }
   }
 
   @Override
   public boolean absolute(int row)
       throws SQLException {
+    validateState();
+
     if (row >= 0 && row < _totalRows) {
       _currentRow = row;
       return true;
@@ -74,12 +94,16 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public void afterLast()
       throws SQLException {
+    validateState();
+
     _currentRow = _totalRows;
   }
 
   @Override
   public void beforeFirst()
       throws SQLException {
+    validateState();
+
     _currentRow = -1;
   }
 
@@ -90,7 +114,6 @@ public class PinotResultSet extends AbstractBaseResultSet {
     _totalRows = 0;
     _currentRow = -1;
     _columns.clear();
-    ;
   }
 
   @Override
@@ -99,13 +122,15 @@ public class PinotResultSet extends AbstractBaseResultSet {
     if (_columns.containsKey(columnLabel)) {
       return _columns.get(columnLabel);
     } else {
-      throw new SQLException("Column with label {} not found in ResultSet", columnLabel);
+      throw new SQLException("Column with label " + columnLabel + " not found in ResultSet");
     }
   }
 
   @Override
   public boolean first()
       throws SQLException {
+    validateState();
+
     _currentRow = 0;
     return true;
   }
@@ -133,14 +158,15 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean getBoolean(int columnIndex)
       throws SQLException {
-    return Boolean.parseBoolean(_resultSet.getString(_currentRow, columnIndex));
+    validateColumn(columnIndex);
+    return Boolean.parseBoolean(_resultSet.getString(_currentRow, columnIndex - 1));
   }
 
   @Override
   public byte[] getBytes(int columnIndex)
       throws SQLException {
     try {
-      String value = _resultSet.getString(_currentRow, columnIndex);
+      String value = getString(columnIndex);
       return Hex.decodeHex(value.toCharArray());
     } catch (Exception e) {
       throw new SQLException(String.format("Unable to fetch value for column %d", columnIndex), e);
@@ -172,30 +198,40 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public double getDouble(int columnIndex)
       throws SQLException {
-    return _resultSet.getDouble(_currentRow, columnIndex);
+    validateColumn(columnIndex);
+
+    return _resultSet.getDouble(_currentRow, columnIndex - 1);
   }
 
   @Override
   public float getFloat(int columnIndex)
       throws SQLException {
-    return _resultSet.getFloat(_currentRow, columnIndex);
+    validateColumn(columnIndex);
+
+    return _resultSet.getFloat(_currentRow, columnIndex - 1);
   }
 
   @Override
   public int getInt(int columnIndex)
       throws SQLException {
-    return _resultSet.getInt(_currentRow, columnIndex);
+    validateColumn(columnIndex);
+
+    return _resultSet.getInt(_currentRow, columnIndex - 1);
   }
 
   @Override
   public long getLong(int columnIndex)
       throws SQLException {
-    return _resultSet.getLong(_currentRow, columnIndex);
+    validateColumn(columnIndex);
+
+    return _resultSet.getLong(_currentRow, columnIndex - 1);
   }
 
   @Override
   public int getRow()
       throws SQLException {
+    validateState();
+
     return _currentRow;
   }
 
@@ -209,7 +245,9 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public String getString(int columnIndex)
       throws SQLException {
-    return _resultSet.getString(_currentRow, columnIndex);
+    validateColumn(columnIndex);
+
+    return _resultSet.getString(_currentRow, columnIndex - 1);
   }
 
   @Override
@@ -262,12 +300,16 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean isAfterLast()
       throws SQLException {
+    validateState();
+
     return (_currentRow >= _totalRows);
   }
 
   @Override
   public boolean isBeforeFirst()
       throws SQLException {
+    validateState();
+
     return (_currentRow < 0);
   }
 
@@ -280,18 +322,24 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean isFirst()
       throws SQLException {
+    validateState();
+
     return _currentRow == 0;
   }
 
   @Override
   public boolean isLast()
       throws SQLException {
+    validateState();
+
     return _currentRow == _totalRows - 1;
   }
 
   @Override
   public boolean last()
       throws SQLException {
+    validateState();
+
     _currentRow = _totalRows - 1;
     return true;
   }
@@ -299,6 +347,8 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean next()
       throws SQLException {
+    validateState();
+
     _currentRow++;
     boolean hasNext = _currentRow < _totalRows;
     return hasNext;
@@ -307,6 +357,8 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean previous()
       throws SQLException {
+    validateState();
+
     if (!isBeforeFirst()) {
       _currentRow--;
       return true;
@@ -317,6 +369,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean relative(int rows)
       throws SQLException {
+    validateState();
     int nextRow = _currentRow + rows;
     if (nextRow >= 0 && nextRow < _totalRows) {
       _currentRow = nextRow;
