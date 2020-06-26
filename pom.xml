@@ -1553,8 +1553,11 @@
             <exclude>**/*.properties</exclude>
 
             <!-- IDE files -->
-            <exclude>**/*.iml</exclude>
-
+	    <exclude>**/*.iml</exclude>
+	    <!-- Eclipse IDE files -->
+	    <exclude>**/*.project</exclude>
+	    <exclude>**/*.classpath</exclude>
+	    <exclude>**/*.prefs</exclude>
             <!-- Top level -->
             <exclude>.codecov*</exclude>
 
