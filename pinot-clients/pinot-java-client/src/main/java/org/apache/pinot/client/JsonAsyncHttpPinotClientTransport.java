@@ -43,7 +43,8 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   AsyncHttpClient _httpClient = new AsyncHttpClient();
   Map<String, String> _headers;
 
-  public JsonAsyncHttpPinotClientTransport() {}
+  public JsonAsyncHttpPinotClientTransport() {
+  }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers) {
     _headers = headers;
@@ -80,13 +81,13 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
       AsyncHttpClient.BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
-      if(_headers != null) {
+      if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
       }
 
-      final Future<Response> response = requestBuilder
-          .addHeader("Content-Type", "application/json; charset=utf-8")
-          .setBody(json.toString()).execute();
+      final Future<Response> response =
+          requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
+              .execute();
 
       return new BrokerResponseFuture(response, request.getQuery(), url);
     } catch (Exception e) {
@@ -108,6 +109,15 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
       throws PinotClientException {
     return executePinotQueryAsync(brokerAddress, request);
+  }
+
+  @Override
+  public void close()
+      throws PinotClientException {
+    if (_httpClient.isClosed()) {
+      throw new PinotClientException("Connection is already closed!");
+    }
+    _httpClient.close();
   }
 
   private static class BrokerResponseFuture implements Future<BrokerResponse> {
