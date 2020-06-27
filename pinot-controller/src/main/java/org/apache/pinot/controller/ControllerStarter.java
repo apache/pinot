@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.controller;
 
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -33,11 +35,15 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
+import org.apache.helix.model.ClusterConfig;
+import org.apache.helix.model.ClusterConstraints;
+import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
@@ -97,6 +103,7 @@ public class ControllerStarter implements ServiceStartable {
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
+  private static final String MAX_MESSAGES_PER_INSTANCE_NAME =  "MaxMessagesPerInstance";
 
   private final ControllerConf _config;
   private final List<ListenerConfig> _listenerConfigs;
@@ -202,6 +209,18 @@ public class ControllerStarter implements ServiceStartable {
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
+  private void setupHelixClusterConstraints() {
+    String maxMessageLimit = _config.getString(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_MESSAGES,
+        CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_MESSAGES);
+    Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = Maps.newHashMap();
+    constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
+    constraintAttributes.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE, "STATE_TRANSITION");
+    ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxMessageLimit);
+
+    getHelixAdmin().setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
+        MAX_MESSAGES_PER_INSTANCE_NAME, constraintItem);
+  }
+
   public PinotHelixResourceManager getHelixResourceManager() {
     return _helixResourceManager;
   }
@@ -281,6 +300,11 @@ public class ControllerStarter implements ServiceStartable {
         .setServiceStatusCallback(_helixParticipantInstanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
   }
 
+  private HelixAdmin getHelixAdmin() {
+    return _controllerMode == ControllerConf.ControllerMode.PINOT_ONLY ? _helixResourceManager.getHelixAdmin()
+        : _helixControllerManager.getClusterManagmentTool();
+  }
+
   private void setUpHelixController() {
     // Register and connect instance as Helix controller.
     LOGGER.info("Starting Helix controller");
@@ -296,6 +320,9 @@ public class ControllerStarter implements ServiceStartable {
         () -> _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixControllerManager));
+
+    // setup up constraint
+    setupHelixClusterConstraints();
   }
 
   private void setUpPinotController() {
@@ -349,6 +376,9 @@ public class ControllerStarter implements ServiceStartable {
       LOGGER.info("Realtime tables with High Level consumers will NOT be supported");
       _realtimeSegmentsManager = null;
     }
+
+    // setup constraints
+    setupHelixClusterConstraints();
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
