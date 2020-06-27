@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,10 +38,12 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -769,6 +772,30 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
+  @Test
+  public void testRealtimeDownloadUrl() {
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setDataDir("fakefs://datadir");
+    String rawTableName = "rawTable";
+    String segmentName = "segment";
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(controllerConf);
+
+    assertEquals(segmentManager.getDownloadUrl(rawTableName, segmentName),
+        URI.create(String.format("%s/%s/%s", controllerConf.getDataDir(), rawTableName, segmentName)).toString());
+
+    controllerConf = new ControllerConf();
+    controllerConf.setControllerVipHost("pinot-controller.example.com");
+    controllerConf.setControllerVipPort("9000");
+    segmentManager = new FakePinotLLCRealtimeSegmentManager(controllerConf);
+
+    assertEquals(segmentManager.getDownloadUrl(rawTableName, segmentName),
+        URI.create(String.format("%s://%s:%s/segments/%s/%s",
+            controllerConf.getControllerVipProtocol(),
+            controllerConf.getControllerVipHost(),
+            controllerConf.getControllerVipPort(),
+            rawTableName, segmentName)).toString());
+  }
+
   //////////////////////////////////////////////////////////////////////////////////
   // Fake classes
   /////////////////////////////////////////////////////////////////////////////////
@@ -792,7 +819,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     boolean _exceededMaxSegmentCompletionTime = false;
 
     FakePinotLLCRealtimeSegmentManager() {
-      super(mock(PinotHelixResourceManager.class), CONTROLLER_CONF, mock(ControllerMetrics.class));
+      this(CONTROLLER_CONF);
+    }
+
+    FakePinotLLCRealtimeSegmentManager(ControllerConf controllerConf) {
+      super(mock(PinotHelixResourceManager.class), controllerConf, mock(ControllerMetrics.class));
     }
 
     void makeTableConfig() {

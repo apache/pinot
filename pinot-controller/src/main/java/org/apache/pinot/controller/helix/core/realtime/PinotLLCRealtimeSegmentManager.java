@@ -49,6 +49,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -57,6 +58,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -485,9 +487,7 @@ public class PinotLLCRealtimeSegmentManager {
     // TODO Issue 5953 remove the long parsing once metadata is set correctly.
     committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
     committingSegmentZKMetadata.setStatus(Status.DONE);
-    committingSegmentZKMetadata.setDownloadUrl(URIUtils
-        .constructDownloadUrl(_controllerConf.generateVipUrl(), TableNameBuilder.extractRawTableName(realtimeTableName),
-            segmentName));
+    committingSegmentZKMetadata.setDownloadUrl(getDownloadUrl(TableNameBuilder.extractRawTableName(realtimeTableName), segmentName));
     committingSegmentZKMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     committingSegmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
@@ -497,6 +497,16 @@ public class PinotLLCRealtimeSegmentManager {
 
     persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
     return committingSegmentZKMetadata;
+  }
+
+  @VisibleForTesting
+  public String getDownloadUrl(String rawTableName, String segmentName) {
+    URI dataDirURI = URIUtils.getUri(_controllerConf.getDataDir());
+    if (dataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+      return URIUtils.constructDownloadUrl(_controllerConf.generateVipUrl(), rawTableName, segmentName);
+    } else {
+      return URIUtils.getPath(dataDirURI.toString(), rawTableName, URIUtils.encode(segmentName));
+    }
   }
 
   /**
