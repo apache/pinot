@@ -37,7 +37,7 @@ public class DefaultTableDataManagerCallbackImpl implements TableDataManagerCall
   }
 
   @Override
-  public void addSegment(String tableName, String segmentName) {
+  public void onSegmentAdd(String tableName, String segmentName) {
   }
 
   /**

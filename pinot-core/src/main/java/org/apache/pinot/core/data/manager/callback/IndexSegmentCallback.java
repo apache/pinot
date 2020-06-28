@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.callback;
 
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -28,17 +27,17 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import java.util.Map;
 
 /**
- * Component inject to {@link IndexSegment} for handling extra logic for
- * upsert-enabled pinot ingestion mode
+ * Component inject to IndexSegment for handling extra logic for upsert-enabled pinot realtime table
+ *
+ * This feature currently only support Low-level consumer.
  */
 @InterfaceStability.Evolving
 public interface IndexSegmentCallback {
 
   /**
-   * Initialize the callback from {@link IndexSegment}. This happens in constructor of IndexSegment implementation class
+   * Initialize the callback from IndexSegment. This happens in constructor of IndexSegment implementation class
    *
-   * In append-tables callback, this method will do nothing
-   * In upsert-tables callback, this method will initialize the necessary virtual columns for upsert table
+   * In upsert-enabled tables callback, this method will initialize the necessary virtual columns for upsert table
    * (offset mapping, $validFrom, $validUntil columns)
    *
    * this method ensure that virtual columns index (forward/reverted index) can be created properly and load
@@ -47,17 +46,17 @@ public interface IndexSegmentCallback {
    * @param segmentMetadata the metadata associated with the current segment
    * @param columnIndexContainerMap mapping of necessary column name and the associate columnIndexContainer
    */
-  void init(SegmentMetadata segmentMetadata, Map<String, ColumnIndexContainer> columnIndexContainerMap);
+  void onIndexSegmentCreation(SegmentMetadata segmentMetadata, Map<String, ColumnIndexContainer> columnIndexContainerMap);
 
   /**
    * Perform operation from the callback for the given row after it has been processed and index.
    * This method happens after indexing finished in MutableSegmentImpl.index(GenericRow, RowMetadata) method
+   * It will only trigger in LLC and if the row is indexed but not aggregated.
    *
-   * In append-tables callback, this method will do nothing
-   * In upsert-tables callback, this method will build offset mapping and update virtual columns for the column if necessary
+   * In upsert-enabled tables callback, this method will build offset mapping and update virtual columns for the column if necessary
    *
    * This method is similar to
-   * {@link org.apache.pinot.core.data.manager.callback.DataManagerCallback#postIndexProcessing(GenericRow, StreamPartitionMsgOffset)}
+   * {@link org.apache.pinot.core.data.manager.callback.DataManagerCallback#onRowIndexed(GenericRow, StreamPartitionMsgOffset)}
    * However, the other method don't have information to docID and it is necessary for upsert virtual columns
    * to have these information to build the forward index and offset columns to build mapping between offset -> docId
    * we also might need to update virtual column forward-index for the newly ingested row
@@ -65,7 +64,7 @@ public interface IndexSegmentCallback {
    * @param row the current pinot row we just indexed into the current IndexSegment
    * @param docId the docId of this record
    */
-  void postProcessRecords(GenericRow row, int docId);
+  void onRowIndexed(GenericRow row, int docId);
 
   /**
    * Retrieve information related to an upsert-enable segment virtual column for debug purpose

@@ -18,29 +18,33 @@
  */
 package org.apache.pinot.core.data.manager.callback;
 
-import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-
-import java.io.IOException;
 
 /**
  * Component inject to {@link org.apache.pinot.core.data.manager.SegmentDataManager} for handling extra logic for
  * upsert-enabled pinot ingestion mode.
+ *
+ * This feature currently only support Low-level consumer.
  */
 @InterfaceStability.Evolving
 public interface DataManagerCallback {
 
-  void init() throws IOException;
+  /**
+   * create proper internal hook and notify segment updater about the current dataManager coming alive to receive update
+   * events
+   *
+   * this method will be called within the constructor of every dataManager object to ensure that upsert component can
+   * register
+   */
+  void onDataManagerCreation();
 
   /**
    * create a {@link IndexSegmentCallback} object to allow SegmentDataManager to create proper IndexSegment that supports
    * either append/upsert mode
    *
-   * In append-tables callback, this method will create a DefaultIndexSegmentCallback
-   * In upsert-tables callback, this method will create a UpsertDataManagerCallbackImpl
+   * In upsert-enabled tables, this method will create a UpsertDataManagerCallbackImpl
    *
    * The {@link IndexSegmentCallback} will be used in the constructor of IndexSegment
    */
@@ -50,9 +54,9 @@ public interface DataManagerCallback {
    * process the row after transformation in LLRealtimeSegmentDataManager.processStreamEvents(...) method
    * it happens after the GenericRow has been transformed by RecordTransformer and before it is indexed by
    * IndexSegmentImpl, to ensure we can provide other necessary data to the segment metadata.
+   * It will only trigger in LLC and if the row is indexed but not aggregated.
    *
-   * In append-tables callback, this method will do nothing
-   * In upsert-tables callback, this method will attach the offset object into the GenericRow object.
+   * In upsert-enabled table, this method will attach the offset object into the GenericRow object.
    *
    * The reason we need this particular logic is that in upsert table, we need to add offset data to the physical data
    * this will help us to apply the update events from key coordinator to upsert table correctly as the offset
@@ -61,14 +65,14 @@ public interface DataManagerCallback {
    * @param row the row of newly ingested and transformed data from upstream
    * @param offset the offset of this particular pinot record
    */
-  void processTransformedRow(GenericRow row, StreamPartitionMsgOffset offset);
+  void onRowTransformed(GenericRow row, StreamPartitionMsgOffset offset);
 
   /**
    * process the row after indexing in LLRealtimeSegmentDataManager.processStreamEvents(...) method
    * it happens after the MutableSegmentImpl has done the indexing of the current row in its physical storage
+   * It will only trigger in LLC and if the row is indexed but not aggregated.
    *
-   * In append-tables callback, this method will do nothing
-   * In upsert-tables callback, this method will emit an event to the message queue that will deliver the event to
+   * In upsert-enabled tables callback, this method will emit an event to the message queue that will deliver the event to
    * key coordinator.
    *
    * This method ensures that we can emit the metadata for an new entry that pinot just indexed to its internal storage
@@ -77,20 +81,19 @@ public interface DataManagerCallback {
    * @param row the row we just index in the current segment
    * @param offset the offset associated with the current row
    */
-  void postIndexProcessing(GenericRow row, StreamPartitionMsgOffset offset);
+  void onRowIndexed(GenericRow row, StreamPartitionMsgOffset offset);
 
   /**
-   * perform any necessary finalize operation after the consumer loop finished in LLRealtimeSegmentDataManager.consumeLoop(...)
-   * method. It happens after the consumerloop exits the loop and reached the end criteria.
+   * perform any necessary finalize operation after the consumer stopped in LLRealtimeSegmentDataManager.consumeLoop(...)
+   * method. It happens after the the current consumption loop reached the end criteria or stopped.
    *
-   * In append-tables callback, this method will do nothing
-   * In upsert-tables callback, this method will flush the queue producer to ensure all pending messages are deliverd
+   * In upsert-enabled tables callback, this method will flush the queue producer to ensure all pending messages are deliverd
    * to the queue between pinot server and pinot key-coordinator
    *
    * this method will ensure that pinot server can send all events to key coordinator eventually before a segment
    * is committed. If this does not happen we might lose data in case of machine failure.
    */
-  void postConsumeLoop();
+  void onConsumptionStoppedOrEndReached();
 
   /**
    * perform any necessary clean up operation when the SegmentDataManager called its destroy() method.
@@ -102,5 +105,5 @@ public interface DataManagerCallback {
    * this method will ensure that segmentUpdater can keep track of which dataManager is still alive in the current pinot
    * server so it can dispatch appropriate update events to only the alive pinot data manager
    */
-  void destroy();
+  void onDataManagerDestroyed();
 }

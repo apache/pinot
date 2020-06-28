@@ -42,11 +42,7 @@ public class ImmutableSegmentDataManager extends SegmentDataManager {
   public ImmutableSegmentDataManager(ImmutableSegment immutableSegment, DataManagerCallback dataManagerCallback) {
     _immutableSegment = immutableSegment;
     _dataManagerCallback = dataManagerCallback;
-    try {
-      _dataManagerCallback.init();
-    } catch (IOException ex) {
-      ExceptionUtils.rethrow(ex);
-    }
+    _dataManagerCallback.onDataManagerCreation();
   }
 
   @Override
@@ -61,7 +57,7 @@ public class ImmutableSegmentDataManager extends SegmentDataManager {
 
   @Override
   public void destroy() {
-    _dataManagerCallback.destroy();
+    _dataManagerCallback.onDataManagerDestroyed();
     _immutableSegment.destroy();
   }
 

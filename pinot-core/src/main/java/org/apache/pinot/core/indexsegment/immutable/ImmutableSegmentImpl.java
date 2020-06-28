@@ -62,7 +62,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _starTreeIndexContainer = starTreeIndexContainer;
     _segmentCallback = segmentCallback;
 
-    _segmentCallback.init(segmentMetadata, columnIndexContainerMap);
+    _segmentCallback.onIndexSegmentCreation(segmentMetadata, columnIndexContainerMap);
   }
 
   @Override

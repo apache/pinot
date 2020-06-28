@@ -451,6 +451,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   @Override
   public void destroy() {
     LOGGER.info("Trying to shutdown RealtimeSegmentDataManager : {}!", _segmentName);
+
     _isShuttingDown = true;
     try {
       _streamLevelConsumer.shutdown();

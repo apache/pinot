@@ -230,7 +230,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     LoaderUtils.reloadFailureRecovery(indexDir);
 
     // tell callback to add segment
-    _tableDataManagerCallback.addSegment(_tableNameWithType, segmentName);
+    _tableDataManagerCallback.onSegmentAdd(_tableNameWithType, segmentName);
 
     if (indexDir.exists() && (realtimeSegmentZKMetadata.getStatus() == Status.DONE)) {
       // Segment already exists on disk, and metadata has been committed. Treat it like an offline segment

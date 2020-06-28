@@ -424,7 +424,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
     }
-    _dataManagerCallback.postConsumeLoop();
+    _dataManagerCallback.onConsumptionStoppedOrEndReached();
     return true;
   }
 
@@ -477,12 +477,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             for (Object singleRow : (Collection) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
               GenericRow transformedRow = _recordTransformer.transform((GenericRow) singleRow);
               if (transformedRow != null) {
-                _dataManagerCallback.processTransformedRow(transformedRow, _currentOffset);
+                _dataManagerCallback.onRowTransformed(transformedRow, _currentOffset);
                 realtimeRowsConsumedMeter = _serverMetrics
                     .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
                 indexedMessageCount++;
                 canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
-                _dataManagerCallback.postIndexProcessing(transformedRow, _currentOffset);
+                _dataManagerCallback.onRowIndexed(transformedRow, _currentOffset);
               } else {
                 realtimeRowsDroppedMeter = _serverMetrics
                     .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
@@ -1057,7 +1057,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   public void destroy() {
-    _dataManagerCallback.destroy();
+    _dataManagerCallback.onDataManagerDestroyed();
     try {
       stop();
     } catch (InterruptedException e) {
@@ -1276,6 +1276,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _protocolHandler);
+
+    // initialize upsert-related component if necessary
+    _dataManagerCallback.onDataManagerCreation();
 
     segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,

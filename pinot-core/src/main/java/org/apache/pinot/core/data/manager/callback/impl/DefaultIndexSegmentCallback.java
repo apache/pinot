@@ -39,11 +39,11 @@ public class DefaultIndexSegmentCallback implements IndexSegmentCallback {
   }
 
   @Override
-  public void init(SegmentMetadata segmentMetadata, Map<String, ColumnIndexContainer> columnIndexContainerMap) {
+  public void onIndexSegmentCreation(SegmentMetadata segmentMetadata, Map<String, ColumnIndexContainer> columnIndexContainerMap) {
   }
 
   @Override
-  public void postProcessRecords(GenericRow row, int docId) {
+  public void onRowIndexed(GenericRow row, int docId) {
   }
 
   @Override

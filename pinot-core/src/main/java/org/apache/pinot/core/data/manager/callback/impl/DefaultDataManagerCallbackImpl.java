@@ -38,7 +38,7 @@ public class DefaultDataManagerCallbackImpl implements DataManagerCallback {
   }
 
   @Override
-  public void init() {
+  public void onDataManagerCreation() {
   }
 
   /**
@@ -50,18 +50,18 @@ public class DefaultDataManagerCallbackImpl implements DataManagerCallback {
   }
 
   @Override
-  public void processTransformedRow(GenericRow row, StreamPartitionMsgOffset offset) {
+  public void onRowTransformed(GenericRow row, StreamPartitionMsgOffset offset) {
   }
 
   @Override
-  public void postIndexProcessing(GenericRow row, StreamPartitionMsgOffset offset) {
+  public void onRowIndexed(GenericRow row, StreamPartitionMsgOffset offset) {
   }
 
   @Override
-  public void postConsumeLoop() {
+  public void onConsumptionStoppedOrEndReached() {
   }
 
   @Override
-  public void destroy() {
+  public void onDataManagerDestroyed() {
   }
 }

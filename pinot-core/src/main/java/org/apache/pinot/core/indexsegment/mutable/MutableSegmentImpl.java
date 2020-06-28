@@ -331,7 +331,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
       virtualColumnIndexContainer.put(column, provider.buildColumnIndexContainer(virtualColumnContext));
     }
-    _indexSegmentCallback.init(_segmentMetadata, virtualColumnIndexContainer);
+    _indexSegmentCallback.onIndexSegmentCreation(_segmentMetadata, virtualColumnIndexContainer);
 
     if (_realtimeLuceneReaders != null) {
       // add the realtime lucene index readers to the global queue for refresh task to pick up
@@ -433,7 +433,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
       // Update number of document indexed at last to make the latest record queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
-      _indexSegmentCallback.postProcessRecords(row, docId);
+      _indexSegmentCallback.onRowIndexed(row, docId);
     } else {
       Preconditions
           .checkState(_aggregateMetrics, "Invalid document-id during indexing: " + docId + " expected: " + numDocs);
