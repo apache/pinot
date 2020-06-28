@@ -59,10 +59,15 @@ public class PinotResultSet extends AbstractBaseResultSet {
     }
   }
 
+  public PinotResultSet() {
+    _totalRows = 0;
+    _currentRow = -1;
+  }
+
   protected void validateState()
       throws SQLException {
     if (_resultSet == null) {
-      throw new SQLException("Not allowed to operate on closed result sets");
+      throw new SQLException("Not possible to operate on closed or empty result sets");
     }
   }
 

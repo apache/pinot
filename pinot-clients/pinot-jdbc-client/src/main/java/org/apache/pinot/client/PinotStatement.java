@@ -49,6 +49,9 @@ public class PinotStatement extends AbstractBaseStatement {
     try {
       Request request = new Request(QUERY_FORMAT, sql);
       _resultSetGroup = _session.execute(request);
+      if (_resultSetGroup.getResultSetCount() == 0) {
+        return new PinotResultSet();
+      }
       return new PinotResultSet(_resultSetGroup.getResultSet(0));
     } catch (PinotClientException e) {
       throw new SQLException("Failed to execute query : {}", sql, e);
