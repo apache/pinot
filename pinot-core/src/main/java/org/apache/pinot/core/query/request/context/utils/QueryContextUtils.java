@@ -66,13 +66,24 @@ public class QueryContextUtils {
   }
 
   /**
-   * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
+   * Returns {@code true} if
+   * the given query is an aggregation query OR
+   * the order by in the given query is an aggregation
+   * {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
     for (ExpressionContext selectExpression : query.getSelectExpressions()) {
       if (selectExpression.getType() == ExpressionContext.Type.FUNCTION
           && selectExpression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
         return true;
+      }
+    }
+    if(query.getOrderByExpressions() != null) {
+      for (OrderByExpressionContext orderByExpressionContext : query.getOrderByExpressions()) {
+        if (orderByExpressionContext.getExpression().getType() == ExpressionContext.Type.FUNCTION
+            && orderByExpressionContext.getExpression().getFunction().getType() == FunctionContext.Type.AGGREGATION) {
+          return true;
+        }
       }
     }
     return false;

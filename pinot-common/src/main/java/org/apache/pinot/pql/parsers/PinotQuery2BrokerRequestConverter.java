@@ -83,15 +83,30 @@ public class PinotQuery2BrokerRequestConverter {
       return;
     }
     List<SelectionSort> sortSequenceList = new ArrayList<>();
+    List<AggregationInfo> aggregationInfoList = brokerRequest.getAggregationsInfo();
     final List<Expression> orderByList = pinotQuery.getOrderByList();
     for (Expression orderByExpr : orderByList) {
       SelectionSort selectionSort = new SelectionSort();
       //order by is always a function (ASC or DESC)
       Function functionCall = orderByExpr.getFunctionCall();
       selectionSort.setIsAsc(functionCall.getOperator().equalsIgnoreCase(OrderByAstNode.ASCENDING_ORDER));
-      selectionSort.setColumn(ParserUtils.standardizeExpression(functionCall.getOperands().get(0), true));
+      Expression expression = functionCall.getOperands().get(0);
+      selectionSort.setColumn(ParserUtils.standardizeExpression(expression, true));
       sortSequenceList.add(selectionSort);
+
+      if (expression.getType().equals(ExpressionType.FUNCTION) && FunctionDefinitionRegistry
+          .isAggFunc(expression.getFunctionCall().getOperator())) {
+        AggregationInfo aggInfo = buildAggregationInfo(expression.getFunctionCall());
+        if (aggregationInfoList == null) {
+          aggregationInfoList = new ArrayList<>();
+          aggregationInfoList.add(aggInfo);
+          brokerRequest.setAggregationsInfo(aggregationInfoList);
+        } else if (!aggregationInfoList.contains(aggInfo)) {
+            aggregationInfoList.add(aggInfo);
+        }
+      }
     }
+
     if (!sortSequenceList.isEmpty()) {
       if (brokerRequest.getSelections() != null) {
         brokerRequest.getSelections().setSelectionSortSequence(sortSequenceList);
