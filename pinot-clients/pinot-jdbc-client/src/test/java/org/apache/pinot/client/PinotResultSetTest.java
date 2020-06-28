@@ -20,7 +20,10 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.concurrent.Future;
+import org.apache.commons.io.IOUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -32,49 +35,53 @@ import org.testng.annotations.Test;
  *
  */
 public class PinotResultSetTest {
+  public static final String TEST_RESULT_SET_RESOURCE = "selection.json";
+  public static final String DATE_FORMAT = "yyyy-mm-dd";
   private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
   private PinotClientTransportFactory _previousTransportFactory = null;
 
   @Test
-  public void testResultSetFetchValues() throws Exception {
-    ResultSetGroup resultSetGroup = getResultSet("selection.json");
+  public void testFetchValues()
+      throws Exception {
+    ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
 
     int currentRow = 0;
-    while(pinotResultSet.next()){
-        Assert.assertEquals(pinotResultSet.getInt( 1), resultSet.getInt(currentRow, 0));
-        Assert.assertEquals(pinotResultSet.getLong( 1), resultSet.getLong(currentRow, 0));
-        Assert.assertEquals(pinotResultSet.getString( 1), resultSet.getString(currentRow, 0));
-        Assert.assertEquals(pinotResultSet.getDouble( 79), resultSet.getDouble(currentRow, 78));
-        currentRow++;
+    while (pinotResultSet.next()) {
+      Assert.assertEquals(pinotResultSet.getInt(1), resultSet.getInt(currentRow, 0));
+      Assert.assertEquals(pinotResultSet.getLong(1), resultSet.getLong(currentRow, 0));
+      Assert.assertEquals(pinotResultSet.getString(1), resultSet.getString(currentRow, 0));
+      Assert.assertEquals(pinotResultSet.getDouble(79), resultSet.getDouble(currentRow, 78));
+      currentRow++;
     }
   }
 
   @Test
-  public void testResultSetCursorMovement() throws Exception {
-    ResultSetGroup resultSetGroup = getResultSet("selection.json");
+  public void testCursorMovement()
+      throws Exception {
+    ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
 
     int currentRow = 0;
     int targetRow = 10;
-    while(pinotResultSet.next() && currentRow < targetRow){
+    while (pinotResultSet.next() && currentRow < targetRow) {
       currentRow++;
     }
 
-    Assert.assertEquals(pinotResultSet.getInt( 10), resultSet.getInt(targetRow, 9));
+    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(targetRow, 9));
 
     pinotResultSet.first();
     Assert.assertTrue(pinotResultSet.isFirst());
-    Assert.assertEquals(pinotResultSet.getInt( 10), resultSet.getInt(0, 9));
+    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(0, 9));
 
     pinotResultSet.last();
     Assert.assertTrue(pinotResultSet.isLast());
-    Assert.assertEquals(pinotResultSet.getInt( 10), resultSet.getInt(resultSet.getRowCount() - 1, 9));
+    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(resultSet.getRowCount() - 1, 9));
 
     pinotResultSet.previous();
-    Assert.assertEquals(pinotResultSet.getInt( 10), resultSet.getInt(resultSet.getRowCount() - 2, 9));
+    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(resultSet.getRowCount() - 2, 9));
 
     pinotResultSet.first();
     pinotResultSet.previous();
@@ -86,15 +93,60 @@ public class PinotResultSetTest {
 
     pinotResultSet.first();
     pinotResultSet.absolute(18);
-    Assert.assertEquals(pinotResultSet.getInt( 10), resultSet.getInt(18, 9));
+    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(18, 9));
 
     pinotResultSet.relative(-5);
-    Assert.assertEquals(pinotResultSet.getInt( 10), resultSet.getInt(13, 9));
+    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(13, 9));
 
     pinotResultSet.relative(1);
-    Assert.assertEquals(pinotResultSet.getInt( 10), resultSet.getInt(14, 9));
+    Assert.assertEquals(pinotResultSet.getInt(10), resultSet.getInt(14, 9));
   }
 
+  @Test
+  public void testFetchStreams()
+      throws Exception {
+    ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
+    ResultSet resultSet = resultSetGroup.getResultSet(0);
+    PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
+
+    int currentRow = 0;
+
+    while (pinotResultSet.next()) {
+      Assert.assertEquals(IOUtils.toString(pinotResultSet.getAsciiStream(30)), resultSet.getString(currentRow, 29));
+      Assert.assertEquals(IOUtils.toString(pinotResultSet.getUnicodeStream(30)), resultSet.getString(currentRow, 29));
+      Assert.assertEquals(IOUtils.toString(pinotResultSet.getCharacterStream(30)), resultSet.getString(currentRow, 29));
+      currentRow++;
+    }
+  }
+
+  @Test
+  public void testFetchDates()
+      throws Exception {
+    ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
+    ResultSet resultSet = resultSetGroup.getResultSet(0);
+    PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
+
+    int currentRow = 0;
+    SimpleDateFormat simpleDateFormat = new SimpleDateFormat(DATE_FORMAT);
+    while (pinotResultSet.next()) {
+      Date date = simpleDateFormat.parse(resultSet.getString(currentRow, 51));
+      long expectedTimeMillis = date.getTime();
+      Assert.assertEquals(pinotResultSet.getDate(52).getTime(), expectedTimeMillis);
+      currentRow++;
+    }
+  }
+
+  @Test
+  public void testFindColumn()
+      throws Exception {
+    ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
+    ResultSet resultSet = resultSetGroup.getResultSet(0);
+    PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
+
+    for (int i = 0; i < resultSet.getColumnCount(); i++) {
+      Assert.assertEquals(pinotResultSet.findColumn(resultSet.getColumnName(i)), i + 1);
+    }
+  }
 
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;

@@ -38,8 +38,8 @@ import org.apache.pinot.client.base.AbstractBaseResultSet;
 
 
 public class PinotResultSet extends AbstractBaseResultSet {
-  private static final String TIMESTAMP_FORMAT = "dd-mm-yyyy HH:MM:SS";
-  private static final String DATE_FORMAT = "dd-mm-yyyy";
+  private static final String TIMESTAMP_FORMAT = "yyyy-mm-dd HH:MM:SS";
+  private static final String DATE_FORMAT = "yyyy-mm-dd";
   private final SimpleDateFormat _dateFormat = new SimpleDateFormat(DATE_FORMAT);
   private final SimpleDateFormat _timestampFormat = new SimpleDateFormat(TIMESTAMP_FORMAT);
 
@@ -55,7 +55,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
     _totalColumns = _resultSet.getColumnCount();
     _currentRow = -1;
     for (int i = 0; i < _totalColumns; i++) {
-      _columns.put(_resultSet.getColumnName(i), i);
+      _columns.put(_resultSet.getColumnName(i), i + 1);
     }
   }
 
