@@ -27,32 +27,32 @@ import java.util.Calendar;
 
 
 public class DateTimeUtils {
-  private static final String TIMESTAMP_FORMAT = "YYYY-MM-dd hh:mm:ss";
-  private static final String DATE_FORMAT = "YYYY-MM-dd";
+  private static final String TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss";
+  private static final String DATE_FORMAT = "yyyy-MM-dd";
   private static final SimpleDateFormat _dateFormat = new SimpleDateFormat(DATE_FORMAT);
   private static final SimpleDateFormat _timestampFormat = new SimpleDateFormat(TIMESTAMP_FORMAT);
 
   public static Date getDateFromString(String value, Calendar cal)
       throws ParseException {
+    _dateFormat.setTimeZone(cal.getTimeZone());
     java.util.Date date = _dateFormat.parse(value);
-    cal.setTime(date);
-    Date sqlDate = new Date(cal.getTimeInMillis());
+    Date sqlDate = new Date(date.getTime());
     return sqlDate;
   }
 
   public static Time getTimeFromString(String value, Calendar cal)
       throws ParseException {
+    _timestampFormat.setTimeZone(cal.getTimeZone());
     java.util.Date date = _timestampFormat.parse(value);
-    cal.setTime(date);
-    Time sqlTime = new Time(cal.getTimeInMillis());
+    Time sqlTime = new Time(date.getTime());
     return sqlTime;
   }
 
   public static Timestamp getTimestampFromString(String value, Calendar cal)
       throws ParseException {
+    _timestampFormat.setTimeZone(cal.getTimeZone());
     java.util.Date date = _timestampFormat.parse(value);
-    cal.setTime(date);
-    Timestamp sqlTime = new Timestamp(cal.getTimeInMillis());
+    Timestamp sqlTime = new Timestamp(date.getTime());
     return sqlTime;
   }
 

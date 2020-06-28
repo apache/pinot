@@ -21,9 +21,11 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.Future;
 import org.apache.commons.io.IOUtils;
+import org.apache.pinot.client.utils.DateTimeUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -127,9 +129,8 @@ public class PinotResultSetTest {
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
 
     int currentRow = 0;
-    SimpleDateFormat simpleDateFormat = new SimpleDateFormat(DATE_FORMAT);
     while (pinotResultSet.next()) {
-      Date date = simpleDateFormat.parse(resultSet.getString(currentRow, 51));
+      Date date = DateTimeUtils.getDateFromString(resultSet.getString(currentRow, 51), Calendar.getInstance());
       long expectedTimeMillis = date.getTime();
       Assert.assertEquals(pinotResultSet.getDate(52).getTime(), expectedTimeMillis);
       currentRow++;
