@@ -174,6 +174,16 @@ public class Connection {
     return _brokerList;
   }
 
+  /**
+   * Close the connection for further processing
+   *
+   * @throws PinotClientException when connection is already closed
+   */
+  public void close()
+      throws PinotClientException {
+    _transport.close();
+  }
+
   private static class ResultSetGroupFuture implements Future<ResultSetGroup> {
     private final Future<BrokerResponse> _responseFuture;
 

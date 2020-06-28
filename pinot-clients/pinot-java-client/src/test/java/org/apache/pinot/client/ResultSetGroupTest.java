@@ -170,6 +170,12 @@ public class ResultSetGroupTest {
         throws PinotClientException {
       return null;
     }
+
+    @Override
+    public void close()
+        throws PinotClientException {
+
+    }
   }
 
   class DummyJsonTransportFactory implements PinotClientTransportFactory {
