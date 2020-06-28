@@ -26,6 +26,8 @@ import java.sql.Statement;
 
 
 public abstract class AbstractBaseStatement implements Statement {
+  protected abstract void validateState()
+      throws SQLException;
 
   @Override
   public void addBatch(String sql)

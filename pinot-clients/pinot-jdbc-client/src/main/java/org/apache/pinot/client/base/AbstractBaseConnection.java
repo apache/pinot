@@ -40,6 +40,8 @@ import java.util.concurrent.Executor;
 
 
 public abstract class AbstractBaseConnection implements Connection {
+  protected abstract void validateState()
+      throws SQLException;
 
   @Override
   public void abort(Executor executor)

@@ -42,6 +42,8 @@ import java.util.Calendar;
 
 
 public abstract class AbstractBasePreparedStatement extends AbstractBaseStatement implements PreparedStatement {
+  protected abstract void validateState()
+      throws SQLException;
 
   @Override
   public ResultSet executeQuery(String sql)

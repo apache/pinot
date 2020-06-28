@@ -309,7 +309,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean isClosed()
       throws SQLException {
-    return false;
+    return (_resultSet == null);
   }
 
   @Override

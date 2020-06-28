@@ -55,5 +55,11 @@ public class DummyPinotClientTransport implements PinotClientTransport {
   public String getLastQuery() {
     return _lastQuery;
   }
+
+  @Override
+  public void close()
+      throws PinotClientException {
+
+  }
 }
 

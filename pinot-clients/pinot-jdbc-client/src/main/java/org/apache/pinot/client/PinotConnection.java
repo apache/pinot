@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.util.List;
 import org.apache.pinot.client.base.AbstractBaseConnection;
@@ -42,20 +43,37 @@ public class PinotConnection extends AbstractBaseConnection {
   }
 
   @Override
+  protected void validateState()
+      throws SQLException {
+    if (isClosed()) {
+      throw new SQLException("Connection is already closed!");
+    }
+  }
+
+  @Override
   public void close()
       throws SQLException {
+    if (!isClosed()) {
+      _session.close();
+    }
     _session = null;
   }
 
   @Override
   public Statement createStatement()
       throws SQLException {
+    if (isClosed()) {
+      throw new SQLException("Connection is already closed!");
+    }
     return new PinotStatement(this);
   }
 
   @Override
   public PreparedStatement prepareStatement(String sql)
       throws SQLException {
+    if (isClosed()) {
+      throw new SQLException("Connection is already closed!");
+    }
     return new PinotPreparedStatement(this, sql);
   }
 
