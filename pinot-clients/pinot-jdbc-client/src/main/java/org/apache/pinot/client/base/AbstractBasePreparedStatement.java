@@ -20,7 +20,6 @@ package org.apache.pinot.client.base;
 
 import java.io.InputStream;
 import java.io.Reader;
-import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Array;
 import java.sql.Blob;
