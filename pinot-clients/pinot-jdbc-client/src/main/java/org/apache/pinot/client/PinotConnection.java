@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -50,6 +51,12 @@ public class PinotConnection extends AbstractBaseConnection {
   public Statement createStatement()
       throws SQLException {
     return new PinotStatement(this);
+  }
+
+  @Override
+  public PreparedStatement prepareStatement(String sql)
+      throws SQLException {
+    return new PinotPreparedStatement(this, sql);
   }
 
   @Override
