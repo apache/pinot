@@ -35,13 +35,10 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
+import org.apache.pinot.client.utils.DateTimeUtils;
 
 
 public class PinotResultSet extends AbstractBaseResultSet {
-  private static final String TIMESTAMP_FORMAT = "yyyy-mm-dd HH:MM:SS";
-  private static final String DATE_FORMAT = "yyyy-mm-dd";
-  private final SimpleDateFormat _dateFormat = new SimpleDateFormat(DATE_FORMAT);
-  private final SimpleDateFormat _timestampFormat = new SimpleDateFormat(TIMESTAMP_FORMAT);
 
   private org.apache.pinot.client.ResultSet _resultSet;
   private int _totalRows;
@@ -191,10 +188,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      java.util.Date date = _dateFormat.parse(value);
-      cal.setTime(date);
-      Date sqlDate = new Date(cal.getTimeInMillis());
-      return sqlDate;
+      return DateTimeUtils.getDateFromString(value, cal);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch date", e);
     }
@@ -260,10 +254,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      java.util.Date date = _timestampFormat.parse(value);
-      cal.setTime(date);
-      Time sqlTime = new Time(cal.getTimeInMillis());
-      return sqlTime;
+      return DateTimeUtils.getTimeFromString(value, cal);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch date", e);
     }
@@ -274,10 +265,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     try {
       String value = getString(columnIndex);
-      java.util.Date date = _timestampFormat.parse(value);
-      cal.setTime(date);
-      Timestamp sqlTime = new Timestamp(cal.getTimeInMillis());
-      return sqlTime;
+      return DateTimeUtils.getTimestampFromString(value, cal);
     } catch (Exception e) {
       throw new SQLException("Unable to fetch date", e);
     }

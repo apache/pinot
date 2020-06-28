@@ -63,36 +63,6 @@ public abstract class AbstractBasePreparedStatement extends AbstractBaseStatemen
   }
 
   @Override
-  public void setBigDecimal(int parameterIndex, BigDecimal x)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void setBytes(int parameterIndex, byte[] x)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void setDate(int parameterIndex, Date x)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void setTime(int parameterIndex, Time x)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void setTimestamp(int parameterIndex, Timestamp x)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
   public void setAsciiStream(int parameterIndex, InputStream x, int length)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
@@ -173,19 +143,19 @@ public abstract class AbstractBasePreparedStatement extends AbstractBaseStatemen
   @Override
   public void setDate(int parameterIndex, Date x, Calendar cal)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    setDate(parameterIndex, x);
   }
 
   @Override
   public void setTime(int parameterIndex, Time x, Calendar cal)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    setTime(parameterIndex, x);
   }
 
   @Override
   public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    setTimestamp(parameterIndex, x);
   }
 
   @Override
