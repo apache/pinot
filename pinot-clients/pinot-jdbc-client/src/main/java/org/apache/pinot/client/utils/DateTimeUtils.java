@@ -27,8 +27,8 @@ import java.util.Calendar;
 
 
 public class DateTimeUtils {
-  private static final String TIMESTAMP_FORMAT = "yyyy-mm-dd HH:MM:SS";
-  private static final String DATE_FORMAT = "yyyy-mm-dd";
+  private static final String TIMESTAMP_FORMAT = "YYYY-MM-dd hh:mm:ss";
+  private static final String DATE_FORMAT = "YYYY-MM-dd";
   private static final SimpleDateFormat _dateFormat = new SimpleDateFormat(DATE_FORMAT);
   private static final SimpleDateFormat _timestampFormat = new SimpleDateFormat(TIMESTAMP_FORMAT);
 
@@ -62,15 +62,15 @@ public class DateTimeUtils {
   }
 
   public static String dateToString(Date date) {
-    return _dateFormat.format(date);
+    return _dateFormat.format(date.getTime());
   }
 
   public static String timeToString(Time time) {
-    return _timestampFormat.format(time);
+    return _timestampFormat.format(time.getTime());
   }
 
   public static String timeStampToString(Timestamp timestamp) {
-    return _timestampFormat.format(timestamp);
+    return _timestampFormat.format(timestamp.getTime());
   }
 
   public static long timeStampToLong(Timestamp timestamp) {
