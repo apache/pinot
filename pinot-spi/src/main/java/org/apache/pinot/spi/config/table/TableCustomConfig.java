@@ -27,8 +27,6 @@ import javax.annotation.Nullable;
 
 
 public class TableCustomConfig extends BaseJsonConfig {
-  public static final String MESSAGE_BASED_REFRESH_KEY = "messageBasedRefresh";
-
   private final Map<String, String> _customConfigs;
 
   @JsonCreator

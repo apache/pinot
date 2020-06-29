@@ -522,46 +522,6 @@ public class PinotHelixResourceManager {
     return deleteSegments(tableNameWithType, Collections.singletonList(segmentName));
   }
 
-  private boolean ifExternalViewChangeReflectedForState(String tableNameWithType, String segmentName,
-      String targetState, long timeoutMillis, boolean considerErrorStateAsDifferentFromTarget) {
-    long externalViewChangeCompletedDeadline = System.currentTimeMillis() + timeoutMillis;
-
-    deadlineLoop:
-    while (System.currentTimeMillis() < externalViewChangeCompletedDeadline) {
-      ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType);
-      Map<String, String> segmentStatsMap = externalView.getStateMap(segmentName);
-      if (segmentStatsMap != null) {
-        LOGGER.info("Found {} instances for segment '{}' in external view", segmentStatsMap.size(), segmentName);
-        for (String instance : segmentStatsMap.keySet()) {
-          final String segmentState = segmentStatsMap.get(instance);
-
-          // jfim: Ignore segments in error state as part of checking if the external view change is reflected
-          if (!segmentState.equalsIgnoreCase(targetState)) {
-            if ("ERROR".equalsIgnoreCase(segmentState) && !considerErrorStateAsDifferentFromTarget) {
-              // Segment is in error and we don't consider error state as different from target, therefore continue
-            } else {
-              // Will try to read data every 500 ms, only if external view not updated.
-              Uninterruptibles
-                  .sleepUninterruptibly(DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
-              continue deadlineLoop;
-            }
-          }
-        }
-
-        // All segments match with the expected external view state
-        return true;
-      } else {
-        // Segment doesn't exist in EV, wait for a little bit
-        Uninterruptibles
-            .sleepUninterruptibly(DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
-      }
-    }
-
-    // Timed out
-    LOGGER.info("Timed out while waiting for segment '{}' to become '{}' in external view.", segmentName, targetState);
-    return false;
-  }
-
   public PinotResourceManagerResponse updateBrokerTenant(Tenant tenant) {
     String brokerTenantTag = TagNameUtils.getBrokerTagForTenant(tenant.getTenantName());
     List<String> instancesInClusterWithTag = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTenantTag);
@@ -1616,18 +1576,8 @@ public class PinotHelixResourceManager {
     }
     LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
 
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
-    Preconditions.checkNotNull(tableConfig);
-    if (shouldSendMessage(tableConfig)) {
-      // Send a message to servers and brokers hosting the table to refresh the segment
-      sendSegmentRefreshMessage(offlineTableName, segmentName);
-    } else {
-      // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
-      if (!updateExistedSegment(offlineTableName, segmentName)) {
-        LOGGER.error("Failed to refresh segment: {} of table: {} by the ONLINE->OFFLINE->ONLINE state transition",
-            segmentName, offlineTableName);
-      }
-    }
+    // Send a message to servers and brokers hosting the table to refresh the segment
+    sendSegmentRefreshMessage(offlineTableName, segmentName);
   }
 
   public int reloadAllSegments(String tableNameWithType) {
@@ -1675,19 +1625,6 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
     return numMessagesSent;
-  }
-
-  // Return false iff the table has been explicitly configured to NOT use messageBasedRefresh.
-  private boolean shouldSendMessage(TableConfig tableConfig) {
-    TableCustomConfig customConfig = tableConfig.getCustomConfig();
-    if (customConfig != null) {
-      Map<String, String> customConfigMap = customConfig.getCustomConfigs();
-      if (customConfigMap != null) {
-        return !customConfigMap.containsKey(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY) || Boolean
-            .valueOf(customConfigMap.get(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY));
-      }
-    }
-    return true;
   }
 
   /**
@@ -1752,75 +1689,6 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No table config refresh message sent to brokers for table: {}", tableNameWithType);
     }
-  }
-
-  private boolean updateExistedSegment(String tableNameWithType, String segmentName) {
-    HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    PropertyKey idealStatePropertyKey = _keyBuilder.idealStates(tableNameWithType);
-
-    // Set all partitions to offline to unload them from the servers
-    boolean updateSuccessful;
-    do {
-      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-      final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
-      if (instanceSet == null || instanceSet.size() == 0) {
-        // We are trying to refresh a segment, but there are no instances currently assigned for fielding this segment.
-        // When those instances do come up, the segment will be uploaded correctly, so return success but log a warning.
-        LOGGER.warn("No instances as yet for segment {}, table {}", segmentName, tableNameWithType);
-        return true;
-      }
-      for (final String instance : instanceSet) {
-        idealState.setPartitionState(segmentName, instance, "OFFLINE");
-      }
-      updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
-    } while (!updateSuccessful);
-
-    // Check that the ideal state has been written to ZK
-    IdealState updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-    Map<String, String> instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
-    for (String state : instanceStateMap.values()) {
-      if (!"OFFLINE".equals(state)) {
-        LOGGER.error("Failed to write OFFLINE ideal state!");
-        return false;
-      }
-    }
-
-    // Wait until the partitions are offline in the external view
-    LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(tableNameWithType, segmentName, "OFFLINE",
-        _externalViewOnlineToOfflineTimeoutMillis, false)) {
-      LOGGER
-          .error("External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
-              segmentName, _externalViewOnlineToOfflineTimeoutMillis);
-      return false;
-    }
-
-    // Set all partitions to online so that they load the new segment data
-    do {
-      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-      final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
-      LOGGER.info("Found {} instances for segment '{}', in ideal state", instanceSet.size(), segmentName);
-      for (final String instance : instanceSet) {
-        idealState.setPartitionState(segmentName, instance, "ONLINE");
-        LOGGER.info("Setting Ideal State for segment '{}' to ONLINE for instance '{}'", segmentName, instance);
-      }
-      updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
-    } while (!updateSuccessful);
-
-    // Check that the ideal state has been written to ZK
-    updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-    instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
-    LOGGER
-        .info("Found {} instances for segment '{}', after updating ideal state", instanceStateMap.size(), segmentName);
-    for (String state : instanceStateMap.values()) {
-      if (!"ONLINE".equals(state)) {
-        LOGGER.error("Failed to write ONLINE ideal state!");
-        return false;
-      }
-    }
-
-    LOGGER.info("Refresh is done for segment - " + segmentName);
-    return true;
   }
 
   /**
