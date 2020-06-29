@@ -49,6 +49,15 @@
         <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
     </plugins>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <targetPath>META-INF/services</targetPath>
+        <includes>
+          <include>java.sql.Driver</include>
+        </includes>
+      </resource>
+    </resources>
   </build>
   <dependencies>
     <dependency>
