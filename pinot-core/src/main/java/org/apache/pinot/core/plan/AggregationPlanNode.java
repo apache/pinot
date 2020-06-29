@@ -20,11 +20,11 @@ package org.apache.pinot.core.plan;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreeUtils;
@@ -46,7 +46,7 @@ public class AggregationPlanNode implements PlanNode {
 
   public AggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext.getBrokerRequest());
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
     if (starTrees != null) {
@@ -81,7 +81,7 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
 
-    Set<TransformExpressionTree> expressionsToTransform =
+    Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(_aggregationFunctions, null);
     _transformPlanNode = new TransformPlanNode(_indexSegment, queryContext, expressionsToTransform);
     _starTreeTransformPlanNode = null;

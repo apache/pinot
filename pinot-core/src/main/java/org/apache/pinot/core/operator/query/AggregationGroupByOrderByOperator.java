@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -28,6 +27,7 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 
 
@@ -35,23 +35,23 @@ import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
  * The <code>AggregationGroupByOrderByOperator</code> class provides the operator for aggregation group-by query on a
  * single segment.
  */
+@SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
 
-  private final DataSchema _dataSchema;
-
   private final AggregationFunction[] _aggregationFunctions;
-  private final TransformExpressionTree[] _groupByExpressions;
+  private final ExpressionContext[] _groupByExpressions;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
+  private final DataSchema _dataSchema;
 
   private int _numDocsScanned = 0;
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
-      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      ExpressionContext[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
       TransformOperator transformOperator, long numTotalDocs, boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
@@ -70,7 +70,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
     // Extract column names and data types for group-by columns
     for (int i = 0; i < numGroupByExpressions; i++) {
-      TransformExpressionTree groupByExpression = groupByExpressions[i];
+      ExpressionContext groupByExpression = groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
       columnDataTypes[i] = DataSchema.ColumnDataType
           .fromDataTypeSV(_transformOperator.getResultMetadata(groupByExpression).getDataType());

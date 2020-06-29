@@ -195,7 +195,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
       LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
       if (numSegmentsMatchedAfterPruning == 0) {
-        dataTable = DataTableUtils.buildEmptyDataTable(queryContext.getBrokerRequest());
+        dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
         Map<String, String> metadata = dataTable.getMetadata();
         metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(numTotalDocs));
         metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");

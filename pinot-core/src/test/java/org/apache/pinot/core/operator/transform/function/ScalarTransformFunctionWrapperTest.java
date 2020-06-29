@@ -19,7 +19,8 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -28,8 +29,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringLowerTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("lower(%s)", STRING_ALPHANUM_SV_COLUMN));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("lower(%s)", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "lower");
@@ -42,8 +43,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringUpperTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("upper(%s)", STRING_ALPHANUM_SV_COLUMN));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("upper(%s)", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "upper");
@@ -56,8 +57,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringReverseTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("reverse(%s)", STRING_ALPHANUM_SV_COLUMN));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("reverse(%s)", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "reverse");
@@ -70,8 +71,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringSubStrTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("substr(%s, 0, 2)", STRING_ALPHANUM_SV_COLUMN));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("substr(%s, 0, 2)", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "substr");
@@ -81,7 +82,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree.compileToExpressionTree(String.format("substr(%s, 2, -1)", STRING_ALPHANUM_SV_COLUMN));
+    expression =
+        QueryContextConverterUtils.getExpression(String.format("substr(%s, 2, -1)", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "substr");
@@ -94,8 +96,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringConcatTransformFunction() {
-    TransformExpressionTree expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("concat(%s, %s, '-')", STRING_ALPHANUM_SV_COLUMN, STRING_ALPHANUM_SV_COLUMN));
+    ExpressionContext expression = QueryContextConverterUtils
+        .getExpression(String.format("concat(%s, %s, '-')", STRING_ALPHANUM_SV_COLUMN, STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "concat");
@@ -108,8 +110,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringReplaceTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("replace(%s, 'A', 'B')", STRING_ALPHANUM_SV_COLUMN));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("replace(%s, 'A', 'B')", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "replace");
@@ -122,10 +124,10 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringPadTransformFunction() {
-    Integer padLength = 50;
+    int padLength = 50;
     String padString = "#";
-    TransformExpressionTree expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("lpad(%s, %d, '%s')", STRING_ALPHANUM_SV_COLUMN, padLength, padString));
+    ExpressionContext expression = QueryContextConverterUtils
+        .getExpression(String.format("lpad(%s, %d, '%s')", STRING_ALPHANUM_SV_COLUMN, padLength, padString));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "lpad");
@@ -135,8 +137,8 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("rpad(%s, %d, '%s')", STRING_ALPHANUM_SV_COLUMN, padLength, padString));
+    expression = QueryContextConverterUtils
+        .getExpression(String.format("rpad(%s, %d, '%s')", STRING_ALPHANUM_SV_COLUMN, padLength, padString));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "rpad");
@@ -149,22 +151,22 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
 
   @Test
   public void testStringTrimTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ltrim(lpad(%s, 50, ' '))", STRING_ALPHANUM_SV_COLUMN));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("ltrim(lpad(%s, 50, ' '))", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "ltrim");
     testTransformFunction(transformFunction, _stringAlphaNumericSVValues);
 
     expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("rtrim(rpad(%s, 50, ' '))", STRING_ALPHANUM_SV_COLUMN));
+        QueryContextConverterUtils.getExpression(String.format("rtrim(rpad(%s, 50, ' '))", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "rtrim");
     testTransformFunction(transformFunction, _stringAlphaNumericSVValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("trim(rpad(lpad(%s, 50, ' '), 100, ' '))", STRING_ALPHANUM_SV_COLUMN));
+    expression = QueryContextConverterUtils
+        .getExpression(String.format("trim(rpad(lpad(%s, 50, ' '), 100, ' '))", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     Assert.assertEquals(transformFunction.getName(), "trim");

@@ -23,11 +23,11 @@ import java.util.Map;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.spi.utils.ByteArray;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BYTES;
@@ -44,7 +44,7 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BYTES;
 public class DistinctCountRawThetaSketchAggregationFunction implements AggregationFunction<Map<String, Sketch>, ByteArray> {
   private final DistinctCountThetaSketchAggregationFunction _thetaSketchAggregationFunction;
 
-  public DistinctCountRawThetaSketchAggregationFunction(List<String> arguments)
+  public DistinctCountRawThetaSketchAggregationFunction(List<ExpressionContext> arguments)
       throws SqlParseException {
     _thetaSketchAggregationFunction = new DistinctCountThetaSketchAggregationFunction(arguments);
   }
@@ -65,7 +65,7 @@ public class DistinctCountRawThetaSketchAggregationFunction implements Aggregati
   }
 
   @Override
-  public List<TransformExpressionTree> getInputExpressions() {
+  public List<ExpressionContext> getInputExpressions() {
     return _thetaSketchAggregationFunction.getInputExpressions();
   }
 
@@ -86,19 +86,19 @@ public class DistinctCountRawThetaSketchAggregationFunction implements Aggregati
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     _thetaSketchAggregationFunction.aggregate(length, aggregationResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     _thetaSketchAggregationFunction.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSetMap);
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     _thetaSketchAggregationFunction.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSetMap);
   }
 
@@ -134,7 +134,7 @@ public class DistinctCountRawThetaSketchAggregationFunction implements Aggregati
 
   @Override
   public ByteArray extractFinalResult(Map<String, Sketch> intermediateResult) {
-    Sketch sketch = _thetaSketchAggregationFunction.extractFinalSketch(intermediateResult);
-    return new ByteArray(sketch.compact().toByteArray());
+    Sketch finalSketch = _thetaSketchAggregationFunction.extractFinalSketch(intermediateResult);
+    return new ByteArray(finalSketch.compact().toByteArray());
   }
 }

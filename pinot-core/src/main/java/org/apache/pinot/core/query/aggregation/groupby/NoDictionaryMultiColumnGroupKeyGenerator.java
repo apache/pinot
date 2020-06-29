@@ -21,17 +21,16 @@ package org.apache.pinot.core.query.aggregation.groupby;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Iterator;
 import java.util.Map;
-import javax.annotation.Nonnull;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.util.FixedIntArray;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -44,7 +43,7 @@ import org.apache.pinot.core.util.FixedIntArray;
  * 2. Add support for trimming group-by results.
  */
 public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerator {
-  private final TransformExpressionTree[] _groupByExpressions;
+  private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
   private final FieldSpec.DataType[] _dataTypes;
   private final Dictionary[] _dictionaries;
@@ -55,7 +54,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   private int _numGroups = 0;
 
   public NoDictionaryMultiColumnGroupKeyGenerator(TransformOperator transformOperator,
-      TransformExpressionTree[] groupByExpressions, int numGroupsLimit) {
+      ExpressionContext[] groupByExpressions, int numGroupsLimit) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
     _dataTypes = new FieldSpec.DataType[_numGroupByExpressions];
@@ -63,7 +62,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     _onTheFlyDictionaries = new ValueToIdMap[_numGroupByExpressions];
 
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      TransformExpressionTree groupByExpression = groupByExpressions[i];
+      ExpressionContext groupByExpression = groupByExpressions[i];
       TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
       _dataTypes[i] = transformResultMetadata.getDataType();
       if (transformResultMetadata.hasDictionary()) {
@@ -83,8 +82,9 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     return _globalGroupIdUpperBound;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] groupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
     int numDocs = transformBlock.getNumDocs();
     Object[] values = new Object[_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -135,7 +135,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] groupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys) {
     // TODO: Support generating keys for multi-valued columns.
     throw new UnsupportedOperationException("Operation not supported");
   }

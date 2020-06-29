@@ -20,16 +20,16 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunction {
 
-  public MinMaxRangeMVAggregationFunction(String column) {
-    super(column);
+  public MinMaxRangeMVAggregationFunction(ExpressionContext expression) {
+    super(expression);
   }
 
   @Override
@@ -44,7 +44,7 @@ public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunc
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     double min = Double.POSITIVE_INFINITY;
     double max = Double.NEGATIVE_INFINITY;
@@ -64,7 +64,7 @@ public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunc
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
@@ -73,7 +73,7 @@ public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunc
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];

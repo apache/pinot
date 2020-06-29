@@ -105,8 +105,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
     AtomicInteger numGroups = new AtomicInteger();
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
-    AggregationFunction[] aggregationFunctions =
-        AggregationFunctionUtils.getAggregationFunctions(_queryContext.getBrokerRequest());
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_queryContext);
     int numAggregationFunctions = aggregationFunctions.length;
 
     // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished

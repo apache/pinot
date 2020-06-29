@@ -51,6 +51,7 @@ import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTab
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -603,8 +604,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         String sqlQuery =
             "SELECT DISTINCT longColumn FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5";
 
-        BrokerRequest pqlBrokerRequest = PQL_COMPILER.compileToBrokerRequest(pqlQuery);
-        QueryContext pqlQueryContext = BrokerRequestToQueryContextConverter.convert(pqlBrokerRequest);
+        QueryContext pqlQueryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
         BrokerResponseNative pqlResponse = queryServersWithDifferentSegments(pqlQueryContext, segment0, segment1);
         BrokerRequest sqlBrokerRequest = SQL_COMPILER.compileToBrokerRequest(sqlQuery);
         sqlBrokerRequest.setQueryOptions(Collections.singletonMap("responseFormat", "sql"));

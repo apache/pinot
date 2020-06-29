@@ -19,7 +19,6 @@
 package org.apache.pinot.core.startree.executor;
 
 import java.util.Map;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -27,6 +26,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
 
@@ -41,9 +41,8 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
-  public StarTreeGroupByExecutor(AggregationFunction[] aggregationFunctions,
-      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      TransformOperator transformOperator) {
+  public StarTreeGroupByExecutor(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator) {
     super(aggregationFunctions, groupByExpressions, maxInitialResultHolderCapacity, numGroupsLimit, transformOperator);
 
     int numAggregationFunctions = aggregationFunctions.length;
@@ -58,7 +57,7 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   protected void aggregate(TransformBlock transformBlock, int length, int functionIndex) {
     AggregationFunction aggregationFunction = _aggregationFunctions[functionIndex];
     GroupByResultHolder groupByResultHolder = _groupByResultHolders[functionIndex];
-    Map<TransformExpressionTree, BlockValSet> blockValSetMap =
+    Map<ExpressionContext, BlockValSet> blockValSetMap =
         AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumnPairs[functionIndex], transformBlock);
     if (_hasMVGroupByExpression) {
       aggregationFunction.aggregateGroupByMV(length, _mvGroupKeys, groupByResultHolder, blockValSetMap);

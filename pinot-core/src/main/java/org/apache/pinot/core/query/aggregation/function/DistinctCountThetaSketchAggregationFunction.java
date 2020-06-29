@@ -21,12 +21,9 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.Stack;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Intersection;
@@ -35,10 +32,6 @@ import org.apache.datasketches.theta.SetOperationBuilder;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -48,11 +41,10 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ThetaSketchParams;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.predicate.Predicate;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.parsers.utils.ParserUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -60,18 +52,16 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 /**
  * Implementation of {@link AggregationFunction} to perform the distinct count aggregation using
  * Theta Sketches.
+ * <p>TODO: For performance concern, use {@code List<Sketch>} as the intermediate result.
  */
 @SuppressWarnings("Duplicates")
 public class DistinctCountThetaSketchAggregationFunction implements AggregationFunction<Map<String, Sketch>, Integer> {
-
-  private String _thetaSketchColumn;
-  private TransformExpressionTree _thetaSketchIdentifier;
-  private Set<String> _predicateStrings;
-  private Expression _postAggregationExpression;
-  private Set<PredicateInfo> _predicateInfoSet;
-  private Map<Expression, String> _expressionMap;
-  private ThetaSketchParams _thetaSketchParams;
-  private List<TransformExpressionTree> _inputExpressions;
+  private final ExpressionContext _thetaSketchColumn;
+  private final ThetaSketchParams _thetaSketchParams;
+  private final SetOperationBuilder _setOperationBuilder;
+  private final List<ExpressionContext> _inputExpressions;
+  private final FilterContext _postAggregationExpression;
+  private final Map<Predicate, PredicateInfo> _predicateInfoMap;
 
   /**
    * Constructor for the class.
@@ -83,16 +73,69 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
    *                    <li> Required: Last expression is the one that will be evaluated to compute final result. </li>
    *                    </ul>
    */
-  public DistinctCountThetaSketchAggregationFunction(List<String> arguments)
+  public DistinctCountThetaSketchAggregationFunction(List<ExpressionContext> arguments)
       throws SqlParseException {
-    int numExpressions = arguments.size();
+    int numArguments = arguments.size();
 
-    // This function expects at least 3 arguments: Theta Sketch Column, Predicates & final aggregation expression.
-    Preconditions.checkArgument(numExpressions >= 3, "DistinctCountThetaSketch expects at least three arguments, got: ",
-        numExpressions);
+    // NOTE: This function expects at least 3 arguments: theta-sketch column, parameters, post-aggregation expression.
+    Preconditions.checkArgument(numArguments >= 3,
+        "DistinctCountThetaSketch expects at least three arguments (theta-sketch column, parameters, post-aggregation expression), got: ",
+        numArguments);
 
-    // Initialize all the internal state.
-    init(arguments);
+    // Initialize the theta-sketch column
+    _thetaSketchColumn = arguments.get(0);
+    Preconditions.checkArgument(_thetaSketchColumn.getType() == ExpressionContext.Type.IDENTIFIER,
+        "First argument of DistinctCountThetaSketch must be identifier (theta-sketch column)");
+
+    // Initialize the theta-sketch parameters
+    ExpressionContext paramsExpression = arguments.get(1);
+    Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL,
+        "Second argument of DistinctCountThetaSketch must be literal (parameters)");
+    _thetaSketchParams = ThetaSketchParams.fromString(paramsExpression.getLiteral());
+
+    // Initialize the theta-sketch set operation builder
+    _setOperationBuilder = getSetOperationBuilder();
+
+    // Initialize the input expressions
+    // NOTE: It is expected to cover the theta-sketch column and the lhs of the predicates.
+    _inputExpressions = new ArrayList<>();
+    _inputExpressions.add(_thetaSketchColumn);
+
+    // Initialize the post-aggregation expression
+    // NOTE: It is modeled as a filter
+    ExpressionContext postAggregationExpression = arguments.get(numArguments - 1);
+    Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL,
+        "Last argument of DistinctCountThetaSketch must be literal (post-aggregation expression)");
+    _postAggregationExpression = QueryContextConverterUtils
+        .getFilter(CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
+
+    // Initialize the predicate map
+    _predicateInfoMap = new HashMap<>();
+    if (numArguments > 3) {
+      // Predicates are explicitly specified
+      for (int i = 2; i < numArguments - 1; i++) {
+        ExpressionContext predicateExpression = arguments.get(i);
+        Preconditions.checkArgument(predicateExpression.getType() == ExpressionContext.Type.LITERAL,
+            "Third to second last argument of DistinctCountThetaSketch must be literal (predicate expression)");
+        Predicate predicate = getPredicate(predicateExpression.getLiteral());
+        _inputExpressions.add(predicate.getLhs());
+        _predicateInfoMap.put(predicate, new PredicateInfo(predicate));
+      }
+    } else {
+      // Auto-derive predicates from the post-aggregation expression
+      Stack<FilterContext> stack = new Stack<>();
+      stack.push(_postAggregationExpression);
+      while (!stack.isEmpty()) {
+        FilterContext filter = stack.pop();
+        if (filter.getType() == FilterContext.Type.PREDICATE) {
+          Predicate predicate = filter.getPredicate();
+          _inputExpressions.add(predicate.getLhs());
+          _predicateInfoMap.put(predicate, new PredicateInfo(predicate));
+        } else {
+          stack.addAll(filter.getChildren());
+        }
+      }
+    }
   }
 
   @Override
@@ -111,7 +154,7 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
   }
 
   @Override
-  public List<TransformExpressionTree> getInputExpressions() {
+  public List<ExpressionContext> getInputExpressions() {
     return _inputExpressions;
   }
 
@@ -132,19 +175,17 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    Map<Predicate, Union> unionMap = getUnionMap(aggregationResultHolder);
 
-    Map<String, Union> result = getDefaultResult(aggregationResultHolder, _predicateStrings);
-    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchIdentifier).getBytesValuesSV(), length);
-
-    for (PredicateInfo predicateInfo : _predicateInfoSet) {
-      String predicate = predicateInfo.getStringVal();
-
-      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getExpression());
+    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchColumn).getBytesValuesSV(), length);
+    for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
+      Predicate predicate = predicateInfo.getPredicate();
+      BlockValSet blockValSet = blockValSetMap.get(predicate.getLhs());
       FieldSpec.DataType valueType = blockValSet.getValueType();
       PredicateEvaluator predicateEvaluator = predicateInfo.getPredicateEvaluator(valueType);
 
-      Union union = result.get(predicate);
+      Union union = unionMap.get(predicate);
       switch (valueType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
@@ -154,7 +195,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
             }
           }
           break;
-
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
@@ -163,7 +203,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
             }
           }
           break;
-
         case FLOAT:
           float[] floatValues = blockValSet.getFloatValuesSV();
           for (int i = 0; i < length; i++) {
@@ -172,7 +211,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
             }
           }
           break;
-
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
@@ -181,7 +219,6 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
             }
           }
           break;
-
         case STRING:
           String[] stringValues = blockValSet.getStringValuesSV();
           for (int i = 0; i < length; i++) {
@@ -190,201 +227,179 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
             }
           }
           break;
-
-        default: // Predicates on BYTES is not allowed.
-          throw new IllegalStateException("Illegal data type for " + getType() + " aggregation function: " + valueType);
+        case BYTES:
+          byte[][] bytesValues = blockValSet.getBytesValuesSV();
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(bytesValues[i])) {
+              union.update(sketches[i]);
+            }
+          }
+          break;
+        default:
+          throw new IllegalStateException();
       }
     }
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
-    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchIdentifier).getBytesValuesSV(), length);
-
-    for (PredicateInfo predicateInfo : _predicateInfoSet) {
-      String predicate = predicateInfo.getStringVal();
-
-      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getExpression());
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchColumn).getBytesValuesSV(), length);
+    for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
+      Predicate predicate = predicateInfo.getPredicate();
+      BlockValSet blockValSet = blockValSetMap.get(predicate.getLhs());
       FieldSpec.DataType valueType = blockValSet.getValueType();
       PredicateEvaluator predicateEvaluator = predicateInfo.getPredicateEvaluator(valueType);
 
-      Map<String, Union> result;
       switch (valueType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(intValues[i])) {
-              result = getDefaultResult(groupByResultHolder, groupKeyArray[i], _predicateStrings);
-              Union union = result.get(predicate);
-              union.update(sketches[i]);
+              getUnionMap(groupByResultHolder, groupKeyArray[i]).get(predicate).update(sketches[i]);
             }
           }
           break;
-
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(longValues[i])) {
-              result = getDefaultResult(groupByResultHolder, groupKeyArray[i], _predicateStrings);
-              Union union = result.get(predicate);
-              union.update(sketches[i]);
+              getUnionMap(groupByResultHolder, groupKeyArray[i]).get(predicate).update(sketches[i]);
             }
           }
           break;
-
         case FLOAT:
           float[] floatValues = blockValSet.getFloatValuesSV();
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(floatValues[i])) {
-              result = getDefaultResult(groupByResultHolder, groupKeyArray[i], _predicateStrings);
-              Union union = result.get(predicate);
-              union.update(sketches[i]);
+              getUnionMap(groupByResultHolder, groupKeyArray[i]).get(predicate).update(sketches[i]);
             }
           }
           break;
-
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(doubleValues[i])) {
-              result = getDefaultResult(groupByResultHolder, groupKeyArray[i], _predicateStrings);
-              Union union = result.get(predicate);
-              union.update(sketches[i]);
+              getUnionMap(groupByResultHolder, groupKeyArray[i]).get(predicate).update(sketches[i]);
             }
           }
           break;
-
         case STRING:
           String[] stringValues = blockValSet.getStringValuesSV();
-
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(stringValues[i])) {
-              result = getDefaultResult(groupByResultHolder, groupKeyArray[i], _predicateStrings);
-              Union union = result.get(predicate);
-              union.update(sketches[i]);
+              getUnionMap(groupByResultHolder, groupKeyArray[i]).get(predicate).update(sketches[i]);
             }
           }
           break;
-
-        default: // Predicates on BYTES is not allowed.
-          throw new IllegalStateException("Illegal data type for " + getType() + " aggregation function: " + valueType);
+        case BYTES:
+          byte[][] bytesValues = blockValSet.getBytesValuesSV();
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(bytesValues[i])) {
+              getUnionMap(groupByResultHolder, groupKeyArray[i]).get(predicate).update(sketches[i]);
+            }
+          }
+        default:
+          throw new IllegalStateException();
       }
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
-    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchIdentifier).getBytesValuesSV(), length);
-
-    for (PredicateInfo predicateInfo : _predicateInfoSet) {
-      String predicate = predicateInfo.getStringVal();
-
-      BlockValSet blockValSet = blockValSetMap.get(predicateInfo.getExpression());
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    Sketch[] sketches = deserializeSketches(blockValSetMap.get(_thetaSketchColumn).getBytesValuesSV(), length);
+    for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
+      Predicate predicate = predicateInfo.getPredicate();
+      BlockValSet blockValSet = blockValSetMap.get(predicate.getLhs());
       FieldSpec.DataType valueType = blockValSet.getValueType();
       PredicateEvaluator predicateEvaluator = predicateInfo.getPredicateEvaluator(valueType);
 
-      Map<String, Union> result;
       switch (valueType) {
         case INT:
           int[] intValues = blockValSet.getIntValuesSV();
-
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(intValues[i])) {
-
               for (int groupKey : groupKeysArray[i]) {
-                result = getDefaultResult(groupByResultHolder, groupKey, _predicateStrings);
-                Union union = result.get(predicate);
-                union.update(sketches[i]);
+                getUnionMap(groupByResultHolder, groupKey).get(predicate).update(sketches[i]);
               }
             }
           }
-
+          break;
         case LONG:
           long[] longValues = blockValSet.getLongValuesSV();
-
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(longValues[i])) {
-
               for (int groupKey : groupKeysArray[i]) {
-                result = getDefaultResult(groupByResultHolder, groupKey, _predicateStrings);
-                Union union = result.get(predicate);
-                union.update(sketches[i]);
+                getUnionMap(groupByResultHolder, groupKey).get(predicate).update(sketches[i]);
               }
             }
           }
           break;
-
         case FLOAT:
           float[] floatValues = blockValSet.getFloatValuesSV();
-
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(floatValues[i])) {
-
               for (int groupKey : groupKeysArray[i]) {
-                result = getDefaultResult(groupByResultHolder, groupKey, _predicateStrings);
-                Union union = result.get(predicate);
-                union.update(sketches[i]);
+                getUnionMap(groupByResultHolder, groupKey).get(predicate).update(sketches[i]);
               }
             }
           }
           break;
-
         case DOUBLE:
           double[] doubleValues = blockValSet.getDoubleValuesSV();
-
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(doubleValues[i])) {
-
               for (int groupKey : groupKeysArray[i]) {
-                result = getDefaultResult(groupByResultHolder, groupKey, _predicateStrings);
-                Union union = result.get(predicate);
-                union.update(sketches[i]);
+                getUnionMap(groupByResultHolder, groupKey).get(predicate).update(sketches[i]);
               }
             }
           }
           break;
-
         case STRING:
           String[] stringValues = blockValSet.getStringValuesSV();
-
           for (int i = 0; i < length; i++) {
             if (predicateEvaluator.applySV(stringValues[i])) {
-
               for (int groupKey : groupKeysArray[i]) {
-                result = getDefaultResult(groupByResultHolder, groupKey, _predicateStrings);
-                Union union = result.get(predicate);
-                union.update(sketches[i]);
+                getUnionMap(groupByResultHolder, groupKey).get(predicate).update(sketches[i]);
               }
             }
           }
           break;
-
-        default: // Predicates on BYTES is not allowed.
-          throw new IllegalStateException("Illegal data type for " + getType() + " aggregation function: " + valueType);
+        case BYTES:
+          byte[][] bytesValues = blockValSet.getBytesValuesSV();
+          for (int i = 0; i < length; i++) {
+            if (predicateEvaluator.applySV(bytesValues[i])) {
+              for (int groupKey : groupKeysArray[i]) {
+                getUnionMap(groupByResultHolder, groupKey).get(predicate).update(sketches[i]);
+              }
+            }
+          }
+          break;
+        default:
+          throw new IllegalStateException();
       }
     }
   }
 
   @Override
   public Map<String, Sketch> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    Map<String, Union> result = aggregationResultHolder.getResult();
-    if (result == null) {
-      result = getDefaultResult(aggregationResultHolder, _predicateStrings);
+    Map<Predicate, Union> unionMap = getUnionMap(aggregationResultHolder);
+    Map<String, Sketch> result = new HashMap<>();
+    for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
+      result.put(predicateInfo.getStringPredicate(), unionMap.get(predicateInfo.getPredicate()).getResult());
     }
-
-    return result.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getResult()));
+    return result;
   }
 
   @Override
   public Map<String, Sketch> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Map<String, Union> result = groupByResultHolder.getResult(groupKey);
-    if (result == null) {
-      result = getDefaultResult(groupByResultHolder, groupKey, _predicateStrings);
+    Map<Predicate, Union> unionMap = getUnionMap(groupByResultHolder, groupKey);
+    Map<String, Sketch> result = new HashMap<>();
+    for (PredicateInfo predicateInfo : _predicateInfoMap.values()) {
+      result.put(predicateInfo.getStringPredicate(), unionMap.get(predicateInfo.getPredicate()).getResult());
     }
-
-    return result.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getResult()));
+    return result;
   }
 
   @Override
@@ -395,14 +410,23 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
       return intermediateResult1;
     }
 
+    // NOTE: Here we parse the map keys to Predicate to handle the non-standard predicate string returned from server
+    //       side for backward-compatibility.
+    // TODO: Remove the extra parsing after releasing 0.5.0
+    Map<Predicate, Union> unionMap = getDefaultUnionMap();
     for (Map.Entry<String, Sketch> entry : intermediateResult1.entrySet()) {
-      String predicate = entry.getKey();
-      Union union = getSetOperationBuilder().buildUnion();
-      union.update(entry.getValue());
-      union.update(intermediateResult2.get(predicate));
-      intermediateResult1.put(predicate, union.getResult());
+      Predicate predicate = getPredicate(entry.getKey());
+      unionMap.get(predicate).update(entry.getValue());
     }
-    return intermediateResult1;
+    for (Map.Entry<String, Sketch> entry : intermediateResult2.entrySet()) {
+      Predicate predicate = getPredicate(entry.getKey());
+      unionMap.get(predicate).update(entry.getValue());
+    }
+    Map<String, Sketch> mergedResult = new HashMap<>();
+    for (Map.Entry<Predicate, Union> entry : unionMap.entrySet()) {
+      mergedResult.put(entry.getKey().toString(), entry.getValue().getResult());
+    }
+    return mergedResult;
   }
 
   @Override
@@ -422,55 +446,47 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public Integer extractFinalResult(Map<String, Sketch> intermediateResult) {
-    // Compute the post aggregation expression and return the result.
-    Sketch finalSketch = evalPostAggregationExpression(_postAggregationExpression, intermediateResult);
+    Sketch finalSketch = extractFinalSketch(intermediateResult);
     return (int) Math.round(finalSketch.getEstimate());
   }
 
-  /**
-   * Returns the Default result for the given expression.
-   *
-   * @param aggregationResultHolder Aggregation result holder
-   * @param expressions Set of expressions that are expected in the result holder
-   * @return Default result
-   */
-  private Map<String, Union> getDefaultResult(AggregationResultHolder aggregationResultHolder,
-      Set<String> expressions) {
-    Map<String, Union> result = aggregationResultHolder.getResult();
-
-    if (result == null) {
-      result = new HashMap<>();
-      aggregationResultHolder.setValue(result);
+  private Predicate getPredicate(String predicateString) {
+    FilterContext filter;
+    try {
+      filter = QueryContextConverterUtils.getFilter(CalciteSqlParser.compileToExpression(predicateString));
+    } catch (SqlParseException e) {
+      throw new IllegalArgumentException("Invalid predicate string: " + predicateString);
     }
-
-    for (String expression : expressions) {
-      result.putIfAbsent(expression, getSetOperationBuilder().buildUnion());
-    }
-    return result;
+    // TODO: Add support for complex predicates with AND/OR.
+    Preconditions.checkArgument(filter.getType() == FilterContext.Type.PREDICATE, "Invalid predicate string: %s",
+        predicateString);
+    return filter.getPredicate();
   }
 
-  /**
-   * Returns the Default result for the given group key if exists, or creates a new one.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the default result
-   * @param expressions Set of expressions that are expected in the result holder
-   *
-   * @return Default result for the group-key
-   */
-  private Map<String, Union> getDefaultResult(GroupByResultHolder groupByResultHolder, int groupKey,
-      Set<String> expressions) {
-    Map<String, Union> result = groupByResultHolder.getResult(groupKey);
-
-    if (result == null) {
-      result = new HashMap<>();
-      groupByResultHolder.setValueForKey(groupKey, result);
+  private Map<Predicate, Union> getUnionMap(AggregationResultHolder aggregationResultHolder) {
+    Map<Predicate, Union> unionMap = aggregationResultHolder.getResult();
+    if (unionMap == null) {
+      unionMap = getDefaultUnionMap();
+      aggregationResultHolder.setValue(unionMap);
     }
+    return unionMap;
+  }
 
-    for (String expression : expressions) {
-      result.putIfAbsent(expression, getSetOperationBuilder().buildUnion());
+  private Map<Predicate, Union> getUnionMap(GroupByResultHolder groupByResultHolder, int groupKey) {
+    Map<Predicate, Union> unionMap = groupByResultHolder.getResult(groupKey);
+    if (unionMap == null) {
+      unionMap = getDefaultUnionMap();
+      groupByResultHolder.setValueForKey(groupKey, unionMap);
     }
-    return result;
+    return unionMap;
+  }
+
+  private Map<Predicate, Union> getDefaultUnionMap() {
+    Map<Predicate, Union> unionMap = new HashMap<>();
+    for (Predicate predicate : _predicateInfoMap.keySet()) {
+      unionMap.put(predicate, _setOperationBuilder.buildUnion());
+    }
+    return unionMap;
   }
 
   private Sketch[] deserializeSketches(byte[][] serializedSketches, int length) {
@@ -481,149 +497,53 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
     return sketches;
   }
 
-  private void init(List<String> arguments)
-      throws SqlParseException {
-    int numArgs = arguments.size();
-
-    // Predicate Strings are optional. When not specified, they are derived from postAggregationExpression
-    boolean predicatesSpecified = numArgs > 3;
-
-    // Initialize the Theta-Sketch Column.
-    _thetaSketchColumn = arguments.get(0);
-    _thetaSketchIdentifier =
-        new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER, _thetaSketchColumn, null);
-
-    // Initialize input expressions. It is expected they are covered between the theta-sketch column and the predicates.
-    _inputExpressions = new ArrayList<>();
-    _inputExpressions.add(_thetaSketchIdentifier);
-
-    // Initialize thetaSketchParams
-    String paramsString = arguments.get(1);
-    _thetaSketchParams = ThetaSketchParams.fromString(paramsString);
-
-    String postAggrExpressionString = arguments.get(numArgs - 1);
-    _postAggregationExpression = CalciteSqlParser.compileToExpression(postAggrExpressionString);
-
-    _predicateInfoSet = new LinkedHashSet<>();
-    _predicateStrings = new LinkedHashSet<>(arguments.subList(2, numArgs - 1));
-    _expressionMap = new HashMap<>();
-
-    if (predicatesSpecified) {
-      for (String predicateString : _predicateStrings) {
-        // FIXME: Standardize predicate string?
-
-        Expression expression = CalciteSqlParser.compileToExpression(predicateString);
-        FilterContext filter = QueryContextConverterUtils.getFilter(expression);
-
-        // TODO: Add support for complex predicates with AND/OR.
-        Preconditions.checkState(filter.getType() == FilterContext.Type.PREDICATE, "Illegal predicate string");
-        Predicate predicate = filter.getPredicate();
-        TransformExpressionTree lhs = predicate.getLhs().toTransformExpressionTree();
-        _predicateInfoSet.add(new PredicateInfo(predicateString, lhs, predicate));
-        _expressionMap.put(expression, predicateString);
-        _inputExpressions.add(lhs);
-      }
-    } else {
-      // Auto-derive predicates from postAggregationExpression.
-      Set<Expression> predicateExpressions = extractPredicatesFromString(postAggrExpressionString);
-      for (Expression predicateExpression : predicateExpressions) {
-        String predicateString = ParserUtils.standardizeExpression(predicateExpression, false);
-        _predicateStrings.add(predicateString);
-
-        FilterContext filter = QueryContextConverterUtils.getFilter(predicateExpression);
-        Preconditions.checkState(filter.getType() == FilterContext.Type.PREDICATE, "Illegal predicate string");
-        Predicate predicate = filter.getPredicate();
-        TransformExpressionTree lhs = predicate.getLhs().toTransformExpressionTree();
-        _predicateInfoSet.add(new PredicateInfo(predicateString, lhs, predicate));
-        _expressionMap.put(predicateExpression, predicateString);
-        _inputExpressions.add(lhs);
-      }
-    }
-  }
-
   /**
-   * Given a post aggregation String of form like ((p1 and p2) or (p3 and p4)), returns the individual
-   * predicates p1, p2, p3, p4.
+   * Evaluates the theta-sketch post-aggregation expression, which is composed by performing AND/OR on top of the
+   * pre-defined predicates. These predicates are evaluated during the aggregation phase, and the cached results are
+   * passed to this method to be used when evaluating the expression.
    *
-   * @param postAggrExpressionString Post aggregation expression String input
-   * @return Set of predicates that compose the input expression
-   * @throws SqlParseException If invalid expression String specified
-   */
-  private Set<Expression> extractPredicatesFromString(String postAggrExpressionString)
-      throws SqlParseException {
-    Set<Expression> predicates = new LinkedHashSet<>();
-    _postAggregationExpression = CalciteSqlParser.compileToExpression(postAggrExpressionString);
-    extractPredicatesFromExpression(_postAggregationExpression, predicates);
-    return predicates;
-  }
-
-  private void extractPredicatesFromExpression(Expression expression, Set<Expression> predicates) {
-    ExpressionType type = expression.getType();
-
-    if (type.equals(ExpressionType.FUNCTION)) {
-      Function function = expression.getFunctionCall();
-      FilterKind filterKind = FilterKind.valueOf(function.getOperator());
-
-      List<Expression> operands = function.getOperands();
-      if (filterKind.equals(FilterKind.AND) || filterKind.equals(FilterKind.OR)) {
-        for (Expression operand : operands) {
-          extractPredicatesFromExpression(operand, predicates);
-        }
-      } else {
-        predicates.add(expression);
-      }
-    } // else do nothing
-  }
-
-  /**
-   * Evaluates the theta-sketch post-aggregation expression, which is composed by performing AND/OR on top of
-   * pre-defined predicates. These predicates are evaluated during the aggregation phase, and the cached
-   * result is passed to this method to be used when evaluating the expression.
-   *
-   * @param expression Expression to evaluate, this is built by applying AND/OR on precomputed sketches
-   * @param intermediateResult Precomputed sketches for predicates that are part of the expression.
+   * @param postAggregationExpression Post-aggregation expression to evaluate (modeled as a filter)
+   * @param sketchMap Precomputed sketches for predicates that are part of the expression.
    * @return Overall evaluated sketch for the expression.
    */
-  private Sketch evalPostAggregationExpression(Expression expression, Map<String, Sketch> intermediateResult) {
-    Function functionCall = expression.getFunctionCall();
-    FilterKind kind = FilterKind.valueOf(functionCall.getOperator());
-    Sketch result;
-
-    switch (kind) {
+  private Sketch evalPostAggregationExpression(FilterContext postAggregationExpression,
+      Map<Predicate, Sketch> sketchMap) {
+    switch (postAggregationExpression.getType()) {
       case AND:
-        Intersection intersection = getSetOperationBuilder().buildIntersection();
-        for (Expression operand : functionCall.getOperands()) {
-          intersection.update(evalPostAggregationExpression(operand, intermediateResult));
+        Intersection intersection = _setOperationBuilder.buildIntersection();
+        for (FilterContext child : postAggregationExpression.getChildren()) {
+          intersection.update(evalPostAggregationExpression(child, sketchMap));
         }
-        result = intersection.getResult();
-        break;
-
+        return intersection.getResult();
       case OR:
-        Union union = getSetOperationBuilder().buildUnion();
-        for (Expression operand : functionCall.getOperands()) {
-          union.update(evalPostAggregationExpression(operand, intermediateResult));
+        Union union = _setOperationBuilder.buildUnion();
+        for (FilterContext child : postAggregationExpression.getChildren()) {
+          union.update(evalPostAggregationExpression(child, sketchMap));
         }
-        result = union.getResult();
-        break;
-
+        return union.getResult();
+      case PREDICATE:
+        return sketchMap.get(postAggregationExpression.getPredicate());
       default:
-        String predicate = _expressionMap.get(expression);
-        result = intermediateResult.get(predicate);
-        Preconditions.checkState(result != null, "Precomputed sketch for predicate not provided: " + predicate);
-        break;
+        throw new IllegalStateException();
     }
-
-    return result;
   }
 
   /**
-   * Extracts the final sketch from the intermediate result by applying the postAggregation expression on it.
+   * Extracts the final sketch from the intermediate result by applying the post-aggregation expression on it.
    *
    * @param intermediateResult Intermediate result
-   * @return Final Sketch obtained by computing the post aggregation expression on intermediate result
+   * @return Final Sketch obtained by computing the post-aggregation expression on intermediate result
    */
   protected Sketch extractFinalSketch(Map<String, Sketch> intermediateResult) {
-    return evalPostAggregationExpression(_postAggregationExpression, intermediateResult);
+    // NOTE: Here we parse the map keys to Predicate to handle the non-standard predicate string returned from server
+    //       side for backward-compatibility.
+    // TODO: Remove the extra parsing after releasing 0.5.0
+    Map<Predicate, Sketch> sketchMap = new HashMap<>();
+    for (Map.Entry<String, Sketch> entry : intermediateResult.entrySet()) {
+      Predicate predicate = getPredicate(entry.getKey());
+      sketchMap.put(predicate, entry.getValue());
+    }
+    return evalPostAggregationExpression(_postAggregationExpression, sketchMap);
   }
 
   /**
@@ -632,78 +552,45 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
    * @return SetOperationBuilder
    */
   private SetOperationBuilder getSetOperationBuilder() {
-    return (_thetaSketchParams == null) ? SetOperation.builder()
+    return _thetaSketchParams == null ? SetOperation.builder()
         : SetOperation.builder().setNominalEntries(_thetaSketchParams.getNominalEntries());
   }
 
   /**
    * Helper class to store predicate related information:
    * <ul>
-   *   <li> String representation of the predicate. </li>
-   *   <li> LHS column of the predicate. </li>
-   *   <li> Complied {@link Predicate}. </li>
-   *   <li> Predicate Evaluator. </li>
+   *   <li>Predicate</li>
+   *   <li>String representation of the predicate</li>
+   *   <li>Predicate evaluator</li>
    * </ul>
-   *
    */
   private static class PredicateInfo {
-    private final String _stringVal;
-    private final TransformExpressionTree _expression; // LHS
-    private final Predicate _predicate;
-    private PredicateEvaluator _predicateEvaluator;
+    final Predicate _predicate;
+    final String _stringPredicate;
+    PredicateEvaluator _predicateEvaluator;
 
-    private PredicateInfo(String stringVal, TransformExpressionTree expression, Predicate predicate) {
-      _stringVal = stringVal;
-      _expression = expression;
+    PredicateInfo(Predicate predicate) {
       _predicate = predicate;
+      _stringPredicate = predicate.toString();
       _predicateEvaluator = null; // Initialized lazily
     }
 
-    public String getStringVal() {
-      return _stringVal;
-    }
-
-    public TransformExpressionTree getExpression() {
-      return _expression;
-    }
-
-    public Predicate getPredicate() {
+    Predicate getPredicate() {
       return _predicate;
+    }
+
+    String getStringPredicate() {
+      return _stringPredicate;
     }
 
     /**
      * Since PredicateEvaluator requires data-type, it is initialized lazily.
-     *
-     * @param dataType Data type for RHS of the predicate
-     * @return Predicate Evaluator
      */
-    public PredicateEvaluator getPredicateEvaluator(FieldSpec.DataType dataType) {
-      if (_predicateEvaluator != null) {
-        return _predicateEvaluator;
+    PredicateEvaluator getPredicateEvaluator(FieldSpec.DataType dataType) {
+      if (_predicateEvaluator == null) {
+        _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, dataType);
       }
-
-      _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, dataType);
       return _predicateEvaluator;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-
-      if (!(o instanceof PredicateInfo)) {
-        return false;
-      }
-
-      PredicateInfo that = (PredicateInfo) o;
-      return Objects.equals(_stringVal, that._stringVal) && Objects.equals(_expression, that._expression) && Objects
-          .equals(_predicate, that._predicate);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(_stringVal, _expression, _predicate);
     }
   }
 }

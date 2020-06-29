@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctCountAggregation
 import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
@@ -56,8 +57,10 @@ public class TableResizerTest {
   public void setUp() {
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)", "distinctcount(m3)", "avg(m4)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.OBJECT});
-    _aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction(
-        "m2"), new DistinctCountAggregationFunction("m3"), new AvgAggregationFunction("m4")};
+    _aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction(
+        ExpressionContext.forIdentifier("m1")), new MaxAggregationFunction(
+        ExpressionContext.forIdentifier("m2")), new DistinctCountAggregationFunction(
+        ExpressionContext.forIdentifier("m3")), new AvgAggregationFunction(ExpressionContext.forIdentifier("m4"))};
 
     IntOpenHashSet i1 = new IntOpenHashSet();
     i1.add(1);

@@ -20,20 +20,20 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
 
-  public MaxAggregationFunction(String column) {
-    super(column);
+  public MaxAggregationFunction(ExpressionContext expression) {
+    super(expression);
   }
 
   @Override
@@ -58,7 +58,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     double max = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
@@ -72,7 +72,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
@@ -85,7 +85,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];

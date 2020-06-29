@@ -29,10 +29,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -64,7 +64,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final static int INITIAL_MAP_SIZE = 256;
   private final static int MAX_CACHING_MAP_SIZE = 1048576;
-  private final TransformExpressionTree[] _groupByExpressions;
+  private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
   private final int[] _cardinalities;
   private final boolean[] _isSingleValueColumn;
@@ -79,9 +79,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
 
-  public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator,
-      TransformExpressionTree[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
-      Map mapBasedRawKeyHolders) {
+  public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator, ExpressionContext[] groupByExpressions,
+      int numGroupsLimit, int arrayBasedThreshold, Map mapBasedRawKeyHolders) {
     assert numGroupsLimit >= arrayBasedThreshold;
 
     _groupByExpressions = groupByExpressions;
@@ -96,7 +95,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     long cardinalityProduct = 1L;
     boolean longOverflow = false;
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      TransformExpressionTree groupByExpression = groupByExpressions[i];
+      ExpressionContext groupByExpression = groupByExpressions[i];
       _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
       int cardinality = _dictionaries[i].length();
       _cardinalities[i] = cardinality;
@@ -115,8 +114,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(ArrayMapBasedHolder.class.getName(),
           o -> new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
       _rawKeyHolder = new ArrayMapBasedHolder(mapInternal);
-      if (((Object2IntOpenHashMap)mapInternal).size() > MAX_CACHING_MAP_SIZE) {
-        mapBasedRawKeyHolders.put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
+      if (((Object2IntOpenHashMap) mapInternal).size() > MAX_CACHING_MAP_SIZE) {
+        mapBasedRawKeyHolders
+            .put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
       }
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
@@ -124,8 +124,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(LongMapBasedHolder.class.getName(),
             o -> new LongMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
         _rawKeyHolder = new LongMapBasedHolder(mapInternal);
-        if (((Long2IntOpenHashMap)mapInternal).size() > MAX_CACHING_MAP_SIZE) {
-          mapBasedRawKeyHolders.put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
+        if (((Long2IntOpenHashMap) mapInternal).size() > MAX_CACHING_MAP_SIZE) {
+          mapBasedRawKeyHolders
+              .put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
         }
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
@@ -133,8 +134,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           Object mapInternal = mapBasedRawKeyHolders.computeIfAbsent(IntMapBasedHolder.class.getName(),
               o -> new IntMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
           _rawKeyHolder = new IntMapBasedHolder(mapInternal);
-          if (((Int2IntOpenHashMap)mapInternal).size() > MAX_CACHING_MAP_SIZE) {
-            mapBasedRawKeyHolders.put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
+          if (((Int2IntOpenHashMap) mapInternal).size() > MAX_CACHING_MAP_SIZE) {
+            mapBasedRawKeyHolders
+                .put(ArrayMapBasedHolder.class.getName(), new ArrayMapBasedHolder(INITIAL_MAP_SIZE).getInternal());
           }
         } else {
           _rawKeyHolder = new ArrayBasedHolder();

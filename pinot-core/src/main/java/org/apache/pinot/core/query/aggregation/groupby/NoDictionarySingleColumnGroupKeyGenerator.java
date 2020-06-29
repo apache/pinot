@@ -30,12 +30,11 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Iterator;
 import java.util.Map;
-import javax.annotation.Nonnull;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -44,7 +43,7 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
  *
  */
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
-  private final TransformExpressionTree _groupByExpression;
+  private final ExpressionContext _groupByExpression;
   private final FieldSpec.DataType _dataType;
   private final Map _groupKeyMap;
   private final int _globalGroupIdUpperBound;
@@ -52,7 +51,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private int _numGroups = 0;
 
   public NoDictionarySingleColumnGroupKeyGenerator(TransformOperator transformOperator,
-      TransformExpressionTree groupByExpression, int numGroupsLimit) {
+      ExpressionContext groupByExpression, int numGroupsLimit) {
     _groupByExpression = groupByExpression;
     _dataType = transformOperator.getResultMetadata(_groupByExpression).getDataType();
     _groupKeyMap = createGroupKeyMap(_dataType);
@@ -65,7 +64,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] groupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
     BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
     int numDocs = transformBlock.getNumDocs();
 
@@ -152,7 +151,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] groupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys) {
     // TODO: Support generating keys for multi-valued columns.
     throw new UnsupportedOperationException("Operation not supported");
   }

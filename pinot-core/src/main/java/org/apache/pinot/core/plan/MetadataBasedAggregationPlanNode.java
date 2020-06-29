@@ -21,12 +21,12 @@ package org.apache.pinot.core.plan;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -47,11 +47,11 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
    */
   public MetadataBasedAggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext.getBrokerRequest());
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
     _dataSourceMap = new HashMap<>();
     for (AggregationFunction aggregationFunction : _aggregationFunctions) {
       if (aggregationFunction.getType() != AggregationFunctionType.COUNT) {
-        String column = ((TransformExpressionTree) aggregationFunction.getInputExpressions().get(0)).getValue();
+        String column = ((ExpressionContext) aggregationFunction.getInputExpressions().get(0)).getIdentifier();
         _dataSourceMap.computeIfAbsent(column, _indexSegment::getDataSource);
       }
     }

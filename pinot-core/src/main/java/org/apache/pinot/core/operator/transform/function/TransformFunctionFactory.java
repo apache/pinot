@@ -26,7 +26,6 @@ import java.util.Set;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
@@ -35,6 +34,8 @@ import org.apache.pinot.core.operator.transform.function.SingleParamMathTransfor
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
 
 
 /**
@@ -82,7 +83,8 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.EQUALS.getName().toLowerCase(), EqualsTransformFunction.class);
           put(TransformFunctionType.NOT_EQUALS.getName().toLowerCase(), NotEqualsTransformFunction.class);
           put(TransformFunctionType.GREATER_THAN.getName().toLowerCase(), GreaterThanTransformFunction.class);
-          put(TransformFunctionType.GREATER_THAN_OR_EQUAL.getName().toLowerCase(), GreaterThanOrEqualTransformFunction.class);
+          put(TransformFunctionType.GREATER_THAN_OR_EQUAL.getName().toLowerCase(),
+              GreaterThanOrEqualTransformFunction.class);
           put(TransformFunctionType.LESS_THAN.getName().toLowerCase(), LessThanTransformFunction.class);
           put(TransformFunctionType.LESS_THAN_OR_EQUAL.getName().toLowerCase(), LessThanOrEqualTransformFunction.class);
         }
@@ -90,7 +92,7 @@ public class TransformFunctionFactory {
 
   /**
    * Initializes the factory with a set of transform function classes.
-   * <p>Should be called only once before calling {@link #get(TransformExpressionTree, Map)}.
+   * <p>Should be called only once before calling {@link #get(ExpressionContext, Map)}.
    *
    * @param transformFunctionClasses Set of transform function classes
    */
@@ -119,11 +121,12 @@ public class TransformFunctionFactory {
    * @param dataSourceMap Map from column name to column data source
    * @return Transform function
    */
-  public static TransformFunction get(TransformExpressionTree expression, Map<String, DataSource> dataSourceMap) {
-    switch (expression.getExpressionType()) {
+  public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
+    switch (expression.getType()) {
       case FUNCTION:
+        FunctionContext function = expression.getFunction();
+        String functionName = function.getFunctionName();
         TransformFunction transformFunction;
-        String functionName = expression.getValue();
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
         if (transformFunctionClass != null) {
           // Transform function
@@ -145,23 +148,23 @@ public class TransformFunctionFactory {
                 e);
           }
         }
-        List<TransformExpressionTree> children = expression.getChildren();
-        List<TransformFunction> arguments = new ArrayList<>(children.size());
-        for (TransformExpressionTree child : children) {
-          arguments.add(TransformFunctionFactory.get(child, dataSourceMap));
+        List<ExpressionContext> arguments = function.getArguments();
+        List<TransformFunction> transformFunctionArguments = new ArrayList<>(arguments.size());
+        for (ExpressionContext argument : arguments) {
+          transformFunctionArguments.add(TransformFunctionFactory.get(argument, dataSourceMap));
         }
         try {
-          transformFunction.init(arguments, dataSourceMap);
+          transformFunction.init(transformFunctionArguments, dataSourceMap);
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
               e);
         }
         return transformFunction;
       case IDENTIFIER:
-        String columnName = expression.getValue();
+        String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, dataSourceMap.get(columnName));
       case LITERAL:
-        return new LiteralTransformFunction(expression.getValue());
+        return new LiteralTransformFunction(expression.getLiteral());
       default:
         throw new IllegalStateException();
     }

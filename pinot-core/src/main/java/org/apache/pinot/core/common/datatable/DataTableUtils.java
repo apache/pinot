@@ -22,18 +22,20 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.QueryOptions;
 
 
 /**
  * The <code>DataTableUtils</code> class provides utility methods for data table.
  */
+@SuppressWarnings("rawtypes")
 public class DataTableUtils {
   private DataTableUtils() {
   }
@@ -84,37 +86,39 @@ public class DataTableUtils {
   /**
    * Builds an empty data table based on the broker request.
    */
-  public static DataTable buildEmptyDataTable(BrokerRequest brokerRequest)
+  public static DataTable buildEmptyDataTable(QueryContext queryContext)
       throws IOException {
     // Selection query.
-    if (brokerRequest.isSetSelections()) {
-      Selection selection = brokerRequest.getSelections();
-      List<String> selectionColumns = selection.getSelectionColumns();
-      int numSelectionColumns = selectionColumns.size();
-      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numSelectionColumns];
-      // Use STRING column data type as default for selection query.
+    if (!QueryContextUtils.isAggregationQuery(queryContext)) {
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      int numSelectExpressions = selectExpressions.size();
+      String[] columnNames = new String[numSelectExpressions];
+      for (int i = 0; i < numSelectExpressions; i++) {
+        columnNames[i] = selectExpressions.get(i).toString();
+      }
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numSelectExpressions];
+      // NOTE: Use STRING column data type as default for selection query.
       Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
-      DataSchema dataSchema =
-          new DataSchema(selectionColumns.toArray(new String[numSelectionColumns]), columnDataTypes);
+      DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
       return new DataTableBuilder(dataSchema).build();
     }
 
     // Aggregation query.
-    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
     int numAggregations = aggregationFunctions.length;
-    if (brokerRequest.isSetGroupBy()) {
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    if (groupByExpressions != null) {
       // Aggregation group-by query.
 
-      if (new QueryOptions(brokerRequest.getQueryOptions()).isGroupByModeSQL()) {
+      if (new QueryOptions(queryContext.getQueryOptions()).isGroupByModeSQL()) {
         // SQL format
 
-        List<String> expressions = brokerRequest.getGroupBy().getExpressions();
-        int numColumns = expressions.size() + numAggregations;
+        int numColumns = groupByExpressions.size() + numAggregations;
         String[] columnNames = new String[numColumns];
         DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
         int index = 0;
-        for (String expression : expressions) {
-          columnNames[index] = expression;
+        for (ExpressionContext groupByExpression : groupByExpressions) {
+          columnNames[index] = groupByExpression.toString();
           // Use STRING column data type as default for group-by expressions
           columnDataTypes[index] = DataSchema.ColumnDataType.STRING;
           index++;

@@ -45,10 +45,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -100,9 +99,9 @@ public class BenchmarkCombineGroupBy {
       _d2.add(i);
     }
 
-    _queryContext = BrokerRequestToQueryContextConverter.convert(new Pql2Compiler()
-        .compileToBrokerRequest("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) TOP 500"));
-    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_queryContext.getBrokerRequest());
+    _queryContext = QueryContextConverterUtils
+        .getQueryContextFromPQL("SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY sum(m1) TOP 500");
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_queryContext);
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
 

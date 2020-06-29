@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.transform;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -30,6 +29,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -41,18 +41,18 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
 
   private final ProjectionOperator _projectionOperator;
   private final Map<String, DataSource> _dataSourceMap;
-  private final Map<TransformExpressionTree, TransformFunction> _transformFunctionMap = new HashMap<>();
+  private final Map<ExpressionContext, TransformFunction> _transformFunctionMap = new HashMap<>();
 
   /**
    * Constructor for the class
    *
    * @param projectionOperator Projection operator
-   * @param expressions Set of expressions to evaluate
+   * @param expressions Collection of expressions to evaluate
    */
-  public TransformOperator(ProjectionOperator projectionOperator, Collection<TransformExpressionTree> expressions) {
+  public TransformOperator(ProjectionOperator projectionOperator, Collection<ExpressionContext> expressions) {
     _projectionOperator = projectionOperator;
     _dataSourceMap = projectionOperator.getDataSourceMap();
-    for (TransformExpressionTree expression : expressions) {
+    for (ExpressionContext expression : expressions) {
       TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
       _transformFunctionMap.put(expression, transformFunction);
     }
@@ -73,7 +73,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
    * @param expression Expression
    * @return Transform result metadata
    */
-  public TransformResultMetadata getResultMetadata(TransformExpressionTree expression) {
+  public TransformResultMetadata getResultMetadata(ExpressionContext expression) {
     return _transformFunctionMap.get(expression).getResultMetadata();
   }
 
@@ -83,7 +83,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
    *
    * @return Dictionary
    */
-  public Dictionary getDictionary(TransformExpressionTree expression) {
+  public Dictionary getDictionary(ExpressionContext expression) {
     return _transformFunctionMap.get(expression).getDictionary();
   }
 

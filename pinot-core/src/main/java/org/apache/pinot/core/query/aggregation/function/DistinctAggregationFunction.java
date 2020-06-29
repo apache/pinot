@@ -19,14 +19,11 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -36,6 +33,8 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 
 
 /**
@@ -44,28 +43,40 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
  */
 @SuppressWarnings("rawtypes")
 public class DistinctAggregationFunction implements AggregationFunction<DistinctTable, Comparable> {
+  private final List<ExpressionContext> _expressions;
   private final String[] _columns;
-  private final List<SelectionSort> _orderBy;
+  private final List<OrderByExpressionContext> _orderByExpressions;
   private final int _limit;
-  private final List<TransformExpressionTree> _inputExpressions;
 
   /**
    * Constructor for the class.
    *
-   * @param columns Distinct columns to return
-   * @param orderBy Order By clause
+   * @param expressions Distinct columns to return
+   * @param orderByExpressions Order By clause
    * @param limit Limit clause
    */
-  public DistinctAggregationFunction(List<String> columns, @Nullable List<SelectionSort> orderBy, int limit) {
-    int numColumns = columns.size();
-    _columns = columns.toArray(new String[numColumns]);
-    _orderBy = orderBy;
-    _limit = limit;
-
-    _inputExpressions = new ArrayList<>(numColumns);
-    for (String column : columns) {
-      _inputExpressions.add(TransformExpressionTree.compileToExpressionTree(column));
+  public DistinctAggregationFunction(List<ExpressionContext> expressions,
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit) {
+    _expressions = expressions;
+    int numExpressions = expressions.size();
+    _columns = new String[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      _columns[i] = expressions.get(i).toString();
     }
+    _orderByExpressions = orderByExpressions;
+    _limit = limit;
+  }
+
+  public String[] getColumns() {
+    return _columns;
+  }
+
+  public List<OrderByExpressionContext> getOrderByExpressions() {
+    return _orderByExpressions;
+  }
+
+  public int getLimit() {
+    return _limit;
   }
 
   @Override
@@ -85,8 +96,8 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   }
 
   @Override
-  public List<TransformExpressionTree> getInputExpressions() {
-    return _inputExpressions;
+  public List<ExpressionContext> getInputExpressions() {
+    return _expressions;
   }
 
   @Override
@@ -101,26 +112,26 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     int numBlockValSets = blockValSetMap.size();
-    int numExpressions = _inputExpressions.size();
+    int numExpressions = _expressions.size();
     Preconditions
         .checkState(numBlockValSets == numExpressions, "Size mismatch: numBlockValSets = %s, numExpressions = %s",
             numBlockValSets, numExpressions);
 
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
-      blockValSets[i] = blockValSetMap.get(_inputExpressions.get(i));
+      blockValSets[i] = blockValSetMap.get(_expressions.get(i));
     }
 
     DistinctTable distinctTable = aggregationResultHolder.getResult();
     if (distinctTable == null) {
       ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
       for (int i = 0; i < numExpressions; i++) {
-        columnDataTypes[i] = ColumnDataType.fromDataTypeSV(blockValSetMap.get(_inputExpressions.get(i)).getValueType());
+        columnDataTypes[i] = ColumnDataType.fromDataTypeSV(blockValSetMap.get(_expressions.get(i)).getValueType());
       }
       DataSchema dataSchema = new DataSchema(_columns, columnDataTypes);
-      distinctTable = new DistinctTable(dataSchema, _orderBy, _limit);
+      distinctTable = new DistinctTable(dataSchema, _orderByExpressions, _limit);
       aggregationResultHolder.setValue(distinctTable);
     }
 
@@ -156,7 +167,7 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
       ColumnDataType[] columnDataTypes = new ColumnDataType[_columns.length];
       // NOTE: Use STRING for unknown type
       Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-      return new DistinctTable(new DataSchema(_columns, columnDataTypes), _orderBy, _limit);
+      return new DistinctTable(new DataSchema(_columns, columnDataTypes), _orderByExpressions, _limit);
     }
   }
 
@@ -198,13 +209,13 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 

@@ -22,16 +22,16 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggregationFunction {
 
-  public DistinctCountHLLMVAggregationFunction(List<String> arguments) {
+  public DistinctCountHLLMVAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments);
   }
 
@@ -47,7 +47,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
@@ -101,7 +101,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
 
@@ -159,7 +159,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DataType valueType = blockValSet.getValueType();
 

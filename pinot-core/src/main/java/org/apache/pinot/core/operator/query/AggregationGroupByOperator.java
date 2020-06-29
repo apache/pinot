@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -27,6 +26,7 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 
 
@@ -34,11 +34,12 @@ import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
  * The <code>AggregationGroupByOperator</code> class provides the operator for aggregation group-by query on a single
  * segment.
  */
+@SuppressWarnings("rawtypes")
 public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOperator";
 
   private final AggregationFunction[] _aggregationFunctions;
-  private final TransformExpressionTree[] _groupByExpressions;
+  private final ExpressionContext[] _groupByExpressions;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
@@ -47,9 +48,9 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
 
   private int _numDocsScanned = 0;
 
-  public AggregationGroupByOperator(AggregationFunction[] aggregationFunctions,
-      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      TransformOperator transformOperator, long numTotalDocs, boolean useStarTree) {
+  public AggregationGroupByOperator(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
+      int maxInitialResultHolderCapacity, int numGroupsLimit, TransformOperator transformOperator, long numTotalDocs,
+      boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;

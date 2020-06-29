@@ -29,14 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Assert;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
 
 
 public class CombinePlanNodeTest {
-  private final QueryContext _queryContext =
-      BrokerRequestToQueryContextConverter.convert(new Pql2Compiler().compileToBrokerRequest("SELECT * FROM table"));
+  private final QueryContext _queryContext = QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table");
   private final ExecutorService _executorService = Executors.newFixedThreadPool(10);
 
   /**

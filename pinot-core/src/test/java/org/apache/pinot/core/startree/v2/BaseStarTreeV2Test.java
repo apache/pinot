@@ -31,9 +31,6 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
@@ -48,16 +45,16 @@ import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder.BuildMode;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -80,8 +77,8 @@ import static org.testng.Assert.assertNotNull;
  * @param <R> Type or raw value
  * @param <A> Type of aggregated value
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 abstract class BaseStarTreeV2Test<R, A> {
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private static final Random RANDOM = new Random();
 
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseStarTreeV2Test");
@@ -179,13 +176,11 @@ abstract class BaseStarTreeV2Test<R, A> {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  @SuppressWarnings("unchecked")
   void testQuery(String query) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
 
     // Aggregations
-    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(queryContext);
     int numAggregations = aggregationFunctions.length;
     List<AggregationFunctionColumnPair> functionColumnPairs = new ArrayList<>(numAggregations);
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
@@ -197,10 +192,10 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     // Group-by columns
     Set<String> groupByColumnSet = new HashSet<>();
-    GroupBy groupBy = brokerRequest.getGroupBy();
-    if (groupBy != null) {
-      for (String expression : groupBy.getExpressions()) {
-        TransformExpressionTree.compileToExpressionTree(expression).getColumns(groupByColumnSet);
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    if (groupByExpressions != null) {
+      for (ExpressionContext groupByExpression : groupByExpressions) {
+        groupByExpression.getColumns(groupByColumnSet);
       }
     }
     int numGroupByColumns = groupByColumnSet.size();

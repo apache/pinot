@@ -18,265 +18,214 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Arrays;
-import java.util.Collections;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.testng.Assert;
+import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
+
+@SuppressWarnings("rawtypes")
 public class AggregationFunctionFactoryTest {
-  private static final String COLUMN = "column";
+  private static final String ARGUMENT = "(column)";
+  private static final QueryContext DUMMY_QUERY_CONTEXT =
+      QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM testTable");
 
   @Test
   public void testGetAggregationFunction() {
-    AggregationFunction aggregationFunction;
+    FunctionContext function = getFunction("CoUnT");
+    AggregationFunction aggregationFunction =
+        AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof CountAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.COUNT);
+    assertEquals(aggregationFunction.getColumnName(), "count_star");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    BrokerRequest brokerRequest = new BrokerRequest();
-    String column;
+    function = getFunction("MiN");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof MinAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MIN);
+    assertEquals(aggregationFunction.getColumnName(), "min_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("CoUnT");
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof CountAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.COUNT);
-    Assert.assertEquals(aggregationFunction.getColumnName(), "count_star");
+    function = getFunction("MaX");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof MaxAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MAX);
+    assertEquals(aggregationFunction.getColumnName(), "max_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("MiN");
-    column = "min_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof MinAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.MIN);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("SuM");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof SumAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.SUM);
+    assertEquals(aggregationFunction.getColumnName(), "sum_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("MaX");
-    column = "max_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof MaxAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.MAX);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("AvG");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof AvgAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVG);
+    assertEquals(aggregationFunction.getColumnName(), "avg_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("SuM");
-    column = "sum_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof SumAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.SUM);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("MiNmAxRaNgE");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof MinMaxRangeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MINMAXRANGE);
+    assertEquals(aggregationFunction.getColumnName(), "minMaxRange_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("AvG");
-    column = "avg_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof AvgAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVG);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("DiStInCtCoUnT");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof DistinctCountAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNT);
+    assertEquals(aggregationFunction.getColumnName(), "distinctCount_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("MiNmAxRaNgE");
-    column = "minMaxRange_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof MinMaxRangeAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.MINMAXRANGE);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("DiStInCtCoUnThLl");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof DistinctCountHLLAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTHLL);
+    assertEquals(aggregationFunction.getColumnName(), "distinctCountHLL_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("DiStInCtCoUnT");
-    column = "distinctCount_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof DistinctCountAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNT);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("DiStInCtCoUnTrAwHlL");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof DistinctCountRawHLLAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLL);
+    assertEquals(aggregationFunction.getColumnName(), "distinctCountRawHLL_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("DiStInCtCoUnThLl");
-    column = "distinctCountHLL_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof DistinctCountHLLAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTHLL);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("FaStHlL");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FastHLLAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.FASTHLL);
+    assertEquals(aggregationFunction.getColumnName(), "fastHLL_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("DiStInCtCoUnTrAwHlL");
-    column = "distinctCountRawHLL_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof DistinctCountRawHLLAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLL);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("PeRcEnTiLe5");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILE);
+    assertEquals(aggregationFunction.getColumnName(), "percentile5_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("FaStHlL");
-    column = "fastHLL_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof FastHLLAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.FASTHLL);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("PeRcEnTiLeEsT50");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileEstAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileEst50_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("PeRcEnTiLe5");
-    column = "percentile5_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof PercentileAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILE);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("PeRcEnTiLeTdIgEsT99");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGEST);
+    assertEquals(aggregationFunction.getColumnName(), "percentileTDigest99_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("PeRcEnTiLeEsT50");
-    column = "percentileEst50_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof PercentileEstAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEEST);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("CoUnTmV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof CountMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.COUNTMV);
+    assertEquals(aggregationFunction.getColumnName(), "countMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("PeRcEnTiLeTdIgEsT99");
-    column = "percentileTDigest99_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof PercentileTDigestAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGEST);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("MiNmV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof MinMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MINMV);
+    assertEquals(aggregationFunction.getColumnName(), "minMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("CoUnTmV");
-    column = "countMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof CountMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.COUNTMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("MaXmV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof MaxMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MAXMV);
+    assertEquals(aggregationFunction.getColumnName(), "maxMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("MiNmV");
-    column = "minMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof MinMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.MINMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("SuMmV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof SumMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.SUMMV);
+    assertEquals(aggregationFunction.getColumnName(), "sumMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("MaXmV");
-    column = "maxMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof MaxMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.MAXMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("AvGmV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof AvgMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVGMV);
+    assertEquals(aggregationFunction.getColumnName(), "avgMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("SuMmV");
-    column = "sumMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof SumMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.SUMMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("MiNmAxRaNgEmV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof MinMaxRangeMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MINMAXRANGEMV);
+    assertEquals(aggregationFunction.getColumnName(), "minMaxRangeMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("AvGmV");
-    column = "avgMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof AvgMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVGMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("DiStInCtCoUnTmV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof DistinctCountMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTMV);
+    assertEquals(aggregationFunction.getColumnName(), "distinctCountMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("MiNmAxRaNgEmV");
-    column = "minMaxRangeMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof MinMaxRangeMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.MINMAXRANGEMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("DiStInCtCoUnThLlMv");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof DistinctCountHLLMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTHLLMV);
+    assertEquals(aggregationFunction.getColumnName(), "distinctCountHLLMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("DiStInCtCoUnTmV");
-    column = "distinctCountMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof DistinctCountMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("DiStInCtCoUnTrAwHlLmV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof DistinctCountRawHLLMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLLMV);
+    assertEquals(aggregationFunction.getColumnName(), "distinctCountRawHLLMV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("DiStInCtCoUnThLlMv");
-    column = "distinctCountHLLMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof DistinctCountHLLMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTHLLMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("PeRcEnTiLe10Mv");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEMV);
+    assertEquals(aggregationFunction.getColumnName(), "percentile10MV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("DiStInCtCoUnTrAwHlLmV");
-    column = "distinctCountRawHLLMV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof DistinctCountRawHLLMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLLMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("PeRcEnTiLeEsT90mV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileEstMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEESTMV);
+    assertEquals(aggregationFunction.getColumnName(), "percentileEst90MV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("PeRcEnTiLe10Mv");
-    column = "percentile10MV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof PercentileMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+    function = getFunction("PeRcEnTiLeTdIgEsT95mV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof PercentileTDigestMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
+    assertEquals(aggregationFunction.getColumnName(), "percentileTDigest95MV_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+  }
 
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("PeRcEnTiLeEsT90mV");
-    column = "percentileEst90MV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof PercentileEstMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILEESTMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
-
-    aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType("PeRcEnTiLeTdIgEsT95mV");
-    column = "percentileTDigest95MV_column";
-    aggregationInfo.setExpressions(Collections.singletonList(COLUMN));
-    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof PercentileTDigestMVAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.PERCENTILETDIGESTMV);
-    Assert.assertEquals(aggregationFunction.getColumnName(), column);
+  private FunctionContext getFunction(String functionName) {
+    return QueryContextConverterUtils.getExpression(functionName + ARGUMENT).getFunction();
   }
 
   @Test
   public void testAggregationFunctionWithMultipleArgs() {
-    // Test using new field `expressions` in AggregationInfo.
-    BrokerRequest brokerRequest = new BrokerRequest();
-    AggregationInfo aggregationInfo = new AggregationInfo();
-
-    aggregationInfo.setAggregationType("distinct");
-    String[] arguments = new String[]{"column1", "column2", "column3"};
-    String expected = "distinct_" + AggregationFunctionUtils.concatArgs(arguments);
-    aggregationInfo.setExpressions(Arrays.asList(arguments));
-
-    AggregationFunction aggregationFunction =
-        AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
-    Assert.assertTrue(aggregationFunction instanceof DistinctAggregationFunction);
-    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCT);
-    Assert.assertEquals(aggregationFunction.getColumnName(), expected);
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT distinct(column1, column2, column3) FROM testTable");
+    AggregationFunction aggregationFunction = AggregationFunctionFactory
+        .getAggregationFunction(queryContext.getSelectExpressions().get(0).getFunction(), queryContext);
+    assertTrue(aggregationFunction instanceof DistinctAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCT);
+    assertEquals(aggregationFunction.getColumnName(), "distinct_column1:column2:column3");
+    assertEquals(aggregationFunction.getResultColumnName(), "distinct(column1:column2:column3)");
   }
 }

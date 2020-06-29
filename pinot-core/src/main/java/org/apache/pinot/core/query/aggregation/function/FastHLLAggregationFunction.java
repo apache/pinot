@@ -22,7 +22,6 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -30,6 +29,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 /**
@@ -40,8 +40,8 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
   public static final int DEFAULT_LOG2M = 8;
   private static final int BYTE_TO_CHAR_OFFSET = 129;
 
-  public FastHLLAggregationFunction(String column) {
-    super(column);
+  public FastHLLAggregationFunction(ExpressionContext expression) {
+    super(expression);
   }
 
   @Override
@@ -66,7 +66,7 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     String[] values = blockValSetMap.get(_expression).getStringValuesSV();
     try {
       HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
@@ -88,7 +88,7 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     String[] values = blockValSetMap.get(_expression).getStringValuesSV();
     try {
       for (int i = 0; i < length; i++) {
@@ -108,7 +108,7 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     String[] values = blockValSetMap.get(_expression).getStringValuesSV();
     try {
       for (int i = 0; i < length; i++) {

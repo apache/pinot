@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.tdunning.math.stats.TDigest;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -29,6 +28,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -40,8 +40,8 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   protected final int _percentile;
 
-  public PercentileTDigestAggregationFunction(String column, int percentile) {
-    super(column);
+  public PercentileTDigestAggregationFunction(ExpressionContext expression, int percentile) {
+    super(expression);
     _percentile = percentile;
   }
 
@@ -52,12 +52,12 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public String getColumnName() {
-    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + _column;
+    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + _expression;
   }
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + _percentile + "(" + _column + ")";
+    return AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + _percentile + "(" + _expression + ")";
   }
 
   @Override
@@ -77,7 +77,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
@@ -105,7 +105,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
@@ -130,7 +130,7 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();

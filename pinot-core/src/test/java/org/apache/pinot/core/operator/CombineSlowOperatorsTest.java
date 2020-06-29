@@ -30,8 +30,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -47,11 +46,11 @@ import static org.testng.Assert.assertTrue;
  * combine operator returns, test whether the slow operators are properly interrupted, and if all the slow operators are
  * not running in order to safely release the segment references.
  */
+@SuppressWarnings("rawtypes")
 public class CombineSlowOperatorsTest {
   private static final int NUM_OPERATORS = 10;
   private static final int NUM_THREADS = 2;
   private static final long TIMEOUT_MS = 100L;
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
 
   private ExecutorService _executorService;
 
@@ -63,9 +62,9 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testCombineOperator() {
     List<Operator> operators = getOperators();
-    CombineOperator combineOperator = new CombineOperator(operators,
-        BrokerRequestToQueryContextConverter.convert(COMPILER.compileToBrokerRequest("SELECT * FROM table")),
-        _executorService, TIMEOUT_MS);
+    CombineOperator combineOperator =
+        new CombineOperator(operators, QueryContextConverterUtils.getQueryContextFromPQL("SELECT * FROM table"),
+            _executorService, TIMEOUT_MS);
     testCombineOperator(operators, combineOperator);
   }
 
@@ -73,9 +72,8 @@ public class CombineSlowOperatorsTest {
   public void testCombineGroupByOperator() {
     List<Operator> operators = getOperators();
     CombineGroupByOperator combineGroupByOperator = new CombineGroupByOperator(operators,
-        BrokerRequestToQueryContextConverter
-            .convert(COMPILER.compileToBrokerRequest("SELECT COUNT(*) FROM table GROUP BY column")), _executorService,
-        TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table GROUP BY column"),
+        _executorService, TIMEOUT_MS, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
     testCombineOperator(operators, combineGroupByOperator);
   }
 
@@ -83,9 +81,8 @@ public class CombineSlowOperatorsTest {
   public void testCombineGroupByOrderByOperator() {
     List<Operator> operators = getOperators();
     CombineGroupByOrderByOperator combineGroupByOrderByOperator = new CombineGroupByOrderByOperator(operators,
-        BrokerRequestToQueryContextConverter
-            .convert(COMPILER.compileToBrokerRequest("SELECT COUNT(*) FROM table GROUP BY column")), _executorService,
-        TIMEOUT_MS);
+        QueryContextConverterUtils.getQueryContextFromPQL("SELECT COUNT(*) FROM table GROUP BY column"),
+        _executorService, TIMEOUT_MS);
     testCombineOperator(operators, combineGroupByOrderByOperator);
   }
 

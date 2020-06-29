@@ -21,9 +21,10 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -35,19 +36,17 @@ public class AggregationFunctionFactory {
   }
 
   /**
-   * Given the name of the aggregation function, returns a new instance of the corresponding aggregation function.
-   * The limit is currently used for DISTINCT aggregation function. Unlike other aggregation functions,
-   * DISTINCT can produce multi-row resultset. So the user specificed limit in query needs to be
-   * passed down to function.
+   * Given the function information, returns a new instance of the corresponding aggregation function.
+   * <p>NOTE: We pass the query context to this method because DISTINCT is currently modeled as an aggregation function
+   *          and requires the order-by and limit information from the query.
+   * <p>TODO: Consider modeling DISTINCT as unique selection instead of aggregation so that early-termination, limit and
+   *          offset can be applied easier
    */
-  public static AggregationFunction getAggregationFunction(AggregationInfo aggregationInfo,
-      BrokerRequest brokerRequest) {
-    String functionName = aggregationInfo.getAggregationType();
-    List<String> arguments = AggregationFunctionUtils.getArguments(aggregationInfo);
-
+  public static AggregationFunction getAggregationFunction(FunctionContext function, QueryContext queryContext) {
     try {
-      String upperCaseFunctionName = functionName.toUpperCase();
-      String column = arguments.get(0);
+      String upperCaseFunctionName = function.getFunctionName().toUpperCase();
+      List<ExpressionContext> arguments = function.getArguments();
+      ExpressionContext firstArgument = arguments.get(0);
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
         int numArguments = arguments.size();
@@ -55,117 +54,116 @@ public class AggregationFunctionFactory {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
           if (remainingFunctionName.matches("\\d+")) {
             // Percentile
-            return new PercentileAggregationFunction(column,
-                AggregationFunctionUtils.parsePercentile(remainingFunctionName));
+            return new PercentileAggregationFunction(firstArgument, parsePercentile(remainingFunctionName));
           } else if (remainingFunctionName.matches("EST\\d+")) {
             // PercentileEst
             String percentileString = remainingFunctionName.substring(3);
-            return new PercentileEstAggregationFunction(column,
-                AggregationFunctionUtils.parsePercentile(percentileString));
+            return new PercentileEstAggregationFunction(firstArgument, parsePercentile(percentileString));
           } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
             // PercentileTDigest
             String percentileString = remainingFunctionName.substring(7);
-            return new PercentileTDigestAggregationFunction(column,
-                AggregationFunctionUtils.parsePercentile(percentileString));
+            return new PercentileTDigestAggregationFunction(firstArgument, parsePercentile(percentileString));
           } else if (remainingFunctionName.matches("\\d+MV")) {
             // PercentileMV
             String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
-            return new PercentileMVAggregationFunction(column,
-                AggregationFunctionUtils.parsePercentile(percentileString));
+            return new PercentileMVAggregationFunction(firstArgument, parsePercentile(percentileString));
           } else if (remainingFunctionName.matches("EST\\d+MV")) {
             // PercentileEstMV
             String percentileString = remainingFunctionName.substring(3, remainingFunctionName.length() - 2);
-            return new PercentileEstMVAggregationFunction(column,
-                AggregationFunctionUtils.parsePercentile(percentileString));
+            return new PercentileEstMVAggregationFunction(firstArgument, parsePercentile(percentileString));
           } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
             // PercentileTDigestMV
             String percentileString = remainingFunctionName.substring(7, remainingFunctionName.length() - 2);
-            return new PercentileTDigestMVAggregationFunction(column,
-                AggregationFunctionUtils.parsePercentile(percentileString));
+            return new PercentileTDigestMVAggregationFunction(firstArgument, parsePercentile(percentileString));
           }
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.)
-          int percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
+          int percentile = parsePercentile(arguments.get(1).getLiteral());
           if (remainingFunctionName.isEmpty()) {
             // Percentile
-            return new PercentileAggregationFunction(column, percentile);
+            return new PercentileAggregationFunction(firstArgument, percentile);
           }
           if (remainingFunctionName.equals("EST")) {
             // PercentileEst
-            return new PercentileEstAggregationFunction(column, percentile);
+            return new PercentileEstAggregationFunction(firstArgument, percentile);
           }
           if (remainingFunctionName.equals("TDIGEST")) {
             // PercentileTDigest
-            return new PercentileTDigestAggregationFunction(column, percentile);
+            return new PercentileTDigestAggregationFunction(firstArgument, percentile);
           }
           if (remainingFunctionName.equals("MV")) {
             // PercentileMV
-            return new PercentileMVAggregationFunction(column, percentile);
+            return new PercentileMVAggregationFunction(firstArgument, percentile);
           }
           if (remainingFunctionName.equals("ESTMV")) {
             // PercentileEstMV
-            return new PercentileEstMVAggregationFunction(column, percentile);
+            return new PercentileEstMVAggregationFunction(firstArgument, percentile);
           }
           if (remainingFunctionName.equals("TDIGESTMV")) {
             // PercentileTDigestMV
-            return new PercentileTDigestMVAggregationFunction(column, percentile);
+            return new PercentileTDigestMVAggregationFunction(firstArgument, percentile);
           }
         }
-        throw new IllegalArgumentException("Invalid percentile function");
+        throw new IllegalArgumentException("Invalid percentile function: " + function);
       } else {
         switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
           case COUNT:
             return new CountAggregationFunction();
           case MIN:
-            return new MinAggregationFunction(column);
+            return new MinAggregationFunction(firstArgument);
           case MAX:
-            return new MaxAggregationFunction(column);
+            return new MaxAggregationFunction(firstArgument);
           case SUM:
-            return new SumAggregationFunction(column);
+            return new SumAggregationFunction(firstArgument);
           case AVG:
-            return new AvgAggregationFunction(column);
+            return new AvgAggregationFunction(firstArgument);
           case MINMAXRANGE:
-            return new MinMaxRangeAggregationFunction(column);
+            return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
-            return new DistinctCountAggregationFunction(column);
+            return new DistinctCountAggregationFunction(firstArgument);
           case DISTINCTCOUNTHLL:
             return new DistinctCountHLLAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLL:
             return new DistinctCountRawHLLAggregationFunction(arguments);
           case FASTHLL:
-            return new FastHLLAggregationFunction(column);
+            return new FastHLLAggregationFunction(firstArgument);
           case DISTINCTCOUNTTHETASKETCH:
             return new DistinctCountThetaSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWTHETASKETCH:
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
           case COUNTMV:
-            return new CountMVAggregationFunction(column);
+            return new CountMVAggregationFunction(firstArgument);
           case MINMV:
-            return new MinMVAggregationFunction(column);
+            return new MinMVAggregationFunction(firstArgument);
           case MAXMV:
-            return new MaxMVAggregationFunction(column);
+            return new MaxMVAggregationFunction(firstArgument);
           case SUMMV:
-            return new SumMVAggregationFunction(column);
+            return new SumMVAggregationFunction(firstArgument);
           case AVGMV:
-            return new AvgMVAggregationFunction(column);
+            return new AvgMVAggregationFunction(firstArgument);
           case MINMAXRANGEMV:
-            return new MinMaxRangeMVAggregationFunction(column);
+            return new MinMaxRangeMVAggregationFunction(firstArgument);
           case DISTINCTCOUNTMV:
-            return new DistinctCountMVAggregationFunction(column);
+            return new DistinctCountMVAggregationFunction(firstArgument);
           case DISTINCTCOUNTHLLMV:
             return new DistinctCountHLLMVAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLLMV:
             return new DistinctCountRawHLLMVAggregationFunction(arguments);
           case DISTINCT:
-            Preconditions.checkState(brokerRequest != null,
-                "Broker request must be provided for 'DISTINCT' aggregation function");
-            return new DistinctAggregationFunction(arguments, brokerRequest.getOrderBy(), brokerRequest.getLimit());
+            return new DistinctAggregationFunction(arguments, queryContext.getOrderByExpressions(),
+                queryContext.getLimit());
           default:
             throw new IllegalArgumentException();
         }
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException("Invalid aggregation: " + aggregationInfo);
+      throw new BadQueryRequestException("Invalid aggregation function: " + function);
     }
+  }
+
+  private static int parsePercentile(String percentileString) {
+    int percentile = Integer.parseInt(percentileString);
+    Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
+    return percentile;
   }
 }
