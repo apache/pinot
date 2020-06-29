@@ -33,7 +33,6 @@ public class PinotDriverTest {
 
   @Test(enabled = false)
   public void testDriver() throws Exception {
-    DriverManager.registerDriver(new PinotDriver());
     Connection conn = DriverManager.getConnection(DB_URL);
     Statement statement = conn.createStatement();
     Integer limitResults = 10;

@@ -67,7 +67,7 @@ public class PinotStatement extends AbstractBaseStatement {
       }
       return new PinotResultSet(_resultSetGroup.getResultSet(0));
     } catch (PinotClientException e) {
-      throw new SQLException("Failed to execute query : {}", sql, e);
+      throw new SQLException(String.format("Failed to execute query : %s", sql), e);
     }
   }
 
