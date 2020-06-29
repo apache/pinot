@@ -35,13 +35,11 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     const alerts = enrichAlertResponseObject(alertsFromResponse);
 
-    let user = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
+    let userMail = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
     let token = config.userNameSplitToken;
-
-    user = user ? user.split(token)[0] : user;
+    let user = userMail ? userMail.split(token)[0] : userMail;
     // Add these filtered arrays to the model (they are only assigned once)
-
-    Object.assign(model, { alerts, user });
+    Object.assign(model, { alerts, user , userMail});
   },
 
   setupController(controller, model) {
