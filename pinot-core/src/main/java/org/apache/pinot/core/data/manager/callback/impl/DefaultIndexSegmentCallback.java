@@ -45,9 +45,4 @@ public class DefaultIndexSegmentCallback implements IndexSegmentCallback {
   @Override
   public void onRowIndexed(GenericRow row, int docId) {
   }
-
-  @Override
-  public String getVirtualColumnInfo(StreamPartitionMsgOffset offset) {
-    return Strings.EMPTY;
-  }
 }

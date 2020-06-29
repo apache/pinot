@@ -66,11 +66,4 @@ public interface IndexSegmentCallback {
    */
   void onRowIndexed(GenericRow row, int docId);
 
-  /**
-   * Retrieve information related to an upsert-enable segment virtual column for debug purpose
-   *
-   * @param offset the offset of the record we are trying to get the virtual columnn data for
-   * @return string representation of the virtual column data information
-   */
-  String getVirtualColumnInfo(StreamPartitionMsgOffset offset);
 }
