@@ -46,10 +46,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
   public void testGroupByOrderBySQLResponse(String query, List<Object[]> expectedResults, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
       DataSchema expectedDataSchema) {
-    Map<String, String> queryOptions = new HashMap<>(2);
-    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
-    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
             expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults, expectedResults.size(),
@@ -155,7 +152,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     long numTotalDocs = 120000;
 
     // order by one of the group by columns
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11";
+    query = "SELECT column11, SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11";
     results = Lists.newArrayList(new Object[]{"", 5935285005452.0}, new Object[]{"P", 88832999206836.0},
         new Object[]{"gFuH", 63202785888.0}, new Object[]{"o", 18105331533948.0}, new Object[]{"t", 16331923219264.0});
     dataSchema = new DataSchema(new String[]{"column11", "sum(column1)"},
@@ -165,7 +162,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // order by one of the group by columns DESC
-    query = "SELECT sum(column1) FROM testTable GROUP BY column11 ORDER BY column11 DESC";
+    query = "SELECT column11, sum(column1) FROM testTable GROUP BY column11 ORDER BY column11 DESC";
     results = Lists.newArrayList(results);
     Collections.reverse(results);
     dataSchema = new DataSchema(new String[]{"column11", "sum(column1)"},
@@ -174,8 +171,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
-    // order by one of the group by columns, TOP less than default
-    query = "SELECT Sum(column1) FROM testTable GROUP BY column11 ORDER BY column11 TOP 3";
+    // order by one of the group by columns, LIMIT less than default
+    query = "SELECT column11, Sum(column1) FROM testTable GROUP BY column11 ORDER BY column11 LIMIT 3";
     results = Lists.newArrayList(results);
     Collections.reverse(results);
     results = results.subList(0, 3);
@@ -186,7 +183,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // group by 2 dimensions, order by both, tie breaker
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12";
+    query = "SELECT column11, column12, SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12";
     results = Lists.newArrayList(new Object[]{"", "HEuxNvH", 3789390396216.0},
         new Object[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.0},
         new Object[]{"", "MaztCmmxxgguBUxPti", 1333941430664.0}, new Object[]{"", "dJWwFk", 55470665124.0000},
@@ -200,8 +197,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
-    // group by 2 columns, order by both, TOP more than default
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12 TOP 15";
+    // group by 2 columns, order by both, LIMIT more than default
+    query = "SELECT column11, column12, SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12 LIMIT 15";
     results = Lists.newArrayList(results);
     results.add(new Object[]{"P", "dJWwFk", 6224665921376.0});
     results.add(new Object[]{"P", "fykKFqiw", 1574451324140.0});
@@ -215,7 +212,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // group by 2 columns, order by both, one of them DESC
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12 DESC";
+    query = "SELECT column11, column12, SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12 DESC";
     results = Lists.newArrayList(new Object[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.0},
         new Object[]{"", "dJWwFk", 55470665124.0000}, new Object[]{"", "MaztCmmxxgguBUxPti", 1333941430664.0},
         new Object[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.0}, new Object[]{"", "HEuxNvH", 3789390396216.0},
@@ -229,7 +226,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // order by group by column and an aggregation
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, sum(column1)";
+    query = "SELECT column11, column12, SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, sum(column1)";
     results = Lists.newArrayList(new Object[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.0},
         new Object[]{"", "dJWwFk", 55470665124.0000}, new Object[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.0},
         new Object[]{"", "MaztCmmxxgguBUxPti", 1333941430664.0}, new Object[]{"", "HEuxNvH", 3789390396216.0},
@@ -242,8 +239,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
-    // order by only aggregation, DESC, TOP
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM(column1) DESC TOP 50";
+    // order by only aggregation, DESC, LIMIT
+    query = "SELECT column11, column12, SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM(column1) DESC LIMIT 50";
     results = Lists.newArrayList(new Object[]{"P", "MaztCmmxxgguBUxPti", 27177029040008.0},
         new Object[]{"P", "HEuxNvH", 21998672845052.0},
         new Object[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx", 18069909216728.0},
@@ -273,28 +270,28 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     // multiple aggregations
     query = "SELECT sum(column1), MIN(column6) FROM testTable GROUP BY column11 ORDER BY column11";
     results = Lists
-        .newArrayList(new Object[]{"", 5935285005452.0, 2.96467636E8}, new Object[]{"P", 88832999206836.0, 1689277.0},
-            new Object[]{"gFuH", 63202785888.0, 2.96467636E8}, new Object[]{"o", 18105331533948.0, 2.96467636E8},
-            new Object[]{"t", 16331923219264.0, 1980174.0});
-    dataSchema = new DataSchema(new String[]{"column11", "sum(column1)", "min(column6)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
+        .newArrayList(new Object[]{5935285005452.0, 2.96467636E8}, new Object[]{88832999206836.0, 1689277.0},
+            new Object[]{63202785888.0, 2.96467636E8}, new Object[]{18105331533948.0, 2.96467636E8},
+            new Object[]{16331923219264.0, 1980174.0});
+    dataSchema = new DataSchema(new String[]{"sum(column1)", "min(column6)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // order by aggregation with space/tab in order by
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM  ( column1) DESC TOP 3";
-    results = Lists.newArrayList(new Object[]{"P", "MaztCmmxxgguBUxPti", 27177029040008.0},
-        new Object[]{"P", "HEuxNvH", 21998672845052.0},
-        new Object[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx", 18069909216728.0});
-    dataSchema = new DataSchema(new String[]{"column11", "column12", "sum(column1)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM  ( column1) DESC LIMIT 3";
+    results = Lists.newArrayList(new Object[]{27177029040008.0},
+        new Object[]{21998672845052.0},
+        new Object[]{18069909216728.0});
+    dataSchema = new DataSchema(new String[]{"sum(column1)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // order by an aggregation DESC, and group by column
-    query = "SELECT MIN(column6) FROM testTable GROUP BY column12 ORDER BY Min(column6) DESC, column12";
+    query = "SELECT column12, MIN(column6) FROM testTable GROUP BY column12 ORDER BY Min(column6) DESC, column12";
     results = Lists.newArrayList(new Object[]{"XcBNHe", 329467557.0}, new Object[]{"fykKFqiw", 296467636.0},
         new Object[]{"gFuH", 296467636.0}, new Object[]{"HEuxNvH", 6043515.0},
         new Object[]{"MaztCmmxxgguBUxPti", 6043515.0}, new Object[]{"dJWwFk", 6043515.0},
@@ -306,8 +303,41 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
+    // ORDER BY aggregation which is not in the selection
+    query = "SELECT column12 FROM testTable GROUP BY column12 ORDER BY Min(column6) DESC, column12";
+    results = Lists.newArrayList(new Object[]{"XcBNHe"}, new Object[]{"fykKFqiw"},
+        new Object[]{"gFuH"}, new Object[]{"HEuxNvH"},
+        new Object[]{"MaztCmmxxgguBUxPti"}, new Object[]{"dJWwFk"},
+        new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx"}, new Object[]{"TTltMtFiRqUjvOG"},
+        new Object[]{"oZgnrlDEtjjVpUoFLol"});
+    dataSchema = new DataSchema(new String[]{"column12"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    numEntriesScannedPostFilter = 240000;
+    data.add(
+        new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
+
+    // multiple aggregations in ORDER BY, none in selection
+    query = "SELECT column12 FROM testTable GROUP BY column12 ORDER BY Min(column6) DESC, SUM(column1) LIMIT 3";
+    results = Lists.newArrayList(new Object[]{"XcBNHe"}, new Object[]{"gFuH"},
+        new Object[]{"fykKFqiw"});
+    dataSchema = new DataSchema(new String[]{"column12"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    numEntriesScannedPostFilter = 360000;
+    data.add(
+        new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
+
+    // multiple aggregations in ORDER BY, some in selection
+    query = "SELECT column12, MIN(column6) FROM testTable GROUP BY column12 ORDER BY Min(column6) DESC, SUM(column1) LIMIT 3";
+    results = Lists.newArrayList(new Object[]{"XcBNHe", 329467557.0}, new Object[]{"gFuH", 296467636.0},
+        new Object[]{"fykKFqiw", 296467636.0});
+    dataSchema = new DataSchema(new String[]{"column12", "min(column6)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
+    numEntriesScannedPostFilter = 360000;
+    data.add(
+        new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
+
     // numeric dimension should follow numeric ordering
-    query = "select count(*) from testTable group by column17 order by column17 top 15";
+    query = "select column17, count(*) from testTable group by column17 order by column17 LIMIT 15";
     results = Lists
         .newArrayList(new Object[]{83386499, 2924L}, new Object[]{217787432, 3892L}, new Object[]{227908817, 6564L},
             new Object[]{402773817, 7304L}, new Object[]{423049234, 6556L}, new Object[]{561673250, 7420L},
@@ -321,7 +351,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // group by UDF order by UDF
-    query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY sub(column1, 100000)";
+    query = "SELECT sub(column1, 100000), COUNT(*) FROM testTable GROUP BY sub(column1, 100000)  ORDER BY sub(column1, 100000) LIMIT 3";
     results = Lists.newArrayList(new Object[]{140528.0, 28L}, new Object[]{194355.0, 12L}, new Object[]{532157.0, 12L});
     dataSchema = new DataSchema(new String[]{"sub(column1,'100000')", "count(*)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.LONG});
@@ -330,16 +360,16 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // spaces in UDF
-    query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY SUB(   column1, 100000 )";
-    results = Lists.newArrayList(new Object[]{140528.0, 28L}, new Object[]{194355.0, 12L}, new Object[]{532157.0, 12L});
-    dataSchema = new DataSchema(new String[]{"sub(column1,'100000')", "count(*)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.LONG});
+    query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) ORDER BY SUB(   column1, 100000 ) LIMIT 3 ";
+    results = Lists.newArrayList(new Object[]{28L}, new Object[]{12L}, new Object[]{12L});
+    dataSchema = new DataSchema(new String[]{"count(*)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
     numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // Object type aggregation - comparable intermediate results (AVG, MINMAXRANGE)
-    query = "SELECT AVG(column6) FROM testTable GROUP BY column11  ORDER BY column11";
+    query = "SELECT column11, AVG(column6) FROM testTable GROUP BY column11  ORDER BY column11";
     results = Lists.newArrayList(new Object[]{"", 296467636.0}, new Object[]{"P", 909380310.3521485},
         new Object[]{"gFuH", 296467636.0}, new Object[]{"o", 296467636.0}, new Object[]{"t", 526245333.3900426});
     dataSchema = new DataSchema(new String[]{"column11", "avg(column6)"},
@@ -348,7 +378,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
-    query = "SELECT AVG(column6) FROM testTable GROUP BY column11 ORDER BY AVG(column6), column11 DESC";
+    query = "SELECT column11, AVG(column6) FROM testTable GROUP BY column11 ORDER BY AVG(column6), column11 DESC";
     results = Lists
         .newArrayList(new Object[]{"o", 296467636.0}, new Object[]{"gFuH", 296467636.0}, new Object[]{"", 296467636.0},
             new Object[]{"t", 526245333.3900426}, new Object[]{"P", 909380310.3521485});
@@ -359,7 +389,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // Object type aggregation - non comparable intermediate results (DISTINCTCOUNT)
-    query = "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY column12";
+    query = "SELECT column12, DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY column12";
     results = Lists.newArrayList(new Object[]{"HEuxNvH", 5}, new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 5},
         new Object[]{"MaztCmmxxgguBUxPti", 5}, new Object[]{"TTltMtFiRqUjvOG", 3}, new Object[]{"XcBNHe", 2},
         new Object[]{"dJWwFk", 4}, new Object[]{"fykKFqiw", 3}, new Object[]{"gFuH", 3},
@@ -372,19 +402,19 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     query =
         "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY DistinctCount(column11), column12 DESC";
-    results = Lists.newArrayList(new Object[]{"XcBNHe", 2}, new Object[]{"gFuH", 3}, new Object[]{"fykKFqiw", 3},
-        new Object[]{"TTltMtFiRqUjvOG", 3}, new Object[]{"oZgnrlDEtjjVpUoFLol", 4}, new Object[]{"dJWwFk", 4},
-        new Object[]{"MaztCmmxxgguBUxPti", 5}, new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 5},
-        new Object[]{"HEuxNvH", 5});
-    dataSchema = new DataSchema(new String[]{"column12", "distinctcount(column11)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    results = Lists.newArrayList(new Object[]{2}, new Object[]{3}, new Object[]{3},
+        new Object[]{3}, new Object[]{4}, new Object[]{4},
+        new Object[]{5}, new Object[]{5},
+        new Object[]{5});
+    dataSchema = new DataSchema(new String[]{"distinctcount(column11)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
     numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // percentile
     query =
-        "SELECT percentile90(column6) FROM testTable GROUP BY column11  ORDER BY PERCENTILE90(column6), column11 TOP 3";
+        "SELECT column11, percentile90(column6) FROM testTable GROUP BY column11  ORDER BY PERCENTILE90(column6), column11 LIMIT 3";
     results = Lists.newArrayList(new Object[]{"", 2.96467636E8}, new Object[]{"gFuH", 2.96467636E8},
         new Object[]{"o", 2.96467636E8});
     dataSchema = new DataSchema(new String[]{"column11", "percentile90(column6)"},
@@ -395,7 +425,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // empty results
     query =
-        "SELECT MIN(column6) FROM testTable where column12='non-existent-value' GROUP BY column11 order by column11";
+        "SELECT column11, MIN(column6) FROM testTable where column12='non-existent-value' GROUP BY column11 order by column11";
     results = new ArrayList<>(0);
     dataSchema = new DataSchema(new String[]{"column11", "min(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
