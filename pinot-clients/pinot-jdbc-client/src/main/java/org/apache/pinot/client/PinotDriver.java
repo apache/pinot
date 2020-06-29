@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.Driver;
+import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
@@ -81,5 +82,14 @@ public class PinotDriver implements Driver {
   public Logger getParentLogger()
       throws SQLFeatureNotSupportedException {
     throw new SQLFeatureNotSupportedException();
+  }
+
+  static {
+    try {
+      PinotDriver driver = new PinotDriver();
+      DriverManager.registerDriver(driver);
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
