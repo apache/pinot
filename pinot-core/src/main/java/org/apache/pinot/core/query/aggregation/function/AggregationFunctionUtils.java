@@ -36,6 +36,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.parsers.CompilerConstants;
@@ -72,12 +73,25 @@ public class AggregationFunctionUtils {
    */
   public static AggregationFunction[] getAggregationFunctions(QueryContext queryContext) {
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    List<AggregationFunction> aggregationFunctions = new ArrayList<>(selectExpressions.size());
+    Set<FunctionContext> functions = new HashSet<>();
+    List<AggregationFunction> aggregationFunctions = new ArrayList<>();
     for (ExpressionContext selectExpression : selectExpressions) {
-      if (selectExpression.getType() == ExpressionContext.Type.FUNCTION
-          && selectExpression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
-        aggregationFunctions
-            .add(AggregationFunctionFactory.getAggregationFunction(selectExpression.getFunction(), queryContext));
+      FunctionContext function = selectExpression.getFunction();
+      if (function != null && function.getType() == FunctionContext.Type.AGGREGATION) {
+        // TODO: Deduplicate aggregation functions after deprecating the BrokerRequest. PQL relies on them to return the
+        //       correct columns.
+        functions.add(function);
+        aggregationFunctions.add(AggregationFunctionFactory.getAggregationFunction(function, queryContext));
+      }
+    }
+    // Add aggregation functions in the ORDER-BY clause but not in the SELECT clause
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    if (orderByExpressions != null) {
+      for (OrderByExpressionContext orderByExpression : orderByExpressions) {
+        FunctionContext function = orderByExpression.getExpression().getFunction();
+        if (function != null && function.getType() == FunctionContext.Type.AGGREGATION && functions.add(function)) {
+          aggregationFunctions.add(AggregationFunctionFactory.getAggregationFunction(function, queryContext));
+        }
       }
     }
     return aggregationFunctions.toArray(new AggregationFunction[0]);
