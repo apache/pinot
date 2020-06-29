@@ -38,6 +38,7 @@ export default Controller.extend({
   totalNumberOfAlerts: 0,
   user: reads('model.user'),
   rules: reads('model.rules'),
+  userMail: reads('model.userMail'),
 
   /**
    * Used to help display filter settings in page header
@@ -98,7 +99,7 @@ export default Controller.extend({
       const {
         originalAlerts,
         user
-      } = this.getProperties('originalAlerts', 'user');
+      } = this.getProperties('originalAlerts', 'userMail');
 
       return originalAlerts.filter(alert => alert.createdBy === user);
     }
@@ -343,7 +344,7 @@ export default Controller.extend({
         break;
       }
       case 'Alerts I own': {
-        paramsForAlerts['createdBy'] = this.get('user');
+        paramsForAlerts['createdBy'] = this.get('userMail');
         set(this, 'selectedGlobalFilter', [primaryFilter]);
         break;
       }

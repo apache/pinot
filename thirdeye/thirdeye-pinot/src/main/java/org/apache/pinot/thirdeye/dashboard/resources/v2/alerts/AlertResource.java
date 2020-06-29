@@ -52,6 +52,9 @@ public class AlertResource {
   /**
    * Search the alerts with result pagination. It will return record from No.(offset+1) to record No.(offset + limit).
    *
+   * The endpoint will return paginated results for alerts that pass all the filters. Within each filter option,
+   * the result only need to pass either one of them.
+   *
    * @param limit the returned result limit
    * @param offset the offset of the start position
    * @param applications the applications for the alerts
