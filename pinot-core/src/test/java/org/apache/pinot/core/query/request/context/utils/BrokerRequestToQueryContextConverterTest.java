@@ -334,6 +334,46 @@ public class BrokerRequestToQueryContextConverterTest {
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
     }
 
+    // Order by with aggregations not in selection
+    {
+      String sqlQuery =
+          "SELECT foobar, COUNT(*) FROM testTable GROUP BY foobar ORDER BY SUB(456, foo), foobar desc, COUNT(*) LIMIT 100";
+      QueryContext queryContext =
+          BrokerRequestToQueryContextConverter.convert(SQL_COMPILER.compileToBrokerRequest(sqlQuery));
+      List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+      assertEquals(selectExpressions.size(), 2);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("foobar"));
+      assertEquals(selectExpressions.get(0).toString(), "foobar");
+      assertEquals(selectExpressions.get(1), ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "count",
+              Collections.singletonList(ExpressionContext.forIdentifier("*")))));
+      assertEquals(selectExpressions.get(1).toString(), "count(*)");
+      assertTrue(queryContext.getAliasMap().isEmpty());
+      assertNull(queryContext.getFilter());
+      List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+      assertNotNull(groupByExpressions);
+      assertEquals(groupByExpressions.size(), 1);
+      assertEquals(groupByExpressions.get(0).toString(), "foobar");
+      List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+      assertNotNull(orderByExpressions);
+      assertEquals(orderByExpressions.size(), 3);
+      assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
+              Arrays.asList(ExpressionContext.forLiteral("456"), ExpressionContext.forIdentifier("foo")))), true));
+      assertEquals(orderByExpressions.get(0).toString(), "sub('456',foo) ASC");
+      assertEquals(orderByExpressions.get(1),
+          new OrderByExpressionContext(ExpressionContext.forIdentifier("foobar"), false));
+      assertEquals(orderByExpressions.get(1).toString(), "foobar DESC");
+      assertEquals(orderByExpressions.get(2), new OrderByExpressionContext(ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "count",
+              Collections.singletonList(ExpressionContext.forIdentifier("*")))), true));
+      assertEquals(orderByExpressions.get(2).toString(), "count(*) ASC");
+      assertNull(queryContext.getHavingFilter());
+      assertEquals(queryContext.getLimit(), 100);
+      assertEquals(QueryContextUtils.getAllColumns(queryContext), new HashSet<>(Arrays.asList("foo", "foobar")));
+      assertTrue(QueryContextUtils.isAggregationQuery(queryContext));
+    }
+
     // TODO: Uncomment the following part after CalciteSqlParser supports Having clause
     // Having (only supported in SQL format)
 //    {
