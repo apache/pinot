@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import com.google.common.collect.Lists;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -38,6 +39,8 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
@@ -748,6 +751,136 @@ public class CalciteSqlCompilerTest {
             .getIdentifier().getName(), "k1");
     Assert.assertEquals(
         pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getStringValue(), "v1");
+  }
+
+  @Test
+  public void testOrderByQueryCompilation() {
+    PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
+
+    // both group by and order by in selection
+    String sql = "SELECT foo, COUNT(*) FROM myTable GROUP BY foo ORDER BY foo";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    BrokerRequest brokerRequest = converter.convert(pinotQuery);
+    List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 1);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "*");
+    List<SelectionSort> orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 1);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "foo");
+
+    sql = "SELECT foo, COUNT(*) FROM myTable GROUP BY foo ORDER BY COUNT(*)";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 1);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "*");
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 1);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "count(*)");
+
+    sql = "SELECT foo FROM myTable GROUP BY foo ORDER BY foo";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    Assert.assertNull(brokerRequest.getAggregationsInfo());
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 1);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "foo");
+
+    // aggregation not provided in selection
+    sql = "SELECT foo FROM myTable GROUP BY foo ORDER BY COUNT(*)";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 1);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "*");
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 1);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "count(*)");
+
+    // group by not provided in selection
+    sql = "SELECT COUNT(*) FROM myTable GROUP BY foo ORDER BY foo";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 1);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "*");
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 1);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "foo");
+
+    sql = "SELECT COUNT(*) FROM myTable GROUP BY foo ORDER BY COUNT(*)";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 1);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "*");
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 1);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "count(*)");
+
+    // multiple aggregations, none provided in selection
+    sql = "SELECT foo FROM myTable GROUP BY foo ORDER BY COUNT(*), SUM(bar)";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 2);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "*");
+    Assert.assertEquals(aggregationInfos.get(1).getAggregationType(), AggregationFunctionType.SUM.toString());
+    Assert.assertEquals(aggregationInfos.get(1).getExpressions().get(0), "bar");
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 2);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "count(*)");
+    Assert.assertEquals(orderBy.get(1).getColumn(), "sum(bar)");
+
+    // multiple aggregations, some provided in selection
+    sql = "SELECT foo, SUM(bar) FROM myTable GROUP BY foo ORDER BY COUNT(*), SUM(bar)";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 2);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.SUM.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "bar");
+    Assert.assertEquals(aggregationInfos.get(1).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(1).getExpressions().get(0), "*");
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 2);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "count(*)");
+    Assert.assertEquals(orderBy.get(1).getColumn(), "sum(bar)");
+
+    // multiple aggregations, group by not provided in selection
+    sql = "SELECT SUM(bar) FROM myTable GROUP BY foo ORDER BY COUNT(*), SUM(bar)";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 2);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.SUM.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "bar");
+    Assert.assertEquals(aggregationInfos.get(1).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(1).getExpressions().get(0), "*");
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 2);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "count(*)");
+    Assert.assertEquals(orderBy.get(1).getColumn(), "sum(bar)");
+
+    sql = "SELECT SUM(bar), COUNT(*) FROM myTable GROUP BY foo ORDER BY COUNT(*), SUM(bar)";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    brokerRequest = converter.convert(pinotQuery);
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 2);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationType(), AggregationFunctionType.SUM.toString());
+    Assert.assertEquals(aggregationInfos.get(0).getExpressions().get(0), "bar");
+    Assert.assertEquals(aggregationInfos.get(1).getAggregationType(), AggregationFunctionType.COUNT.toString());
+    Assert.assertEquals(aggregationInfos.get(1).getExpressions().get(0), "*");
+    orderBy = brokerRequest.getOrderBy();
+    Assert.assertEquals(orderBy.size(), 2);
+    Assert.assertEquals(orderBy.get(0).getColumn(), "count(*)");
+    Assert.assertEquals(orderBy.get(1).getColumn(), "sum(bar)");
   }
 
   @Test
