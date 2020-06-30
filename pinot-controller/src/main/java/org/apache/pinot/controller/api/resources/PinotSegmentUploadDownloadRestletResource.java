@@ -313,7 +313,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       return out;
     }
 
-    if (isUploadedSegmentEncrypted && !crypterClassNameInTableConfig.equalsIgnoreCase(crypterUsedInUploadedSegment)) {
+    if (isUploadedSegmentEncrypted && !crypterClassNameInTableConfig.equals(crypterUsedInUploadedSegment)) {
       throw new ControllerApplicationException(LOGGER, String
           .format("Uploaded segment is encrypted with '%s' while table config requires '%s' as crypter "
                   + "(segment name = '%s', table name = '%s').", crypterUsedInUploadedSegment,
