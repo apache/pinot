@@ -18,13 +18,19 @@
  */
 package org.apache.pinot.client.utils;
 
+import com.ning.http.client.uri.Uri;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DriverUtils {
+  public static final String SCHEME = "jdbc";
+  public static final String DRIVER = "pinot";
+  public static final Logger LOG = LoggerFactory.getLogger(DriverUtils.class);
 
   private DriverUtils() {
   }
@@ -41,5 +47,17 @@ public class DriverUtils {
     String brokerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
     List<String> brokerList = Collections.singletonList(brokerUrl);
     return brokerList;
+  }
+
+  public static String getURIFromBrokers(List<String> brokers) {
+    try {
+      String broker = brokers.get(0);
+      String[] hostPort = broker.split(":");
+      URI uri = new URI(SCHEME + ":" + DRIVER, hostPort[0], hostPort[1]);
+      return uri.toString();
+    } catch (Exception e) {
+      LOG.warn("Broker list is either empty or has incorrect format", e);
+    }
+    return "";
   }
 }

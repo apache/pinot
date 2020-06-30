@@ -62,7 +62,8 @@ public abstract class AbstractBaseStatement implements Statement {
   @Override
   public boolean execute(String sql)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    ResultSet resultSet = executeQuery(sql);
+    return resultSet.next();
   }
 
   @Override

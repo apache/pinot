@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.collect.Iterables;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.Driver;
@@ -25,6 +26,7 @@ import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
@@ -40,6 +42,7 @@ public class PinotDriver implements Driver {
   public Connection connect(String url, Properties info)
       throws SQLException {
     try {
+      LOGGER.info("Initiating connection to database for url: " + url);
       PinotClientTransport pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
       List<String> brokerList = DriverUtils.getBrokersFromURL(url);
       return new PinotConnection(brokerList, pinotClientTransport);
@@ -60,7 +63,8 @@ public class PinotDriver implements Driver {
   @Override
   public DriverPropertyInfo[] getPropertyInfo(String url, Properties info)
       throws SQLException {
-    return new DriverPropertyInfo[0];
+    List<DriverPropertyInfo> propertyInfoList = new ArrayList<>();
+    return Iterables.toArray(propertyInfoList, DriverPropertyInfo.class);
   }
 
   @Override

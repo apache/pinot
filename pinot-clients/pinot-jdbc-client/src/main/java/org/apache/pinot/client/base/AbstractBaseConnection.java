@@ -37,6 +37,7 @@ import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import org.apache.pinot.client.PinotConnectionMetaData;
 
 
 public abstract class AbstractBaseConnection implements Connection {
@@ -164,12 +165,6 @@ public abstract class AbstractBaseConnection implements Connection {
   }
 
   @Override
-  public DatabaseMetaData getMetaData()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
   public int getNetworkTimeout()
       throws SQLException {
     throw new SQLFeatureNotSupportedException();
@@ -232,7 +227,7 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public boolean isValid(int timeout)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return !isClosed();
   }
 
   @Override

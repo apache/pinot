@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
@@ -81,5 +82,11 @@ public class PinotConnection extends AbstractBaseConnection {
   public boolean isClosed()
       throws SQLException {
     return (_session == null);
+  }
+
+  @Override
+  public DatabaseMetaData getMetaData()
+      throws SQLException {
+    return new PinotConnectionMetaData(this);
   }
 }
