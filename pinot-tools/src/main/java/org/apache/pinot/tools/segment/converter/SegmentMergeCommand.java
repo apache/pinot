@@ -195,12 +195,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
       MergeRollupSegmentConverter mergeRollupSegmentConverter =
           new MergeRollupSegmentConverter.Builder().setMergeType(MergeType.fromString(_mergeType))
-              .setSegmentName(_outputSegmentName)
-              .setInputIndexDirs(inputIndexDirs)
-              .setWorkingDir(workingDir)
-              .setTableName(tableName)
-              .setTableConfig(tableConfig)
-              .build();
+              .setSegmentName(_outputSegmentName).setInputIndexDirs(inputIndexDirs).setWorkingDir(workingDir)
+              .setTableName(tableName).setTableConfig(tableConfig).build();
 
       List<File> outputSegments = mergeRollupSegmentConverter.convert();
       Preconditions.checkState(outputSegments.size() == 1);

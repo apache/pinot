@@ -120,7 +120,7 @@ public class MergeRollupTaskExecutorTest {
       GenericRow row = new GenericRow();
       while (pinotSegmentRecordReader.hasNext()) {
         row = pinotSegmentRecordReader.next(row);
-        numRecords ++;
+        numRecords++;
       }
       Assert.assertEquals(numRecords, NUM_SEGMENTS * NUM_ROWS);
     }

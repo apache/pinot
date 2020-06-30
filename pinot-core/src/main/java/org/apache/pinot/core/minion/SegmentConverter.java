@@ -119,21 +119,19 @@ public class SegmentConverter {
       }
 
       // Sorting on sorted column and creating indices
-      if (_tableConfig != null) {
-        IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-        List<String> sortedColumn = indexingConfig.getSortedColumn();
-        List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
+      IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
+      List<String> sortedColumn = indexingConfig.getSortedColumn();
+      List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
 
-        // Check if the table config has any index configured
-        if (CollectionUtils.isNotEmpty(sortedColumn) || CollectionUtils.isNotEmpty(invertedIndexColumns)) {
-          String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
-          try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(outputSegment, null,
-              sortedColumn)) {
-            buildSegment(indexGenerationOutputPath, outputSegmentName, pinotSegmentRecordReader,
-                pinotSegmentRecordReader.getSchema(), _tableConfig);
-          }
-          outputSegment = new File(indexGenerationOutputPath + File.separator + outputSegmentName);
+      // Check if the table config has any index configured
+      if (CollectionUtils.isNotEmpty(sortedColumn) || CollectionUtils.isNotEmpty(invertedIndexColumns)) {
+        String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
+        try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(outputSegment, null,
+            sortedColumn)) {
+          buildSegment(indexGenerationOutputPath, outputSegmentName, pinotSegmentRecordReader,
+              pinotSegmentRecordReader.getSchema(), _tableConfig);
         }
+        outputSegment = new File(indexGenerationOutputPath + File.separator + outputSegmentName);
       }
 
       resultFiles.add(outputSegment);

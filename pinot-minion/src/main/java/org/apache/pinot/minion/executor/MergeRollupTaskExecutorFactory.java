@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.minion.executor;
 
-public class MergeRollupTaskExecutorFactory  implements PinotTaskExecutorFactory{
+public class MergeRollupTaskExecutorFactory implements PinotTaskExecutorFactory {
   @Override
   public PinotTaskExecutor create() {
     return new MergeRollupTaskExecutor();

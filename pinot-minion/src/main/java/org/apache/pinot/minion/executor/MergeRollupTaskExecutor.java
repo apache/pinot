@@ -40,14 +40,15 @@ import org.slf4j.LoggerFactory;
  * TODO:
  *   1. Add the support for roll-up
  *   2. Add the support for time split to provide backfill support for merged segments
- *   3. Change the way to decide the number of output segments (explicit numPartition config -> maxRumRowsPerSegment)
+ *   3. Change the way to decide the number of output segments (explicit numPartition config -> maxNumRowsPerSegment)
  */
 public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskExecutor.class);
 
   @Override
   protected List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> originalIndexDirs,
-      File workingDir) throws Exception {
+      File workingDir)
+      throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String mergeTypeString = configs.get(MinionConstants.MergeRollupTask.MERGE_TYPE_KEY);
     // TODO: add the support for rollup
@@ -63,22 +64,16 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
         ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableNameWithType);
 
     MergeRollupSegmentConverter rollupSegmentConverter =
-        new MergeRollupSegmentConverter.Builder().setMergeType(mergeType)
-            .setTableName(tableNameWithType)
-            .setSegmentName(mergedSegmentName)
-            .setInputIndexDirs(originalIndexDirs)
-            .setWorkingDir(workingDir)
-            .setTableConfig(tableConfig)
-            .build();
+        new MergeRollupSegmentConverter.Builder().setMergeType(mergeType).setTableName(tableNameWithType)
+            .setSegmentName(mergedSegmentName).setInputIndexDirs(originalIndexDirs).setWorkingDir(workingDir)
+            .setTableConfig(tableConfig).build();
 
     List<File> resultFiles = rollupSegmentConverter.convert();
     List<SegmentConversionResult> results = new ArrayList<>();
     for (File file : resultFiles) {
       String outputSegmentName = file.getName();
-      results.add(new SegmentConversionResult.Builder().setFile(file)
-          .setSegmentName(outputSegmentName)
-          .setTableNameWithType(tableNameWithType)
-          .build());
+      results.add(new SegmentConversionResult.Builder().setFile(file).setSegmentName(outputSegmentName)
+          .setTableNameWithType(tableNameWithType).build());
     }
     return results;
   }
