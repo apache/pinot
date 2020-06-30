@@ -1072,7 +1072,7 @@ public class SegmentCompletionManager {
       // store.
       // The exception is when the server uses the Peer segment download scheme, in such case, there is no need to
       // move the segment.
-      if (isSplitCommit && isPeerSegmentDownloadScheme(committingSegmentDescriptor)) {
+      if (isSplitCommit && !isPeerSegmentDownloadScheme(committingSegmentDescriptor)) {
         try {
           committingSegmentDescriptor.setSegmentLocation(
               _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor));
@@ -1098,7 +1098,7 @@ public class SegmentCompletionManager {
 
     private boolean isPeerSegmentDownloadScheme(CommittingSegmentDescriptor committingSegmentDescriptor) {
       return !(committingSegmentDescriptor == null) && !(committingSegmentDescriptor.getSegmentLocation() == null) &&
-          !committingSegmentDescriptor.getSegmentLocation().startsWith("peer");
+          committingSegmentDescriptor.getSegmentLocation().toLowerCase().startsWith("peer://");
     }
 
     private SegmentCompletionProtocol.Response processCommitWhileUploading(String instanceId,

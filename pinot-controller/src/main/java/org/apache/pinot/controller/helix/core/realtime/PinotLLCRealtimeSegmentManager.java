@@ -355,7 +355,7 @@ public class PinotLLCRealtimeSegmentManager {
    * This method moves the segment file from another location to its permanent location.
    * When splitCommit is enabled, segment file is uploaded to the segmentLocation in the committingSegmentDescriptor,
    * and we need to move the segment file to its permanent location before committing the segment metadata.
-   * Return the permanent location of the segment if succceed.
+   * Return the permanent location of the segment if the commit succeeds.
    */
   public String commitSegmentFile(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor)
       throws Exception {
@@ -487,7 +487,10 @@ public class PinotLLCRealtimeSegmentManager {
     // TODO Issue 5953 remove the long parsing once metadata is set correctly.
     committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
     committingSegmentZKMetadata.setStatus(Status.DONE);
-    committingSegmentZKMetadata.setDownloadUrl(committingSegmentDescriptor.getSegmentLocation());
+    // If the download url set by the server is a peer download url format with peer scheme, put an empty string in zk
+    // otherwise just use the location in the descriptor.
+    committingSegmentZKMetadata.setDownloadUrl(isPeerURL(committingSegmentDescriptor.getSegmentLocation()) ? ""
+        : committingSegmentDescriptor.getSegmentLocation());
     committingSegmentZKMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     committingSegmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
@@ -497,6 +500,10 @@ public class PinotLLCRealtimeSegmentManager {
 
     persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
     return committingSegmentZKMetadata;
+  }
+
+  private boolean isPeerURL(String segmentLocation) {
+    return segmentLocation != null && segmentLocation.toLowerCase().startsWith("peer://");
   }
 
   /**
