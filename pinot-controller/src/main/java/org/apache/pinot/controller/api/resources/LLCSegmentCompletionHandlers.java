@@ -319,6 +319,7 @@ public class LLCSegmentCompletionHandlers {
         }
         committingSegmentDescriptor =
             CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
+        committingSegmentDescriptor.setSegmentLocation(segmentFileURI.toString());
         success = true;
       } catch (Exception e) {
         LOGGER.error("Caught exception while committing segment: {} from instance: {}", segmentName, instanceId, e);
