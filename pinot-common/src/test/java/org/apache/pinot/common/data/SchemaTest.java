@@ -237,10 +237,10 @@ public class SchemaTest {
       throws Exception {
     TimeGranularitySpec incomingTimeGranularitySpec =
         new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS,
-            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "DateColumn");
     TimeGranularitySpec outgoingTimeGranularitySpec =
         new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS,
-            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "DateColumn");
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     String jsonSchema = schema.toSingleLineJsonString();

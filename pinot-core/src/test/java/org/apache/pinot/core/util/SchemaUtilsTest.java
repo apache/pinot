@@ -30,12 +30,12 @@ import org.testng.annotations.Test;
 
 
 /**
- * Tests that the source field names are extracted correctly
+ * Tests schema validations
  */
 public class SchemaUtilsTest {
 
   @Test
-  public void testValidate() {
+  public void testValidateTransformFunctionArguments() {
     Schema pinotSchema;
     // source name used as destination name
     pinotSchema = new Schema();
@@ -57,14 +57,18 @@ public class SchemaUtilsTest {
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
 
     pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), null).build();
-    pinotSchema.getFieldSpecFor("time").setTransformFunction("Groovy({function}, time)");
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "timeColumn"), null).build();
+    pinotSchema.getFieldSpecFor("timeColumn").setTransformFunction("Groovy({function}, timeColumn)");
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
+  }
 
+  @Test
+  public void testValidateTimeFieldSpec() {
+    Schema pinotSchema;
     // time field spec using same name for incoming and outgoing
     pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time")).build();
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "timeColumn"),
+            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "timeColumn")).build();
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
 
     // time field spec using SIMPLE_DATE_FORMAT, not allowed when conversion is needed
@@ -74,9 +78,18 @@ public class SchemaUtilsTest {
                 TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "outgoing")).build();
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
 
+    // valid time field spec
+    pinotSchema = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"), new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing")).build();
+    Assert.assertTrue(SchemaUtils.validate(pinotSchema));
+  }
+
+  @Test
+  public void testGroovyFunctionSyntax() {
+    Schema pinotSchema;
     // incorrect groovy function syntax
     pinotSchema = new Schema();
-    dimensionFieldSpec = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
+    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
     dimensionFieldSpec.setTransformFunction("Groovy(function, argument3)");
     pinotSchema.addField(dimensionFieldSpec);
     Assert.assertFalse(SchemaUtils.validate(pinotSchema));
@@ -92,16 +105,57 @@ public class SchemaUtilsTest {
     pinotSchema = new Schema.SchemaBuilder()
         .addSingleValueDimension("dim1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.LONG)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), null)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "t"), null)
         .build();
     pinotSchema.getFieldSpecFor("dim1").setTransformFunction("Groovy({function}, argument1, argument2, argument3)");
     pinotSchema.getFieldSpecFor("m1").setTransformFunction("Groovy({function}, m2, m3)");
-    pinotSchema.getFieldSpecFor("time").setTransformFunction("Groovy({function}, millis)");
+    pinotSchema.getFieldSpecFor("t").setTransformFunction("Groovy({function}, millis)");
     Assert.assertTrue(SchemaUtils.validate(pinotSchema));
+  }
 
-    // valid time field spec
-    pinotSchema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-            new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing")).build();
+  @Test
+  public void testValidateFieldName() {
+    // test some keywords which are not allowed by BABEL
+    Schema pinotSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("timestamp", FieldSpec.DataType.STRING, true).build();
+    Assert.assertFalse(SchemaUtils.validate(pinotSchema));
+
+    pinotSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("date", FieldSpec.DataType.STRING, true).build();
+    Assert.assertFalse(SchemaUtils.validate(pinotSchema));
+
+    pinotSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("time", FieldSpec.DataType.STRING, true).build();
+    Assert.assertFalse(SchemaUtils.validate(pinotSchema));
+
+    pinotSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("table", FieldSpec.DataType.STRING, true).build();
+    Assert.assertFalse(SchemaUtils.validate(pinotSchema));
+
+    // test keywords which would not have been allowed in a conformance level stricter than BABEL
+    pinotSchema =
+        new Schema.SchemaBuilder()
+            .addSingleValueDimension("count", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("language", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("value", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("system", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("position", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("module", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("dateTime", FieldSpec.DataType.STRING, true)
+            .build();
     Assert.assertTrue(SchemaUtils.validate(pinotSchema));
+  }
+
+  @Test
+  public void testDisableFieldNameValidation() {
+    Schema pinotSchema =
+        new Schema.SchemaBuilder()
+            .addSingleValueDimension("timestamp", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("date", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("time", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("table", FieldSpec.DataType.STRING, true)
+            .addSingleValueDimension("group", FieldSpec.DataType.STRING, true)
+            .build();
+    Assert.assertTrue(SchemaUtils.validate(pinotSchema, false, null));
   }
 }

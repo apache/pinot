@@ -176,6 +176,10 @@ public class ControllerRequestURLBuilder {
     return URIUtils.constructDownloadUrl(_baseUrl, tableName, segmentName);
   }
 
+  public String forSchemaValidate() {
+    return StringUtil.join("/", _baseUrl, "schemas/validate");
+  }
+
   public String forSegmentDelete(String resourceName, String segmentName) {
     return StringUtil.join("/", _baseUrl, "datafiles", resourceName, segmentName);
   }

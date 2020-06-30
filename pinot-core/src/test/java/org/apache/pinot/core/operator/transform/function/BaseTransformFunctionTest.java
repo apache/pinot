@@ -72,7 +72,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
   protected static final String INT_MV_COLUMN = "intMV";
-  protected static final String TIME_COLUMN = "time";
+  protected static final String TIME_COLUMN = "timeColumn";
   protected static final String JSON_COLUMN = "json";
   protected final int[] _intSVValues = new int[NUM_ROWS];
   protected final long[] _longSVValues = new long[NUM_ROWS];

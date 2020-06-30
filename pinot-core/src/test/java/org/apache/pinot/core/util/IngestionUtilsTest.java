@@ -87,10 +87,10 @@ public class IngestionUtilsTest {
     // Time field spec
     // only incoming
     schema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"), null).build();
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "timeColumn"), null).build();
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), schema));
     Assert.assertEquals(extract.size(), 1);
-    Assert.assertTrue(extract.contains("time"));
+    Assert.assertTrue(extract.contains("timeColumn"));
 
     // incoming and outgoing different column name
     schema = new Schema.SchemaBuilder()
@@ -103,30 +103,30 @@ public class IngestionUtilsTest {
     // inbuilt functions
     schema = new Schema();
     dimensionFieldSpec = new DimensionFieldSpec("hoursSinceEpoch", FieldSpec.DataType.LONG, true);
-    dimensionFieldSpec.setTransformFunction("toEpochHours(timestamp)");
+    dimensionFieldSpec.setTransformFunction("toEpochHours(timestampInEpoch)");
     schema.addField(dimensionFieldSpec);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), schema));
     Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Arrays.asList("timestamp", "hoursSinceEpoch")));
+    Assert.assertTrue(extract.containsAll(Arrays.asList("timestampInEpoch", "hoursSinceEpoch")));
 
     // inbuilt functions with literal
     schema = new Schema();
     dimensionFieldSpec = new DimensionFieldSpec("tenMinutesSinceEpoch", FieldSpec.DataType.LONG, true);
-    dimensionFieldSpec.setTransformFunction("toEpochMinutesBucket(timestamp, 10)");
+    dimensionFieldSpec.setTransformFunction("toEpochMinutesBucket(timestampInEpoch, 10)");
     schema.addField(dimensionFieldSpec);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), schema));
     Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestamp")));
+    Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestampInEpoch")));
 
     // inbuilt functions on DateTimeFieldSpec
     schema = new Schema();
     DateTimeFieldSpec dateTimeFieldSpec =
-        new DateTimeFieldSpec("date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS");
-    dateTimeFieldSpec.setTransformFunction("toDateTime(timestamp, 'yyyy-MM-dd')");
+        new DateTimeFieldSpec("dateTime", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS");
+    dateTimeFieldSpec.setTransformFunction("toDateTime(timestampInEpoch, 'yyyy-MM-dd')");
     schema.addField(dateTimeFieldSpec);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), schema));
     Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("date", "timestamp")));
+    Assert.assertTrue(extract.containsAll(Lists.newArrayList("dateTime", "timestampInEpoch")));
   }
 
   @Test

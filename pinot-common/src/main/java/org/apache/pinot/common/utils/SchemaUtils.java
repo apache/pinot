@@ -189,7 +189,7 @@ public class SchemaUtils {
   public static void main(String[] args) {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension("dimension", FieldSpec.DataType.DOUBLE).addMetric("metric", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "time"), null).build();
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "timeColumn"), null).build();
     System.out.println(postSchema("localhost", 8100, schema));
     Schema fetchedSchema = getSchema("localhost", 8100, "testSchema");
     Preconditions.checkNotNull(fetchedSchema);

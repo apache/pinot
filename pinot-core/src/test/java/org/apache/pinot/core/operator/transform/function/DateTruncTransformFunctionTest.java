@@ -60,9 +60,9 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.core.operator.transform.function.DateTruncTransformFunction.DateTimeZoneIndex.getDateTimeZone;
 import static org.apache.pinot.core.operator.transform.function.TimeZoneKey.UTC_KEY;
 
-
-public class DateTruncTransformFunctionTest {
-  private static final String TIME_COLUMN = "time";
+public class DateTruncTransformFunctionTest
+{
+  private static final String TIME_COLUMN = "timeColumn";
   private static final ZoneOffset WEIRD_ZONE = ZoneOffset.ofHoursMinutes(7, 9);
   private static final DateTimeZone WEIRD_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());
   private static final DateTime WEIRD_TIMESTAMP = new DateTime(2001, 8, 22, 3, 4, 5, 321, WEIRD_DATE_TIME_ZONE);

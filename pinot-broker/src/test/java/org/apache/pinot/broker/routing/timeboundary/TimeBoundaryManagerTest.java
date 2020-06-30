@@ -48,7 +48,7 @@ import static org.testng.Assert.assertNull;
 
 
 public class TimeBoundaryManagerTest {
-  private static final String TIME_COLUMN = "time";
+  private static final String TIME_COLUMN = "timeColumn";
 
   private ZkStarter.ZookeeperInstance _zkInstance;
   private ZkClient _zkClient;

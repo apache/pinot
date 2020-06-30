@@ -54,7 +54,7 @@ import org.testng.annotations.Test;
 
 public class SegmentGenerationWithTimeColumnTest {
   private static final String STRING_COL_NAME = "someString";
-  private static final String TIME_COL_NAME = "date";
+  private static final String TIME_COL_NAME = "dateColumn";
   private static final String TIME_COL_FORMAT = "yyyyMMdd";
   private static final String SEGMENT_DIR_NAME =
       System.getProperty("java.io.tmpdir") + File.separator + "segmentGenTest";

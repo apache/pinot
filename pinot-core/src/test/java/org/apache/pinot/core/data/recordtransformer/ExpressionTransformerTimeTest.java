@@ -63,28 +63,28 @@ public class ExpressionTransformerTimeTest {
 
     // 2] both incoming and outgoing defined - exactly the same - Doesn't create DefaultTimeFSpecEvaluator, incoming used as is.
     pinotSchema = new Schema.SchemaBuilder()
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time")).build();
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "timeColumn"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "timeColumn")).build();
 
     // correct value - use incoming
     expressionTransformer = new ExpressionTransformer(pinotSchema);
     genericRow = new GenericRow();
-    genericRow.putValue("time", validMillis);
+    genericRow.putValue("timeColumn", validMillis);
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("time"), validMillis);
+    Assert.assertEquals(genericRow.getValue("timeColumn"), validMillis);
 
     // incorrect value - use whatever is
     expressionTransformer = new ExpressionTransformer(pinotSchema);
     genericRow = new GenericRow();
-    genericRow.putValue("time", -1);
+    genericRow.putValue("timeColumn", -1);
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("time"), -1);
+    Assert.assertEquals(genericRow.getValue("timeColumn"), -1);
 
     // 3] both incoming and outgoing defined - same column name only - skip conversion - this shouldn't be allowed by validation during add schema
     try {
       pinotSchema = new Schema.SchemaBuilder()
-          .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "time"),
-              new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time")).build();
+          .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "timeColumn"),
+              new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "timeColumn")).build();
       new ExpressionTransformer(pinotSchema);
       Assert.fail();
     } catch (Exception e) {
@@ -163,11 +163,11 @@ public class ExpressionTransformerTimeTest {
     // 5] SIMPLE_DATE_FORMAT
     // When incoming and outgoing spec are the same, any time format should work
     pinotSchema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
-        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "time"), null).build();
+        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString(), "timeColumn"), null).build();
     expressionTransformer = new ExpressionTransformer(pinotSchema);
     genericRow = new GenericRow();
-    genericRow.putValue("time", 20180101);
+    genericRow.putValue("timeColumn", 20180101);
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("time"), 20180101);
+    Assert.assertEquals(genericRow.getValue("timeColumn"), 20180101);
   }
 }

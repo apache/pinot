@@ -25,6 +25,7 @@ import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
@@ -125,6 +126,55 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
     putMethod = sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName),
         schema.toSingleLineJsonString());
     Assert.assertEquals(putMethod.getStatusCode(), 400);
+  }
+
+  @Test
+  public void testValidationFlag()
+      throws IOException {
+    // create schema with invalid column - fails
+    String schemaName = "testSchema";
+    Schema schema = createDummySchema(schemaName);
+    String invalidFieldName = "timestamp";
+    schema.addField(new DimensionFieldSpec(invalidFieldName, FieldSpec.DataType.STRING, true));
+    String addUrl = _controllerRequestURLBuilder.forSchemaCreate();
+    PostMethod postMethod = sendMultipartPostRequest(addUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(postMethod.getStatusCode(), 400);
+
+    // disable field name validation - succeeds
+    addUrl = addUrl + "?validateFieldNames=false";
+    postMethod = sendMultipartPostRequest(addUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(postMethod.getStatusCode(), 200);
+
+    // verify schema contains invalid column
+    String schemaStr = sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(schemaName));
+    Schema readSchema = Schema.fromString(schemaStr);
+    Assert.assertTrue(readSchema.getFieldSpecMap().containsKey("timestamp"));
+
+    // update schema with invalid column - fails
+    schema.addField(new MetricFieldSpec("newMetric", FieldSpec.DataType.LONG));
+    String updateUrl = _controllerRequestURLBuilder.forSchemaUpdate(schemaName);
+    PutMethod putMethod = sendMultipartPutRequest(updateUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(putMethod.getStatusCode(), 400);
+
+    // disable field name validation before update - succeeds
+    updateUrl = updateUrl + "?validateFieldNames=false";
+    putMethod = sendMultipartPutRequest(updateUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(putMethod.getStatusCode(), 200);
+
+    // verify
+    schemaStr = sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(schemaName));
+    readSchema = Schema.fromString(schemaStr);
+    Assert.assertTrue(readSchema.getFieldSpecMap().containsKey("newMetric"));
+
+    // schema validation - fails
+    String validateUrl = _controllerRequestURLBuilder.forSchemaValidate();
+    postMethod = sendMultipartPostRequest(validateUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(postMethod.getStatusCode(), 400);
+
+    // disable field name validation - succeeds
+    validateUrl = validateUrl + "?validateFieldNames=false";
+    postMethod = sendMultipartPostRequest(validateUrl, schema.toSingleLineJsonString());
+    Assert.assertEquals(postMethod.getStatusCode(), 200);
   }
 
   @AfterClass

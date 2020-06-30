@@ -417,7 +417,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       }
     }
     // 2. We want to get the schema errors, if any, even if isValid is false;
-    if (!SchemaUtils.validate(schema, _logger)) {
+    if (!SchemaUtils.validate(schema, false, _logger)) {
       isValid = false;
     }
 

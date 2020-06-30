@@ -67,12 +67,12 @@ public class SegmentGeneratorConfigTest {
   @Test
   public void testSimpleDateFormat() {
     Schema schema = new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(FieldSpec.DataType.STRING, TimeUnit.DAYS,
-        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date"), null).build();
+        TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "DateColumn"), null).build();
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("Date").build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("DateColumn").build();
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    assertEquals(segmentGeneratorConfig.getTimeColumnName(), "Date");
+    assertEquals(segmentGeneratorConfig.getTimeColumnName(), "DateColumn");
     assertEquals(segmentGeneratorConfig.getTimeColumnType(), SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE);
     assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
     assertEquals(segmentGeneratorConfig.getSimpleDateFormat(), "yyyyMMdd");
@@ -85,10 +85,10 @@ public class SegmentGeneratorConfigTest {
     assertNull(segmentGeneratorConfig.getSimpleDateFormat());
 
     schema = new Schema.SchemaBuilder()
-        .addDateTime("Date", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS").build();
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("Date").build();
+        .addDateTime("DateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS").build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName("DateColumn").build();
     segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    assertEquals(segmentGeneratorConfig.getTimeColumnName(), "Date");
+    assertEquals(segmentGeneratorConfig.getTimeColumnName(), "DateColumn");
     assertEquals(segmentGeneratorConfig.getTimeColumnType(), SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE);
     assertNull(segmentGeneratorConfig.getSegmentTimeUnit());
     assertEquals(segmentGeneratorConfig.getSimpleDateFormat(), "yyyyMMdd");

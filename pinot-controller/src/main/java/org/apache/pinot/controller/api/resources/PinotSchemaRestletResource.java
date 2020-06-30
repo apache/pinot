@@ -122,8 +122,9 @@ public class PinotSchemaRestletResource {
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
+      @ApiParam(value = "Validate field names. Disable this to force update of schema w/ invalid field names") @DefaultValue("true") @QueryParam("validateFieldNames") boolean validateFieldNames,
       FormDataMultiPart multiPart) {
-    return updateSchema(schemaName, getSchemaFromMultiPart(multiPart), reload);
+    return updateSchema(schemaName, getSchemaFromMultiPart(multiPart), reload, validateFieldNames);
   }
 
   @PUT
@@ -135,8 +136,9 @@ public class PinotSchemaRestletResource {
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
+      @ApiParam(value = "Validate field names. Disable this to force update of schema w/ invalid field names") @DefaultValue("true") @QueryParam("validateFieldNames") boolean validateFieldNames,
       Schema schema) {
-    return updateSchema(schemaName, schema, reload);
+    return updateSchema(schemaName, schema, reload, validateFieldNames);
   }
 
   @POST
@@ -146,8 +148,9 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
+      @ApiParam(value = "Validate field names. Disable this to force addition of schema w/ invalid field names") @DefaultValue("true") @QueryParam("validateFieldNames") boolean validateFieldNames,
       FormDataMultiPart multiPart) {
-    return addSchema(getSchemaFromMultiPart(multiPart), override);
+    return addSchema(getSchemaFromMultiPart(multiPart), override, validateFieldNames);
   }
 
   @POST
@@ -158,8 +161,9 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
+      @ApiParam(value = "Validate field names. Disable this to force addition of schema w/ invalid field names") @DefaultValue("true") @QueryParam("validateFieldNames") boolean validateFieldNames,
       Schema schema) {
-    return addSchema(schema, override);
+    return addSchema(schema, override, validateFieldNames);
   }
 
   @POST
@@ -167,10 +171,14 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/validate")
   @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public String validateSchema(FormDataMultiPart multiPart) {
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")})
+  public String validateSchema(
+      @ApiParam(value = "Validate field names. Disable this to force validation of schema w/ invalid field names") @DefaultValue("true") @QueryParam("validateFieldNames") boolean validateFieldNames,
+      FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
-    if (!SchemaUtils.validate(schema, LOGGER)) {
+    if (!SchemaUtils.validate(schema, validateFieldNames, LOGGER)) {
       throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
           Response.Status.BAD_REQUEST);
     }
@@ -184,8 +192,10 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public String validateSchema(Schema schema) {
-    if (!SchemaUtils.validate(schema, LOGGER)) {
+  public String validateSchema(
+      @ApiParam(value = "Validate field names. Disable this to force validation of schema w/ invalid field names") @DefaultValue("true") @QueryParam("validateFieldNames") boolean validateFieldNames,
+      Schema schema) {
+    if (!SchemaUtils.validate(schema, validateFieldNames, LOGGER)) {
       throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
           Response.Status.BAD_REQUEST);
     }
@@ -198,8 +208,8 @@ public class PinotSchemaRestletResource {
    * @param override  set to true to override the existing schema with the same name
    * @return
    */
-  private SuccessResponse addSchema(Schema schema, boolean override) {
-    if (!SchemaUtils.validate(schema, LOGGER)) {
+  private SuccessResponse addSchema(Schema schema, boolean override, boolean validateFieldNames) {
+    if (!SchemaUtils.validate(schema, validateFieldNames, LOGGER)) {
       throw new ControllerApplicationException(LOGGER, "Cannot add invalid schema " + schema.getSchemaName(),
           Response.Status.BAD_REQUEST);
     }
@@ -226,8 +236,8 @@ public class PinotSchemaRestletResource {
    * @param reload  set to true to reload the tables using the schema, so committed segments can pick up the new schema
    * @return
    */
-  private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload) {
-    if (!SchemaUtils.validate(schema, LOGGER)) {
+  private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload, boolean validateFieldNames) {
+    if (!SchemaUtils.validate(schema, validateFieldNames, LOGGER)) {
       throw new ControllerApplicationException(LOGGER, "Cannot add invalid schema: " + schemaName,
           Response.Status.BAD_REQUEST);
     }
