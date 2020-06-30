@@ -55,6 +55,8 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -216,7 +218,6 @@ public class PinotSegmentUploadDownloadRestletResource {
         decryptFile(crypterClassNameInHeader, tempEncryptedFile, tempDecryptedFile);
       }
 
-      // TODO: Change when metadata upload added
       String metadataProviderClass = DefaultMetadataExtractor.class.getName();
       SegmentMetadata segmentMetadata = getSegmentMetadata(tempDecryptedFile, tempSegmentDir, metadataProviderClass);
 
@@ -248,14 +249,12 @@ public class PinotSegmentUploadDownloadRestletResource {
       // Encrypt segment
       String crypterClassNameInTableConfig =
           _pinotHelixResourceManager.getCrypterClassNameFromTableConfig(offlineTableName);
-      boolean segmentGotEncrypted =
-          encryptSegmentIfNeeded(offlineTableName, tempDecryptedFile, tempEncryptedFile, uploadedSegmentIsEncrypted,
-              crypterClassNameInHeader, crypterClassNameInTableConfig);
+      Pair<String, File> encryptionInfo =
+          encryptSegmentIfNeeded(tempDecryptedFile, tempEncryptedFile, uploadedSegmentIsEncrypted,
+              crypterClassNameInHeader, crypterClassNameInTableConfig, segmentName, tableName);
 
-      String crypterClassName = Strings.isNullOrEmpty(crypterClassNameInTableConfig) ? crypterClassNameInHeader
-          : crypterClassNameInTableConfig;
-      File finalSegmentFile =
-          (uploadedSegmentIsEncrypted || segmentGotEncrypted) ? tempEncryptedFile : tempDecryptedFile;
+      String crypterClassName = encryptionInfo.getLeft();
+      File finalSegmentFile = encryptionInfo.getRight();
 
       // ZK download URI
       String zkDownloadUri;
@@ -297,32 +296,37 @@ public class PinotSegmentUploadDownloadRestletResource {
     return value;
   }
 
-  private Boolean encryptSegmentIfNeeded(String offlineTableName, File tempDecryptedFile, File tempEncryptedFile,
-      boolean uploadedSegmentIsEncrypted, String crypterUsedInUploadedSegment, String crypterClassNameInTableConfig) {
+  Pair<String, File> encryptSegmentIfNeeded(File tempDecryptedFile, File tempEncryptedFile,
+      boolean isUploadedSegmentEncrypted, String crypterUsedInUploadedSegment, String crypterClassNameInTableConfig,
+      String segmentName, String tableName) {
 
     boolean segmentNeedsEncryption = !Strings.isNullOrEmpty(crypterClassNameInTableConfig);
+
+    // form the output
+    File finalSegmentFile =
+        (isUploadedSegmentEncrypted || segmentNeedsEncryption) ? tempEncryptedFile : tempDecryptedFile;
+    String crypterClassName = Strings.isNullOrEmpty(crypterClassNameInTableConfig) ? crypterUsedInUploadedSegment
+        : crypterClassNameInTableConfig;
+    ImmutablePair<String, File> out = ImmutablePair.of(crypterClassName, finalSegmentFile);
+
     if (!segmentNeedsEncryption) {
-      // do nothing
-      return false;
+      return out;
     }
 
-    if (uploadedSegmentIsEncrypted) {
-      if (!crypterClassNameInTableConfig.equalsIgnoreCase(crypterUsedInUploadedSegment)) {
-        throw new ControllerApplicationException(LOGGER, String
-            .format("Uploaded segment is encrypted with '%s' while table config requires '%s' as crypter",
-                crypterUsedInUploadedSegment, crypterClassNameInTableConfig), Response.Status.INTERNAL_SERVER_ERROR);
-      }
-      // do nothing
-      return false;
+    if (isUploadedSegmentEncrypted && !crypterClassNameInTableConfig.equalsIgnoreCase(crypterUsedInUploadedSegment)) {
+      throw new ControllerApplicationException(LOGGER, String
+          .format("Uploaded segment is encrypted with '%s' while table config requires '%s' as crypter "
+                  + "(segment name = '%s', table name = '%s').", crypterUsedInUploadedSegment,
+              crypterClassNameInTableConfig, segmentName, tableName), Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     // encrypt segment
     PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassNameInTableConfig);
-    LOGGER.info("Using crypter class {} for encrypting {} to {}.", pinotCrypter.getClass().getName(), tempDecryptedFile,
+    LOGGER.info("Using crypter class {} for encrypting {} to {}.", crypterClassNameInTableConfig, tempDecryptedFile,
         tempEncryptedFile);
     pinotCrypter.encrypt(tempDecryptedFile, tempEncryptedFile);
 
-    return true;
+    return out;
   }
 
   private String getZkDownloadURIForSegmentUpload(String rawTableName, String segmentName) {
