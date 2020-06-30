@@ -257,7 +257,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     FileUtils.deleteQuietly(tempIndexDir);
 
     // Convert segment format if necessary
-    convertFormatIfNeeded(segmentOutputDir);
+    convertFormatIfNecessary(segmentOutputDir);
 
     // Build star-tree V2 if necessary
     buildStarTreeV2IfNecessary(segmentOutputDir);
@@ -316,7 +316,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   // Using converter is similar to option (2), plus it's battle-tested code. We will roll out with
   // this change to keep changes limited. Once we've migrated we can implement approach (1) with option to
   // copy for indexes for which we don't know sizes upfront.
-  private void convertFormatIfNeeded(File segmentDirectory)
+  private void convertFormatIfNecessary(File segmentDirectory)
       throws Exception {
     SegmentVersion versionToGenerate = config.getSegmentVersion();
     if (versionToGenerate.equals(SegmentVersion.v1)) {

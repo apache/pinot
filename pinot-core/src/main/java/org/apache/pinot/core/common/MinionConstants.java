@@ -55,4 +55,10 @@ public class MinionConstants {
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";
   }
+
+  public static class MergeRollupTask {
+    public static final String TASK_TYPE = "mergeRollupTask";
+    public static final String MERGE_TYPE_KEY = "mergeTypeKey";
+    public static final String MERGED_SEGMENT_NAME_KEY = "mergedSegmentNameKey";
+  }
 }
