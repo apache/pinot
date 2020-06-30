@@ -131,11 +131,9 @@ public class TableConfigUtils {
       ingestionConfig = JsonUtils.stringToObject(ingestionConfigString, IngestionConfig.class);
     }
 
-    String crypterClassName = simpleFields.get(TableConfig.CRYPTER_CLASS_NAME_KEY);
-
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
-        upsertConfig, ingestionConfig, crypterClassName);
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
+        ingestionConfig);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -185,10 +183,6 @@ public class TableConfigUtils {
     if (ingestionConfig != null) {
       simpleFields.put(TableConfig.INGESTION_CONFIG_KEY, JsonUtils.objectToString(ingestionConfig));
     }
-    String crypterClassName = tableConfig.getCrypterClassName();
-    if (crypterClassName != null) {
-      simpleFields.put(TableConfig.CRYPTER_CLASS_NAME_KEY, crypterClassName);
-    }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
     znRecord.setSimpleFields(simpleFields);
@@ -234,8 +228,10 @@ public class TableConfigUtils {
       }
       String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
       if (peerSegmentDownloadScheme != null) {
-        if (!"http".equalsIgnoreCase(peerSegmentDownloadScheme) && !"https".equalsIgnoreCase(peerSegmentDownloadScheme)) {
-          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme + "' for peerSegmentDownloadScheme. Must be one of http nor https" );
+        if (!"http".equalsIgnoreCase(peerSegmentDownloadScheme) && !"https"
+            .equalsIgnoreCase(peerSegmentDownloadScheme)) {
+          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
+              + "' for peerSegmentDownloadScheme. Must be one of http nor https");
         }
       }
     }

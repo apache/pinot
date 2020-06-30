@@ -248,8 +248,10 @@ public class TableConfigSerDeTest {
     {
       // with SegmentsValidationAndRetentionConfig
       TableConfig tableConfig = tableConfigBuilder.setPeerSegmentDownloadScheme("http").build();
-      checkSegmentsValidationAndRetentionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkSegmentsValidationAndRetentionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+      checkSegmentsValidationAndRetentionConfig(
+          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkSegmentsValidationAndRetentionConfig(
+          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
     {
       // With ingestion config
@@ -266,14 +268,6 @@ public class TableConfigSerDeTest {
       tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkIngestionConfig(tableConfigToCompare);
-    }
-    {
-      // with crypter class name
-      TableConfig origTableConfig = tableConfigBuilder.setCrypterClassName("AdvancedCrypter").build();
-      TableConfig serDeTableConfig = JsonUtils.stringToObject(origTableConfig.toJsonString(), TableConfig.class);
-      assertEquals(serDeTableConfig.getCrypterClassName(), "AdvancedCrypter");
-      serDeTableConfig = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(origTableConfig));
-      assertEquals(serDeTableConfig.getCrypterClassName(), "AdvancedCrypter");
     }
   }
 

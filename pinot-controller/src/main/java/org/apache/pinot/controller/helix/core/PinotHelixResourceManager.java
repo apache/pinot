@@ -467,7 +467,7 @@ public class PinotHelixResourceManager {
   public String getCrypterClassNameFromTableConfig(String tableName) {
     TableConfig tableConfig = _tableCache.getTableConfig(tableName);
     Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableName);
-    return tableConfig.getCrypterClassName();
+    return tableConfig.getValidationConfig().getCrypterClassName();
   }
 
   /**

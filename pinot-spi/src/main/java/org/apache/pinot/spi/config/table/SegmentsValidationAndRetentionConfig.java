@@ -39,6 +39,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _segmentAssignmentStrategy;
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
+  private String _crypterClassName;
   // Possible values can be http or https. If this field is set, a Pinot server can download segments from peer servers
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
   // For more usage of this field, please refer to this design doc:
@@ -158,9 +159,19 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     return Integer.parseInt(_replicasPerPartition);
   }
 
-  public String getPeerSegmentDownloadScheme() { return _peerSegmentDownloadScheme; }
+  public String getPeerSegmentDownloadScheme() {
+    return _peerSegmentDownloadScheme;
+  }
 
   public void setPeerSegmentDownloadScheme(String peerSegmentDownloadScheme) {
     _peerSegmentDownloadScheme = peerSegmentDownloadScheme;
+  }
+
+  public String getCrypterClassName() {
+    return _crypterClassName;
+  }
+
+  public void setCrypterClassName(String crypterClassName) {
+    _crypterClassName = crypterClassName;
   }
 }
