@@ -19,174 +19,91 @@
 package org.apache.pinot.index.reader;
 
 import java.io.File;
-import java.io.RandomAccessFile;
-import java.lang.reflect.Constructor;
+import java.io.IOException;
 import java.util.Random;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
-import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.io.reader.impl.FixedBitMVForwardIndexReader;
-import org.apache.pinot.core.io.writer.ForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.FixedBitMVForwardIndexWriter;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class FixedBitMVForwardIndexTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FixedBitMVForwardIndexTest");
+  private static final File INDEX_FILE =
+      new File(TEMP_DIR, "testColumn" + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+  private static final int NUM_DOCS = 100;
+  private static final int MAX_NUM_VALUES_PER_MV_ENTRY = 100;
+  private static final Random RANDOM = new Random();
+
+  @BeforeClass
+  public void setUp()
+      throws IOException {
+    FileUtils.forceMkdir(TEMP_DIR);
+  }
 
   @Test
-  public void testSingleColMultiValue()
+  public void testFixedBitMVForwardIndex()
       throws Exception {
-    testSingleColMultiValue(FixedBitMVForwardIndexWriter.class, FixedBitMVForwardIndexReader.class);
-    testSingleColMultiValueWithContext(FixedBitMVForwardIndexWriter.class, FixedBitMVForwardIndexReader.class);
-  }
-
-  public void testSingleColMultiValue(Class<? extends ForwardIndexWriter> writerClazz,
-      Class<? extends ForwardIndexReader<?>> readerClazz)
-      throws Exception {
-    Constructor<? extends ForwardIndexWriter> writerClazzConstructor =
-        writerClazz.getConstructor(File.class, int.class, int.class, int.class);
-    Constructor<? extends ForwardIndexReader<?>> readerClazzConstructor =
-        readerClazz.getConstructor(PinotDataBuffer.class, int.class, int.class, int.class);
-    int maxBits = 1;
-    while (maxBits < 32) {
-      final String fileName = getClass().getName() + "_test_single_col_mv_fixed_bit.dat";
-      final File f = new File(fileName);
-      f.delete();
-      int numDocs = 10;
-      int maxNumValues = 100;
-      final int[][] data = new int[numDocs][];
-      final Random r = new Random();
-      final int maxValue = (int) Math.pow(2, maxBits);
+    for (int numBitsPerValue = 1; numBitsPerValue <= 31; numBitsPerValue++) {
+      // Generate random values
+      int[][] valuesArray = new int[NUM_DOCS][];
       int totalNumValues = 0;
-      int[] startOffsets = new int[numDocs];
-      int[] lengths = new int[numDocs];
-      for (int i = 0; i < data.length; i++) {
-        final int numValues = r.nextInt(maxNumValues) + 1;
-        data[i] = new int[numValues];
+      int maxValue = numBitsPerValue != 31 ? 1 << numBitsPerValue : Integer.MAX_VALUE;
+      for (int i = 0; i < NUM_DOCS; i++) {
+        int numValues = RANDOM.nextInt(MAX_NUM_VALUES_PER_MV_ENTRY) + 1;
+        int[] values = new int[numValues];
         for (int j = 0; j < numValues; j++) {
-          data[i][j] = r.nextInt(maxValue);
+          values[j] = RANDOM.nextInt(maxValue);
         }
-        startOffsets[i] = totalNumValues;
-        lengths[i] = numValues;
-        totalNumValues = totalNumValues + numValues;
+        valuesArray[i] = values;
+        totalNumValues += numValues;
       }
 
-      ForwardIndexWriter writer = writerClazzConstructor.newInstance(f, numDocs, totalNumValues, maxBits);
-
-      for (int i = 0; i < data.length; i++) {
-        writer.setIntArray(i, data[i]);
+      // Create the forward index
+      try (FixedBitMVForwardIndexWriter writer = new FixedBitMVForwardIndexWriter(INDEX_FILE, NUM_DOCS, totalNumValues,
+          numBitsPerValue)) {
+        for (int[] values : valuesArray) {
+          writer.putIntArray(values);
+        }
       }
-      writer.close();
 
-      final RandomAccessFile raf = new RandomAccessFile(f, "rw");
-      raf.close();
+      // Read the forward index
+      try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
+          FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues,
+              numBitsPerValue)) {
+        int[] valueBuffer = new int[MAX_NUM_VALUES_PER_MV_ENTRY];
 
-      int[] readValues = new int[maxNumValues];
-
-      // Test heap mode
-      try (ForwardIndexReader<?> heapReader = readerClazzConstructor
-          .newInstance(PinotDataBuffer.loadBigEndianFile(f), numDocs, totalNumValues, maxBits)) {
-        for (int i = 0; i < data.length; i++) {
-          final int numValues = heapReader.getIntArray(i, readValues);
-          Assert.assertEquals(numValues, data[i].length);
+        // Read without context
+        for (int i = 0; i < NUM_DOCS; i++) {
+          int numValues = reader.getIntArray(i, valueBuffer);
           for (int j = 0; j < numValues; j++) {
-            Assert.assertEquals(readValues[j], data[i][j]);
+            assertEquals(valueBuffer[j], valuesArray[i][j]);
+          }
+        }
+
+        // Read with context
+        FixedBitMVForwardIndexReader.Context context = reader.createContext();
+        for (int i = 0; i < NUM_DOCS; i++) {
+          int numValues = reader.getIntArray(i, valueBuffer, context);
+          for (int j = 0; j < numValues; j++) {
+            assertEquals(valueBuffer[j], valuesArray[i][j]);
           }
         }
       }
 
-      // Test mmap mode
-      try (ForwardIndexReader<?> mmapReader = readerClazzConstructor
-          .newInstance(PinotDataBuffer.mapReadOnlyBigEndianFile(f), numDocs, totalNumValues, maxBits)) {
-        for (int i = 0; i < data.length; i++) {
-          final int numValues = mmapReader.getIntArray(i, readValues);
-          Assert.assertEquals(numValues, data[i].length);
-          for (int j = 0; j < numValues; j++) {
-            Assert.assertEquals(readValues[j], data[i][j]);
-          }
-        }
-      }
-
-      f.delete();
-      maxBits = maxBits + 1;
+      FileUtils.forceDelete(INDEX_FILE);
     }
   }
 
-  public void testSingleColMultiValueWithContext(Class<? extends ForwardIndexWriter> writerClazz,
-      Class<? extends ForwardIndexReader<?>> readerClazz)
-      throws Exception {
-    Constructor<? extends ForwardIndexWriter> writerClazzConstructor =
-        writerClazz.getConstructor(File.class, int.class, int.class, int.class);
-    Constructor<? extends ForwardIndexReader<?>> readerClazzConstructor =
-        readerClazz.getConstructor(PinotDataBuffer.class, int.class, int.class, int.class);
-    int maxBits = 1;
-    while (maxBits < 32) {
-      final String fileName = getClass().getName() + "_test_single_col_mv_fixed_bit.dat";
-      final File f = new File(fileName);
-      f.delete();
-      int numDocs = 10;
-      int maxNumValues = 100;
-      final int[][] data = new int[numDocs][];
-      final Random r = new Random();
-      final int maxValue = (int) Math.pow(2, maxBits);
-      int totalNumValues = 0;
-      int[] startOffsets = new int[numDocs];
-      int[] lengths = new int[numDocs];
-      for (int i = 0; i < data.length; i++) {
-        final int numValues = r.nextInt(maxNumValues) + 1;
-        data[i] = new int[numValues];
-        for (int j = 0; j < numValues; j++) {
-          data[i][j] = r.nextInt(maxValue);
-        }
-        startOffsets[i] = totalNumValues;
-        lengths[i] = numValues;
-        totalNumValues = totalNumValues + numValues;
-      }
-
-      ForwardIndexWriter writer = writerClazzConstructor.newInstance(f, numDocs, totalNumValues, maxBits);
-
-      for (int i = 0; i < data.length; i++) {
-        writer.setIntArray(i, data[i]);
-      }
-      writer.close();
-
-      final RandomAccessFile raf = new RandomAccessFile(f, "rw");
-      raf.close();
-
-      int[] readValues = new int[maxNumValues];
-
-      // Test heap mode
-      try (ForwardIndexReader heapReader = readerClazzConstructor
-          .newInstance(PinotDataBuffer.loadBigEndianFile(f), numDocs, totalNumValues, maxBits)) {
-        ReaderContext context = heapReader.createContext();
-        for (int i = 0; i < data.length; i++) {
-          final int numValues = heapReader.getIntArray(i, readValues, context);
-          if (numValues != data[i].length) {
-            System.err.println("Failed Expected:" + data[i].length + " Actual:" + numValues);
-            int length = heapReader.getIntArray(i, readValues, context);
-          }
-          Assert.assertEquals(numValues, data[i].length);
-          for (int j = 0; j < numValues; j++) {
-            Assert.assertEquals(readValues[j], data[i][j]);
-          }
-        }
-      }
-
-      // Test mmap mode
-      try (ForwardIndexReader<?> mmapReader = readerClazzConstructor
-          .newInstance(PinotDataBuffer.mapReadOnlyBigEndianFile(f), numDocs, totalNumValues, maxBits)) {
-        for (int i = 0; i < data.length; i++) {
-          final int numValues = mmapReader.getIntArray(i, readValues);
-          Assert.assertEquals(numValues, data[i].length);
-          for (int j = 0; j < numValues; j++) {
-            Assert.assertEquals(readValues[j], data[i][j]);
-          }
-        }
-      }
-
-      f.delete();
-      maxBits = maxBits + 1;
-    }
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

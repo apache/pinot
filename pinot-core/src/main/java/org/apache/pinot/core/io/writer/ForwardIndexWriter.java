@@ -23,6 +23,7 @@ import java.io.Closeable;
 
 /**
  * Interface for forward index writer.
+ * <p>TODO: Remove this interface and merge the writer implementations into the ForwardIndexCreator implementations.
  */
 public interface ForwardIndexWriter extends Closeable {
 
@@ -31,63 +32,57 @@ public interface ForwardIndexWriter extends Closeable {
    */
 
   /**
-   * Writes the INT type single-value into the given document id.
+   * Writes the next INT type single-value into the forward index.
    * <p>NOTE: Dictionary id is handled as INT type.
    *
-   * @param docId Document id
    * @param value Value to write
    */
-  default void setInt(int docId, int value) {
+  default void putInt(int value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the LONG type single-value into the given document id.
+   * Writes the next LONG type single-value into the forward index.
    *
-   * @param docId Document id
    * @param value Value to write
    */
-  default void setLong(int docId, long value) {
+  default void putLong(long value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the FLOAT type single-value into the given document id.
+   * Writes the next FLOAT type single-value into the forward index.
    *
-   * @param docId Document id
    * @param value Value to write
    */
-  default void setFloat(int docId, float value) {
+  default void putFloat(float value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the DOUBLE type single-value into the given document id.
+   * Writes the next DOUBLE type single-value into the forward index.
    *
-   * @param docId Document id
    * @param value Value to write
    */
-  default void setDouble(int docId, double value) {
+  default void putDouble(double value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the STRING type single-value into the given document id.
+   * Writes the next STRING type single-value into the forward index.
    *
-   * @param docId Document id
    * @param value Value to write
    */
-  default void setString(int docId, String value) {
+  default void putString(String value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the BYTES type single-value into the given document id.
+   * Writes the next BYTES type single-value into the forward index.
    *
-   * @param docId Document id
    * @param value Value to write
    */
-  default void setBytes(int docId, byte[] value) {
+  default void putBytes(byte[] value) {
     throw new UnsupportedOperationException();
   }
 
@@ -96,53 +91,48 @@ public interface ForwardIndexWriter extends Closeable {
    */
 
   /**
-   * Writes the INT type multi-value from the given int array into the given document id.
+   * Writes the next INT type multi-value from the given int array into the forward index.
    * <p>NOTE: Dictionary id is handled as INT type.
    *
-   * @param docId Document id
    * @param intArray Array containing the values to write
    */
-  default void setIntArray(int docId, int[] intArray) {
+  default void putIntArray(int[] intArray) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the LONG type multi-value from the given long array into the given document id.
+   * Writes the next LONG type multi-value from the given long array into the forward index.
    *
-   * @param docId Document id
    * @param longArray Array containing the values to write
    */
-  default void setLongArray(int docId, long[] longArray) {
+  default void putLongArray(long[] longArray) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the FLOAT type multi-value from the given float array into the given document id.
+   * Writes the next FLOAT type multi-value from the given float array into the forward index.
    *
-   * @param docId Document id
    * @param floatArray Array containing the values to write
    */
-  default void setFloatArray(int docId, float[] floatArray) {
+  default void putFloatArray(float[] floatArray) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the DOUBLE type multi-value from the given double array into the given document id.
+   * Writes the next DOUBLE type multi-value from the given double array into the forward index.
    *
-   * @param docId Document id
    * @param doubleArray Array containing the values to write
    */
-  default void setDoubleArray(int docId, double[] doubleArray) {
+  default void putDoubleArray(double[] doubleArray) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Writes the STRING type multi-value from the given String array into the given document id.
+   * Writes the next STRING type multi-value from the given String array into the forward index.
    *
-   * @param docId Document id
    * @param stringArray Array containing the values to write
    */
-  default void setStringArray(int docId, String[] stringArray) {
+  default void putStringArray(String[] stringArray) {
     throw new UnsupportedOperationException();
   }
 }

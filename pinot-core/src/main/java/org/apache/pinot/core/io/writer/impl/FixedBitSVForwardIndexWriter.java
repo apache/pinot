@@ -34,18 +34,20 @@ public class FixedBitSVForwardIndexWriter implements ForwardIndexWriter {
   private final PinotDataBuffer _dataBuffer;
   private final FixedBitIntReaderWriter _intReaderWriter;
 
-  public FixedBitSVForwardIndexWriter(File file, int rows, int columnSizeInBits)
+  private int _nextDocId = 0;
+
+  public FixedBitSVForwardIndexWriter(File file, int numDocs, int numBitsPerValue)
       throws Exception {
     // Convert to long in order to avoid int overflow
-    long length = ((long) rows * columnSizeInBits + Byte.SIZE - 1) / Byte.SIZE;
+    long length = ((long) numDocs * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE;
     // Backward-compatible: index file is always big-endian
     _dataBuffer = PinotDataBuffer.mapFile(file, false, 0, length, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
-    _intReaderWriter = new FixedBitIntReaderWriter(_dataBuffer, rows, columnSizeInBits);
+    _intReaderWriter = new FixedBitIntReaderWriter(_dataBuffer, numDocs, numBitsPerValue);
   }
 
   @Override
-  public void setInt(int docId, int value) {
-    _intReaderWriter.writeInt(docId, value);
+  public void putInt(int value) {
+    _intReaderWriter.writeInt(_nextDocId++, value);
   }
 
   @Override

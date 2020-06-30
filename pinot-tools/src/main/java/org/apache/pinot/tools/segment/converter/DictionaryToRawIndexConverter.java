@@ -37,7 +37,7 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -305,13 +305,13 @@ public class DictionaryToRawIndexConverter {
     int lengthOfLongestEntry = (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
     ColumnValueReader valueReader = dataSource.getValueReader();
 
-    try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
+    try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
         .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, totalDocs, lengthOfLongestEntry,
             false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION)) {
       for (int docId = 0; docId < totalDocs; docId++) {
         int dictId = valueReader.getIntValue(docId);
         Object value = dictionary.get(dictId);
-        rawIndexCreator.index(docId++, value);
+        rawIndexCreator.index(value);
 
         if (docId % 1000000 == 0) {
           LOGGER.info("Converted {} records.", docId);

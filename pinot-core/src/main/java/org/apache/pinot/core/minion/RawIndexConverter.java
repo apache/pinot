@@ -33,7 +33,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -197,15 +197,16 @@ public class RawIndexConverter {
     // Create the raw index
     DataSource dataSource = _originalImmutableSegment.getDataSource(columnName);
     Dictionary dictionary = dataSource.getDictionary();
+    assert dictionary != null;
     FieldSpec.DataType dataType = fieldSpec.getDataType();
     int numDocs = _originalSegmentMetadata.getTotalDocs();
     int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getColumnMaxLength();
-    try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
+    try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
         .getRawIndexCreatorForColumn(_convertedIndexDir, ChunkCompressorFactory.CompressionType.SNAPPY, columnName,
             dataType, numDocs, lengthOfLongestEntry, false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION)) {
       ColumnValueReader valueReader = dataSource.getValueReader();
       for (int docId = 0; docId < numDocs; docId++) {
-        rawIndexCreator.index(docId, dictionary.get(valueReader.getIntValue(docId)));
+        rawIndexCreator.index(dictionary.get(valueReader.getIntValue(docId)));
       }
     }
 

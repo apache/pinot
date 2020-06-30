@@ -30,15 +30,13 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
 import org.apache.pinot.core.data.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory.CompressionType;
-import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
@@ -46,6 +44,8 @@ import org.apache.pinot.core.startree.StarTreeBuilderUtils;
 import org.apache.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
 import org.apache.pinot.core.startree.StarTreeNode;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +58,7 @@ import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_TREE_IN
  * The {@code BaseSingleTreeBuilder} class is the base class for star-tree builders that works on a single
  * {@link StarTreeV2BuilderConfig}s and provides common methods to build a single star-tree.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleTreeBuilder.class);
 
@@ -256,7 +257,6 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
    * @param segmentRecord Segment record
    * @return Merged record
    */
-  @SuppressWarnings("unchecked")
   Record mergeSegmentRecord(@Nullable Record aggregatedRecord, Record segmentRecord) {
     if (aggregatedRecord == null) {
       int[] dimensions = Arrays.copyOf(segmentRecord._dimensions, _numDimensions);
@@ -282,7 +282,6 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
    * @param starTreeRecord Star-tree record
    * @return Merged record
    */
-  @SuppressWarnings("unchecked")
   Record mergeStarTreeRecord(@Nullable Record aggregatedRecord, Record starTreeRecord) {
     if (aggregatedRecord == null) {
       int[] dimensions = Arrays.copyOf(starTreeRecord._dimensions, _numDimensions);
@@ -467,18 +466,19 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           new SingleValueUnsortedForwardIndexCreator(_outputDir, _dimensionsSplitOrder[i], cardinality, _numDocs);
     }
 
-    SingleValueRawIndexCreator[] metricIndexCreators = new SingleValueRawIndexCreator[_numMetrics];
+    ForwardIndexCreator[] metricIndexCreators = new ForwardIndexCreator[_numMetrics];
     for (int i = 0; i < _numMetrics; i++) {
       String metric = _metrics[i];
       ValueAggregator valueAggregator = _valueAggregators[i];
-      if (valueAggregator.getAggregatedValueType() == DataType.BYTES) {
+      DataType valueType = valueAggregator.getAggregatedValueType();
+      if (valueType == DataType.BYTES) {
         metricIndexCreators[i] =
             new SingleValueVarByteRawIndexCreator(_outputDir, CompressionType.PASS_THROUGH, metric, _numDocs,
-                valueAggregator.getMaxAggregatedValueByteSize());
+                DataType.BYTES, valueAggregator.getMaxAggregatedValueByteSize());
       } else {
         metricIndexCreators[i] =
             new SingleValueFixedByteRawIndexCreator(_outputDir, CompressionType.PASS_THROUGH, metric, _numDocs,
-                valueAggregator.getMaxAggregatedValueByteSize());
+                valueType);
       }
     }
 
@@ -486,15 +486,15 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       for (int docId = 0; docId < _numDocs; docId++) {
         Record record = getStarTreeRecord(docId);
         for (int i = 0; i < _numDimensions; i++) {
-          dimensionIndexCreators[i].index(docId, record._dimensions[i]);
+          dimensionIndexCreators[i].index(record._dimensions[i]);
         }
         for (int i = 0; i < _numMetrics; i++) {
           ValueAggregator valueAggregator = _valueAggregators[i];
           if (valueAggregator.getAggregatedValueType() == DataType.BYTES) {
             //noinspection unchecked
-            metricIndexCreators[i].index(docId, valueAggregator.serializeAggregatedValue(record._metrics[i]));
+            metricIndexCreators[i].index(valueAggregator.serializeAggregatedValue(record._metrics[i]));
           } else {
-            metricIndexCreators[i].index(docId, record._metrics[i]);
+            metricIndexCreators[i].index(record._metrics[i]);
           }
         }
       }
@@ -502,7 +502,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       for (SingleValueUnsortedForwardIndexCreator dimensionIndexCreator : dimensionIndexCreators) {
         dimensionIndexCreator.close();
       }
-      for (SingleValueRawIndexCreator metricIndexCreator : metricIndexCreators) {
+      for (ForwardIndexCreator metricIndexCreator : metricIndexCreators) {
         metricIndexCreator.close();
       }
     }

@@ -83,12 +83,12 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
   }
 
   @Override
-  public void setString(int docId, String value) {
-    setBytes(docId, StringUtil.encodeUtf8(value));
+  public void putString(String value) {
+    putBytes(StringUtil.encodeUtf8(value));
   }
 
   @Override
-  public void setBytes(int docId, byte[] value) {
+  public void putBytes(byte[] value) {
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 

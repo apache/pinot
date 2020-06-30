@@ -66,21 +66,22 @@ public class FixedBitMVForwardIndexWriter implements ForwardIndexWriter {
   private int numChunks;
   int prevRowStartIndex = 0;
   int prevRowLength = 0;
-  int prevRowId = -1;
   private int chunkOffsetHeaderSize;
   private int bitsetSize;
   private long rawDataSize;
   private long totalSize;
   private int docsPerChunk;
 
-  public FixedBitMVForwardIndexWriter(File file, int numDocs, int totalNumValues, int columnSizeInBits)
+  private int _nextDocId = 0;
+
+  public FixedBitMVForwardIndexWriter(File file, int numDocs, int totalNumValues, int numBitsPerValue)
       throws Exception {
     float averageValuesPerDoc = totalNumValues / numDocs;
     this.docsPerChunk = (int) (Math.ceil(PREFERRED_NUM_VALUES_PER_CHUNK / averageValuesPerDoc));
     this.numChunks = (numDocs + docsPerChunk - 1) / docsPerChunk;
     chunkOffsetHeaderSize = numChunks * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     bitsetSize = (totalNumValues + 7) / 8;
-    rawDataSize = ((long) totalNumValues * columnSizeInBits + 7) / 8;
+    rawDataSize = ((long) totalNumValues * numBitsPerValue + 7) / 8;
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
     Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: ",
         file.toString());
@@ -95,7 +96,7 @@ public class FixedBitMVForwardIndexWriter implements ForwardIndexWriter {
 
     chunkOffsetsWriter = new FixedByteValueReaderWriter(chunkOffsetsBuffer);
     customBitSet = new PinotDataBitSet(bitsetBuffer);
-    rawDataWriter = new FixedBitIntReaderWriter(rawDataBuffer, totalNumValues, columnSizeInBits);
+    rawDataWriter = new FixedBitIntReaderWriter(rawDataBuffer, totalNumValues, numBitsPerValue);
   }
 
   public int getChunkOffsetHeaderSize() {
@@ -138,22 +139,21 @@ public class FixedBitMVForwardIndexWriter implements ForwardIndexWriter {
     rawDataWriter = null;
   }
 
-  private int updateHeader(int rowId, int length) {
-    assert (rowId == prevRowId + 1);
+  private int updateHeader(int length) {
     int newStartIndex = prevRowStartIndex + prevRowLength;
-    if (rowId % docsPerChunk == 0) {
-      int chunkId = rowId / docsPerChunk;
+    int docId = _nextDocId++;
+    if (docId % docsPerChunk == 0) {
+      int chunkId = docId / docsPerChunk;
       chunkOffsetsWriter.writeInt(chunkId, newStartIndex);
     }
     customBitSet.setBit(newStartIndex);
     prevRowStartIndex = newStartIndex;
     prevRowLength = length;
-    prevRowId = rowId;
     return newStartIndex;
   }
 
   @Override
-  public void setIntArray(int docId, int[] intArray) {
-    rawDataWriter.writeInt(updateHeader(docId, intArray.length), intArray.length, intArray);
+  public void putIntArray(int[] intArray) {
+    rawDataWriter.writeInt(updateHeader(intArray.length), intArray.length, intArray);
   }
 }

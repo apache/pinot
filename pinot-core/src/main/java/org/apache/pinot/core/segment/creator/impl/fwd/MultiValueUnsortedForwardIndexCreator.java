@@ -23,11 +23,15 @@ import java.io.IOException;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.ForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.FixedBitMVForwardIndexWriter;
-import org.apache.pinot.core.segment.creator.MultiValueForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardIndexCreator {
+/**
+ * Forward index creator for dictionary-encoded multi-value column.
+ */
+public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreator {
   private final ForwardIndexWriter _writer;
 
   public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs,
@@ -39,8 +43,19 @@ public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardI
   }
 
   @Override
-  public void index(int docId, int[] dictIds) {
-    _writer.setIntArray(docId, dictIds);
+  public FieldSpec.DataType getValueType() {
+    // NOTE: Dictionary id is handled as INT type.
+    return FieldSpec.DataType.INT;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return false;
+  }
+
+  @Override
+  public void index(int[] dictIds) {
+    _writer.putIntArray(dictIds);
   }
 
   @Override

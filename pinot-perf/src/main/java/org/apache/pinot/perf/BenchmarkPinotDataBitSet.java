@@ -202,9 +202,8 @@ public class BenchmarkPinotDataBitSet {
     BufferedReader bfr = new BufferedReader(new FileReader(rawFile));
     FixedBitSVForwardIndexWriter forwardIndexWriter = new FixedBitSVForwardIndexWriter(encodedFile, ROWS, numBits);
     String line;
-    int rowId = 0;
     while ((line = bfr.readLine()) != null) {
-      forwardIndexWriter.setInt(rowId++, Integer.parseInt(line));
+      forwardIndexWriter.putInt(Integer.parseInt(line));
     }
     forwardIndexWriter.close();
   }

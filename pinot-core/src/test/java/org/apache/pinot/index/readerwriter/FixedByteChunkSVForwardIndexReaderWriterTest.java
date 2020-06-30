@@ -82,20 +82,17 @@ public class FixedByteChunkSVForwardIndexReaderWriterTest {
     FileUtils.deleteQuietly(outFileEightByte);
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter =
-        new FixedByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            Integer.BYTES, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-    FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter =
-        new FixedByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            Integer.BYTES, BaseChunkSVForwardIndexWriter.CURRENT_VERSION);
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      fourByteOffsetWriter.setInt(i, expected[i]);
-      eightByteOffsetWriter.setInt(i, expected[i]);
+    try (FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
+        outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES,
+        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
+            outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES,
+            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+      for (int value : expected) {
+        fourByteOffsetWriter.putInt(value);
+        eightByteOffsetWriter.putInt(value);
+      }
     }
-
-    fourByteOffsetWriter.close();
-    eightByteOffsetWriter.close();
 
     try (FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.INT);
@@ -132,20 +129,17 @@ public class FixedByteChunkSVForwardIndexReaderWriterTest {
     FileUtils.deleteQuietly(outFileEightByte);
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter =
-        new FixedByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            Long.BYTES, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-    FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter =
-        new FixedByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            Long.BYTES, BaseChunkSVForwardIndexWriter.CURRENT_VERSION);
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      fourByteOffsetWriter.setLong(i, expected[i]);
-      eightByteOffsetWriter.setLong(i, expected[i]);
+    try (FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
+        outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES,
+        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
+            outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES,
+            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+      for (long value : expected) {
+        fourByteOffsetWriter.putLong(value);
+        eightByteOffsetWriter.putLong(value);
+      }
     }
-
-    fourByteOffsetWriter.close();
-    eightByteOffsetWriter.close();
 
     try (FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.LONG);
@@ -182,20 +176,17 @@ public class FixedByteChunkSVForwardIndexReaderWriterTest {
     FileUtils.deleteQuietly(outFileEightByte);
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter =
-        new FixedByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            Float.BYTES, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-    FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter =
-        new FixedByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            Float.BYTES, BaseChunkSVForwardIndexWriter.CURRENT_VERSION);
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      fourByteOffsetWriter.setFloat(i, expected[i]);
-      eightByteOffsetWriter.setFloat(i, expected[i]);
+    try (FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
+        outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES,
+        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
+            outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES,
+            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+      for (float value : expected) {
+        fourByteOffsetWriter.putFloat(value);
+        eightByteOffsetWriter.putFloat(value);
+      }
     }
-
-    fourByteOffsetWriter.close();
-    eightByteOffsetWriter.close();
 
     try (FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.FLOAT);
@@ -232,20 +223,17 @@ public class FixedByteChunkSVForwardIndexReaderWriterTest {
     FileUtils.deleteQuietly(outFileEightByte);
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter =
-        new FixedByteChunkSVForwardIndexWriter(outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            Double.BYTES, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-    FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter =
-        new FixedByteChunkSVForwardIndexWriter(outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            Double.BYTES, BaseChunkSVForwardIndexWriter.CURRENT_VERSION);
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      fourByteOffsetWriter.setDouble(i, expected[i]);
-      eightByteOffsetWriter.setDouble(i, expected[i]);
+    try (FixedByteChunkSVForwardIndexWriter fourByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
+        outFileFourByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES,
+        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        FixedByteChunkSVForwardIndexWriter eightByteOffsetWriter = new FixedByteChunkSVForwardIndexWriter(
+            outFileEightByte, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES,
+            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+      for (double value : expected) {
+        fourByteOffsetWriter.putDouble(value);
+        eightByteOffsetWriter.putDouble(value);
+      }
     }
-
-    fourByteOffsetWriter.close();
-    eightByteOffsetWriter.close();
 
     try (FixedByteChunkSVForwardIndexReader fourByteOffsetReader = new FixedByteChunkSVForwardIndexReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.DOUBLE);

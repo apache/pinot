@@ -65,7 +65,7 @@ public class ForwardIndexWriterBenchmark {
         new FixedBitMVForwardIndexWriter(outputFile, totalDocs, totalNumValues, maxBitsNeeded);
 
     for (int i = 0; i < totalDocs; i++) {
-      fixedBitSkipListSCMVWriter.setIntArray(i, data[i]);
+      fixedBitSkipListSCMVWriter.putIntArray(data[i]);
       if (i % size == size - 1) {
         MutableRoaringBitmap rr1 = MutableRoaringBitmap.bitmapOf(offsets);
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
