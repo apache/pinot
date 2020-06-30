@@ -55,7 +55,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
  * <p>TODO: For performance concern, use {@code List<Sketch>} as the intermediate result.
  */
 @SuppressWarnings("Duplicates")
-public class DistinctCountThetaSketchAggregationFunction implements AggregationFunction<Map<String, Sketch>, Integer> {
+public class DistinctCountThetaSketchAggregationFunction implements AggregationFunction<Map<String, Sketch>, Long> {
   private final ExpressionContext _thetaSketchColumn;
   private final ThetaSketchParams _thetaSketchParams;
   private final SetOperationBuilder _setOperationBuilder;
@@ -441,13 +441,13 @@ public class DistinctCountThetaSketchAggregationFunction implements AggregationF
 
   @Override
   public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.INT;
+    return DataSchema.ColumnDataType.LONG;
   }
 
   @Override
-  public Integer extractFinalResult(Map<String, Sketch> intermediateResult) {
+  public Long extractFinalResult(Map<String, Sketch> intermediateResult) {
     Sketch finalSketch = extractFinalSketch(intermediateResult);
-    return (int) Math.round(finalSketch.getEstimate());
+    return Math.round(finalSketch.getEstimate());
   }
 
   private Predicate getPredicate(String predicateString) {
