@@ -355,11 +355,17 @@ public class PinotLLCRealtimeSegmentManager {
    * This method moves the segment file from another location to its permanent location.
    * When splitCommit is enabled, segment file is uploaded to the segmentLocation in the committingSegmentDescriptor,
    * and we need to move the segment file to its permanent location before committing the segment metadata.
-   * Return the permanent location of the segment if the commit succeeds.
+   * Updated the segment location to the uri which the segment is moved to.
+   * Exception: for committingSegmentDescriptor with peer download scheme in its segment location, there is no need for
+   * moving.
    */
-  public String commitSegmentFile(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor)
+  public void commitSegmentFile(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor)
       throws Exception {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
+    if (isPeerSegmentDownloadScheme(committingSegmentDescriptor)) {
+      LOGGER.info("No moving needed for segment on peer servers: {}", committingSegmentDescriptor.getSegmentLocation());
+      return;
+    }
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     String segmentName = committingSegmentDescriptor.getSegmentName();
@@ -388,7 +394,12 @@ public class PinotLLCRealtimeSegmentManager {
     } catch (Exception e) {
       LOGGER.warn("Caught exception while deleting temporary segment files for segment: {}", segmentName, e);
     }
-    return uriToMoveTo.toString();
+    committingSegmentDescriptor.setSegmentLocation(uriToMoveTo.toString());
+  }
+
+  private boolean isPeerSegmentDownloadScheme(CommittingSegmentDescriptor committingSegmentDescriptor) {
+    return !(committingSegmentDescriptor == null) && !(committingSegmentDescriptor.getSegmentLocation() == null) &&
+        committingSegmentDescriptor.getSegmentLocation().toLowerCase().startsWith("peer://");
   }
 
   /**

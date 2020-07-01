@@ -1243,9 +1243,8 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    public String commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    public void commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       Preconditions.checkState(!committingSegmentDescriptor.getSegmentLocation().equals("doNotCommitMe"));
-      return committingSegmentDescriptor.getSegmentLocation();
     }
 
     @Override

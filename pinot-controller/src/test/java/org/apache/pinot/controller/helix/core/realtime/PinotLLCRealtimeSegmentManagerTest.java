@@ -689,8 +689,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String segmentLocation = SCHEME + tableDir + "/" + segmentFileName;
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
         PARTITION_OFFSET.toString(), 0, segmentLocation);
-    String segmentFinalLocation = segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
-    Assert.assertEquals(segmentFinalLocation, URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
+    segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    Assert.assertEquals(committingSegmentDescriptor.getSegmentLocation(),
+        URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
     assertFalse(segmentFile.exists());
   }
 
@@ -715,8 +716,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String segmentLocation = SCHEME + tableDir + "/" + segmentFileName;
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
         PARTITION_OFFSET.toString(), 0, segmentLocation);
-    String segmentFinalLocation = segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
-    Assert.assertEquals(segmentFinalLocation, URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
+    segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    Assert.assertEquals(committingSegmentDescriptor.getSegmentLocation(),
+        URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
     assertFalse(segmentFile.exists());
     assertFalse(extraSegmentFile.exists());
     assertTrue(otherSegmentFile.exists());
