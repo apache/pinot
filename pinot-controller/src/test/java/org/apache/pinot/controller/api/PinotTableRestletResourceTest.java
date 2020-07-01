@@ -282,6 +282,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         sendPostRequest(_controllerRequestURLBuilder.forTruncateTable(tableName, tableType), null);
 
     Assert.assertEquals(truncateResponse, "{\"status\":\"Table " + tableName + " successfully truncated\"}");
+    
+    tableType = TableType.OFFLINE.toString();
+    truncateResponse =
+        sendPostRequest(_controllerRequestURLBuilder.forTruncateTable(tableName, tableType), null);
+
+    Assert.assertEquals(truncateResponse, "{\"status\":\"Table " + tableName + " successfully truncated\"}");
 
   }
 

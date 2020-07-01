@@ -376,13 +376,24 @@ public class PinotTableRestletResource {
       String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       // disable real-time table
       _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.DISABLE);
-
     }
 
     // Get all segment names for table and delete all segments
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
     List<String> segmentNames = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType);
     PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentNames);
+    
+    // Enable table on tableType
+    if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      // disable offline table
+      _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.ENABLE);
+    }
+    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      // disable real-time table
+      _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.ENABLE);
+    }
 
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
