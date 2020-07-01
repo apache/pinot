@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PeerServerSegmentFinder {
   private static final Logger _logger = LoggerFactory.getLogger(PeerServerSegmentFinder.class);
+
   /**
    *
    * @param segmentName
@@ -71,28 +72,20 @@ public class PeerServerSegmentFinder {
       return ListUtils.EMPTY_LIST;
     }
     List<URI> onlineServerURIs = new ArrayList<>();
-    // Find out the ONLINE server serving the segment.
-    for (String segment : externalViewForResource.getPartitionSet()) {
-      if (!segmentName.equals(segment)) {
-        continue;
-      }
-
-      Map<String, String> instanceToStateMap = externalViewForResource.getStateMap(segmentName);
-
-      // Randomly pick a server from the list of on-line server hosting the given segment.
-      for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
-        if ("ONLINE".equals(instanceState.getValue())) {
-          String instanceId = instanceState.getKey();
-          _logger.info("Found ONLINE server {} for segment {}.", instanceId, segmentName);
-          InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, instanceId);
-          String hostName = instanceConfig.getHostName();
-          int port = getServerAdminPort(helixAdmin, clusterName, instanceId);
-          try {
-            onlineServerURIs.add(new URI(StringUtil
-                .join("/",  downloadScheme + "://" + hostName + ":" + port, "segments", tableNameWithType, segmentName)));
-          } catch (URISyntaxException e) {
-            _logger.warn("Error in uri syntax: ", e);
-          }
+    // Find out the ONLINE servers serving the segment.
+    Map<String, String> instanceToStateMap = externalViewForResource.getStateMap(segmentName);
+    for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
+      if ("ONLINE".equals(instanceState.getValue())) {
+        String instanceId = instanceState.getKey();
+        _logger.info("Found ONLINE server {} for segment {}.", instanceId, segmentName);
+        InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, instanceId);
+        String hostName = instanceConfig.getHostName();
+        int port = getServerAdminPort(helixAdmin, clusterName, instanceId);
+        try {
+          onlineServerURIs.add(new URI(StringUtil
+              .join("/", downloadScheme + "://" + hostName + ":" + port, "segments", tableNameWithType, segmentName)));
+        } catch (URISyntaxException e) {
+          _logger.warn("Error in uri syntax: ", e);
         }
       }
     }

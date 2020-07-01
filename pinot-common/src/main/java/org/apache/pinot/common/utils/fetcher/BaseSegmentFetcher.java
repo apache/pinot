@@ -84,7 +84,17 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
       throw new IllegalArgumentException("The input uri list is empty");
     }
     Random r = new Random();
-    fetchSegmentToLocal(uris.get(r.nextInt(uris.size())), dest);
+    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+      URI uri = uris.get(r.nextInt(uris.size()));
+      try {
+        fetchSegmentToLocalWithoutRetry(uri, dest);
+        _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
+        return true;
+      } catch (Exception e) {
+        _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
+        return false;
+      }
+    });
   }
 
   /**

@@ -282,6 +282,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       try {
         downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, uri);
       } catch (Exception e) {
+        _logger.warn("Download segment {} from deepstore uri {} failed.", segmentName, uri, e);
         // Download from deep store failed; try to download from peer if peer download is setup for the table.
         if (isPeerSegmentDownloadEnabled(tableConfig)) {
           downloadSegmentFromPeer(segmentName, tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), indexLoadingConfig);
@@ -334,25 +335,20 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
   }
 
-  private void downloadSegmentFromPeer(String segmentName, String downloadScheme, IndexLoadingConfig indexLoadingConfig) {
+  private void downloadSegmentFromPeer(String segmentName, String downloadScheme,
+      IndexLoadingConfig indexLoadingConfig) {
     File tempSegmentFolder = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
     File tempFile = new File(_indexDir, segmentName + ".tar.gz");
     try {
-      RetryPolicies.exponentialBackoffRetryPolicy(RETRY_COUNT, RETRY_WAIT_MS, RETRY_DELAY_SCALE_FACTOR).attempt(() -> {
-        try {
-          // First find servers hosting the segment in a ONLINE state.
-          List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
-          // Next download the segment from the server using configured scheme.
-          SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, tempFile);
-          _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, tempFile, tempFile.length());
-          return true;
-        } catch (Exception e) {
-          _logger.warn("Caught exception while downloading segment {} from peer with scheme {}", segmentName, downloadScheme);
-          return false;
-        }
-      });
+      // First find servers hosting the segment in a ONLINE state.
+      List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
+      // Next download the segment from a randomly chosen server using configured scheme.
+      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, tempFile);
+      _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, tempFile,
+          tempFile.length());
       untarAndMoveSegment(segmentName, indexLoadingConfig, tempSegmentFolder, tempFile);
     } catch (Exception e) {
+      _logger.warn("Download and move segment {} from peer with scheme {} failed.", segmentName, downloadScheme, e);
       throw new RuntimeException(e);
     } finally {
       FileUtils.deleteQuietly(tempFile);
