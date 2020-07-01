@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -141,7 +142,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
         + DEFAULT_TABLE_NAME + " where dimName = 'course' AND dimValue = 'Math'";
     runAndAssert(query, 50 + 80 + 110 + 140);
 
-    // gender = gemale AND course = math
+    // gender = female AND course = math
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
         + "\"dimName = 'gender'\", \"dimValue = 'Female'\", \"dimName = 'course'\", \"dimValue = 'Math'\", "
         + "\"(dimName = 'gender' AND dimValue = 'Female') AND (dimName = 'course' AND dimValue = 'Math')\") from "
@@ -156,13 +157,50 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
         + DEFAULT_TABLE_NAME
         + " where (dimName = 'gender' AND dimValue = 'Male') OR (dimName = 'course' AND dimValue = 'Biology')";
     runAndAssert(query, 70 + 80 + 90 + 100 + 130 + 140 + 150 + 160);
+
+    // group by gender
+    query = "select dimValue, distinctCountThetaSketch(thetaSketchCol, '', \"dimName = 'gender'\", \"dimName = 'gender'\") from "
+        + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND (dimValue = 'Female' OR dimValue = 'Male') "
+        + "group by dimValue";
+    runAndAssert(query,
+        ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160));
   }
 
   private void runAndAssert(String query, int expected)
       throws Exception {
+
+    // pql
     JsonNode jsonNode = postQuery(query);
     int actual = Integer.parseInt(jsonNode.get("aggregationResults").get(0).get("value").textValue());
     assertEquals(actual, expected);
+
+    // sql
+    jsonNode = postSqlQuery(query, _brokerBaseApiUrl);
+    actual = Integer.parseInt(jsonNode.get("resultTable").get("rows").get(0).get(0).asText());
+    assertEquals(actual, expected);
+  }
+
+  private void runAndAssert(String query, Map<String, Integer> expectedGroupToValueMap)
+      throws Exception {
+
+    // pql
+    Map<String, Integer> actualGroupToValueMap = new HashMap<>();
+    JsonNode jsonNode = postQuery(query);
+    jsonNode.get("aggregationResults").get(0).get("groupByResult").forEach(node -> {
+      String group = node.get("group").get(0).textValue();
+      int value = Integer.parseInt(node.get("value").textValue());
+      actualGroupToValueMap.put(group, value);
+    });
+    assertEquals(actualGroupToValueMap, expectedGroupToValueMap);
+
+    // sql
+    jsonNode = postSqlQuery(query, _brokerBaseApiUrl);
+    jsonNode.get("resultTable").get("rows").forEach(node -> {
+      String group = node.get(0).textValue();
+      int value = node.get(1).intValue();
+      actualGroupToValueMap.put(group, value);
+    });
+    assertEquals(actualGroupToValueMap, expectedGroupToValueMap);
   }
 
   private File createAvroFile()
