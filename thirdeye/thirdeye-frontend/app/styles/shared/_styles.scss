@@ -281,6 +281,10 @@ body {
   color: app-shade(black, 9);
   margin-bottom: 12px;
 
+  &--display {
+    font-size: 18px;
+  }
+
   &--flush {
     margin-bottom: 0;
   }

@@ -42,19 +42,33 @@
           </div>
         {{/if}}
         {{#if dataIsCurrent}}
-          {{range-pill-selectors
-            title="Showing"
-            uiDateFormat=pill.uiDateFormat
-            activeRangeEnd=pill.activeRangeEnd
-            activeRangeStart=pill.activeRangeStart
-            timeRangeOptions=pill.timeRangeOptions
-            timePickerIncrement=pill.timePickerIncrement
-            predefinedRanges=pill.predefinedRanges
-            selectAction=(action "onRangeSelection")
-            triggerId='time-range-selector'
-            placeholder="Last 48 Hours"
-          }}
-
+          <div class="col-xs-12 preview">
+            <div class="col-xs-2 no-padding">
+              <label class="te-label te-label--display">Display Window
+                <span>
+                  <i class="glyphicon glyphicon-question-sign"></i>
+                  {{#tooltip-on-element class="te-tooltip"}}
+                    This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
+                  {{/tooltip-on-element}}
+                </span>
+              </label>
+            </div>
+            <div class="col-xs-4 no-padding">
+              {{date-range-picker
+                class="te-range-picker"
+                timePicker=true
+                timePicker24Hour=true
+                timePickerIncrement=pill.timePickerIncrement
+                start=pill.activeRangeStart
+                end=pill.activeRangeEnd
+                ranges=pill.predefinedRanges
+                showCustomRangeLabel=false
+                format=pill.uiDateFormat
+                serverFormat="YYYY-MM-DD HH:mm"
+                applyAction=(action "onRangeSelection")
+              }}
+            </div>
+          </div>
 
           {{#if alertId}}
 
@@ -317,36 +331,66 @@
         </div>
         {{else}}
         <div class="detection-yaml-msg">Alert configuration has changed.</div>
-          {{range-pill-selectors
-            title="Show me"
-            uiDateFormat=pill.uiDateFormat
-            activeRangeEnd=pill.activeRangeEnd
-            activeRangeStart=pill.activeRangeStart
-            timeRangeOptions=pill.timeRangeOptions
-            timePickerIncrement=pill.timePickerIncrement
-            predefinedRanges=pill.predefinedRanges
-            selectAction=(action "onRangeSelection")
-            triggerId='time-range-selector'
-            placeholder="Last 48 Hours"
-          }}
+          <div class="col-xs-12 preview">
+            <div class="col-xs-2 no-padding">
+              <label class="te-label te-label--display">Display Window
+                <span>
+                  <i class="glyphicon glyphicon-question-sign"></i>
+                  {{#tooltip-on-element class="te-tooltip"}}
+                    This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
+                  {{/tooltip-on-element}}
+                </span>
+              </label>
+            </div>
+            <div class="col-xs-4 no-padding">
+              {{date-range-picker
+                class="te-range-picker"
+                timePicker=true
+                timePicker24Hour=true
+                timePickerIncrement=pill.timePickerIncrement
+                start=pill.activeRangeStart
+                end=pill.activeRangeEnd
+                ranges=pill.predefinedRanges
+                showCustomRangeLabel=false
+                format=pill.uiDateFormat
+                serverFormat="YYYY-MM-DD HH:mm"
+                applyAction=(action "onRangeSelection")
+              }}
+            </div>
+          </div>
         {{/if}}
       {{/if}}
     {{else}}
       {{#if disablePreviewButton}}
         <p>Enter YAML configuration to enable preview.</p>
       {{else}}
-        {{range-pill-selectors
-          title="Show me"
-          uiDateFormat=pill.uiDateFormat
-          activeRangeEnd=pill.activeRangeEnd
-          activeRangeStart=pill.activeRangeStart
-          timeRangeOptions=pill.timeRangeOptions
-          timePickerIncrement=pill.timePickerIncrement
-          predefinedRanges=pill.predefinedRanges
-          selectAction=(action "onRangeSelection")
-          triggerId='time-range-selector'
-          placeholder="Last 48 Hours"
-        }}
+        <div class="col-xs-12 preview">
+          <div class="col-xs-2 no-padding">
+            <label class="te-label te-label--display">Display Window
+              <span>
+                <i class="glyphicon glyphicon-question-sign"></i>
+                {{#tooltip-on-element class="te-tooltip"}}
+                  This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
+                {{/tooltip-on-element}}
+              </span>
+            </label>
+          </div>
+          <div class="col-xs-4 no-padding">
+            {{date-range-picker
+              class="te-range-picker"
+              timePicker=true
+              timePicker24Hour=true
+              timePickerIncrement=pill.timePickerIncrement
+              start=pill.activeRangeStart
+              end=pill.activeRangeEnd
+              ranges=pill.predefinedRanges
+              showCustomRangeLabel=false
+              format=pill.uiDateFormat
+              serverFormat="YYYY-MM-DD HH:mm"
+              applyAction=(action "onRangeSelection")
+            }}
+          </div>
+        </div>
       {{/if}}
     {{/if}}
   {{/unless}}
