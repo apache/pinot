@@ -81,7 +81,7 @@ public class TableCache {
   }
 
   public TableConfig getTableConfig(String tableName) {
-    return _tableConfigChangeListener._tableConfigMap.get(tableName.toLowerCase());
+    return _tableConfigChangeListener._tableConfigMap.get(tableName);
   }
 
   class TableConfigChangeListener implements IZkChildListener, IZkDataListener {
@@ -102,7 +102,7 @@ public class TableCache {
             try {
               TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
               String tableNameWithType = tableConfig.getTableName();
-              _tableConfigMap.put(tableNameWithType.toLowerCase(), tableConfig);
+              _tableConfigMap.put(tableNameWithType, tableConfig);
               String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
               //create case insensitive mapping
               _tableNameMap.put(tableNameWithType.toLowerCase(), tableNameWithType);

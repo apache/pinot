@@ -205,7 +205,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
       switch (uploadType) {
         case URI:
-          downloadSegmentFileFromURI(downloadUri, dstFile);
+          downloadSegmentFileFromURI(downloadUri, dstFile, tableName);
           break;
         case SEGMENT:
           createSegmentFileFromMultipart(multiPart, dstFile);
@@ -314,16 +314,16 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
 
     if (isUploadedSegmentEncrypted && !crypterClassNameInTableConfig.equals(crypterUsedInUploadedSegment)) {
-      throw new ControllerApplicationException(LOGGER, String
-          .format("Uploaded segment is encrypted with '%s' while table config requires '%s' as crypter "
-                  + "(segment name = '%s', table name = '%s').", crypterUsedInUploadedSegment,
-              crypterClassNameInTableConfig, segmentName, tableName), Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, String.format(
+          "Uploaded segment is encrypted with '%s' while table config requires '%s' as crypter "
+              + "(segment name = '%s', table name = '%s').", crypterUsedInUploadedSegment,
+          crypterClassNameInTableConfig, segmentName, tableName), Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     // encrypt segment
     PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassNameInTableConfig);
-    LOGGER.info("Using crypter class {} for encrypting {} to {}.", crypterClassNameInTableConfig, tempDecryptedFile,
-        tempEncryptedFile);
+    LOGGER.info("Using crypter class '{}' for encrypting '{}' to '{}' (segment name = '{}}', table name = '{}').",
+        crypterClassNameInTableConfig, tempDecryptedFile, tempEncryptedFile, segmentName, tableName);
     pinotCrypter.encrypt(tempDecryptedFile, tempEncryptedFile);
 
     return out;
@@ -342,13 +342,14 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
   }
 
-  private void downloadSegmentFileFromURI(String currentSegmentLocationURI, File destFile)
+  private void downloadSegmentFileFromURI(String currentSegmentLocationURI, File destFile, String tableName)
       throws Exception {
     if (currentSegmentLocationURI == null || currentSegmentLocationURI.isEmpty()) {
       throw new ControllerApplicationException(LOGGER, "Failed to get downloadURI, needed for URI upload",
           Response.Status.BAD_REQUEST);
     }
-    LOGGER.info("Downloading segment from {} to {}", currentSegmentLocationURI, destFile.getAbsolutePath());
+    LOGGER.info("Downloading segment from {} to {} for table {}", currentSegmentLocationURI, destFile.getAbsolutePath(),
+        tableName);
     SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, destFile);
   }
 
