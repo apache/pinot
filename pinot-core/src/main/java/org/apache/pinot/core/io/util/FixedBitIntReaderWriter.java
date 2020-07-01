@@ -25,29 +25,34 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 public final class FixedBitIntReaderWriter implements Closeable {
   private final PinotDataBitSet _dataBitSet;
-  private final int _numBitsPerValue;
 
   public FixedBitIntReaderWriter(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
     Preconditions
         .checkState(dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
-    _dataBitSet = new PinotDataBitSet(dataBuffer);
-    _numBitsPerValue = numBitsPerValue;
+    _dataBitSet = new PinotDataBitSet(dataBuffer, numBitsPerValue);
   }
 
   public int readInt(int index) {
-    return _dataBitSet.readInt(index, _numBitsPerValue);
+    return _dataBitSet.readInt(index);
   }
 
   public void readInt(int startIndex, int length, int[] buffer) {
-    _dataBitSet.readInt(startIndex, _numBitsPerValue, length, buffer);
+    _dataBitSet.readInt(startIndex, length, buffer);
+  }
+
+  public void readValues(int[] docIds, int docIdStartIndex, int docIdLength, int[] values, int valuesStartIndex) {
+    int docIdEndIndex = docIdStartIndex + docIdLength;
+    for (int i = docIdStartIndex; i < docIdEndIndex; i++) {
+      values[valuesStartIndex++] = readInt(docIds[i]);
+    }
   }
 
   public void writeInt(int index, int value) {
-    _dataBitSet.writeInt(index, _numBitsPerValue, value);
+    _dataBitSet.writeInt(index, value);
   }
 
   public void writeInt(int startIndex, int length, int[] values) {
-    _dataBitSet.writeInt(startIndex, _numBitsPerValue, length, values);
+    _dataBitSet.writeInt(startIndex, length, values);
   }
 
   @Override

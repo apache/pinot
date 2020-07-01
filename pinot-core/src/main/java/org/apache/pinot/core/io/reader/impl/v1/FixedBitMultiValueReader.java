@@ -20,7 +20,9 @@ package org.apache.pinot.core.io.reader.impl.v1;
 
 import org.apache.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.util.BasePinotBitSet;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
+import org.apache.pinot.core.io.util.FixedBitIntReaderWriterV2;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
@@ -49,8 +51,8 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
   private final FixedByteValueReaderWriter _chunkOffsetReader;
-  private final PinotDataBitSet _bitmapReader;
-  private final FixedBitIntReaderWriter _rawDataReader;
+  private final PinotDataBuffer _headerBitmapBuffer;
+  private final FixedBitIntReaderWriterV2 _rawDataReader;
   private final int _numRows;
   private final int _numValues;
   private final int _numRowsPerChunk;
@@ -63,11 +65,11 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
     long endOffset = numChunks * Integer.BYTES;
     _chunkOffsetReader = new FixedByteValueReaderWriter(dataBuffer.view(0L, endOffset));
     int bitmapSize = (numValues + Byte.SIZE - 1) / Byte.SIZE;
-    _bitmapReader = new PinotDataBitSet(dataBuffer.view(endOffset, endOffset + bitmapSize));
+    _headerBitmapBuffer = dataBuffer.view(endOffset, endOffset + bitmapSize);
     endOffset += bitmapSize;
     int rawDataSize = (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
     _rawDataReader =
-        new FixedBitIntReaderWriter(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
+        new FixedBitIntReaderWriterV2(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
   }
 
   @Override
@@ -79,13 +81,13 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
     if (indexInChunk == 0) {
       startIndex = chunkOffset;
     } else {
-      startIndex = _bitmapReader.getNextNthSetBitOffset(chunkOffset + 1, indexInChunk);
+      startIndex = BasePinotBitSet.getNextNthSetBitOffset(_headerBitmapBuffer, chunkOffset + 1, indexInChunk);
     }
     int endIndex;
     if (row == _numRows - 1) {
       endIndex = _numValues;
     } else {
-      endIndex = _bitmapReader.getNextSetBitOffset(startIndex + 1);
+      endIndex = BasePinotBitSet.getNextSetBitOffset(_headerBitmapBuffer, startIndex + 1);
     }
     int numValues = endIndex - startIndex;
     _rawDataReader.readInt(startIndex, numValues, intArray);
@@ -103,7 +105,7 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
       int chunkId = row / _numRowsPerChunk;
       if (row > contextRow && chunkId == contextRow / _numRowsPerChunk) {
         // Same chunk
-        startIndex = _bitmapReader.getNextNthSetBitOffset(contextEndOffset + 1, row - contextRow - 1);
+        startIndex = BasePinotBitSet.getNextNthSetBitOffset(_headerBitmapBuffer,contextEndOffset + 1, row - contextRow - 1);
       } else {
         // Different chunk
         int chunkOffset = _chunkOffsetReader.getInt(chunkId);
@@ -111,7 +113,7 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
         if (indexInChunk == 0) {
           startIndex = chunkOffset;
         } else {
-          startIndex = _bitmapReader.getNextNthSetBitOffset(chunkOffset + 1, indexInChunk);
+          startIndex = BasePinotBitSet.getNextNthSetBitOffset(_headerBitmapBuffer,chunkOffset + 1, indexInChunk);
         }
       }
     }
@@ -119,7 +121,7 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
     if (row == _numRows - 1) {
       endIndex = _numValues;
     } else {
-      endIndex = _bitmapReader.getNextSetBitOffset(startIndex + 1);
+      endIndex = BasePinotBitSet.getNextSetBitOffset(_headerBitmapBuffer,startIndex + 1);
     }
     int numValues = endIndex - startIndex;
     _rawDataReader.readInt(startIndex, numValues, intArray);
@@ -141,7 +143,6 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
     _chunkOffsetReader.close();
-    _bitmapReader.close();
     _rawDataReader.close();
   }
 

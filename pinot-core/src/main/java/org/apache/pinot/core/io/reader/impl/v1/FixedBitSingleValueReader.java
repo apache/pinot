@@ -20,15 +20,15 @@ package org.apache.pinot.core.io.reader.impl.v1;
 
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
+import org.apache.pinot.core.io.util.FixedBitIntReaderWriterV2;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {
-  private final FixedBitIntReaderWriter _reader;
+  private final FixedBitIntReaderWriterV2 _reader;
 
   public FixedBitSingleValueReader(PinotDataBuffer dataBuffer, int numRows, int numBitsPerValue) {
-    _reader = new FixedBitIntReaderWriter(dataBuffer, numRows, numBitsPerValue);
+    _reader = new FixedBitIntReaderWriterV2(dataBuffer, numRows, numBitsPerValue);
   }
 
   @Override
@@ -42,11 +42,8 @@ public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValue
   }
 
   @Override
-  public void readValues(int[] rows, int rowsStartIndex, int rowSize, int[] values, int valuesStartIndex) {
-    int rowsEndIndex = rowsStartIndex + rowSize;
-    for (int i = rowsStartIndex; i < rowsEndIndex; i++) {
-      values[valuesStartIndex++] = getInt(rows[i]);
-    }
+  public void readValues(int[] docIds, int docIdStartIndex, int docIdLength, int[] out, int outPos) {
+    _reader.readValues(docIds, docIdStartIndex, docIdLength, out, outPos);
   }
 
   @Override

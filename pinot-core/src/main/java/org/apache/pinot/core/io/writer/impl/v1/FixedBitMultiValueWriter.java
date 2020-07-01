@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import org.apache.pinot.core.io.util.BasePinotBitSet;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
+import org.apache.pinot.core.io.util.FixedBitIntReaderWriterV2;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.SingleColumnMultiValueWriter;
@@ -58,12 +60,11 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
 
   private PinotDataBuffer indexDataBuffer;
   private PinotDataBuffer chunkOffsetsBuffer;
-  private PinotDataBuffer bitsetBuffer;
+  private PinotDataBuffer headerBitsetBuffer;
   private PinotDataBuffer rawDataBuffer;
 
   private FixedByteValueReaderWriter chunkOffsetsWriter;
-  private PinotDataBitSet customBitSet;
-  private FixedBitIntReaderWriter rawDataWriter;
+  private FixedBitIntReaderWriterV2 rawDataWriter;
   private int numChunks;
   int prevRowStartIndex = 0;
   int prevRowLength = 0;
@@ -91,12 +92,11 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
 
     chunkOffsetsBuffer = indexDataBuffer.view(0, chunkOffsetHeaderSize);
     int bitsetEndPos = chunkOffsetHeaderSize + bitsetSize;
-    bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
+    headerBitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
     rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos + rawDataSize);
 
     chunkOffsetsWriter = new FixedByteValueReaderWriter(chunkOffsetsBuffer);
-    customBitSet = new PinotDataBitSet(bitsetBuffer);
-    rawDataWriter = new FixedBitIntReaderWriter(rawDataBuffer, totalNumValues, columnSizeInBits);
+    rawDataWriter = new FixedBitIntReaderWriterV2(rawDataBuffer, totalNumValues, columnSizeInBits);
   }
 
   public int getChunkOffsetHeaderSize() {
@@ -126,15 +126,12 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
   @Override
   public void close()
       throws IOException {
-    customBitSet.close();
     chunkOffsetsWriter.close();
     rawDataWriter.close();
     indexDataBuffer.close();
 
     chunkOffsetsBuffer = null;
-    bitsetBuffer = null;
     rawDataBuffer = null;
-    customBitSet = null;
     chunkOffsetsWriter = null;
     rawDataWriter = null;
   }
@@ -146,7 +143,7 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
       int chunkId = rowId / docsPerChunk;
       chunkOffsetsWriter.writeInt(chunkId, newStartIndex);
     }
-    customBitSet.setBit(newStartIndex);
+    BasePinotBitSet.setBit(headerBitsetBuffer, newStartIndex);
     prevRowStartIndex = newStartIndex;
     prevRowLength = length;
     prevRowId = rowId;

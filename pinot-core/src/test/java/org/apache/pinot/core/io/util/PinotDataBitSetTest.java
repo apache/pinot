@@ -58,17 +58,17 @@ public class PinotDataBitSetTest {
     int dataBufferSize = (numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE;
 
     try (PinotDataBuffer dataBuffer = getEmptyDataBuffer(dataBufferSize);
-        PinotDataBitSet dataBitSet = new PinotDataBitSet(dataBuffer)) {
+        PinotDataBitSet dataBitSet = new PinotDataBitSet(dataBuffer, numBitsPerValue)) {
       for (int i = 0; i < numValues; i++) {
         int value = RANDOM.nextInt(maxAllowedValue);
         values[i] = value;
-        dataBitSet.writeInt(i, numBitsPerValue, value);
+        dataBitSet.writeInt(i, value);
       }
 
       // Test single value read
       for (int i = 0; i < NUM_ITERATIONS; i++) {
         int index = RANDOM.nextInt(numValues);
-        assertEquals(dataBitSet.readInt(index, numBitsPerValue), values[index]);
+        assertEquals(dataBitSet.readInt(index), values[index]);
       }
 
       // Test batch read
@@ -76,7 +76,7 @@ public class PinotDataBitSetTest {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
         int startIndex = RANDOM.nextInt(numValues - 10);
         int numValuesToRead = RANDOM.nextInt(10) + 1;
-        dataBitSet.readInt(startIndex, numBitsPerValue, numValuesToRead, buffer);
+        dataBitSet.readInt(startIndex, numValuesToRead, buffer);
         for (int j = 0; j < numValuesToRead; j++) {
           assertEquals(buffer[j], values[startIndex + j]);
         }
@@ -87,12 +87,12 @@ public class PinotDataBitSetTest {
       while (startIndex < numValues) {
         int numValuesToWrite = Math.min(RANDOM.nextInt(10) + 1, numValues - startIndex);
         System.arraycopy(values, startIndex, buffer, 0, numValuesToWrite);
-        dataBitSet.writeInt(startIndex, numBitsPerValue, numValuesToWrite, buffer);
+        dataBitSet.writeInt(startIndex, numValuesToWrite, buffer);
         startIndex += numValuesToWrite;
       }
       for (int i = 0; i < NUM_ITERATIONS; i++) {
         int index = RANDOM.nextInt(numValues);
-        assertEquals(dataBitSet.readInt(index, numBitsPerValue), values[index]);
+        assertEquals(dataBitSet.readInt(index), values[index]);
       }
     }
   }
@@ -103,22 +103,22 @@ public class PinotDataBitSetTest {
     int dataBufferSize = RANDOM.nextInt(100) + 1;
     boolean[] bits = new boolean[dataBufferSize * Byte.SIZE];
     try (PinotDataBuffer dataBuffer = getEmptyDataBuffer(dataBufferSize);
-        PinotDataBitSet dataBitSet = new PinotDataBitSet(dataBuffer)) {
+        PinotDataBitSet dataBitSet = new PinotDataBitSet(dataBuffer, 1)) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
         int bitOffset = RANDOM.nextInt(dataBufferSize * Byte.SIZE);
         if (bits[bitOffset]) {
-          assertEquals(dataBitSet.readInt(bitOffset, 1), 1);
+          assertEquals(dataBitSet.readInt(bitOffset), 1);
         } else {
-          assertEquals(dataBitSet.readInt(bitOffset, 1), 0);
+          assertEquals(dataBitSet.readInt(bitOffset), 0);
         }
         if (RANDOM.nextBoolean()) {
-          dataBitSet.setBit(bitOffset);
+          BasePinotBitSet.setBit(dataBuffer, bitOffset);
           bits[bitOffset] = true;
-          assertEquals(dataBitSet.readInt(bitOffset, 1), 1);
+          assertEquals(dataBitSet.readInt(bitOffset), 1);
         } else {
-          dataBitSet.unsetBit(bitOffset);
+          BasePinotBitSet.unsetBit(dataBuffer, bitOffset);
           bits[bitOffset] = false;
-          assertEquals(dataBitSet.readInt(bitOffset, 1), 0);
+          assertEquals(dataBitSet.readInt(bitOffset), 0);
         }
       }
     }
@@ -134,24 +134,23 @@ public class PinotDataBitSetTest {
       bitOffset += RANDOM.nextInt(10) + 1;
     }
     int dataBufferSize = setBitOffsets[NUM_ITERATIONS - 1] / Byte.SIZE + 1;
-    try (PinotDataBuffer dataBuffer = getEmptyDataBuffer(dataBufferSize);
-        PinotDataBitSet dataBitSet = new PinotDataBitSet(dataBuffer)) {
+    try (PinotDataBuffer dataBuffer = getEmptyDataBuffer(dataBufferSize)) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
-        dataBitSet.setBit(setBitOffsets[i]);
+        BasePinotBitSet.setBit(dataBuffer, setBitOffsets[i]);
       }
 
       // Test next set bit offset
       for (int i = 0; i < NUM_ITERATIONS - 1; i++) {
-        assertEquals(dataBitSet
-                .getNextSetBitOffset(setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1),
+        assertEquals(BasePinotBitSet
+                .getNextSetBitOffset(dataBuffer, setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1),
             setBitOffsets[i + 1]);
       }
 
       // Test next nth set bit offset
       for (int i = 0; i < NUM_ITERATIONS - 100; i++) {
         int n = RANDOM.nextInt(100) + 1;
-        assertEquals(dataBitSet
-                .getNextNthSetBitOffset(setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1, n),
+        assertEquals(BasePinotBitSet
+                .getNextNthSetBitOffset(dataBuffer, setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1, n),
             setBitOffsets[i + n]);
       }
     }
