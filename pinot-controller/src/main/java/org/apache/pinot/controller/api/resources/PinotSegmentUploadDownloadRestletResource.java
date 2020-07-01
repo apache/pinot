@@ -322,7 +322,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
     // encrypt segment
     PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassNameInTableConfig);
-    LOGGER.info("Using crypter class '{}' for encrypting '{}' to '{}' (segment name = '{}}', table name = '{}').",
+    LOGGER.info("Using crypter class '{}' for encrypting '{}' to '{}' (segment name = '{}', table name = '{}').",
         crypterClassNameInTableConfig, tempDecryptedFile, tempEncryptedFile, segmentName, tableName);
     pinotCrypter.encrypt(tempDecryptedFile, tempEncryptedFile);
 
