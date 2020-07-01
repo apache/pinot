@@ -662,7 +662,9 @@ public class CalciteSqlParser {
   private static String extractFunctionName(SqlBasicCall funcSqlNode) {
     String funcName = funcSqlNode.getOperator().getKind().name();
     if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
-      funcName = funcSqlNode.getOperator().getName();
+      // in-built functions like REGEXP_LIKE, TEXT_MATCH that are not natively
+      // supported by Calcite grammar
+      funcName = funcSqlNode.getOperator().getName().toUpperCase();
     }
     if (funcName.equalsIgnoreCase(SqlKind.COUNT.toString()) && (funcSqlNode.getFunctionQuantifier() != null)
         && funcSqlNode.getFunctionQuantifier().toValue().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
