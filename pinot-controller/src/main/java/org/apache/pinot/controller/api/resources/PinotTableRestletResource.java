@@ -366,34 +366,16 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
     }
 
-    // Disable table on tableType
-    if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      // disable offline table
-      _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.DISABLE);
-    }
-    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      // disable real-time table
-      _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.DISABLE);
-    }
+    // Disable table by tableType
+    toggleTableState(tableName, tableType, StateType.DISABLE);
 
     // Get all segment names for table and delete all segments
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
     List<String> segmentNames = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType);
     PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentNames);
-    
-    // Enable table on tableType
-    if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      // disable offline table
-      _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.ENABLE);
-    }
-    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      // disable real-time table
-      _pinotHelixResourceManager.toggleTableState(tableNameWithType, StateType.ENABLE);
-    }
+
+    // Enable table by tableType
+    toggleTableState(tableName, tableType, StateType.DISABLE);
 
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
@@ -403,6 +385,20 @@ public class PinotTableRestletResource {
 
     return new SuccessResponse("Table " + tableName + " successfully truncated");
   }
+  
+  private void toggleTableState(String tableName, TableType tableType, StateType status) {
+    if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      // toggle offline table status
+      _pinotHelixResourceManager.toggleTableState(tableNameWithType, status);
+    }
+    if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      // toggle real-time table status
+      _pinotHelixResourceManager.toggleTableState(tableNameWithType, status);
+    }
+  }
+  
 
   @POST
   @Path("/tables/validate")
