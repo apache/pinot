@@ -271,12 +271,6 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   }
 
   @Override
-  public ResultSetMetaData getMetaData()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
   public Reader getNCharacterStream(int columnIndex)
       throws SQLException {
     throw new SQLFeatureNotSupportedException();

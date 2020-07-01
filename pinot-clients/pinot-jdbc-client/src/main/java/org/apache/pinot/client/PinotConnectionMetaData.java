@@ -23,7 +23,6 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.RowIdLifetime;
 import java.sql.SQLException;
-import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.utils.DriverUtils;
 
 
@@ -72,19 +71,19 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean nullsAreSortedHigh()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean nullsAreSortedLow()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean nullsAreSortedAtStart()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -130,13 +129,13 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean usesLocalFiles()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean usesLocalFilePerTable()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -461,85 +460,85 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsCatalogsInDataManipulation()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsCatalogsInProcedureCalls()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsCatalogsInTableDefinitions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsCatalogsInIndexDefinitions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsCatalogsInPrivilegeDefinitions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsPositionedDelete()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsPositionedUpdate()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSelectForUpdate()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsStoredProcedures()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSubqueriesInComparisons()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSubqueriesInExists()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSubqueriesInIns()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSubqueriesInQuantifieds()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsCorrelatedSubqueries()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -749,105 +748,105 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern,
       String columnNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getSchemas()
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getCatalogs()
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getTableTypes()
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getColumnPrivileges(String catalog, String schema, String table, String columnNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getTablePrivileges(String catalog, String schemaPattern, String tableNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getBestRowIdentifier(String catalog, String schema, String table, int scope, boolean nullable)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getVersionColumns(String catalog, String schema, String table)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getPrimaryKeys(String catalog, String schema, String table)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getImportedKeys(String catalog, String schema, String table)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getExportedKeys(String catalog, String schema, String table)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getCrossReference(String parentCatalog, String parentSchema, String parentTable,
       String foreignCatalog, String foreignSchema, String foreignTable)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getTypeInfo()
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
@@ -926,7 +925,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public ResultSet getUDTs(String catalog, String schemaPattern, String typeNamePattern, int[] types)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
@@ -962,20 +961,20 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public ResultSet getSuperTypes(String catalog, String schemaPattern, String typeNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getSuperTables(String catalog, String schemaPattern, String tableNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getAttributes(String catalog, String schemaPattern, String typeNamePattern,
       String attributeNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
@@ -1041,7 +1040,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public ResultSet getSchemas(String catalog, String schemaPattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
@@ -1059,27 +1058,27 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public ResultSet getClientInfoProperties()
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getFunctions(String catalog, String schemaPattern, String functionNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getFunctionColumns(String catalog, String schemaPattern, String functionNamePattern,
       String columnNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getPseudoColumns(String catalog, String schemaPattern, String tableNamePattern,
       String columnNamePattern)
       throws SQLException {
-    return null;
+    return PinotResultSet.empty();
   }
 
   @Override

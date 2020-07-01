@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -45,12 +46,14 @@ public class PinotResultSet extends AbstractBaseResultSet {
   private int _currentRow;
   private int _totalColumns;
   private Map<String, Integer> _columns = new HashMap<>();
+  private boolean _closed;
 
   public PinotResultSet(org.apache.pinot.client.ResultSet resultSet) {
     _resultSet = resultSet;
     _totalRows = _resultSet.getRowCount();
     _totalColumns = _resultSet.getColumnCount();
     _currentRow = -1;
+    _closed = false;
     for (int i = 0; i < _totalColumns; i++) {
       _columns.put(_resultSet.getColumnName(i), i + 1);
     }
@@ -59,11 +62,16 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public PinotResultSet() {
     _totalRows = 0;
     _currentRow = -1;
+    _totalColumns = 0;
+  }
+
+  public static PinotResultSet empty() {
+    return new PinotResultSet();
   }
 
   protected void validateState()
       throws SQLException {
-    if (_resultSet == null) {
+    if (isClosed()) {
       throw new SQLException("Not possible to operate on closed or empty result sets");
     }
   }
@@ -116,6 +124,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
     _totalRows = 0;
     _currentRow = -1;
     _columns.clear();
+    _closed = true;
   }
 
   @Override
@@ -126,6 +135,13 @@ public class PinotResultSet extends AbstractBaseResultSet {
     } else {
       throw new SQLException("Column with label " + columnLabel + " not found in ResultSet");
     }
+  }
+
+  @Override
+  public ResultSetMetaData getMetaData()
+      throws SQLException {
+    validateState();
+    return new PinotResultMetadata(_totalColumns, _columns);
   }
 
   @Override
@@ -309,7 +325,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean isClosed()
       throws SQLException {
-    return (_resultSet == null);
+    return _closed;
   }
 
   @Override

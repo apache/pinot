@@ -38,11 +38,13 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   private ResultSetGroup _resultSetGroup;
   private PreparedStatement _preparedStatement;
   private String _query;
+  private boolean _closed;
 
   public PinotPreparedStatement(PinotConnection connection, String query) {
     _connection = connection;
     _session = connection.getSession();
     _query = query;
+    _closed = false;
     _preparedStatement = new PreparedStatement(_session, new Request(QUERY_FORMAT, query));
   }
 
@@ -170,12 +172,10 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   @Override
   public void close()
       throws SQLException {
-    if (!isClosed()) {
-      _connection.close();
-    }
     _preparedStatement = null;
     _connection = null;
     _session = null;
+    _closed = true;
   }
 
   @Override
@@ -188,6 +188,6 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   @Override
   public boolean isClosed()
       throws SQLException {
-    return (_connection == null);
+    return _closed;
   }
 }
