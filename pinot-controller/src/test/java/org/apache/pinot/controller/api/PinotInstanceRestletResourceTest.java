@@ -23,7 +23,6 @@ import com.google.common.base.Function;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
@@ -37,7 +36,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 import static org.testng.Assert.fail;
 
 
@@ -64,7 +62,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       try {
         String getResponse = sendGetRequest(listInstancesUrl);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
-        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() >= 1)
+        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() == 1)
             && (jsonNode.get("instances").get(0).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE));
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -121,6 +119,22 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     checkInstanceInfo("Broker_2.3.4.5_1234", "Broker_2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, null);
     checkInstanceInfo("Server_2.3.4.5_2345", "Server_2.3.4.5", 2345, new String[]{"tag_OFFLINE", "tag_REALTIME"},
         new String[]{"tag_OFFLINE", "tag_REALTIME"}, new int[]{0, 1});
+
+    // Test PUT Instance API
+    String newBrokerTag = "new-broker-tag";
+    Instance newBrokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null);
+    String brokerInstanceId = "Broker_1.2.3.4_1234";
+    String brokerInstanceUrl = _controllerRequestURLBuilder.forInstance(brokerInstanceId);
+    sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
+
+    String newServerTag = "new-server-tag";
+    Instance newServerInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null);
+    String serverInstanceId = "Server_1.2.3.4_2345";
+    String serverInstanceUrl = _controllerRequestURLBuilder.forInstance(serverInstanceId);
+    sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
+
+    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{newBrokerTag}, null, null);
+    checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345, new String[]{newServerTag}, null, null);
   }
 
   private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
@@ -175,47 +189,6 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
         throw new RuntimeException(e);
       }
     }, GET_CALL_TIMEOUT_MS, "Expected " + numInstances + " instances after creation of tagged instances");
-  }
-
-  @Test
-  public void testPutInstance()
-      throws IOException {
-    // Check that there is only one CONTROLLER instance in the cluster
-    String listInstancesUrl = _controllerRequestURLBuilder.forInstanceList();
-
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String getResponse = sendGetRequest(listInstancesUrl);
-        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
-        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() >= 1)
-            && (jsonNode.get("instances").get(0).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, GET_CALL_TIMEOUT_MS, "Expected one controller instance");
-
-    // Create untagged broker and server instances
-    String createInstanceUrl = _controllerRequestURLBuilder.forInstanceCreate();
-    String brokerInstanceId = "Broker_a.b.c.d_1234";
-    Instance brokerInstance = new Instance("a.b.c.d", 1234, InstanceType.BROKER, null, null);
-    sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
-    String brokerInstanceUrl = _controllerRequestURLBuilder.forInstance(brokerInstanceId);
-
-    String serverInstanceId = "Server_e.f.g.h_2345";
-    Instance serverInstance = new Instance("e.f.g.h", 2345, InstanceType.SERVER, Arrays.asList(UNTAGGED_SERVER_INSTANCE), null);
-    sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
-    String serverInstanceUrl = _controllerRequestURLBuilder.forInstance(serverInstanceId);
-
-    String newBrokerTag = "new-broker-tag";
-    Instance newBrokerInstance = new Instance("a.b.c.d", 1234, InstanceType.BROKER, Arrays.asList(newBrokerTag), null);
-    sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
-
-    String newServerTag = "new-server-tag";
-    Instance newServerInstance = new Instance("e.f.g.h", 2345, InstanceType.SERVER, Arrays.asList(newServerTag), null);
-    sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
-
-    checkInstanceInfo(brokerInstanceId, "Broker_a.b.c.d", 1234, new String[]{newBrokerTag}, null, null);
-    checkInstanceInfo(serverInstanceId, "Server_e.f.g.h", 2345, new String[]{newServerTag}, null, null);
   }
 
   @AfterClass
