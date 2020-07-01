@@ -24,19 +24,19 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -187,33 +187,35 @@ public class BrokerReduceService {
       return brokerResponseNative;
     }
 
-    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(brokerRequest);
+    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(queryContext);
     dataTableReducer
         .reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
-    updateAliasToSchemaName(brokerRequest, brokerResponseNative);
+    updateAlias(queryContext, brokerResponseNative);
     return brokerResponseNative;
   }
 
-  private static void updateAliasToSchemaName(BrokerRequest brokerRequest, BrokerResponseNative brokerResponseNative) {
-    if (brokerRequest.getPinotQuery() == null) {
+  private static void updateAlias(QueryContext queryContext, BrokerResponseNative brokerResponseNative) {
+    ResultTable resultTable = brokerResponseNative.getResultTable();
+    if (resultTable == null) {
       return;
     }
-    QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
-    if (!queryOptions.isResponseFormatSQL()) {
+    Map<ExpressionContext, String> aliasMap = queryContext.getAliasMap();
+    if (aliasMap.isEmpty()) {
       return;
     }
-    DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
-    List<Expression> selectList = brokerRequest.getPinotQuery().getSelectList();
-    String[] columnNames = dataSchema.getColumnNames();
-    int selectListSize = selectList.size();
+
+    String[] columnNames = resultTable.getDataSchema().getColumnNames();
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    int numSelectExpressions = selectExpressions.size();
     // For query like `SELECT *`, we skip alias update.
-    if (columnNames.length != selectListSize) {
+    if (columnNames.length != numSelectExpressions) {
       return;
     }
-    for (int i = 0; i < selectListSize; i++) {
-      Function selectFunc = selectList.get(i).getFunctionCall();
-      if (selectFunc != null && selectFunc.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
-        columnNames[i] = selectFunc.getOperands().get(1).getIdentifier().getName();
+    for (int i = 0; i < numSelectExpressions; i++) {
+      String alias = aliasMap.get(selectExpressions.get(i));
+      if (alias != null) {
+        columnNames[i] = alias;
       }
     }
   }

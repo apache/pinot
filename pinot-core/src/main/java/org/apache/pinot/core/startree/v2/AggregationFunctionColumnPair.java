@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.AggregationFunctionType;
 
 
@@ -27,12 +26,11 @@ public class AggregationFunctionColumnPair {
   public static final String STAR = "*";
   public static final AggregationFunctionColumnPair COUNT_STAR =
       new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, STAR);
-  public static final String COUNT_STAR_COLUMN_NAME = COUNT_STAR.toColumnName();
 
   private final AggregationFunctionType _functionType;
   private final String _column;
 
-  public AggregationFunctionColumnPair(@Nonnull AggregationFunctionType functionType, @Nonnull String column) {
+  public AggregationFunctionColumnPair(AggregationFunctionType functionType, String column) {
     _functionType = functionType;
     if (functionType == AggregationFunctionType.COUNT) {
       _column = STAR;
@@ -41,28 +39,23 @@ public class AggregationFunctionColumnPair {
     }
   }
 
-  @Nonnull
   public AggregationFunctionType getFunctionType() {
     return _functionType;
   }
 
-  @Nonnull
   public String getColumn() {
     return _column;
   }
 
-  @Nonnull
   public String toColumnName() {
     return toColumnName(_functionType, _column);
   }
 
-  @Nonnull
   public static String toColumnName(AggregationFunctionType functionType, String column) {
     return functionType.getName() + DELIMITER + column;
   }
 
-  @Nonnull
-  public static AggregationFunctionColumnPair fromColumnName(@Nonnull String columnName) {
+  public static AggregationFunctionColumnPair fromColumnName(String columnName) {
     String[] parts = columnName.split(DELIMITER, 2);
     AggregationFunctionType functionType = AggregationFunctionType.valueOf(parts[0].toUpperCase());
     if (functionType == AggregationFunctionType.COUNT) {

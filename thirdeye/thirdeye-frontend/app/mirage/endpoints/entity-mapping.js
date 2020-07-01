@@ -27,6 +27,13 @@ export default function (server) {
     ];
   });
 
+  /**
+   * get request for rules
+   */
+  server.get('/detection/rule', () => {
+    return [];
+  });
+
   server.get('/external/services/all', () => {
     return [
       'service 1',

@@ -64,9 +64,7 @@ public class BrokerRequestToQueryContextConverter {
     if (pinotQuery != null) {
       aliasMap = new HashMap<>();
       List<Expression> selectList = pinotQuery.getSelectList();
-      int numExpressions = selectList.size();
-      List<ExpressionContext> aggregationExpressions = new ArrayList<>(numExpressions);
-      List<ExpressionContext> nonAggregationExpressions = new ArrayList<>(numExpressions);
+      selectExpressions = new ArrayList<>(selectList.size());
       for (Expression thriftExpression : selectList) {
         ExpressionContext expression;
         if (thriftExpression.getType() == ExpressionType.FUNCTION && thriftExpression.getFunctionCall().getOperator()
@@ -78,27 +76,13 @@ public class BrokerRequestToQueryContextConverter {
         } else {
           expression = QueryContextConverterUtils.getExpression(thriftExpression);
         }
-        if (expression.getType() == ExpressionContext.Type.FUNCTION
-            && expression.getFunction().getType() == FunctionContext.Type.AGGREGATION) {
-          aggregationExpressions.add(expression);
-        } else {
-          nonAggregationExpressions.add(expression);
-        }
+        selectExpressions.add(expression);
       }
-      if (aggregationExpressions.isEmpty()) {
-        // NOTE: Pinot ignores the GROUP-BY clause when there is no aggregation expressions in the SELECT clause.
-        selectExpressions = nonAggregationExpressions;
-      } else {
-        // NOTE: Pinot ignores the non-aggregation expressions when there are aggregation expressions in the SELECT
-        //       clause. E.g. SELECT a, SUM(b) -> SELECT SUM(b).
-        selectExpressions = aggregationExpressions;
-
-        List<Expression> groupByList = pinotQuery.getGroupByList();
-        if (CollectionUtils.isNotEmpty(groupByList)) {
-          groupByExpressions = new ArrayList<>(groupByList.size());
-          for (Expression thriftExpression : groupByList) {
-            groupByExpressions.add(QueryContextConverterUtils.getExpression(thriftExpression));
-          }
+      List<Expression> groupByList = pinotQuery.getGroupByList();
+      if (CollectionUtils.isNotEmpty(groupByList)) {
+        groupByExpressions = new ArrayList<>(groupByList.size());
+        for (Expression thriftExpression : groupByList) {
+          groupByExpressions.add(QueryContextConverterUtils.getExpression(thriftExpression));
         }
       }
       limit = pinotQuery.getLimit();
@@ -127,10 +111,11 @@ public class BrokerRequestToQueryContextConverter {
           List<String> stringExpressions = aggregationInfo.getExpressions();
           int numArguments = stringExpressions.size();
           List<ExpressionContext> arguments = new ArrayList<>(numArguments);
-          if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH.getName())) {
-            // NOTE: For DistinctCountThetaSketch, because of the legacy behavior of PQL compiler treating string
-            //       literal as identifier in aggregation, here we treat all expressions except for the first one as
-            //       string literal.
+          if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH.getName()) || functionName
+              .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH.getName())) {
+            // NOTE: For DistinctCountThetaSketch and DistinctCountRawThetaSketch, because of the legacy behavior of PQL
+            //       compiler treating string literal as identifier in aggregation, here we treat all expressions except
+            //       for the first one as string literal.
             arguments.add(QueryContextConverterUtils.getExpression(stringExpressions.get(0)));
             for (int i = 1; i < numArguments; i++) {
               arguments.add(ExpressionContext.forLiteral(stringExpressions.get(i)));

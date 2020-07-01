@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.EqPredicate;
 import org.apache.pinot.core.query.request.context.predicate.InPredicate;
 import org.apache.pinot.core.query.request.context.predicate.IsNotNullPredicate;
@@ -47,6 +48,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
 public class QueryContextConverterUtils {
@@ -54,6 +56,21 @@ public class QueryContextConverterUtils {
   }
 
   private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
+  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
+
+  /**
+   * Converts the given PQL query into a {@link QueryContext}.
+   */
+  public static QueryContext getQueryContextFromPQL(String pqlQuery) {
+    return BrokerRequestToQueryContextConverter.convert(PQL_COMPILER.compileToBrokerRequest(pqlQuery));
+  }
+
+  /**
+   * Converts the given SQL query into a {@link QueryContext}.
+   */
+  public static QueryContext getQueryContextFromSQL(String sqlQuery) {
+    return BrokerRequestToQueryContextConverter.convert(SQL_COMPILER.compileToBrokerRequest(sqlQuery));
+  }
 
   /**
    * Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
@@ -125,6 +142,11 @@ public class QueryContextConverterUtils {
    */
   public static FunctionContext getFunction(FunctionCallAstNode astNode) {
     String functionName = astNode.getName();
+    if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+      // NOTE: COUNT always take one single argument "*"
+      return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
+          Collections.singletonList(ExpressionContext.forIdentifier("*")));
+    }
     FunctionContext.Type functionType =
         FunctionDefinitionRegistry.isAggFunc(functionName) ? FunctionContext.Type.AGGREGATION
             : FunctionContext.Type.TRANSFORM;

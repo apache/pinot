@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -29,8 +30,8 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testDivisionTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("div(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("div(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     Assert.assertEquals(transformFunction.getName(), DivisionTransformFunction.FUNCTION_NAME);
@@ -40,8 +41,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("div(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("div(%s,%s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -50,7 +50,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("div(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
+        QueryContextConverterUtils.getExpression(String.format("div(%s,%s)", FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -58,8 +58,8 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("div(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
+    expression =
+        QueryContextConverterUtils.getExpression(String.format("div(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -67,8 +67,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("div(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
+    expression = QueryContextConverterUtils.getExpression(String.format("div(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -76,7 +75,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree.compileToExpressionTree(String
+    expression = QueryContextConverterUtils.getExpression(String
         .format("div(div(div(div(div(12,%s),%s),div(div(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
             FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
@@ -91,7 +90,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(expressionStr);
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

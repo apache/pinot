@@ -19,14 +19,17 @@
 
 package org.apache.pinot.thirdeye.auto.onboard;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeGranularitySpec;
-import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
@@ -44,15 +47,24 @@ public class ConfigGenerator {
   private static final String NON_ADDITIVE = "non_additive";
   private static final String PINOT_PRE_AGGREGATED_KEYWORD = "*";
 
-  public static void setTimeSpecs(DatasetConfigDTO datasetConfigDTO, TimeGranularitySpec timeSpec) {
-    datasetConfigDTO.setTimeColumn(timeSpec.getName());
-    datasetConfigDTO.setTimeDuration(timeSpec.getTimeUnitSize());
-    datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
-    datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
-    datasetConfigDTO.setExpectedDelay(getExpectedDelayFromTimeunit(timeSpec.getTimeType()));
-    if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()) || timeSpec.getTimeFormat().equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
-      datasetConfigDTO.setTimezone(PDT_TIMEZONE);
-    }
+  public static void setDateTimeSpecs(DatasetConfigDTO datasetConfigDTO, DateTimeFieldSpec dateTimeFieldSpec) {
+    Preconditions.checkNotNull(dateTimeFieldSpec);
+    DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+    String timeFormatStr = formatSpec.getTimeFormat().equals(TimeFormat.SIMPLE_DATE_FORMAT) ? String
+        .format("%s:%s", TimeFormat.SIMPLE_DATE_FORMAT.toString(), formatSpec.getSDFPattern())
+        : TimeFormat.EPOCH.toString();
+    setDateTimeSpecs(datasetConfigDTO, dateTimeFieldSpec.getName(), timeFormatStr, formatSpec.getColumnSize(),
+        formatSpec.getColumnUnit());
+  }
+
+  public static void setDateTimeSpecs(DatasetConfigDTO datasetConfigDTO, String timeColumnName, String timeFormatStr,
+      int columnSize, TimeUnit columnUnit) {
+    datasetConfigDTO.setTimeColumn(timeColumnName);
+    datasetConfigDTO.setTimeDuration(columnSize);
+    datasetConfigDTO.setTimeUnit(columnUnit);
+    datasetConfigDTO.setTimeFormat(timeFormatStr);
+    datasetConfigDTO.setExpectedDelay(getExpectedDelayFromTimeunit(columnUnit));
+    datasetConfigDTO.setTimezone(PDT_TIMEZONE);
     // set the data granularity of epoch timestamp dataset to minute-level
     if (datasetConfigDTO.getTimeFormat().equals(TimeSpec.SINCE_EPOCH_FORMAT) && datasetConfigDTO.getTimeUnit()
         .equals(TimeUnit.MILLISECONDS) && (datasetConfigDTO.getNonAdditiveBucketSize() == null
@@ -62,15 +74,15 @@ public class ConfigGenerator {
     }
   }
 
-  public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema,
+  public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema, String timeColumnName,
       Map<String, String> customConfigs) {
     List<String> dimensions = schema.getDimensionNames();
-    TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
+    DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
     // Create DatasetConfig
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
     datasetConfigDTO.setDataset(dataset);
     datasetConfigDTO.setDimensions(dimensions);
-    setTimeSpecs(datasetConfigDTO, timeSpec);
+    setDateTimeSpecs(datasetConfigDTO, dateTimeFieldSpec);
     datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
     datasetConfigDTO.setProperties(customConfigs);
     checkNonAdditive(datasetConfigDTO);

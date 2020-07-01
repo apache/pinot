@@ -20,12 +20,8 @@ package org.apache.pinot.common.utils.request;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.Stack;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang.mutable.MutableInt;
@@ -37,9 +33,6 @@ import org.apache.pinot.common.request.FilterQueryMap;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FloatingPointLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
@@ -244,59 +237,6 @@ public class RequestUtils {
     }
 
     return new FilterQueryTree(q.getColumn(), q.getValue(), q.getOperator(), c);
-  }
-
-  /**
-   * Extracts all columns from the given filter query tree.
-   */
-  public static Set<String> extractFilterColumns(FilterQueryTree root) {
-    Set<String> filterColumns = new HashSet<>();
-    if (root.getChildren() == null) {
-      root.getExpression().getColumns(filterColumns);
-    } else {
-      Stack<FilterQueryTree> stack = new Stack<>();
-      stack.add(root);
-      while (!stack.empty()) {
-        FilterQueryTree node = stack.pop();
-        for (FilterQueryTree child : node.getChildren()) {
-          if (child.getChildren() == null) {
-            child.getExpression().getColumns(filterColumns);
-          } else {
-            stack.push(child);
-          }
-        }
-      }
-    }
-    return filterColumns;
-  }
-
-  /**
-   * Extracts all columns from the given expressions.
-   */
-  public static Set<String> extractColumnsFromExpressions(Set<TransformExpressionTree> expressions) {
-    Set<String> expressionColumns = new HashSet<>();
-    for (TransformExpressionTree expression : expressions) {
-      expression.getColumns(expressionColumns);
-    }
-    return expressionColumns;
-  }
-
-  /**
-   * Extracts all columns from the given selection, '*' will be ignored.
-   */
-  public static Set<String> extractSelectionColumns(Selection selection) {
-    Set<String> selectionColumns = new LinkedHashSet<>();
-    for (String selectionColumn : selection.getSelectionColumns()) {
-      if (!selectionColumn.equals("*")) {
-        selectionColumns.add(selectionColumn);
-      }
-    }
-    if (selection.getSelectionSortSequence() != null) {
-      for (SelectionSort selectionSort : selection.getSelectionSortSequence()) {
-        selectionColumns.add(selectionSort.getColumn());
-      }
-    }
-    return selectionColumns;
   }
 
   /**

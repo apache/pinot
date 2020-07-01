@@ -20,38 +20,36 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 
 
 /**
  * Base implementation of {@link AggregationFunction} with single input expression.
  */
 public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable> implements AggregationFunction<I, F> {
-  protected final String _column;
-  protected final TransformExpressionTree _expression;
+  protected final ExpressionContext _expression;
 
   /**
    * Constructor for the class.
    *
-   * @param column Column to aggregate on (could be column name or transform function).
+   * @param expression Expression to aggregate on.
    */
-  public BaseSingleInputAggregationFunction(String column) {
-    _column = column;
-    _expression = TransformExpressionTree.compileToExpressionTree(column);
+  public BaseSingleInputAggregationFunction(ExpressionContext expression) {
+    _expression = expression;
   }
 
   @Override
   public String getColumnName() {
-    return getType().getName() + "_" + _column;
+    return getType().getName() + "_" + _expression;
   }
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _column + ")";
+    return getType().getName().toLowerCase() + "(" + _expression + ")";
   }
 
   @Override
-  public List<TransformExpressionTree> getInputExpressions() {
+  public List<ExpressionContext> getInputExpressions() {
     return Collections.singletonList(_expression);
   }
 }

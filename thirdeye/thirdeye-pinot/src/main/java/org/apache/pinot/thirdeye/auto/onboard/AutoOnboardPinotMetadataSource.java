@@ -39,9 +39,11 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -55,7 +57,7 @@ import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.auto.onboard.ConfigGenerator.*;
+import static org.apache.pinot.thirdeye.auto.onboard.ConfigGenerator.checkNonAdditive;
 
 /**
  * This is a service to onboard datasets automatically to thirdeye from pinot
@@ -105,15 +107,17 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
       List<String> allDatasets = new ArrayList<>();
       Map<String, Schema> allSchemas = new HashMap<>();
       Map<String, Map<String, String>> allCustomConfigs = new HashMap<>();
-      loadDatasets(allDatasets, allSchemas, allCustomConfigs);
+      Map<String, String> datasetToTimeColumn = new HashMap<>();
+      loadDatasets(allDatasets, allSchemas, allCustomConfigs, datasetToTimeColumn);
       LOG.info("Checking all datasets");
       deactivateDatasets(allDatasets);
       for (String dataset : allDatasets) {
         LOG.info("Checking dataset {}", dataset);
         Schema schema = allSchemas.get(dataset);
         Map<String, String> customConfigs = allCustomConfigs.get(dataset);
+        String timeColumnName = datasetToTimeColumn.get(dataset);
         DatasetConfigDTO datasetConfig = datasetDAO.findByDataset(dataset);
-        addPinotDataset(dataset, schema, customConfigs, datasetConfig);
+        addPinotDataset(dataset, schema, timeColumnName, customConfigs, datasetConfig);
       }
     } catch (Exception e) {
       LOG.error("Exception in loading datasets", e);
@@ -161,31 +165,28 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
 
   /**
    * Adds a dataset to the thirdeye database
-   * @param dataset
-   * @param schema
-   * @param datasetConfig
    */
-  public void addPinotDataset(String dataset, Schema schema, Map<String, String> customConfigs,
-      DatasetConfigDTO datasetConfig) throws Exception {
+  public void addPinotDataset(String dataset, Schema schema, String timeColumnName, Map<String, String> customConfigs,
+      DatasetConfigDTO datasetConfig)
+      throws Exception {
     if (datasetConfig == null) {
       LOG.info("Dataset {} is new, adding it to thirdeye", dataset);
-      addNewDataset(dataset, schema, customConfigs);
+      addNewDataset(dataset, schema, timeColumnName, customConfigs);
     } else {
       LOG.info("Dataset {} already exists, checking for updates", dataset);
-      refreshOldDataset(dataset, schema, customConfigs, datasetConfig);
+      refreshOldDataset(dataset, schema, timeColumnName, customConfigs, datasetConfig);
     }
   }
 
   /**
    * Adds a new dataset to the thirdeye database
-   * @param dataset
-   * @param schema
    */
-  private void addNewDataset(String dataset, Schema schema, Map<String, String> customConfigs) throws Exception {
+  private void addNewDataset(String dataset, Schema schema, String timeColumnName, Map<String, String> customConfigs) {
     List<MetricFieldSpec> metricSpecs = schema.getMetricFieldSpecs();
 
     // Create DatasetConfig
-    DatasetConfigDTO datasetConfigDTO = ConfigGenerator.generateDatasetConfig(dataset, schema, customConfigs);
+    DatasetConfigDTO datasetConfigDTO =
+        ConfigGenerator.generateDatasetConfig(dataset, schema, timeColumnName, customConfigs);
     LOG.info("Creating dataset for {}", dataset);
     this.datasetDAO.save(datasetConfigDTO);
 
@@ -200,15 +201,12 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
   /**
    * Refreshes an existing dataset in the thirdeye database
    * with any dimension/metric changes from pinot schema
-   * @param dataset
-   * @param schema
-   * @param datasetConfig
    */
-  private void refreshOldDataset(String dataset, Schema schema, Map<String, String> customConfigs,
-      DatasetConfigDTO datasetConfig) throws Exception {
+  private void refreshOldDataset(String dataset, Schema schema, String timeColumnName,
+      Map<String, String> customConfigs, DatasetConfigDTO datasetConfig) {
     checkDimensionChanges(dataset, datasetConfig, schema);
     checkMetricChanges(dataset, datasetConfig, schema);
-    checkTimeFieldChanges(datasetConfig, schema);
+    checkTimeFieldChanges(datasetConfig, schema, timeColumnName);
     appendNewCustomConfigs(datasetConfig, customConfigs);
     checkNonAdditive(datasetConfig);
     datasetConfig.setActive(true);
@@ -338,16 +336,21 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
 
   }
 
-  private void checkTimeFieldChanges(DatasetConfigDTO datasetConfig, Schema schema) {
-    TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
-    if (!datasetConfig.getTimeColumn().equals(timeSpec.getName())
-        || !datasetConfig.getTimeFormat().equals(timeSpec.getTimeFormat())
-        || datasetConfig.bucketTimeGranularity().getUnit() != timeSpec.getTimeType()
-        || datasetConfig.bucketTimeGranularity().getSize() != timeSpec.getTimeUnitSize()) {
-      ConfigGenerator.setTimeSpecs(datasetConfig, timeSpec);
+  private void checkTimeFieldChanges(DatasetConfigDTO datasetConfig, Schema schema, String timeColumnName) {
+    DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+    DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+    String timeFormatStr = formatSpec.getTimeFormat().equals(TimeFormat.SIMPLE_DATE_FORMAT) ? String
+        .format("%s:%s", TimeFormat.SIMPLE_DATE_FORMAT.toString(), formatSpec.getSDFPattern())
+        : TimeFormat.EPOCH.toString();
+    if (!datasetConfig.getTimeColumn().equals(timeColumnName)
+        || !datasetConfig.getTimeFormat().equals(timeFormatStr)
+        || datasetConfig.bucketTimeGranularity().getUnit() != formatSpec.getColumnUnit()
+        || datasetConfig.bucketTimeGranularity().getSize() != formatSpec.getColumnSize()) {
+      ConfigGenerator.setDateTimeSpecs(datasetConfig, timeColumnName, timeFormatStr, formatSpec.getColumnSize(),
+          formatSpec.getColumnUnit());
       DAO_REGISTRY.getDatasetConfigDAO().update(datasetConfig);
       LOG.info("Refreshed time field. name = {}, format = {}, type = {}, unit size = {}.",
-          timeSpec.getName(), timeSpec.getTimeType(), timeSpec.getTimeType(), timeSpec.getTimeUnitSize());
+          timeColumnName, timeFormatStr, formatSpec.getColumnUnit(), formatSpec.getColumnSize());
     }
   }
 
@@ -385,28 +388,36 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
   }
 
   /**
-   * Reads all table names in pinot, and loads their schema
-   * @param allSchemas
-   * @param allDatasets
-   * @throws IOException
+   * For every table in Pinot, fetches the following:
+   * 1. Pinot schema
+   * 2. TimeColumnName from Pinot table config
+   * 3. Custom property map from Pinot table config
    */
   private void loadDatasets(List<String> allDatasets, Map<String, Schema> allSchemas,
-      Map<String, Map<String, String>> allCustomConfigs) throws IOException {
+      Map<String, Map<String, String>> allCustomConfigs, Map<String, String> datasetToTimeColumnMap) throws IOException {
 
     JsonNode tables = autoLoadPinotMetricsUtils.getAllTablesFromPinot();
     LOG.info("Getting all schemas");
     for (JsonNode table : tables) {
       String dataset = table.asText();
-      Map<String, String> pinotCustomProperty = autoLoadPinotMetricsUtils.getCustomConfigsFromPinotEndpoint(dataset);
       Schema schema = autoLoadPinotMetricsUtils.getSchemaFromPinot(dataset);
       if (schema != null) {
-        if (!autoLoadPinotMetricsUtils.verifySchemaCorrectness(schema)) {
-          LOG.info("Skipping {} due to incorrect schema", dataset);
-        } else {
-          allDatasets.add(dataset);
-          allSchemas.put(dataset, schema);
-          allCustomConfigs.put(dataset, pinotCustomProperty);
+        JsonNode tableConfigJson = autoLoadPinotMetricsUtils.getTableConfigFromPinotEndpoint(dataset);
+        String timeColumnName = null;
+        Map<String, String> pinotCustomProperty = null;
+        if (tableConfigJson != null && !tableConfigJson.isNull()) {
+          timeColumnName = autoLoadPinotMetricsUtils.extractTimeColumnFromPinotTable(tableConfigJson);
+          pinotCustomProperty =
+              autoLoadPinotMetricsUtils.extractCustomConfigsFromPinotTable(tableConfigJson);
         }
+        if (!autoLoadPinotMetricsUtils.verifySchemaCorrectness(schema, timeColumnName)) {
+          LOG.info("Skipping {} due to incorrect schema", dataset);
+          continue;
+        }
+        allDatasets.add(dataset);
+        allSchemas.put(dataset, schema);
+        allCustomConfigs.put(dataset, pinotCustomProperty);
+        datasetToTimeColumnMap.put(dataset, timeColumnName);
       }
     }
   }

@@ -1,7 +1,5 @@
 logging:
-  level: INFO
-  loggers:
-    org.hibernate.engine.internal: WARN
+  type: external
 server:
   type: default
   rootPath: '/api/*'
@@ -13,6 +11,8 @@ server:
   adminConnectors:
     - type: http
       port: 1868
+  requestLog:
+    type: external
 alert: false
 autoload: false
 classifier: false

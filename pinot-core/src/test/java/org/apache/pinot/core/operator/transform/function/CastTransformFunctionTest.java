@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -29,8 +30,8 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testCastTransformFunction() {
-    TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("cast(%s,%s)", INT_SV_COLUMN, "'String'"));
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("cast(%s,%s)", INT_SV_COLUMN, "'String'"));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     Assert.assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
@@ -40,7 +41,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree.compileToExpressionTree(
+    expression = QueryContextConverterUtils.getExpression(
         String.format("cast(add(cast(%s, 'STRING'), %s), 'string')", STRING_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
@@ -49,7 +50,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree.compileToExpressionTree(
+    expression = QueryContextConverterUtils.getExpression(
         String.format("cast(cast(add(cast(%s, 'STRING'), %s), 'string'), 'double')", STRING_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
@@ -62,7 +63,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(expressionStr);
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

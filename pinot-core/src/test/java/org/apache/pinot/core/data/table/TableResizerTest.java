@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AvgAggregationFunction;
@@ -33,6 +32,9 @@ import org.apache.pinot.core.query.aggregation.function.DistinctCountAggregation
 import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -41,6 +43,7 @@ import org.testng.annotations.Test;
 /**
  * Tests the functionality of {@link @TableResizer}
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class TableResizerTest {
   private DataSchema _dataSchema;
   private AggregationFunction[] _aggregationFunctions;
@@ -54,8 +57,10 @@ public class TableResizerTest {
   public void setUp() {
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)", "distinctcount(m3)", "avg(m4)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.OBJECT});
-    _aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction(
-        "m2"), new DistinctCountAggregationFunction("m3"), new AvgAggregationFunction("m4")};
+    _aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction(
+        ExpressionContext.forIdentifier("m1")), new MaxAggregationFunction(
+        ExpressionContext.forIdentifier("m2")), new DistinctCountAggregationFunction(
+        ExpressionContext.forIdentifier("m3")), new AvgAggregationFunction(ExpressionContext.forIdentifier("m4"))};
 
     IntOpenHashSet i1 = new IntOpenHashSet();
     i1.add(1);
@@ -102,27 +107,21 @@ public class TableResizerTest {
   @Test
   public void testResizeRecordsMap() {
     Map<Key, Record> recordsMap;
-    SelectionSort selectionSort1 = new SelectionSort();
-    SelectionSort selectionSort2 = new SelectionSort();
-    SelectionSort selectionSort3 = new SelectionSort();
     // Test resize algorithm with numRecordsToEvict < trimToSize.
     // TotalRecords=5; trimToSize=3; numRecordsToEvict=2
 
     // d1 asc
-    selectionSort1.setColumn("d1");
-    selectionSort1.setIsAsc(true);
     recordsMap = new HashMap<>(_recordsMap);
-    TableResizer tableResizer =
-        new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    TableResizer tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true)));
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(_keys.get(0))); // a, b, c
     Assert.assertTrue(recordsMap.containsKey(_keys.get(1)));
 
     // d1 desc
-    selectionSort1.setColumn("d1");
-    selectionSort1.setIsAsc(false);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), false)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -130,12 +129,10 @@ public class TableResizerTest {
     Assert.assertTrue(recordsMap.containsKey(_keys.get(3)));
     Assert.assertTrue(recordsMap.containsKey(_keys.get(4)));
 
-    // d1 asc, d3 desc (tie breaking with 2nd comparator
-    selectionSort1.setColumn("d1");
-    selectionSort1.setIsAsc(true);
-    selectionSort2.setColumn("d3");
-    selectionSort2.setIsAsc(false);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays.asList(selectionSort1, selectionSort2));
+    // d1 asc, d3 desc (tie breaking with 2nd comparator)
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d3"), false)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -144,9 +141,8 @@ public class TableResizerTest {
     Assert.assertTrue(recordsMap.containsKey(_keys.get(4)));
 
     // d2 asc
-    selectionSort1.setColumn("d2");
-    selectionSort1.setIsAsc(true);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d2"), true)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -155,14 +151,10 @@ public class TableResizerTest {
     Assert.assertTrue(recordsMap.containsKey(_keys.get(3)));
 
     // d1 asc, sum(m1) desc, max(m2) desc
-    selectionSort1.setColumn("d1");
-    selectionSort1.setIsAsc(true);
-    selectionSort2.setColumn("sum(m1)");
-    selectionSort2.setIsAsc(false);
-    selectionSort3.setColumn("max(m2)");
-    selectionSort3.setIsAsc(false);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
-        Arrays.asList(selectionSort1, selectionSort2, selectionSort3));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sum(m1)"), false),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("max(m2)"), false)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -171,9 +163,8 @@ public class TableResizerTest {
     Assert.assertTrue(recordsMap.containsKey(_keys.get(2)));
 
     // object type avg(m4) asc
-    selectionSort1.setColumn("avg(m4)");
-    selectionSort1.setIsAsc(true);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections
+        .singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("avg(m4)"), true)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -182,11 +173,9 @@ public class TableResizerTest {
     Assert.assertTrue(recordsMap.containsKey(_keys.get(1)));
 
     // non-comparable intermediate result
-    selectionSort1.setColumn("distinctcount(m3)");
-    selectionSort1.setIsAsc(false);
-    selectionSort2.setColumn("d1");
-    selectionSort2.setIsAsc(true);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays.asList(selectionSort1, selectionSort2));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("distinctcount(m3)"), false),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -199,9 +188,8 @@ public class TableResizerTest {
     trimToSize = 2;
 
     // d1 asc
-    selectionSort1.setColumn("d1");
-    selectionSort1.setIsAsc(true);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -209,9 +197,8 @@ public class TableResizerTest {
     Assert.assertTrue(recordsMap.containsKey(_keys.get(1)));
 
     // object type avg(m4) asc
-    selectionSort1.setColumn("avg(m4)");
-    selectionSort1.setIsAsc(true);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections
+        .singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("avg(m4)"), true)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -219,11 +206,9 @@ public class TableResizerTest {
     Assert.assertTrue(recordsMap.containsKey(_keys.get(3)));
 
     // non-comparable intermediate result
-    selectionSort1.setColumn("distinctcount(m3)");
-    selectionSort1.setIsAsc(false);
-    selectionSort2.setColumn("d1");
-    selectionSort2.setIsAsc(true);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays.asList(selectionSort1, selectionSort2));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("distinctcount(m3)"), false),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true)));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
@@ -242,15 +227,10 @@ public class TableResizerTest {
     List<Record> sortedRecords;
     int[] order;
     Map<Key, Record> recordsMap;
-    SelectionSort selectionSort1 = new SelectionSort();
-    SelectionSort selectionSort2 = new SelectionSort();
-    SelectionSort selectionSort3 = new SelectionSort();
 
     // d1 asc
-    selectionSort1.setColumn("d1");
-    selectionSort1.setIsAsc(true);
-    TableResizer tableResizer =
-        new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    TableResizer tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true)));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.resizeAndSortRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(sortedRecords.size(), trimToSize);
@@ -269,11 +249,9 @@ public class TableResizerTest {
     }
 
     // d1 asc, d3 desc (tie breaking with 2nd comparator)
-    selectionSort1.setColumn("d1");
-    selectionSort1.setIsAsc(true);
-    selectionSort2.setColumn("d3");
-    selectionSort2.setIsAsc(false);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays.asList(selectionSort1, selectionSort2));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d3"), false)));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.resizeAndSortRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(sortedRecords.size(), trimToSize);
@@ -292,14 +270,10 @@ public class TableResizerTest {
     }
 
     // d1 asc, sum(m1) desc, max(m2) desc
-    selectionSort1.setColumn("d1");
-    selectionSort1.setIsAsc(true);
-    selectionSort2.setColumn("sum(m1)");
-    selectionSort2.setIsAsc(false);
-    selectionSort3.setColumn("max(m2)");
-    selectionSort3.setIsAsc(false);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
-        Arrays.asList(selectionSort1, selectionSort2, selectionSort3));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sum(m1)"), false),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("max(m2)"), false)));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.resizeAndSortRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(sortedRecords.size(), trimToSize);
@@ -318,11 +292,9 @@ public class TableResizerTest {
     }
 
     // object type avg(m4) asc
-    selectionSort1.setColumn("avg(m4)");
-    selectionSort1.setIsAsc(true);
-    selectionSort2.setColumn("d1");
-    selectionSort2.setIsAsc(true);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays.asList(selectionSort1, selectionSort2));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("avg(m4)"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true)));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.resizeAndSortRecordsMap(recordsMap, 10); // high trim to size
     Assert.assertEquals(sortedRecords.size(), recordsMap.size());
@@ -332,11 +304,9 @@ public class TableResizerTest {
     }
 
     // non-comparable intermediate result
-    selectionSort1.setColumn("distinctcount(m3)");
-    selectionSort1.setIsAsc(false);
-    selectionSort2.setColumn("avg(m4)");
-    selectionSort2.setIsAsc(false);
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays.asList(selectionSort1, selectionSort2));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("distinctcount(m3)"), false),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("avg(m4)"), false)));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.resizeAndSortRecordsMap(recordsMap, recordsMap.size()); // equal trim to size
     Assert.assertEquals(sortedRecords.size(), recordsMap.size());
@@ -351,14 +321,10 @@ public class TableResizerTest {
    */
   @Test
   public void testIntermediateRecord() {
-    SelectionSort selectionSort1 = new SelectionSort();
-    SelectionSort selectionSort2 = new SelectionSort();
-    SelectionSort selectionSort3 = new SelectionSort();
 
     // d2
-    selectionSort1.setColumn("d2");
-    TableResizer tableResizer =
-        new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    TableResizer tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d2"), true)));
     for (Map.Entry<Key, Record> entry : _recordsMap.entrySet()) {
       Key key = entry.getKey();
       Record record = entry.getValue();
@@ -369,8 +335,8 @@ public class TableResizerTest {
     }
 
     // sum(m1)
-    selectionSort1.setColumn("sum(m1)");
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections
+        .singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sum(m1)"), true)));
     for (Map.Entry<Key, Record> entry : _recordsMap.entrySet()) {
       Key key = entry.getKey();
       Record record = entry.getValue();
@@ -381,9 +347,9 @@ public class TableResizerTest {
     }
 
     // d1, max(m2)
-    selectionSort1.setColumn("d1");
-    selectionSort2.setColumn("max(m2)");
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays.asList(selectionSort1, selectionSort2));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("max(m2)"), true)));
     for (Map.Entry<Key, Record> entry : _recordsMap.entrySet()) {
       Key key = entry.getKey();
       Record record = entry.getValue();
@@ -395,11 +361,10 @@ public class TableResizerTest {
     }
 
     // d2, sum(m1), d3
-    selectionSort1.setColumn("d2");
-    selectionSort2.setColumn("sum(m1)");
-    selectionSort3.setColumn("d3");
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions,
-        Arrays.asList(selectionSort1, selectionSort2, selectionSort3));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d2"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sum(m1)"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d3"), true)));
     for (Map.Entry<Key, Record> entry : _recordsMap.entrySet()) {
       Key key = entry.getKey();
       Record record = entry.getValue();
@@ -412,8 +377,8 @@ public class TableResizerTest {
     }
 
     // non-comparable intermediate result
-    selectionSort1.setColumn("distinctcount(m3)");
-    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(selectionSort1));
+    tableResizer = new TableResizer(_dataSchema, _aggregationFunctions, Collections.singletonList(
+        new OrderByExpressionContext(QueryContextConverterUtils.getExpression("distinctcount(m3)"), true)));
     AggregationFunction distinctCountFunction = _aggregationFunctions[2];
     for (Map.Entry<Key, Record> entry : _recordsMap.entrySet()) {
       Key key = entry.getKey();

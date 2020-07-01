@@ -16,26 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.minion.executor;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
-import java.util.Map;
-import javax.annotation.Nullable;
-
-
-public class TableCustomConfig extends BaseJsonConfig {
-  private final Map<String, String> _customConfigs;
-
-  @JsonCreator
-  public TableCustomConfig(@JsonProperty("customConfigs") @Nullable Map<String, String> customConfigs) {
-    _customConfigs = customConfigs;
-  }
-
-  @Nullable
-  public Map<String, String> getCustomConfigs() {
-    return _customConfigs;
+public class MergeRollupTaskExecutorFactory implements PinotTaskExecutorFactory {
+  @Override
+  public PinotTaskExecutor create() {
+    return new MergeRollupTaskExecutor();
   }
 }

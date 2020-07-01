@@ -20,8 +20,9 @@ package org.apache.pinot.core.operator.transform.function;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -32,7 +33,7 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testValueInTransformFunction")
   public void testValueInTransformFunction(String expressionStr) {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(expressionStr);
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ValueInTransformFunction);
     Assert.assertEquals(transformFunction.getName(), ValueInTransformFunction.FUNCTION_NAME);
@@ -75,7 +76,7 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(expressionStr);
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

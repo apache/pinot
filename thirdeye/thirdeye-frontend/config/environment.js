@@ -47,6 +47,9 @@ module.exports = function(environment) {
       cubeWiki: "/link/to/cubeAlgorithm/wiki"
     },
 
+    // used to split username if needed.  
+    userNameSplitToken: ' ',
+
     EmberENV: {
 
       FEATURES: {

@@ -1,7 +1,7 @@
 import Component from '@ember/component';
 import fetch from 'fetch';
 import { toBaselineUrn, toCurrentUrn, filterPrefix, toMetricLabel } from 'thirdeye-frontend/utils/rca-utils';
-import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
+import { autocompleteAPI } from 'thirdeye-frontend/utils/api/self-serve';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
@@ -83,7 +83,7 @@ export default Component.extend({
    */
   searchMetrics: task(function* (metric) {
     yield timeout(1000);
-    return fetch(selfServeApiCommon.metricAutoComplete(metric))
+    return fetch(autocompleteAPI.metric(metric))
       .then(checkStatus);
   }),
 

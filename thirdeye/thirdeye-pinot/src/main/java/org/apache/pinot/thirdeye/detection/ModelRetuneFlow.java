@@ -23,7 +23,6 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.base.Preconditions;
-import com.sun.org.apache.xpath.internal.operations.Mod;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;

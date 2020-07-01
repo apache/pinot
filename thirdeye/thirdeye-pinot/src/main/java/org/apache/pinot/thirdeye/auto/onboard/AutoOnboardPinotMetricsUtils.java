@@ -19,12 +19,9 @@
 
 package org.apache.pinot.thirdeye.auto.onboard;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.thirdeye.datasource.DataSourceConfig;
-import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
-import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -34,8 +31,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
@@ -47,6 +44,9 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.TrustStrategy;
 import org.apache.http.util.EntityUtils;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,25 +156,18 @@ public class AutoOnboardPinotMetricsUtils {
     return schema;
   }
 
-  public boolean verifySchemaCorrectness(Schema schema) {
-    boolean isSchemaCorrect = true;
-    if (StringUtils.isBlank(schema.getSchemaName()) || schema.getTimeFieldSpec() == null
-        || schema.getTimeFieldSpec().getOutgoingGranularitySpec() == null) {
-      isSchemaCorrect = false;
+  /**
+   * Verify schema name and presence of field spec for time column
+   */
+  public boolean verifySchemaCorrectness(Schema schema, @Nullable String timeColumnName) {
+    if (StringUtils.isBlank(schema.getSchemaName()) || timeColumnName == null
+        || schema.getSpecForTimeColumn(timeColumnName) == null) {
+      return false;
     }
-    return isSchemaCorrect;
+    return true;
   }
 
-  /**
-   * Returns the map of custom configs of the given dataset from the table config on Pinot.
-   *
-   * @param dataset the target dataset
-   *
-   * @return the field, which is a Map of string to string, of custom config on Pinot's table config
-   *
-   * @throws IOException if this method fails to connect to Pinot endpoint.
-   */
-  public Map<String, String> getCustomConfigsFromPinotEndpoint(String dataset) throws IOException {
+  public JsonNode getTableConfigFromPinotEndpoint(String dataset) throws IOException {
     HttpGet request = new HttpGet(String.format(PINOT_TABLES_ENDPOINT_TEMPLATE, dataset));
     CloseableHttpResponse response = pinotControllerClient.execute(pinotControllerHost, request);
     LOG.debug("Retrieving dataset's custom config: {}", request);
@@ -196,25 +189,35 @@ public class AutoOnboardPinotMetricsUtils {
       response.close();
     }
 
-    // Parse custom config
-    Map<String, String> customConfigs = Collections.emptyMap();
+    JsonNode tableJson = null;
     if (tables != null) {
-      JsonNode table = tables.get("REALTIME");
-      if (table == null || table.isNull()) {
-        table = tables.get("OFFLINE");
-      }
-      if (table != null && !table.isNull()) {
-        try {
-          JsonNode jsonNode = table.get("metadata").get("customConfigs");
-          customConfigs = OBJECT_MAPPER.convertValue(jsonNode, HashMap.class);
-        } catch (Exception e) {
-          LOG.warn("Failed to get custom config for dataset: {}. Reason: {}", dataset, e);
-        }
-      } else {
-        LOG.debug("Dataset {} doesn't exists in Pinot.", dataset);
+      tableJson = tables.get("REALTIME");
+      if (tableJson == null || tableJson.isNull()) {
+        tableJson = tables.get("OFFLINE");
       }
     }
+    return tableJson;
+  }
+
+  /**
+   * Returns the map of custom configs of the given dataset from the Pinot table config json.
+   */
+  public Map<String, String> extractCustomConfigsFromPinotTable(JsonNode tableConfigJson) {
+
+    Map<String, String> customConfigs = Collections.emptyMap();
+    try {
+      JsonNode jsonNode = tableConfigJson.get("metadata").get("customConfigs");
+      customConfigs = OBJECT_MAPPER.convertValue(jsonNode, new TypeReference<Map<String, String>>() {
+      });
+    } catch (Exception e) {
+      LOG.warn("Failed to get custom config from table: {}. Reason: {}", tableConfigJson, e);
+    }
     return customConfigs;
+  }
+
+  public String extractTimeColumnFromPinotTable(JsonNode tableConfigJson) {
+    JsonNode timeColumnNode = tableConfigJson.get("segmentsConfig").get("timeColumnName");
+    return (timeColumnNode != null && !timeColumnNode.isNull()) ? timeColumnNode.asText() : null;
   }
 
   /**

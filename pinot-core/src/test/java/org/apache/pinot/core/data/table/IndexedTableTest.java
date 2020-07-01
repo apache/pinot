@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.table;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -30,12 +30,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -44,6 +46,7 @@ import org.testng.annotations.Test;
 /**
  * Tests the {@link Table} operations
  */
+@SuppressWarnings({"rawtypes"})
 public class IndexedTableTest {
 
   @Test
@@ -51,14 +54,11 @@ public class IndexedTableTest {
       throws InterruptedException, TimeoutException, ExecutionException {
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    AggregationFunction[] aggregationFunctions =
-        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
-    SelectionSort selectionSort = new SelectionSort();
-    selectionSort.setColumn("sum(m1)");
-    selectionSort.setIsAsc(true);
-    List<SelectionSort> orderBy = Collections.singletonList(selectionSort);
-
-    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationFunctions, orderBy, 5);
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction(
+        ExpressionContext.forIdentifier("m1")), new MaxAggregationFunction(ExpressionContext.forIdentifier("m2"))};
+    List<OrderByExpressionContext> orderByExpressions = Collections
+        .singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sum(m1)"), true));
+    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationFunctions, orderByExpressions, 5);
 
     // 3 threads upsert together
     // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
@@ -107,7 +107,7 @@ public class IndexedTableTest {
         return null;
       };
 
-      List<Future<Void>> futures = executorService.invokeAll(Lists.newArrayList(c1, c2, c3));
+      List<Future<Void>> futures = executorService.invokeAll(Arrays.asList(c1, c2, c3));
       for (Future future : futures) {
         future.get(10, TimeUnit.SECONDS);
       }
@@ -121,16 +121,16 @@ public class IndexedTableTest {
   }
 
   @Test(dataProvider = "initDataProvider")
-  public void testNonConcurrentIndexedTable(List<SelectionSort> orderBy, List<String> survivors) {
+  public void testNonConcurrentIndexedTable(List<OrderByExpressionContext> orderByExpressions, List<String> survivors) {
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "d4", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    AggregationFunction[] aggregationFunctions =
-        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction(
+        ExpressionContext.forIdentifier("m1")), new MaxAggregationFunction(ExpressionContext.forIdentifier("m2"))};
 
     // Test SimpleIndexedTable
-    IndexedTable simpleIndexedTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderBy, 5);
+    IndexedTable simpleIndexedTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderByExpressions, 5);
     // merge table
-    IndexedTable mergeTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderBy, 10);
+    IndexedTable mergeTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderByExpressions, 10);
     testNonConcurrent(simpleIndexedTable, mergeTable);
 
     // finish
@@ -138,8 +138,9 @@ public class IndexedTableTest {
     checkSurvivors(simpleIndexedTable, survivors);
 
     // Test ConcurrentIndexedTable
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(dataSchema, aggregationFunctions, orderBy, 5);
-    mergeTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderBy, 10);
+    IndexedTable concurrentIndexedTable =
+        new ConcurrentIndexedTable(dataSchema, aggregationFunctions, orderByExpressions, 5);
+    mergeTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, orderByExpressions, 10);
     testNonConcurrent(concurrentIndexedTable, mergeTable);
 
     // finish
@@ -149,59 +150,42 @@ public class IndexedTableTest {
 
   @DataProvider(name = "initDataProvider")
   public Object[][] initDataProvider() {
-
     List<Object[]> data = new ArrayList<>();
 
-    SelectionSort sel1;
-    SelectionSort sel2;
-    List<SelectionSort> orderBy;
+    List<OrderByExpressionContext> orderByExpressions;
     List<String> survivors;
 
     // d1 desc
-    sel1 = new SelectionSort();
-    sel1.setColumn("d1");
-    sel1.setIsAsc(false);
-    orderBy = Lists.newArrayList(sel1);
-    survivors = Lists.newArrayList("m", "l", "k", "j", "i");
-    data.add(new Object[]{orderBy, survivors});
+    orderByExpressions =
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), false));
+    survivors = Arrays.asList("m", "l", "k", "j", "i");
+    data.add(new Object[]{orderByExpressions, survivors});
 
     // d1 asc
-    sel1 = new SelectionSort();
-    sel1.setColumn("d1");
-    sel1.setIsAsc(true);
-    orderBy = Lists.newArrayList(sel1);
-    survivors = Lists.newArrayList("a", "b", "c", "d", "e");
-    data.add(new Object[]{orderBy, survivors});
+    orderByExpressions =
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true));
+    survivors = Arrays.asList("a", "b", "c", "d", "e");
+    data.add(new Object[]{orderByExpressions, survivors});
 
     // sum(m1) desc, d1 asc
-    sel1 = new SelectionSort();
-    sel1.setColumn("sum(m1)");
-    sel1.setIsAsc(false);
-    sel2 = new SelectionSort();
-    sel2.setColumn("d1");
-    sel2.setIsAsc(true);
-    orderBy = Lists.newArrayList(sel1, sel2);
-    survivors = Lists.newArrayList("m", "h", "i", "a", "b");
-    data.add(new Object[]{orderBy, survivors});
+    orderByExpressions = Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("sum(m1)"), false),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true));
+    survivors = Arrays.asList("m", "h", "i", "a", "b");
+    data.add(new Object[]{orderByExpressions, survivors});
 
     // d2 desc
-    sel1 = new SelectionSort();
-    sel1.setColumn("d2");
-    sel1.setIsAsc(false);
-    orderBy = Lists.newArrayList(sel1);
-    survivors = Lists.newArrayList("m", "l", "k", "j", "i");
-    data.add(new Object[]{orderBy, survivors});
+    orderByExpressions =
+        Collections.singletonList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d2"), false));
+    survivors = Arrays.asList("m", "l", "k", "j", "i");
+    data.add(new Object[]{orderByExpressions, survivors});
 
     // d4 asc, d1 asc
-    sel1 = new SelectionSort();
-    sel1.setColumn("d4");
-    sel1.setIsAsc(true);
-    sel2 = new SelectionSort();
-    sel2.setColumn("d1");
-    sel2.setIsAsc(true);
-    orderBy = Lists.newArrayList(sel1, sel2);
-    survivors = Lists.newArrayList("a", "b", "c", "d", "e");
-    data.add(new Object[]{orderBy, survivors});
+    orderByExpressions = Arrays
+        .asList(new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d4"), true),
+            new OrderByExpressionContext(QueryContextConverterUtils.getExpression("d1"), true));
+    survivors = Arrays.asList("a", "b", "c", "d", "e");
+    data.add(new Object[]{orderByExpressions, survivors});
 
     return data.toArray(new Object[data.size()][]);
   }
@@ -289,8 +273,8 @@ public class IndexedTableTest {
   public void testNoMoreNewRecords() {
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    AggregationFunction[] aggregationFunctions =
-        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[]{new SumAggregationFunction(
+        ExpressionContext.forIdentifier("m1")), new MaxAggregationFunction(ExpressionContext.forIdentifier("m2"))};
 
     IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, aggregationFunctions, null, 5);
     testNoMoreNewRecordsInTable(indexedTable);

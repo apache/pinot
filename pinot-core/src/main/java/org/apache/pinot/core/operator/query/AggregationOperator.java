@@ -32,6 +32,7 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 /**
  * The <code>AggregationOperator</code> class provides the operator for aggregation only query on a single segment.
  */
+@SuppressWarnings("rawtypes")
 public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationOperator";
 

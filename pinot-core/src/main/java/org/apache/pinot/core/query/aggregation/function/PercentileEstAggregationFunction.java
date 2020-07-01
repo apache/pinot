@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -29,6 +28,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -37,8 +37,8 @@ public class PercentileEstAggregationFunction extends BaseSingleInputAggregation
 
   protected final int _percentile;
 
-  public PercentileEstAggregationFunction(String column, int percentile) {
-    super(column);
+  public PercentileEstAggregationFunction(ExpressionContext expression, int percentile) {
+    super(expression);
     _percentile = percentile;
   }
 
@@ -49,12 +49,12 @@ public class PercentileEstAggregationFunction extends BaseSingleInputAggregation
 
   @Override
   public String getColumnName() {
-    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "_" + _column;
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "_" + _expression;
   }
 
   @Override
   public String getResultColumnName() {
-    return AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + _percentile + "(" + _column + ")";
+    return AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + _percentile + "(" + _expression + ")";
   }
 
   @Override
@@ -74,7 +74,7 @@ public class PercentileEstAggregationFunction extends BaseSingleInputAggregation
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       long[] longValues = blockValSet.getLongValuesSV();
@@ -102,7 +102,7 @@ public class PercentileEstAggregationFunction extends BaseSingleInputAggregation
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       long[] longValues = blockValSet.getLongValuesSV();
@@ -127,7 +127,7 @@ public class PercentileEstAggregationFunction extends BaseSingleInputAggregation
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       long[] longValues = blockValSet.getLongValuesSV();

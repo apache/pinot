@@ -24,15 +24,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -45,10 +42,10 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator;
 import org.apache.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -96,15 +93,13 @@ public class NoDictionaryGroupKeyGeneratorTest {
     // Create transform operator and block
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
     String query = String.format("SELECT COUNT(*) FROM table GROUP BY %s", StringUtils.join(COLUMN_NAMES, ", "));
-    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(query);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(query);
 
-    // Compute the transform expressions
-    Set<TransformExpressionTree> expressionTrees = new LinkedHashSet<>();
-    for (String columnName : COLUMN_NAMES) {
-      expressionTrees.add(TransformExpressionTree.compileToExpressionTree(columnName));
+    List<ExpressionContext> expressions = new ArrayList<>();
+    for (String column : COLUMN_NAMES) {
+      expressions.add(ExpressionContext.forIdentifier(column));
     }
-    TransformPlanNode transformPlanNode = new TransformPlanNode(indexSegment, queryContext, expressionTrees);
+    TransformPlanNode transformPlanNode = new TransformPlanNode(indexSegment, queryContext, expressions);
     _transformOperator = transformPlanNode.run();
     _transformBlock = _transformOperator.nextBlock();
   }
@@ -145,9 +140,9 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private void testGroupKeyGenerator(String[] groupByColumns)
       throws Exception {
     int numGroupByColumns = groupByColumns.length;
-    TransformExpressionTree[] groupByExpressions = new TransformExpressionTree[numGroupByColumns];
+    ExpressionContext[] groupByExpressions = new ExpressionContext[numGroupByColumns];
     for (int i = 0; i < numGroupByColumns; i++) {
-      groupByExpressions[i] = TransformExpressionTree.compileToExpressionTree(groupByColumns[i]);
+      groupByExpressions[i] = ExpressionContext.forIdentifier(groupByColumns[i]);
     }
 
     GroupKeyGenerator groupKeyGenerator;

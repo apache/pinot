@@ -29,12 +29,12 @@ import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.query.reduce.CombineService;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>CombineOperator</code> class is the operator to combine selection results and aggregation only results.
  */
+@SuppressWarnings("rawtypes")
 public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombineOperator.class);
   private static final String OPERATOR_NAME = "CombineOperator";
@@ -55,15 +56,15 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
       Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
 
   private final List<Operator> _operators;
-  private final BrokerRequest _brokerRequest;
+  private final QueryContext _queryContext;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
 
-  public CombineOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
-      BrokerRequest brokerRequest) {
+  public CombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
+      long timeOutMs) {
     _operators = operators;
+    _queryContext = queryContext;
     _executorService = executorService;
-    _brokerRequest = brokerRequest;
     _timeOutMs = timeOutMs;
   }
 
@@ -104,12 +105,12 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
 
             IntermediateResultsBlock mergedBlock = (IntermediateResultsBlock) _operators.get(index).nextBlock();
             for (int i = index + numThreads; i < numOperators; i += numThreads) {
-              if (isQuerySatisfied(_brokerRequest, mergedBlock)) {
+              if (isQuerySatisfied(_queryContext, mergedBlock)) {
                 break;
               }
               IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) _operators.get(i).nextBlock();
               try {
-                CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+                CombineService.mergeTwoBlocks(_queryContext, mergedBlock, blockToMerge);
               } catch (Exception e) {
                 LOGGER.error("Caught exception while merging two blocks (step 1).", e);
                 mergedBlock
@@ -142,7 +143,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
             }
             int numMergedBlocks = 1;
             while (numMergedBlocks < numThreads) {
-              if (isQuerySatisfied(_brokerRequest, mergedBlock)) {
+              if (isQuerySatisfied(_queryContext, mergedBlock)) {
                 break;
               }
               IntermediateResultsBlock blockToMerge =
@@ -151,7 +152,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
                 throw new TimeoutException("Timed out while polling result from thread: " + numMergedBlocks);
               }
               try {
-                CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+                CombineService.mergeTwoBlocks(_queryContext, mergedBlock, blockToMerge);
               } catch (Exception e) {
                 LOGGER.error("Caught exception while merging two blocks (step 2).", e);
                 mergedBlock
@@ -168,13 +169,13 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     try {
       mergedBlock = mergedBlockFuture.get(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
-      LOGGER.error("Caught InterruptedException. (brokerRequest = {})", _brokerRequest, e);
+      LOGGER.error("Caught InterruptedException. (queryContext = {})", _queryContext, e);
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.FUTURE_CALL_ERROR, e));
     } catch (ExecutionException e) {
-      LOGGER.error("Caught ExecutionException. (brokerRequest = {})", _brokerRequest, e);
+      LOGGER.error("Caught ExecutionException. (queryContext = {})", _queryContext, e);
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
     } catch (TimeoutException e) {
-      LOGGER.error("Caught TimeoutException. (brokerRequest = {})", _brokerRequest, e);
+      LOGGER.error("Caught TimeoutException. (queryContext = {})", _queryContext, e);
       mergedBlockFuture.cancel(true);
       mergedBlock =
           new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
@@ -205,16 +206,15 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
   }
 
   /**
-   * Returns {@code true} if the query is already satisfied with the IntermediateResultsBlock so that there is no need to
-   * process more segments, {@code false} otherwise.
+   * Returns {@code true} if the query is already satisfied with the IntermediateResultsBlock so that there is no need
+   * to process more segments, {@code false} otherwise.
    * <p>For selection-only query, the query is satisfied when enough records are gathered.
    */
-  private boolean isQuerySatisfied(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
-    Selection selections = brokerRequest.getSelections();
-    if (selections != null && brokerRequest.getOrderBy() == null) {
+  private boolean isQuerySatisfied(QueryContext queryContext, IntermediateResultsBlock mergedBlock) {
+    if (!QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getOrderByExpressions() == null) {
       // Selection-only
       Collection<Object[]> selectionResult = mergedBlock.getSelectionResult();
-      return selectionResult != null && selectionResult.size() >= selections.getSize();
+      return selectionResult != null && selectionResult.size() >= queryContext.getLimit();
     }
     return false;
   }

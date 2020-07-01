@@ -194,15 +194,23 @@ public class AlertSearcher {
     Set<Long> metricIds = new HashSet<>();
     if (!searchFilter.getMetrics().isEmpty()) {
       for (String metric : searchFilter.getMetrics()) {
-        metricIds =
-            this.metricDAO.findByMetricName(metric).stream().map(AbstractDTO::getId).collect(Collectors.toSet());
+        metricIds.addAll(
+            this.metricDAO.findByMetricName(metric).stream().map(AbstractDTO::getId).collect(Collectors.toSet()));
       }
     }
 
     if (!searchFilter.getDatasets().isEmpty()) {
+      Set<Long> metricIdsFromDataset = new HashSet<>();
       for (String dataset : searchFilter.getDatasets()) {
-        metricIds.retainAll(
-            this.metricDAO.findByDataset(dataset).stream().map(AbstractDTO::getId).collect(Collectors.toSet()));
+        metricIdsFromDataset.addAll(this.metricDAO.findByPredicate(Predicate.LIKE("dataset", "%" + dataset + "%"))
+            .stream()
+            .map(AbstractDTO::getId)
+            .collect(Collectors.toSet()));
+      }
+      if (!searchFilter.getMetrics().isEmpty()) {
+        metricIds.retainAll(metricIdsFromDataset);
+      } else {
+        metricIds = metricIdsFromDataset;
       }
     }
 
@@ -263,13 +271,17 @@ public class AlertSearcher {
 
     // join detections with subscription groups
     Multimap<Long, String> detectionIdToSubscriptionGroups = ArrayListMultimap.create();
+    Multimap<Long, String> detectionIdToApplications = ArrayListMultimap.create();
     for (DetectionAlertConfigDTO subscriptionGroup : subscriptionGroups) {
       for (long detectionConfigId : subscriptionGroup.getVectorClocks().keySet()) {
         detectionIdToSubscriptionGroups.put(detectionConfigId, subscriptionGroup.getName());
+        detectionIdToApplications.put(detectionConfigId, subscriptionGroup.getApplication());
       }
     }
     for (Map<String, Object> alert : alerts) {
-      alert.put("subscriptionGroup", detectionIdToSubscriptionGroups.get(MapUtils.getLong(alert, "id")));
+      long id = MapUtils.getLong(alert, "id");
+      alert.put("subscriptionGroup", detectionIdToSubscriptionGroups.get(id));
+      alert.put("application", new TreeSet<>(detectionIdToApplications.get(id)));
     }
 
     return ImmutableMap.of("count", count, "limit", searchQuery.limit, "offset", searchQuery.offset, "elements",

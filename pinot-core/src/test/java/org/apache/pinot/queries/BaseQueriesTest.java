@@ -37,6 +37,7 @@ import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
@@ -64,8 +65,7 @@ public abstract class BaseQueriesTest {
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
   protected <T extends Operator> T getOperatorForQuery(String pqlQuery) {
-    BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(pqlQuery);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromPQL(pqlQuery);
     return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
   }
 

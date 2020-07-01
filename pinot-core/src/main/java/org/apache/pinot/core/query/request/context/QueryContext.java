@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.request.context;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -72,7 +73,7 @@ public class QueryContext {
       int offset, @Nullable Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
       BrokerRequest brokerRequest) {
     _selectExpressions = selectExpressions;
-    _aliasMap = aliasMap;
+    _aliasMap = Collections.unmodifiableMap(aliasMap);
     _filter = filter;
     _groupByExpressions = groupByExpressions;
     _orderByExpressions = orderByExpressions;
@@ -92,11 +93,10 @@ public class QueryContext {
   }
 
   /**
-   * Returns the alias of the given expression, or {@code null} if it does not have an alias.
+   * Returns an unmodifiable map from the expression to its alias.
    */
-  @Nullable
-  public String getAlias(ExpressionContext expression) {
-    return _aliasMap.get(expression);
+  public Map<ExpressionContext, String> getAliasMap() {
+    return _aliasMap;
   }
 
   /**

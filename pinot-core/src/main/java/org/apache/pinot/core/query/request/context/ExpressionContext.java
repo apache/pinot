@@ -18,12 +18,8 @@
  */
 package org.apache.pinot.core.query.request.context;
 
-import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 
 
 /**
@@ -86,29 +82,6 @@ public class ExpressionContext {
       }
     } else if (_type == Type.FUNCTION) {
       _function.getColumns(columns);
-    }
-  }
-
-  /**
-   * Temporary helper method to help the migration from BrokerRequest to QueryContext.
-   */
-  public TransformExpressionTree toTransformExpressionTree() {
-    switch (_type) {
-      case LITERAL:
-        return new TransformExpressionTree(TransformExpressionTree.ExpressionType.LITERAL, _value, null);
-      case IDENTIFIER:
-        return new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER, _value, null);
-      case FUNCTION:
-        Preconditions.checkState(_function.getType() == FunctionContext.Type.TRANSFORM);
-        List<ExpressionContext> arguments = _function.getArguments();
-        List<TransformExpressionTree> children = new ArrayList<>(arguments.size());
-        for (ExpressionContext argument : arguments) {
-          children.add(argument.toTransformExpressionTree());
-        }
-        return new TransformExpressionTree(TransformExpressionTree.ExpressionType.FUNCTION, _function.getFunctionName(),
-            children);
-      default:
-        throw new IllegalStateException();
     }
   }
 

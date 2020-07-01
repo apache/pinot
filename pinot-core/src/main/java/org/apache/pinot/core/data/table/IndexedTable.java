@@ -20,25 +20,25 @@ package org.apache.pinot.core.data.table;
 
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.request.SelectionSort;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
 
 
 /**
  * Base implementation of Map-based Table for indexed lookup
  */
 public abstract class IndexedTable extends BaseTable {
-
   private final KeyExtractor _keyExtractor;
   final int _numKeyColumns;
 
   /**
    * Initializes the variables and comparators needed for the table
    */
-  IndexedTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions, List<SelectionSort> orderBy,
-      int capacity) {
-    super(dataSchema, aggregationFunctions, orderBy, capacity);
+  IndexedTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions,
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int capacity) {
+    super(dataSchema, aggregationFunctions, orderByExpressions, capacity);
 
     _numKeyColumns = dataSchema.size() - _numAggregations;
     _keyExtractor = new KeyExtractor(_numKeyColumns);

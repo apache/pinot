@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,10 +32,12 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FunctionContext;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.parsers.CompilerConstants;
 
@@ -43,6 +45,7 @@ import org.apache.pinot.parsers.CompilerConstants;
 /**
  * The <code>AggregationFunctionUtils</code> class provides utility methods for aggregation function.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationFunctionUtils {
   private AggregationFunctionUtils() {
   }
@@ -66,17 +69,32 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * Creates an array of {@link AggregationFunction}s based on the given {@link BrokerRequest}.
+   * Creates an array of {@link AggregationFunction}s based on the given {@link QueryContext}.
    */
-  public static AggregationFunction[] getAggregationFunctions(BrokerRequest brokerRequest) {
-    List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
-    int numAggregationFunctions = aggregationInfos.size();
-    AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      aggregationFunctions[i] =
-          AggregationFunctionFactory.getAggregationFunction(aggregationInfos.get(i), brokerRequest);
+  public static AggregationFunction[] getAggregationFunctions(QueryContext queryContext) {
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    Set<FunctionContext> functions = new HashSet<>();
+    List<AggregationFunction> aggregationFunctions = new ArrayList<>();
+    for (ExpressionContext selectExpression : selectExpressions) {
+      FunctionContext function = selectExpression.getFunction();
+      if (function != null && function.getType() == FunctionContext.Type.AGGREGATION) {
+        // TODO: Deduplicate aggregation functions after deprecating the BrokerRequest. PQL relies on them to return the
+        //       correct columns.
+        functions.add(function);
+        aggregationFunctions.add(AggregationFunctionFactory.getAggregationFunction(function, queryContext));
+      }
     }
-    return aggregationFunctions;
+    // Add aggregation functions in the ORDER-BY clause but not in the SELECT clause
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    if (orderByExpressions != null) {
+      for (OrderByExpressionContext orderByExpression : orderByExpressions) {
+        FunctionContext function = orderByExpression.getExpression().getFunction();
+        if (function != null && function.getType() == FunctionContext.Type.AGGREGATION && functions.add(function)) {
+          aggregationFunctions.add(AggregationFunctionFactory.getAggregationFunction(function, queryContext));
+        }
+      }
+    }
+    return aggregationFunctions.toArray(new AggregationFunction[0]);
   }
 
   /**
@@ -91,24 +109,14 @@ public class AggregationFunctionUtils {
     if (aggregationFunctionType == AggregationFunctionType.COUNT) {
       return AggregationFunctionColumnPair.COUNT_STAR;
     }
-    //noinspection unchecked
-    List<TransformExpressionTree> inputExpressions = aggregationFunction.getInputExpressions();
+    List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
     if (inputExpressions.size() == 1) {
-      TransformExpressionTree inputExpression = inputExpressions.get(0);
-      if (inputExpression.isColumn()) {
-        return new AggregationFunctionColumnPair(aggregationFunctionType, inputExpression.getValue());
+      ExpressionContext inputExpression = inputExpressions.get(0);
+      if (inputExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
+        return new AggregationFunctionColumnPair(aggregationFunctionType, inputExpression.getIdentifier());
       }
     }
     return null;
-  }
-
-  public static boolean[] getAggregationFunctionsSelectStatus(List<AggregationInfo> aggregationInfos) {
-    int numAggregationFunctions = aggregationInfos.size();
-    boolean[] aggregationFunctionsStatus = new boolean[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      aggregationFunctionsStatus[i] = aggregationInfos.get(i).isIsInSelectList();
-    }
-    return aggregationFunctionsStatus;
   }
 
   public static String formatValue(Object value) {
@@ -137,26 +145,6 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * Utility function to parse percentile value from string.
-   * <p>Asserts that percentile value is within 0 and 100.
-   * <p>NOTE: When percentileString is from the second argument (e.g. percentile(foo, 99), percentileTDigest(bar, 95),
-   *          etc.), it might be standardized into single-quoted format.
-   *
-   * @param percentileString Input String
-   * @return Percentile value parsed from String.
-   */
-  public static int parsePercentile(String percentileString) {
-    int percentile;
-    if (percentileString.charAt(0) == '\'') {
-      percentile = Integer.parseInt(percentileString.substring(1, percentileString.length() - 1));
-    } else {
-      percentile = Integer.parseInt(percentileString);
-    }
-    Preconditions.checkState(percentile >= 0 && percentile <= 100);
-    return percentile;
-  }
-
-  /**
    * Helper function to concatenate arguments using separator.
    *
    * @param arguments Arguments to concatenate
@@ -172,11 +160,10 @@ public class AggregationFunctionUtils {
    * <p>NOTE: We don't need to consider order-by columns here as the ordering is only allowed for aggregation functions
    *          or group-by expressions.
    */
-  public static Set<TransformExpressionTree> collectExpressionsToTransform(AggregationFunction[] aggregationFunctions,
-      @Nullable TransformExpressionTree[] groupByExpressions) {
-    Set<TransformExpressionTree> expressions = new HashSet<>();
+  public static Set<ExpressionContext> collectExpressionsToTransform(AggregationFunction[] aggregationFunctions,
+      @Nullable ExpressionContext[] groupByExpressions) {
+    Set<ExpressionContext> expressions = new HashSet<>();
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      //noinspection unchecked
       expressions.addAll(aggregationFunction.getInputExpressions());
     }
     if (groupByExpressions != null) {
@@ -189,20 +176,20 @@ public class AggregationFunctionUtils {
    * Creates a map from expression required by the {@link AggregationFunction} to {@link BlockValSet} fetched from the
    * {@link TransformBlock}.
    */
-  public static Map<TransformExpressionTree, BlockValSet> getBlockValSetMap(AggregationFunction aggregationFunction,
+  public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggregationFunction,
       TransformBlock transformBlock) {
     //noinspection unchecked
-    List<TransformExpressionTree> expressions = aggregationFunction.getInputExpressions();
+    List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
       return Collections.emptyMap();
     }
     if (numExpressions == 1) {
-      TransformExpressionTree expression = expressions.get(0);
+      ExpressionContext expression = expressions.get(0);
       return Collections.singletonMap(expression, transformBlock.getBlockValueSet(expression));
     }
-    Map<TransformExpressionTree, BlockValSet> blockValSetMap = new HashMap<>();
-    for (TransformExpressionTree expression : expressions) {
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    for (ExpressionContext expression : expressions) {
       blockValSetMap.put(expression, transformBlock.getBlockValueSet(expression));
     }
     return blockValSetMap;
@@ -214,10 +201,9 @@ public class AggregationFunctionUtils {
    * <p>NOTE: We construct the map with original column name as the key but fetch BlockValSet with the aggregation
    *          function pair so that the aggregation result column name is consistent with or without star-tree.
    */
-  public static Map<TransformExpressionTree, BlockValSet> getBlockValSetMap(
+  public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(
       AggregationFunctionColumnPair aggregationFunctionColumnPair, TransformBlock transformBlock) {
-    TransformExpressionTree expression = new TransformExpressionTree(TransformExpressionTree.ExpressionType.IDENTIFIER,
-        aggregationFunctionColumnPair.getColumn(), null);
+    ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumnPair.getColumn());
     BlockValSet blockValSet = transformBlock.getBlockValueSet(aggregationFunctionColumnPair.toColumnName());
     return Collections.singletonMap(expression, blockValSet);
   }

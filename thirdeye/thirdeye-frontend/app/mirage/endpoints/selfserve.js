@@ -160,8 +160,12 @@ export default function (server) {
   /**
    * Mocks a list of alerts, displayed in the /manage/alerts page
    */
-  server.get('/yaml/list', (schema) => {
-    return schema.alerts.all().models;
+  server.get('/alerts', (schema) => {
+    const response = {
+      count: schema.alerts.all().models.length,
+      elements: schema.alerts.all().models
+    };
+    return response;
   });
 
   /**

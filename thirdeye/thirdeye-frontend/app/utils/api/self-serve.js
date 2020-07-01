@@ -1,16 +1,4 @@
 /**
- * GET request for all alert subscription groups
- * @see {@link https://tinyurl.com/ycv55yyx|class EntityManagerResource}
- */
-const allConfigGroups = '/thirdeye/entity/ALERT_CONFIG';
-
-/**
- * GET request for all alert application groups
- * @see {@link https://tinyurl.com/ycv55yyx|class EntityManagerResource}
- */
-const allApplications = '/thirdeye/entity/APPLICATION';
-
-/**
  * GET request for job status (a sequence of events including create, replay, autotune)
  * Requires 'jobId' query param
  * @see {@link https://tinyurl.com/ya6mwyjt|class DetectionOnboardResource}
@@ -42,39 +30,11 @@ const updateAlert = jobName => `/detection-onboard/create-job?jobName=${jobName}
 const deleteAlert = functionId => `/dashboard/anomaly-function?id=${functionId}`;
 
 /**
- * GET autocomplete request for metric data by name
- * @param {String} metricName: metric name
- * @see {@link https://tinyurl.com/y7hhzm33|class DataResource}
- */
-const metricAutoComplete = metricName => `/data/autocomplete/metric?name=${encodeURIComponent(metricName)}`;
-
-/**
- * GET autocomplete request for alert by name
- * @param {String} functionName: alert name
- * @see {@link https://tinyurl.com/ybelagey|class DataResource}
- */
-const alertFunctionByName = functionName => `/data/autocomplete/functionByName?name=${encodeURIComponent(functionName)}`;
-
-/**
- * GET autocomplete request for alert by app name
- * @param {String} appName: application name
- * @see {@link https://tinyurl.com/ybelagey|class DataResource}
- */
-const alertFunctionByAppName = appName => `/data/autocomplete/functionByAppname?appname=${encodeURIComponent(appName)}`;
-
-/**
  * GET a single function record by id
  * @param {String} id: alert function id
  * @see {@link https://tinyurl.com/y76fu5vp|class OnboardResource}
  */
-const alertById = functionId => `/onboard/function/${functionId}`;
-
-/**
- * GET config group records containing functionId in emailConfig property
- * @param {String} id: alert function id
- * @see {@link https://tinyurl.com/yc36oo2c|class EmailResource}
- */
-const configGroupByAlertId = functionId => `/thirdeye/email/function/${functionId}`;
+const getAlertById = functionId => `/onboard/function/${functionId}`;
 
 /**
  * GET the timestamp for the end of the time range of available data for a given metric
@@ -142,20 +102,98 @@ const createNewDataset = '/onboard/create';
  */
 const setAlertActivationUrl = (detectionId, active) => `/yaml/activation/${detectionId}?active=${active}`;
 
+/**
+ * GET autocomplete request for alert by name
+ * @param {String} functionName: alert name
+ * @see {@link https://tinyurl.com/ybelagey|class DataResource}
+ */
+const alertByName = functionName => `/data/autocomplete/detection?name=${encodeURIComponent(functionName)}`;
 
 /**
- * General self-serve endpoints
- * TODO: rename these API utils according to entity, not UI features (self-serve, rca)
+ * GET autocomplete request for application
+ * @param {String} app: application name
  */
-export const selfServeApiCommon = {
-  alertById,
-  allConfigGroups,
-  allApplications,
-  alertFunctionByName,
-  configGroupByAlertId,
-  alertFunctionByAppName,
-  metricAutoComplete,
-  setAlertActivationUrl
+const application = app => `/data/autocomplete/application?name=${encodeURIComponent(app)}`;
+
+/**
+ * GET autocomplete request for dataset
+ * @param {String} type: dataset name
+ */
+const dataset = name => `/data/autocomplete/dataset?name=${encodeURIComponent(name)}`;
+
+/**
+ * GET autocomplete request for detection type
+ * @param {String} type: detection type
+ */
+const detectionType = type => `/data/autocomplete/ruleType?name=${encodeURIComponent(type)}`;
+
+/**
+ * GET autocomplete request for metric data by name
+ * @param {String} metricName: metric name
+ * @see {@link https://tinyurl.com/y7hhzm33|class DataResource}
+ */
+const metric = metricName => `/data/autocomplete/metric?name=${encodeURIComponent(metricName)}`;
+
+/**
+ * GET autocomplete request for alerty owner
+ * @param {String} name: owner name
+ */
+const owner = name => `/data/autocomplete/detection-createdby?name=${encodeURIComponent(name)}`;
+
+/**
+ * GET autocomplete request for subscription group by name
+ * @param {String} name: group name
+ */
+const subscriptionGroup = name => `/data/autocomplete/subscription?name=${encodeURIComponent(name)}`;
+
+/**
+ * GET alerts, filtered and paginated according to params
+ * @param {Object} params: params to query alerts by
+ */
+const getPaginatedAlertsUrl = params => {
+  const paramKeys = Object.keys(params || {});
+  let url = '/alerts';
+  if (paramKeys.length === 0) {
+    return url;
+  }
+  url += '?';
+  paramKeys.forEach(key => {
+    if (Array.isArray(params[key])) {
+      const paramVals = params[key];
+      paramVals.forEach(value => {
+        url += `${key}=${encodeURIComponent(value)}`;
+        url += '&';
+      });
+      url = url.slice(0, -1);
+    } else {
+      url += `${key}=${encodeURIComponent(params[key])}`;
+    }
+    url += '&';
+  });
+  url = url.slice(0, -1);
+  return url;
+};
+
+/**
+ * Autocomplete endpoints
+ */
+export const autocompleteAPI = {
+  alertByName,
+  application,
+  detectionType,
+  dataset,
+  getAlertById,
+  metric,
+  owner,
+  subscriptionGroup
+};
+
+/**
+ * Yaml endpoints
+ */
+export const yamlAPI = {
+  setAlertActivationUrl,
+  getPaginatedAlertsUrl
 };
 
 /**
@@ -184,7 +222,7 @@ export const selfServeApiOnboard = {
 };
 
 export default {
-  selfServeApiCommon,
+  autocompleteAPI,
   selfServeApiOnboard,
   selfServeApiGraph
 };

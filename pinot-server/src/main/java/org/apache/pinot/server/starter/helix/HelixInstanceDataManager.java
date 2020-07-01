@@ -161,6 +161,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
     SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
     if (segmentMetadata == null) {
+      LOGGER.info("Segment metadata is null. Skip reloading segment: {} in table: {}", segmentName, tableNameWithType);
       return;
     }
 
