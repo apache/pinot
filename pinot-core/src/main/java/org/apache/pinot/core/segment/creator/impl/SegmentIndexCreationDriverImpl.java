@@ -23,7 +23,6 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
@@ -52,9 +52,9 @@ import org.apache.pinot.core.segment.index.converter.SegmentFormatConverter;
 import org.apache.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
-import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.CrcUtils;
 import org.apache.pinot.core.util.IngestionUtils;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -288,18 +288,16 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void buildStarTreeV2IfNecessary(File indexDir)
       throws Exception {
-    List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = new ArrayList<>();
-    if (config.getStarTreeV2BuilderConfigs() != null) {
-      starTreeV2BuilderConfigs.addAll(config.getStarTreeV2BuilderConfigs());
-    }
-    // Append the default star-tree after the customized star-trees if enabled
-    if (config.isEnableDefaultStarTree()) {
-      starTreeV2BuilderConfigs.add(null);
-    }
-    if (!starTreeV2BuilderConfigs.isEmpty()) {
+    List<StarTreeIndexConfig> starTreeIndexConfigs = config.getStarTreeIndexConfigs();
+    boolean enableDefaultStarTree = config.isEnableDefaultStarTree();
+    if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
       MultipleTreesBuilder.BuildMode buildMode =
           config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
-      new MultipleTreesBuilder(starTreeV2BuilderConfigs, indexDir, buildMode).build();
+      try (
+          MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
+              buildMode)) {
+        builder.build();
+      }
     }
   }
 

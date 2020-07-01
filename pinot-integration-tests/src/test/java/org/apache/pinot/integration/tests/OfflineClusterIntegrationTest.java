@@ -38,7 +38,10 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -79,6 +82,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   // For bloom filter triggering test
   private static final List<String> UPDATED_BLOOM_FILTER_COLUMNS = Collections.singletonList("Carrier");
   private static final String TEST_UPDATED_BLOOM_FILTER_QUERY = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'CA'";
+
+  // For star-tree triggering test
+  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG =
+      new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
+  private static final String TEST_STAR_TREE_QUERY = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA'";
 
   // For default columns test
   private static final String SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS =
@@ -404,6 +413,46 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate bloom filter");
+  }
+
+  @Test
+  public void testStarTreeTriggering()
+      throws Exception {
+    long numTotalDocs = getCountStarResult();
+
+    JsonNode queryResponse = postQuery(TEST_STAR_TREE_QUERY);
+    int result = queryResponse.get("aggregationResults").get(0).get("value").asInt();
+    // Initially 'numDocsScanned' should be the same as 'COUNT(*)' result
+    assertEquals(queryResponse.get("numDocsScanned").asInt(), result);
+
+    // Update table config and trigger reload
+    TableConfig tableConfig = getOfflineTableConfig();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG));
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    updateTableConfig(tableConfig);
+    reloadOfflineTable(getTableName());
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse1 = postQuery(TEST_STAR_TREE_QUERY);
+        // Result should not change during reload
+        assertEquals(queryResponse1.get("aggregationResults").get(0).get("value").asInt(), result);
+        // Total docs should not change during reload
+        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
+        // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
+        return queryResponse1.get("numDocsScanned").asInt() == NUM_SEGMENTS;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to generate bloom filter");
+
+    // Reload again should have no effect
+    reloadOfflineTable(getTableName());
+    JsonNode queryResponse1 = postQuery(TEST_STAR_TREE_QUERY);
+    assertEquals(queryResponse1.get("aggregationResults").get(0).get("value").asInt(), result);
+    assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(queryResponse1.get("numDocsScanned").asInt(), NUM_SEGMENTS);
   }
 
   /**
