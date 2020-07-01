@@ -375,7 +375,7 @@ public class PinotTableRestletResource {
     PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentNames);
 
     // Enable table by tableType
-    toggleTableState(tableName, tableType, StateType.DISABLE);
+    toggleTableState(tableName, tableType, StateType.ENABLE);
 
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
