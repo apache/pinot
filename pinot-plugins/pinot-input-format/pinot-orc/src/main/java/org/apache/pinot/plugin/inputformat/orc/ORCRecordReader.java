@@ -324,7 +324,7 @@ public class ORCRecordReader implements RecordReader {
         }
       default:
         // Unsupported types
-        throw new IllegalStateException("Unsupported field type: " + category + " for field " + field);
+        throw new IllegalStateException("Unsupported field type: " + category + " for field: " + field);
     }
   }
 
