@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -37,16 +39,20 @@ import java.util.Map;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.client.utils.DateTimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotResultSet extends AbstractBaseResultSet {
-
+  public static final String NULL_STRING = "null";
+  private static final Logger LOG = LoggerFactory.getLogger(PinotResultSet.class);
   private org.apache.pinot.client.ResultSet _resultSet;
   private int _totalRows;
   private int _currentRow;
   private int _totalColumns;
   private Map<String, Integer> _columns = new HashMap<>();
   private boolean _closed;
+  private boolean _wasNull = false;
 
   public PinotResultSet(org.apache.pinot.client.ResultSet resultSet) {
     _resultSet = resultSet;
@@ -69,6 +75,17 @@ public class PinotResultSet extends AbstractBaseResultSet {
     return new PinotResultSet();
   }
 
+  public static PinotResultSet fromJson(String jsonText) {
+    try {
+      JsonNode brokerResponse = new ObjectMapper().readTree(jsonText);
+      ResultSet resultSet = new ResultTableResultSet(brokerResponse.get("resultTable"));
+      return new PinotResultSet(resultSet);
+    } catch (Exception e) {
+      LOG.error("Error encoutered while creating result set from JSON", e);
+      return empty();
+    }
+  }
+
   protected void validateState()
       throws SQLException {
     if (isClosed()) {
@@ -79,7 +96,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   protected void validateColumn(int columnIndex)
       throws SQLException {
     validateState();
-
+    _wasNull = false;
     if (columnIndex > _totalColumns) {
       throw new SQLException("Column Index should be less than " + (_totalColumns + 1) + ". Found " + columnIndex);
     }
@@ -262,7 +279,20 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     validateColumn(columnIndex);
 
-    return _resultSet.getString(_currentRow, columnIndex - 1);
+    String val = _resultSet.getString(_currentRow, columnIndex - 1);
+    if (checkIsNull(val)) {
+      return null;
+    }
+
+    return val;
+  }
+
+  private boolean checkIsNull(String val) {
+    if (val == null || val.toLowerCase().contentEquals(NULL_STRING)) {
+      _wasNull = true;
+      return true;
+    }
+    return false;
   }
 
   @Override
@@ -390,6 +420,6 @@ public class PinotResultSet extends AbstractBaseResultSet {
   @Override
   public boolean wasNull()
       throws SQLException {
-    return false;
+    return _wasNull;
   }
 }
