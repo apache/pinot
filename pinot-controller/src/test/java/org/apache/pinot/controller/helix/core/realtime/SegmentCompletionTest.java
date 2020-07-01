@@ -37,6 +37,7 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -49,10 +50,12 @@ import static org.mockito.Mockito.when;
 
 
 public class SegmentCompletionTest {
+  private static final String FAKEFS_FINAL_SEGMENT_URI = "fakefs:///final_segment_uri";
   private MockPinotLLCRealtimeSegmentManager segmentManager;
   private MockSegmentCompletionManager segmentCompletionMgr;
   private Map<String, Object> fsmMap;
   private Map<String, Long> commitTimeMap;
+  private final String tableName = "someTable";
   private String segmentNameStr;
   private final String s1 = "S1";
   private final String s2 = "S2";
@@ -91,7 +94,6 @@ public class SegmentCompletionTest {
     final int partitionId = 23;
     final int seqId = 12;
     final long now = System.currentTimeMillis();
-    final String tableName = "someTable";
     final LLCSegmentName segmentName = new LLCSegmentName(tableName, partitionId, seqId, now);
     segmentNameStr = segmentName.getSegmentName();
     final LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
@@ -304,15 +306,21 @@ public class SegmentCompletionTest {
 
   // Tests happy path with split commit protocol
   @Test
-  public void testHappyPathSplitCommit()
+  public void testHappyPathSplitCommitWithLocalFS()
       throws Exception {
-    testHappyPathSplitCommit(5L, "location");
+    testHappyPathSplitCommit(5L, "/local/file", "http://null:null/segments/" + tableName + "/" + segmentNameStr);
+  }
+
+  @Test
+  public void testHappyPathSplitCommitWithDeepstore()
+      throws Exception {
+    testHappyPathSplitCommit(5L, "fakefs:///segment1", "fakefs:///segment1");
   }
 
   @Test
   public void testHappyPathSplitCommitWithPeerDownloadScheme()
       throws Exception {
-    testHappyPathSplitCommit(5L, "peer:///segment1");
+    testHappyPathSplitCommit(5L, "peer:///segment1", "peer:///segment1");
   }
 
   @Test
@@ -432,7 +440,7 @@ public class SegmentCompletionTest {
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
   }
 
-  private void testHappyPathSplitCommit(long startTime, String segmentLocation)
+  private void testHappyPathSplitCommit(long startTime, String segmentLocation, String downloadURL)
       throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
@@ -488,6 +496,7 @@ public class SegmentCompletionTest {
     response = segmentCompletionMgr
         .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+    Assert.assertEquals(segmentManager.getSegmentZKMetadata(null, null,null).getDownloadUrl(), downloadURL);
 
     // Now the FSM should have disappeared from the map
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
@@ -1229,15 +1238,14 @@ public class SegmentCompletionTest {
     public void commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       _segmentMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
-      _segmentMetadata.setDownloadUrl(URIUtils.constructDownloadUrl(CONTROLLER_CONF.generateVipUrl(), rawTableName,
-          committingSegmentDescriptor.getSegmentName()));
+      _segmentMetadata.setDownloadUrl(committingSegmentDescriptor.getSegmentLocation());
       _segmentMetadata.setEndTime(_segmentCompletionMgr.getCurrentTimeMs());
     }
 
     @Override
     public String commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       Preconditions.checkState(!committingSegmentDescriptor.getSegmentLocation().equals("doNotCommitMe"));
-      return "final_segment_uri";
+      return committingSegmentDescriptor.getSegmentLocation();
     }
 
     @Override
