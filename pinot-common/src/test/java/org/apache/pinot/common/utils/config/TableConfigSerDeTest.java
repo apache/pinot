@@ -248,8 +248,10 @@ public class TableConfigSerDeTest {
     {
       // with SegmentsValidationAndRetentionConfig
       TableConfig tableConfig = tableConfigBuilder.setPeerSegmentDownloadScheme("http").build();
-      checkSegmentsValidationAndRetentionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkSegmentsValidationAndRetentionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+      checkSegmentsValidationAndRetentionConfig(
+          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkSegmentsValidationAndRetentionConfig(
+          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
     {
       // With ingestion config

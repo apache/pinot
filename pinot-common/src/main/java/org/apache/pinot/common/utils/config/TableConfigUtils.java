@@ -132,8 +132,8 @@ public class TableConfigUtils {
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
-        upsertConfig, ingestionConfig);
+        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
+        ingestionConfig);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -228,8 +228,10 @@ public class TableConfigUtils {
       }
       String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
       if (peerSegmentDownloadScheme != null) {
-        if (!"http".equalsIgnoreCase(peerSegmentDownloadScheme) && !"https".equalsIgnoreCase(peerSegmentDownloadScheme)) {
-          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme + "' for peerSegmentDownloadScheme. Must be one of http nor https" );
+        if (!"http".equalsIgnoreCase(peerSegmentDownloadScheme) && !"https"
+            .equalsIgnoreCase(peerSegmentDownloadScheme)) {
+          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
+              + "' for peerSegmentDownloadScheme. Must be one of http nor https");
         }
       }
     }

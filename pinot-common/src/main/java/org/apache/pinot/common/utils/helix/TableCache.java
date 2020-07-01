@@ -80,6 +80,10 @@ public class TableCache {
     return columnName;
   }
 
+  public TableConfig getTableConfig(String tableName) {
+    return _tableConfigChangeListener._tableConfigMap.get(tableName);
+  }
+
   class TableConfigChangeListener implements IZkChildListener, IZkDataListener {
 
     Map<String, TableConfig> _tableConfigMap = new ConcurrentHashMap<>();

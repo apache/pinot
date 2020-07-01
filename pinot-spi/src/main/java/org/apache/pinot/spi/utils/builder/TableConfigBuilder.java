@@ -68,6 +68,7 @@ public class TableConfigBuilder {
   private String _peerSegmentDownloadScheme;
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
+  private String _crypterClassName;
 
   // Tenant config related
   private String _brokerTenant;
@@ -170,6 +171,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setCompletionConfig(CompletionConfig completionConfig) {
     _completionConfig = completionConfig;
+    return this;
+  }
+
+  public TableConfigBuilder setCrypterClassName(String crypterClassName) {
+    _crypterClassName = crypterClassName;
     return this;
   }
 
@@ -318,6 +324,7 @@ public class TableConfigBuilder {
     if (_isLLC) {
       validationConfig.setReplicasPerPartition(_numReplicas);
     }
+    validationConfig.setCrypterClassName(_crypterClassName);
 
     // Tenant config
     TenantConfig tenantConfig = new TenantConfig(_brokerTenant, _serverTenant, _tagOverrideConfig);
