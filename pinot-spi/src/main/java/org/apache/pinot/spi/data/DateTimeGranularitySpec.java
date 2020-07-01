@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -30,8 +32,7 @@ import org.apache.pinot.spi.utils.EqualityUtils;
  */
 public class DateTimeGranularitySpec {
 
-  public static final String GRANULARITY_TOKENS_ERROR_STR = "granularity must be of format size:timeunit";
-  public static final String GRANULARITY_PATTERN_ERROR_STR = "granularity must be of format [0-9]+:<TimeUnit>";
+  private static final Logger LOGGER = LoggerFactory.getLogger(DateTimeGranularitySpec.class);
   public static final String NUMBER_REGEX = "[1-9][0-9]*";
 
   public static final String COLON_SEPARATOR = ":";
@@ -41,34 +42,31 @@ public class DateTimeGranularitySpec {
   public static final int GRANULARITY_UNIT_POSITION = 1;
   public static final int MAX_GRANULARITY_TOKENS = 2;
 
-  private String _granularity;
-  private int _size;
-  private TimeUnit _timeUnit;
+  private final String _granularity;
+  private final int _size;
+  private final TimeUnit _timeUnit;
 
   /**
    * Constructs a dateTimeGranularitySpec granularity from a string
-   * @param granularity
-   * @return
    */
   public DateTimeGranularitySpec(String granularity) {
     _granularity = granularity;
-    isValidGranularity(granularity);
+    Preconditions.checkArgument(isValidGranularity(granularity),
+        "Invalid granularity string:%. Must be of format [0-9]+:<TimeUnit>", granularity);
     String[] granularityTokens = _granularity.split(COLON_SEPARATOR);
-    _size = Integer.valueOf(granularityTokens[GRANULARITY_SIZE_POSITION]);
+    _size = Integer.parseInt(granularityTokens[GRANULARITY_SIZE_POSITION]);
     _timeUnit = TimeUnit.valueOf(granularityTokens[GRANULARITY_UNIT_POSITION]);
   }
 
   /**
    * Constructs a dateTimeGranularitySpec granularity given the components of a granularity
-   * @param columnSize
-   * @param columnUnit
-   * @return
    */
   public DateTimeGranularitySpec(int columnSize, TimeUnit columnUnit) {
     _granularity = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit);
     _size = columnSize;
     _timeUnit = columnUnit;
-    isValidGranularity(_granularity);
+    Preconditions.checkArgument(isValidGranularity(_granularity),
+        "Invalid granularity string:%. Must be of format [0-9]+:<TimeUnit>", _granularity);
   }
 
   public String getGranularity() {
@@ -94,7 +92,6 @@ public class DateTimeGranularitySpec {
    * <li>3) granularityToMillis(15:MINUTES) = 900000 (15*60*1000)</li>
    * </ul>
    * </ul>
-   * @return
    */
   public Long granularityToMillis() {
     return TimeUnit.MILLISECONDS.convert(_size, _timeUnit);
@@ -102,18 +99,24 @@ public class DateTimeGranularitySpec {
 
   /**
    * Check correctness of granularity of {@link DateTimeFieldSpec}
-   * @param granularity
-   * @return
    */
   public static boolean isValidGranularity(String granularity) {
-    Preconditions.checkNotNull(granularity);
+    if (granularity == null) {
+      return false;
+    }
     String[] granularityTokens = granularity.split(COLON_SEPARATOR);
-    Preconditions.checkArgument(granularityTokens.length == MAX_GRANULARITY_TOKENS, GRANULARITY_TOKENS_ERROR_STR);
-    Preconditions.checkArgument(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX),
-        GRANULARITY_PATTERN_ERROR_STR);
-    Preconditions.checkArgument(EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[GRANULARITY_UNIT_POSITION]),
-        GRANULARITY_PATTERN_ERROR_STR);
-
+    if (granularityTokens.length != MAX_GRANULARITY_TOKENS) {
+      LOGGER.error("Incorrect granularity:{}. Must be of format size:timeunit", granularity);
+      return false;
+    }
+    if (!granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX)) {
+      LOGGER.error("Incorrect granularity size:{}. Must be of format [0-9]+:<TimeUnit>", granularityTokens[GRANULARITY_SIZE_POSITION]);
+      return false;
+    }
+    if (!EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[GRANULARITY_UNIT_POSITION])) {
+      LOGGER.error("Incorrect granularity size:{}. Must be of format [0-9]+:<TimeUnit>", granularityTokens[GRANULARITY_SIZE_POSITION]);
+      return false;
+    }
     return true;
   }
 
@@ -134,7 +137,6 @@ public class DateTimeGranularitySpec {
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_granularity);
-    return result;
+    return EqualityUtils.hashCodeOf(_granularity);
   }
 }

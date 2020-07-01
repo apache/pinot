@@ -27,6 +27,9 @@ import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -50,8 +53,14 @@ public class SchemaUtils {
           .build()).getMetadata();
 
   /**
-   * Validates that for a field spec with transform function, the source column name and destination column name are exclusive
-   * i.e. do not allow using source column name for destination column
+   * Validates the following:
+   * 1) Checks if sql reserved keywords are being used as field names. This check can be disabled, for not breaking existing schemas with invalid names
+   * 2) Checks valid transform function -
+   *   for a field spec with transform function, the source column name and destination column name are exclusive i.e. do not allow using source column name for destination column
+   *   ensure transform function string can be used to create a {@link FunctionEvaluator}
+   * 3) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be same b) cannot use SIMPLE_DATE_FORMAT for conversion
+   * 4) Checks valid dateTimeFieldSpecs - checks format and granularity string
+   * 5) Schema validations from {@link Schema#validate(Logger)}
    */
   public static boolean validate(Schema schema) {
     return validate(schema, true, LOGGER);
@@ -59,9 +68,13 @@ public class SchemaUtils {
 
   /**
    * Validates the following:
-   * 1) for a field spec with transform function, the source column name and destination column name are exclusive
-   * i.e. do not allow using source column name for destination column
-   * 2) Basic schema validations
+   * 1) Checks if sql reserved keywords are being used as field names. This check can be disabled, for not breaking existing schemas with invalid names
+   * 2) Checks valid transform function -
+   *   for a field spec with transform function, the source column name and destination column name are exclusive i.e. do not allow using source column name for destination column
+   *   ensure transform function string can be used to create a {@link FunctionEvaluator}
+   * 3) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be same b) cannot use SIMPLE_DATE_FORMAT for conversion
+   * 4) Checks valid dateTimeFieldSpecs - checks format and granularity string
+   * 5) Schema validations from {@link Schema#validate(Logger)}
    *
    * @param validateFieldNames if false, does not validate field names. This is to prevent validation failing on existing schemas with invalid field names during a schema update
    */
@@ -75,8 +88,15 @@ public class SchemaUtils {
           if (!isValidTransformFunction(fieldSpec)) {
             return false;
           }
-          if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME) && !isValidTimeFieldSpec(fieldSpec)) {
-            return false;
+          FieldSpec.FieldType fieldType = fieldSpec.getFieldType();
+          if (fieldType.equals(FieldSpec.FieldType.DATE_TIME)) {
+            if (!isValidDateTimeFieldSpec(fieldSpec)) {
+              return false;
+            }
+          } else if (fieldType.equals(FieldSpec.FieldType.TIME)) {
+            if (!isValidTimeFieldSpec(fieldSpec)) {
+              return false;
+            }
           }
         }
       }
@@ -99,6 +119,9 @@ public class SchemaUtils {
     return true;
   }
 
+  /**
+   * Checks for valid transform function string
+   */
   private static boolean isValidTransformFunction(FieldSpec fieldSpec) {
     String column = fieldSpec.getName();
     String transformFunction = fieldSpec.getTransformFunction();
@@ -117,6 +140,9 @@ public class SchemaUtils {
     return true;
   }
 
+  /**
+   * Checks for valid incoming and outgoing granularity spec in the time field spec
+   */
   private static boolean isValidTimeFieldSpec(FieldSpec fieldSpec) {
     TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
     TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
@@ -138,5 +164,14 @@ public class SchemaUtils {
       }
     }
     return true;
+  }
+
+  /**
+   * Checks for valid format and granularity string in dateTimeFieldSpec
+   */
+  private static boolean isValidDateTimeFieldSpec(FieldSpec fieldSpec) {
+    DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
+    return DateTimeFormatSpec.isValidFormat(dateTimeFieldSpec.getFormat()) && DateTimeGranularitySpec
+        .isValidGranularity(dateTimeFieldSpec.getGranularity());
   }
 }

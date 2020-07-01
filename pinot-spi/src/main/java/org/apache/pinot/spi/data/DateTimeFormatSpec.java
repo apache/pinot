@@ -25,6 +25,8 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,14 +34,9 @@ import org.joda.time.format.DateTimeFormatter;
  */
 public class DateTimeFormatSpec {
 
-  public static final String FORMAT_TOKENS_ERROR_STR = "format must be of pattern size:timeunit:timeformat(:pattern)";
-  public static final String FORMAT_PATTERN_ERROR_STR =
-      "format must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)";
-  public static final String TIME_FORMAT_ERROR_STR =
-      "format must be of format [0-9]+:<TimeUnit>:EPOCH or [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:<format>";
+  private static final Logger LOGGER = LoggerFactory.getLogger(DateTimeFormatSpec.class);
 
   public static final String NUMBER_REGEX = "[1-9][0-9]*";
-
   public static final String COLON_SEPARATOR = ":";
 
   /* DateTimeFieldSpec format is of format size:timeUnit:timeformat:pattern tz(timezone)
@@ -51,36 +48,34 @@ public class DateTimeFormatSpec {
   public static final int MIN_FORMAT_TOKENS = 3;
   public static final int MAX_FORMAT_TOKENS = 4;
 
-  private String _format;
+  private final String _format;
   private int _size;
   private DateTimeFormatUnitSpec _unitSpec;
   private DateTimeFormatPatternSpec _patternSpec;
 
   public DateTimeFormatSpec(String format) {
     _format = format;
-    if (isValidFormat(format)) {
-      String[] formatTokens = format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
-      _size = Integer.valueOf(formatTokens[FORMAT_SIZE_POSITION]);
-      _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
-      if (formatTokens.length == MAX_FORMAT_TOKENS) {
-        _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
-            formatTokens[FORMAT_PATTERN_POSITION]);
-      } else {
-        _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION], null);
-      }
+    Preconditions.checkArgument(isValidFormat(format),
+        "Invalid format string:%. Must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)", format);
+    String[] formatTokens = format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
+    _size = Integer.parseInt(formatTokens[FORMAT_SIZE_POSITION]);
+    _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
+    if (formatTokens.length == MAX_FORMAT_TOKENS) {
+      _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
+          formatTokens[FORMAT_PATTERN_POSITION]);
+    } else {
+      _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION], null);
     }
+
   }
 
   /**
    * Constructs a dateTimeSpec format, given the components of a format
-   * @param columnSize
-   * @param columnUnit
-   * @param columnTimeFormat
-   * @return
    */
   public DateTimeFormatSpec(int columnSize, String columnUnit, String columnTimeFormat) {
     _format = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit, columnTimeFormat);
-    isValidFormat(_format);
+    Preconditions.checkArgument(isValidFormat(_format),
+        "Invalid format:%. Must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)", _format);
 
     _size = columnSize;
     _unitSpec = new DateTimeFormatUnitSpec(columnUnit);
@@ -89,15 +84,12 @@ public class DateTimeFormatSpec {
 
   /**
    * Constructs a dateTimeSpec format, given the components of a format
-   * @param columnSize
-   * @param columnUnit
-   * @param columnTimeFormat
    * @param sdfPattern and tz
-   * @return
    */
   public DateTimeFormatSpec(int columnSize, String columnUnit, String columnTimeFormat, String sdfPattern) {
     _format = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit, columnTimeFormat, sdfPattern);
-    isValidFormat(_format);
+    Preconditions.checkArgument(isValidFormat(_format),
+        "Invalid format:%. Must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)", _format);
 
     _size = columnSize;
     _unitSpec = new DateTimeFormatUnitSpec(columnUnit);
@@ -150,16 +142,13 @@ public class DateTimeFormatSpec {
    * format=1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd, dateTimeSpec.fromMillis(1498892400000) = 20170701</li>
    * </ul>
    * </ul>
-   * @param dateTimeColumnValueMS
-   * @param toFormat - the format in which to convert the millis value
    * @param type - type of return value (can be int/long or string depending on time format)
    * @return dateTime column value in dateTimeFieldSpec
    */
   public <T extends Object> T fromMillisToFormat(Long dateTimeColumnValueMS, Class<T> type) {
     Preconditions.checkNotNull(dateTimeColumnValueMS);
 
-    Object dateTimeColumnValue = null;
-
+    Object dateTimeColumnValue;
     if (_patternSpec.getTimeFormat().equals(TimeFormat.EPOCH)) {
       dateTimeColumnValue = _unitSpec.getTimeUnit().convert(dateTimeColumnValueMS, TimeUnit.MILLISECONDS) / _size;
     } else {
@@ -183,39 +172,58 @@ public class DateTimeFormatSpec {
    * </ul>
    * <ul>
    * @param dateTimeColumnValue - datetime Column value to convert to millis
-   * @param fromFormat - the format in which the date time column value is expressed
    * @return datetime value in millis
    */
   public Long fromFormatToMillis(Object dateTimeColumnValue) {
     Preconditions.checkNotNull(dateTimeColumnValue);
 
-    Long timeColumnValueMS = 0L;
-
+    long timeColumnValueMS;
     if (_patternSpec.getTimeFormat().equals(TimeFormat.EPOCH)) {
       timeColumnValueMS = TimeUnit.MILLISECONDS.convert((Long) dateTimeColumnValue * _size, _unitSpec.getTimeUnit());
     } else {
       timeColumnValueMS = _patternSpec.getDateTimeFormatter().parseMillis(String.valueOf(dateTimeColumnValue));
     }
-
     return timeColumnValueMS;
   }
 
+  /**
+   * Validates the format string in the dateTimeFieldSpec
+   */
   public static boolean isValidFormat(String format) {
-    Preconditions.checkNotNull(format);
-
+    if (format == null) {
+      LOGGER.error("Format string in dateTimeFieldSpec is null");
+      return false;
+    }
     String[] formatTokens = format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
-    Preconditions.checkArgument(formatTokens.length == MIN_FORMAT_TOKENS || formatTokens.length == MAX_FORMAT_TOKENS,
-        FORMAT_TOKENS_ERROR_STR);
+    if (formatTokens.length < MIN_FORMAT_TOKENS || formatTokens.length > MAX_FORMAT_TOKENS) {
+      LOGGER.error("Incorrect format:{}. Must be of format size:timeunit:timeformat(:pattern)", format);
+      return false;
+    }
 
-    Preconditions.checkArgument(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX), FORMAT_PATTERN_ERROR_STR);
-    Preconditions.checkArgument(DateTimeFormatUnitSpec.isValidUnitSpec(formatTokens[FORMAT_UNIT_POSITION]));
+    if (!formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX)) {
+      LOGGER.error("Incorrect format size:{} in format:{}. Must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)",
+          formatTokens[FORMAT_SIZE_POSITION], format);
+      return false;
+    }
+
+    if (!DateTimeFormatUnitSpec.isValidUnitSpec(formatTokens[FORMAT_UNIT_POSITION])) {
+      LOGGER.error("Incorrect format unit:{} in format:{}. Must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)",
+          formatTokens[FORMAT_UNIT_POSITION], format);
+      return false;
+    }
+
     if (formatTokens.length == MIN_FORMAT_TOKENS) {
-      Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
-          TIME_FORMAT_ERROR_STR);
+      if (!formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString())) {
+        LOGGER.error("Incorrect format type:{} in format:{}. Must be of [0-9]+:<TimeUnit>:EPOCH",
+            formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
+        return false;
+      }
     } else {
-      Preconditions
-          .checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-              TIME_FORMAT_ERROR_STR);
+      if (!formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
+        LOGGER.error("Incorrect format type:{} in format:{}. Must be of [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern",
+            formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
+        return false;
+      }
     }
     return true;
   }
