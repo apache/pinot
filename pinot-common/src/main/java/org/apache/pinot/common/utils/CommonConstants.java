@@ -111,8 +111,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS = "pinot.broker.flapping.timeWindowMs";
     public static final String CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS = "pinot.server.flapping.timeWindowMs";
     public static final String CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS = "pinot.minion.flapping.timeWindowMs";
-    public static final String CONFIG_OF_HELIX_INSTANCE_MAX_MESSAGES = "pinot.helix.instance.messages.max";
-    public static final String DEFAULT_HELIX_INSTANCE_MAX_MESSAGES = "100000";
+    public static final String CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "pinot.helix.instance.state.transitions.max";
+    public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "10000000";
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
 
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";

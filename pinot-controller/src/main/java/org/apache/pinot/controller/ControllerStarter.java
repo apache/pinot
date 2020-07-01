@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.controller;
 
-import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,10 +41,10 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
-import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -103,7 +103,7 @@ public class ControllerStarter implements ServiceStartable {
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
-  private static final String MAX_MESSAGES_PER_INSTANCE_NAME =  "MaxMessagesPerInstance";
+  private static final String MAX_STATE_TRANSITIONS_PER_INSTANCE =  "MaxStateTransitionsPerInstance";
 
   private final ControllerConf _config;
   private final List<ListenerConfig> _listenerConfigs;
@@ -210,15 +210,16 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void setupHelixClusterConstraints() {
-    String maxMessageLimit = _config.getString(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_MESSAGES,
-        CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_MESSAGES);
-    Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = Maps.newHashMap();
+    String maxMessageLimit = _config.getString(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
+        CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
+    Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
-    constraintAttributes.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE, "STATE_TRANSITION");
+    constraintAttributes
+        .put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE, Message.MessageType.STATE_TRANSITION.name());
     ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxMessageLimit);
 
     getHelixAdmin().setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
-        MAX_MESSAGES_PER_INSTANCE_NAME, constraintItem);
+        MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {

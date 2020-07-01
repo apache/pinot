@@ -263,11 +263,11 @@ public class PinotControllerModeTest extends ControllerTest {
   private void checkHelixConstraints(HelixAdmin helixAdmin) {
     ClusterConstraints constraints =
         helixAdmin.getConstraints(getHelixClusterName(), ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT);
-    ConstraintItem item = constraints.getConstraintItem("MaxMessagesPerInstance");
+    ConstraintItem item = constraints.getConstraintItem("MaxStateTransitionsPerInstance");
     Assert.assertEquals(".*", item.getAttributeValue(ClusterConstraints.ConstraintAttribute.INSTANCE));
     Assert
         .assertEquals("STATE_TRANSITION", item.getAttributeValue(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE));
-    Assert.assertEquals(CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_MESSAGES, item.getConstraintValue());
+    Assert.assertEquals(CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS, item.getConstraintValue());
   }
 
   private void checkInstanceState(HelixAdmin helixAdmin) {
