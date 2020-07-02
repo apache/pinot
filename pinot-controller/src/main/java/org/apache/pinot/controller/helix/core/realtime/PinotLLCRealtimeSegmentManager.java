@@ -355,7 +355,7 @@ public class PinotLLCRealtimeSegmentManager {
    * This method moves the segment file from another location to its permanent location.
    * When splitCommit is enabled, segment file is uploaded to the segmentLocation in the committingSegmentDescriptor,
    * and we need to move the segment file to its permanent location before committing the segment metadata.
-   * Updated the segment location to the uri which the segment is moved to.
+   * Modifies the segment location in committingSegmentDescriptor to the uri which the segment is moved to
    * Exception: for committingSegmentDescriptor with peer download scheme in its segment location, there is no need for
    * moving.
    */
