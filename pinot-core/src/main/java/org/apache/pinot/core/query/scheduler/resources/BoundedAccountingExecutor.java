@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  *
  * This class also supports a resource accounting interface to accurately track resources
  * utilization based on submission time and end time of a task. This does not require
- * any changes to client id which continue to use ExecutorService interface.
+ * any changes to client code which continue to use ExecutorService interface.
  */
 public class BoundedAccountingExecutor extends QueryExecutorService {
   private static Logger LOGGER = LoggerFactory.getLogger(BoundedAccountingExecutor.class);

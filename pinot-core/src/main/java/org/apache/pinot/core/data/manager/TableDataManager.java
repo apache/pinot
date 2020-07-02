@@ -33,7 +33,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
- * The <id>TableDataManager</id> interface provides APIs to manage segments under a table.
+ * The <code>TableDataManager</code> interface provides APIs to manage segments under a table.
  */
 @ThreadSafe
 public interface TableDataManager {
@@ -101,7 +101,7 @@ public interface TableDataManager {
    * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
    *
    * @param segmentName Name of the segment to acquire
-   * @return Segment data manager with the given name, or <id>null</id> if no segment matches the name
+   * @return Segment data manager with the given name, or <code>null</code> if no segment matches the name
    */
   @Nullable
   SegmentDataManager acquireSegment(String segmentName);

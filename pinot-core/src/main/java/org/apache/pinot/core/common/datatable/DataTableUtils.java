@@ -33,7 +33,7 @@ import org.apache.pinot.core.util.QueryOptions;
 
 
 /**
- * The <id>DataTableUtils</id> class provides utility methods for data table.
+ * The <code>DataTableUtils</code> class provides utility methods for data table.
  */
 @SuppressWarnings("rawtypes")
 public class DataTableUtils {

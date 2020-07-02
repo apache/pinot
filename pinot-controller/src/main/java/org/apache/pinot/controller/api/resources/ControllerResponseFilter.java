@@ -48,7 +48,7 @@ public class ControllerResponseFilter implements ContainerResponseFilter {
     final String reasonPhrase = responseContext.getStatusInfo().getReasonPhrase();
     final String srcIpAddr = request.get().getRemoteAddr();
     final String contentType = requestContext.getHeaderString(HttpHeaders.CONTENT_TYPE);
-    LOGGER.info("Handled request from {} {} {}, content-type {} status id {} {}", srcIpAddr, method, uri, contentType,
+    LOGGER.info("Handled request from {} {} {}, content-type {} status code {} {}", srcIpAddr, method, uri, contentType,
         respStatus, reasonPhrase);
   }
 }

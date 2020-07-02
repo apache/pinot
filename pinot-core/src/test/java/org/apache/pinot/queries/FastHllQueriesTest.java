@@ -50,7 +50,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * The <id>FastHllQueriesTest</id> class sets up the index segment and create fastHll on 'column17' and 'column18'.
+ * The <code>FastHllQueriesTest</code> class sets up the index segment and create fastHll on 'column17' and 'column18'.
  * <p>There are totally 18 columns, 30000 records inside the original Avro file where 11 columns are selected to build
  * the index segment. Selected columns information are as following:
  * <ul>
@@ -178,7 +178,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    // The segment generation id in SegmentColumnarIndexCreator will throw
+    // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check

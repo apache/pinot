@@ -43,7 +43,7 @@ import org.apache.pinot.spi.utils.ByteArray;
  * ser/deser requires us to convert the primitives data types in objects like
  * Integer etc. This is waste of cpu resource and increase the payload size. We
  * optimize the data format for Pinot usecase. We can also support lazy
- * construction of obejcts. In fact we retain the bytes as it is and will be able
+ * construction of obejcts. Infact we retain the bytes as it is and will be able
  * to lookup the a field directly within a byte buffer.<br>
  *
  * USAGE:

@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <id>DateTruncTransformationFunction</id> class implements the sql compatible date_trunc function for TIMESTAMP type.
+ * The <code>DateTruncTransformationFunction</code> class implements the sql compatible date_trunc function for TIMESTAMP type.
  * <p>
  *  <ul>
  *    <li>
@@ -213,7 +213,7 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
     }
   }
 
-  // Original comment from presto id
+  // Original comment from presto code
   // ```Forked from org.elasticsearch.common.joda.Joda```
   public static final class QuarterOfYearDateTimeField extends DateTimeFieldType {
     private static final DateTimeFieldType QUARTER_OF_YEAR = new QuarterOfYearDateTimeField();

@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
- * The class <id>BaseOnHeapMutableDictionary</id> is the implementation of the mutable dictionary required by
+ * The class <code>BaseOnHeapMutableDictionary</code> is the implementation of the mutable dictionary required by
  * REALTIME consuming segments.
  * <p>The implementation needs to be thread safe for single writer multiple readers scenario.
  * <p>We can assume the readers always first get the dictionary id for a value, then use the dictionary id to fetch the

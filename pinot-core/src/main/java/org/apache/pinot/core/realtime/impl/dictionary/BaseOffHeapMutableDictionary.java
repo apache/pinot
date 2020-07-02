@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  *        ==========================================|
  *
  * To start with, all cells are initialized to have NULL_VALUE_INDEX (indicating empty cell)
- * Here is the pseudo-id for indexing an item or finding the dictionary ID of an item.
+ * Here is the pseudo-code for indexing an item or finding the dictionary ID of an item.
  *
  * index(item) {
  *   foreach (iBuf: iBufList) {

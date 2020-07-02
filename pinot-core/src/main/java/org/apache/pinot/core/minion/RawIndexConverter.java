@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <id>RawIndexConverter</id> class takes a segment and converts the dictionary-based indexes inside the segment
+ * The <code>RawIndexConverter</code> class takes a segment and converts the dictionary-based indexes inside the segment
  * into raw indexes.
  * <ul>
  *   <li>

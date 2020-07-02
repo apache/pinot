@@ -28,8 +28,8 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 
 
 /**
- * The <id>DocIdSetOperator</id> takes a filter operator and returns blocks with set of the matched document Ids.
- * <p>Should call {@link #nextBlock()} multiple times until it returns <id>null</id> (already exhausts all the
+ * The <code>DocIdSetOperator</code> takes a filter operator and returns blocks with set of the matched document Ids.
+ * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
  * matched documents) or already gathered enough documents (for selection queries).
  */
 public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {

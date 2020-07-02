@@ -930,7 +930,7 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * TODO: refactor id to use this method over {@link #getAllInstancesForServerTenant(String)} if applicable to reuse
+   * TODO: refactor code to use this method over {@link #getAllInstancesForServerTenant(String)} if applicable to reuse
    * instance configs in order to reduce ZK accesses
    */
   public Set<String> getAllInstancesForServerTenant(List<InstanceConfig> instanceConfigs, String tenantName) {
@@ -942,7 +942,7 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * TODO: refactor id to use this method over {@link #getAllInstancesForBrokerTenant(String)} if applicable to reuse
+   * TODO: refactor code to use this method over {@link #getAllInstancesForBrokerTenant(String)} if applicable to reuse
    * instance configs in order to reduce ZK accesses
    */
   public Set<String> getAllInstancesForBrokerTenant(List<InstanceConfig> instanceConfigs, String tenantName) {
@@ -1797,7 +1797,7 @@ public class PinotHelixResourceManager {
       Stat metadataStat = metadataStats[i];
       // metadataStat can be null in some cases:
       // 1. SegmentZkMetadata is somehow missing due to system inconsistency.
-      // 2. A segment is deleted after we fetch the list from idealstate and before reaching this part of the id.
+      // 2. A segment is deleted after we fetch the list from idealstate and before reaching this part of the code.
       if (metadataStat != null) {
         int currentVersion = metadataStat.getVersion();
         if (_lastKnownSegmentMetadataVersionMap.get(tableNameWithType).containsKey(currentSegment)) {
@@ -2149,7 +2149,7 @@ public class PinotHelixResourceManager {
   /**
    * Helper method to return a list of tables that exists and matches the given table name and type, or throws
    * {@link ControllerApplicationException} if no table found.
-   * <p>When table type is <id>null</id>, try to match both OFFLINE and REALTIME table.
+   * <p>When table type is <code>null</code>, try to match both OFFLINE and REALTIME table.
    *
    * @param tableName Table name with or without type suffix
    * @param tableType Table type

@@ -61,7 +61,7 @@ import org.slf4j.LoggerFactory;
  * Note that data buffers and headers grow independently.
  *
  * Data format
- * <id>
+ * <code>
  *  HEADER SECTION 0
  *    bufferId startIndex length
  *    bufferId startIndex length
@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  *     [set of values of row ... ] [set of values of row ...]
  *     .....
  *     [set of values of row n]
- * </id>
+ * </code>
  *
  */
 // TODO: Fix thread-safety issue for ArrayList

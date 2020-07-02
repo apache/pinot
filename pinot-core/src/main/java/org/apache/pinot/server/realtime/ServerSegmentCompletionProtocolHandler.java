@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * A class that handles sending segment completion protocol requests to the controller and getting
  * back responses
  */
-// TODO: Use exception based id to handle different types of exceptions.
+// TODO: Use exception based code to handle different types of exceptions.
 public class ServerSegmentCompletionProtocolHandler {
   private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
   private static final String HTTPS_PROTOCOL = CommonConstants.HTTPS_PROTOCOL;

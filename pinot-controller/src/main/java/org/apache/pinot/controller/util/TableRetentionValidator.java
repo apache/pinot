@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <id>TableRetentionValidator</id> class validates the retention policy in table config, and the start/end
+ * The <code>TableRetentionValidator</code> class validates the retention policy in table config, and the start/end
  * timestamp in segment metadata.
  * <p>Will validate the followings:
  * <ul>

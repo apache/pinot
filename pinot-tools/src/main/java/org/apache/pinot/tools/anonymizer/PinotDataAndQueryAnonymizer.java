@@ -106,7 +106,7 @@ import org.slf4j.LoggerFactory;
  * these should be time (or time related) columns since they don't reveal anything and so
  * it is fine to copy them as is from souce segments into Avro files.
  *
- * Please see the implementation notes further in the id explaining the global
+ * Please see the implementation notes further in the code explaining the global
  * dictionary building, and data generation and query generation phases in detail.
  *
  * Also, please see usage examples in
@@ -1127,7 +1127,7 @@ public class PinotDataAndQueryAnonymizer {
         // if the user worked with partial dataset, then every original value
         // from the dictionary of original dataset won't be present in the
         // global dictionary -- we just return appropriate exception such that
-        // query generator id can continue after ignoring this query
+        // query generator code can continue after ignoring this query
         if (!origToDerived.containsKey(origValue)) {
           throw new PredicateValueNotFoundException(origValue);
         }

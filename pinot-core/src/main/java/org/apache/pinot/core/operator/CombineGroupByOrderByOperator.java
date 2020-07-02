@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <id>CombineGroupByOrderByOperator</id> class is the operator to combine aggregation results with group-by and order by.
+ * The <code>CombineGroupByOrderByOperator</code> class is the operator to combine aggregation results with group-by and order by.
  */
 // TODO: this class has a lot of duplication with {@link CombineGroupByOperator}.
 // These 2 classes can be combined into one

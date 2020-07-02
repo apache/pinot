@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A simple id to invoke a method in any class using reflection.
+ * A simple code to invoke a method in any class using reflection.
  * Eventually this will support annotations on the method but for now its a simple wrapper on any java method
  */
 public class FunctionInvoker {

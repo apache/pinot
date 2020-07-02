@@ -28,7 +28,7 @@ import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 
 
 /**
- * The <id>PinotSegmentToJsonConverter</id> class is the tool to convert Pinot segment to JSON format.
+ * The <code>PinotSegmentToJsonConverter</code> class is the tool to convert Pinot segment to JSON format.
  */
 public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
   private final String _segmentDir;

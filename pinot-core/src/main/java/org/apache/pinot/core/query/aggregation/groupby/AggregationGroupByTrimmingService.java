@@ -40,7 +40,7 @@ import org.apache.pinot.core.util.GroupByUtils;
 
 
 /**
- * The <id>AggregationGroupByTrimmingService</id> class provides trimming service for aggregation group-by queries.
+ * The <code>AggregationGroupByTrimmingService</code> class provides trimming service for aggregation group-by queries.
  */
 public class AggregationGroupByTrimmingService {
 

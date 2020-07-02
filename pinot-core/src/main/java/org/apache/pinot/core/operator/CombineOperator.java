@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <id>CombineOperator</id> class is the operator to combine selection results and aggregation only results.
+ * The <code>CombineOperator</code> class is the operator to combine selection results and aggregation only results.
  */
 @SuppressWarnings("rawtypes")
 public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {

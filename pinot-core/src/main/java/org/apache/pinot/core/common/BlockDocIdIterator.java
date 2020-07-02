@@ -19,7 +19,7 @@
 package org.apache.pinot.core.common;
 
 /**
- * The interface <id>BlockDocIdIterator</id> represents the iterator for <id>BlockDocIdSet</id>. The document
+ * The interface <code>BlockDocIdIterator</code> represents the iterator for <code>BlockDocIdSet</code>. The document
  * ids returned from the iterator should be in ascending order.
  */
 public interface BlockDocIdIterator {

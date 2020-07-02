@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <id>PinotSegmentConvertCommand</id> class provides tools to convert Pinot segments into another format.
+ * The <code>PinotSegmentConvertCommand</code> class provides tools to convert Pinot segments into another format.
  * <p>Currently support converting Pinot segments to:
  * <ul>
  *   <li>AVRO format</li>

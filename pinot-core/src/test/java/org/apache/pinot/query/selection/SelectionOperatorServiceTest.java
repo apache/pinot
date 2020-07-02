@@ -47,7 +47,7 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * The <id>SelectionOperatorServiceTest</id> class provides unit tests for {@link SelectionOperatorUtils} and
+ * The <code>SelectionOperatorServiceTest</code> class provides unit tests for {@link SelectionOperatorUtils} and
  * {@link SelectionOperatorService}.
  */
 public class SelectionOperatorServiceTest {

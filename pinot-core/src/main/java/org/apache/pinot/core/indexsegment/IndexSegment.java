@@ -73,7 +73,7 @@ public interface IndexSegment {
 
   /**
    * Returns the record for the given document Id. Virtual column values are not returned.
-   * <p>NOTE: don't use this method for high performance id.
+   * <p>NOTE: don't use this method for high performance code.
    *
    * @param docId Document Id
    * @param reuse Reusable buffer for the record

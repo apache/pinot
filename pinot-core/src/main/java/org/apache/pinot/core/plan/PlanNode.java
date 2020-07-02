@@ -24,7 +24,7 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 
 
 /**
- * The <id>PlanNode</id> is a single execution plan node inside the {@link Plan} tree.
+ * The <code>PlanNode</code> is a single execution plan node inside the {@link Plan} tree.
  */
 @InterfaceAudience.Private
 public interface PlanNode {

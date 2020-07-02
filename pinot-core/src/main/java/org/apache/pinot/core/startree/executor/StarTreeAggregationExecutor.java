@@ -26,7 +26,7 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
 
 /**
- * The <id>StarTreeAggregationExecutor</id> class is the aggregation executor for star-tree index.
+ * The <code>StarTreeAggregationExecutor</code> class is the aggregation executor for star-tree index.
  * <ul>
  *   <li>The column in function context is function-column pair</li>
  *   <li>No transform function in aggregation</li>

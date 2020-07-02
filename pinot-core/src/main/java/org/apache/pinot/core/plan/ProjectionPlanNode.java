@@ -28,7 +28,7 @@ import org.apache.pinot.core.operator.ProjectionOperator;
 
 
 /**
- * The <id>ProjectionPlanNode</id> class provides the execution plan for fetching projection columns' data source
+ * The <code>ProjectionPlanNode</code> class provides the execution plan for fetching projection columns' data source
  * on a single segment.
  */
 public class ProjectionPlanNode implements PlanNode {

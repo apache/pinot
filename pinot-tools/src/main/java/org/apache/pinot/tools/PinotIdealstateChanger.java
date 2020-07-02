@@ -49,7 +49,7 @@ public class PinotIdealstateChanger extends PinotZKChanger {
   }
 
   private IdealState applyChangesToIdealState(IdealState input) {
-    // Add id here as needed to change idealstate
+    // Add code here as needed to change idealstate
     System.out.println("No change applied to idealstate.");
     return input;
   }

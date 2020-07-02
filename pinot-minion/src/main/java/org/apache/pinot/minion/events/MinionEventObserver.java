@@ -23,7 +23,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**
- * The <id>MinionEventObserver</id> interface provides call backs for Minion events.
+ * The <code>MinionEventObserver</code> interface provides call backs for Minion events.
  */
 public interface MinionEventObserver {
 

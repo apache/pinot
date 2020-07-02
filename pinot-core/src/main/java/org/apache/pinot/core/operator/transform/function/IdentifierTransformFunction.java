@@ -28,7 +28,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
- * The <id>IdentifierTransformFunction</id> class is a special transform function which is a wrapper on top of an
+ * The <code>IdentifierTransformFunction</code> class is a special transform function which is a wrapper on top of an
  * IDENTIFIER (column), and directly return the column value without any transformation.
  */
 public class IdentifierTransformFunction implements TransformFunction {

@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The class <id>PinotHelixTaskResourceManager</id> manages all the task resources in Pinot cluster.
+ * The class <code>PinotHelixTaskResourceManager</code> manages all the task resources in Pinot cluster.
  */
 public class PinotHelixTaskResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixTaskResourceManager.class);

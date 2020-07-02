@@ -305,7 +305,7 @@ public class MutableDictionaryTest {
   }
 
   /**
-   * Helper method to return an <id>Integer</id> or <id>String</id> based on the given int value and data type.
+   * Helper method to return an <code>Integer</code> or <code>String</code> based on the given int value and data type.
    */
   private static Object makeObject(int intValue, FieldSpec.DataType dataType) {
     switch (dataType) {

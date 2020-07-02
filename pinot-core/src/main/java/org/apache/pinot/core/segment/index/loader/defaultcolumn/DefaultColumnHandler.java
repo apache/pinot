@@ -25,7 +25,7 @@ public interface DefaultColumnHandler {
 
   /**
    * Update the auto-generated default columns.
-   * <p>Supported default column actions include: <id>ADD/UPDATE/REMOVE DIMENSION/METRIC</id>
+   * <p>Supported default column actions include: <code>ADD/UPDATE/REMOVE DIMENSION/METRIC</code>
    *
    * @throws Exception
    */

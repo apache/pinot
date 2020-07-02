@@ -25,7 +25,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**
- * The class <id>SegmentConversionResult</id> wraps the result of
+ * The class <code>SegmentConversionResult</code> wraps the result of
  * {@link BaseSingleSegmentConversionExecutor#convert(PinotTaskConfig, File, File)}.
  */
 public class SegmentConversionResult {

@@ -254,7 +254,7 @@ public class MultiLevelPriorityQueueTest {
     }
 
     // this is for main thread that creates reader. Pattern is odd
-    // it keeps calling id concise
+    // it keeps calling code concise
     // Use this when test expects to read something from queue. This blocks
     // till an entry is read from the queue
     void startAndWaitForRead()

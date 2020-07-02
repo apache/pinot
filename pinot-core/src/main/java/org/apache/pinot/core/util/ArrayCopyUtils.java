@@ -23,7 +23,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
- * The class <id>ArrayCopyUtils</id> provides methods to copy values across arrays of different types.
+ * The class <code>ArrayCopyUtils</code> provides methods to copy values across arrays of different types.
  */
 public class ArrayCopyUtils {
   private ArrayCopyUtils() {

@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <id>CombineService</id> class provides the utility methods to combine {@link IntermediateResultsBlock}s.
+ * The <code>CombineService</code> class provides the utility methods to combine {@link IntermediateResultsBlock}s.
  */
 @SuppressWarnings({"ConstantConditions", "rawtypes", "unchecked"})
 public class CombineService {

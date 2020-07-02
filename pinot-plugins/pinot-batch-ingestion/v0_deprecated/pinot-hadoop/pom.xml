@@ -55,7 +55,7 @@
                   <!--
                   Usually in hadoop environment, there are multiple jars with different versions.
                   Most of the NoSuchMethodExceptions are caused by class loading conflicts.
-                  Class relocation ensures the reference of certain packages/classes in Pinot id to
+                  Class relocation ensures the reference of certain packages/classes in Pinot code to
                   shaded libs, e.g. jackson or guava.
                   Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
                   -->

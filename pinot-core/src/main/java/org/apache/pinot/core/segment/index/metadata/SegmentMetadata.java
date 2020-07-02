@@ -27,7 +27,7 @@ import org.joda.time.Interval;
 
 
 /**
- * The <id>SegmentMetadata</id> class holds the segment level management information and data statistics.
+ * The <code>SegmentMetadata</code> class holds the segment level management information and data statistics.
  */
 @InterfaceAudience.Private
 public interface SegmentMetadata {
@@ -63,12 +63,12 @@ public interface SegmentMetadata {
   long getIndexCreationTime();
 
   /**
-   * Get the last time that this segment was pushed or <id>Long.MIN_VALUE</id> if it has never been pushed.
+   * Get the last time that this segment was pushed or <code>Long.MIN_VALUE</code> if it has never been pushed.
    */
   long getPushTime();
 
   /**
-   * Get the last time that this segment was refreshed or <id>Long.MIN_VALUE</id> if it has never been refreshed.
+   * Get the last time that this segment was refreshed or <code>Long.MIN_VALUE</code> if it has never been refreshed.
    */
   long getRefreshTime();
 
@@ -84,7 +84,7 @@ public interface SegmentMetadata {
    * Applicable for MutableSegments.
    *
    * @return latest timestamp associated with indexed records
-   *         <id>Long.MIN_VALUE</id> if the stream doesn't provide a timestamp
+   *         <code>Long.MIN_VALUE</code> if the stream doesn't provide a timestamp
    */
   long getLatestIngestionTimestamp();
 

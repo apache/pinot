@@ -252,7 +252,7 @@ public class RetentionManagerTest {
     final String serverName = "Server_localhost_0";
     // If we set the segment creation time to a certain value and compare it as being X ms old,
     // then we could get unpredictable results depending on whether it takes more or less than
-    // one millisecond to get to RetentionManager time comparison id. To be safe, set the
+    // one millisecond to get to RetentionManager time comparison code. To be safe, set the
     // milliseconds off by 1/2 day.
     long segmentCreationTime = now - (nSegments + 1) * millisInDays + millisInDays / 2;
     for (int seq = 1; seq <= nSegments; seq++) {

@@ -60,7 +60,6 @@ public interface Dictionary extends Closeable {
    *   <li>DOUBLE -> Double</li>
    *   <li>STRING -> String</li>
    *   <li>BYTES -> byte[]</li>
-   *   <li>BOOLEAN -> boolean[]<li/>
    * </ul>
    */
   Object get(int dictId);

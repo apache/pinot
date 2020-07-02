@@ -114,7 +114,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
       try {
         sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), state);
       } catch (IOException ioe) {
-        // receive non-200 status id
+        // receive non-200 status code
         return false;
       }
       return true;

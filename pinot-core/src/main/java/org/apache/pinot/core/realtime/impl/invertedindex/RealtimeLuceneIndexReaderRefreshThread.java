@@ -127,7 +127,7 @@ public class RealtimeLuceneIndexReaderRefreshThread implements Runnable {
                 searcherManager.maybeRefresh();
               } catch (Exception e) {
                 // we should never be here since the locking semantics between MutableSegmentImpl::destroy()
-                // and this id along with volatile state "isSegmentDestroyed" protect against the cases
+                // and this code along with volatile state "isSegmentDestroyed" protect against the cases
                 // where this thread might attempt to refresh a realtime lucene reader after it has already
                 // been closed duing segment destroy.
                 LOGGER.warn("Caught exception {} while refreshing realtime lucene reader for segment: {}", e,

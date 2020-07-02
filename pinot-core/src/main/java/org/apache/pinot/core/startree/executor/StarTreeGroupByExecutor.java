@@ -31,7 +31,7 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
 
 /**
- * The <id>StarTreeGroupByExecutor</id> class is the group-by executor for star-tree index.
+ * The <code>StarTreeGroupByExecutor</code> class is the group-by executor for star-tree index.
  * <ul>
  *   <li>The column in function context is function-column pair</li>
  *   <li>No transform function in aggregation</li>

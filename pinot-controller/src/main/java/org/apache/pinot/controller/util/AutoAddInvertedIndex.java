@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <id>AutoAddInvertedIndex</id> class can be used to automatically add inverted index to tables based on the
+ * The <code>AutoAddInvertedIndex</code> class can be used to automatically add inverted index to tables based on the
  * strategy and mode specified.
  * <p>Currently support:
  * <ul>

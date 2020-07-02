@@ -96,7 +96,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
 
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
-      LOGGER.error("Got error while refreshing segment: {} of table: {} (error id: {}, error type: {})", _segmentName,
+      LOGGER.error("Got error while refreshing segment: {} of table: {} (error code: {}, error type: {})", _segmentName,
           _tableNameWithType, code, type, e);
     }
   }
@@ -121,7 +121,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
 
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
-      LOGGER.error("Got error while refreshing table config for table: {} (error id: {}, error type: {})",
+      LOGGER.error("Got error while refreshing table config for table: {} (error code: {}, error type: {})",
           _tableNameWithType, code, type, e);
     }
   }
@@ -141,7 +141,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
 
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
-      LOGGER.error("Got error for no-op message handling (error id: {}, error type: {})", code, type, e);
+      LOGGER.error("Got error for no-op message handling (error code: {}, error type: {})", code, type, e);
     }
   }
 }

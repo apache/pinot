@@ -219,7 +219,7 @@ public class VarByteChunkSVForwardIndexTest {
     // will take a long time to execute due to comparison
     // (75000 characters in each row and 10000 rows will hit this scenario).
     // So we specifically test for mapping the index file into a LBuffer
-    // to exercise the LBuffer id
+    // to exercise the LBuffer code
     if (ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN) {
       buffer = PinotNativeOrderLBuffer.mapFile(outFile, true, 0, outFile.length());
     } else {

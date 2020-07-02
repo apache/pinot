@@ -438,7 +438,7 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizerTest {
       Assert.assertEquals(childrenThatAreNonLeafOperators1.size(), childrenThatAreNonLeafOperators2.size());
 
       // the optimizer adds them in the same order so we simply need to recurse
-      // and let the rest of this id compare the subtrees ignoring order
+      // and let the rest of this code compare the subtrees ignoring order
       for (int i = 0; i < childrenThatAreNonLeafOperators1.size(); i++) {
         FilterQueryTree f1 = childrenThatAreNonLeafOperators1.get(i);
         FilterQueryTree f2 = childrenThatAreNonLeafOperators2.get(i);

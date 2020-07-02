@@ -253,7 +253,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   /**
    * Helper method to traverse the star tree, get matching documents and keep track of all the predicate columns that
    * are not matched.
-   * <p>Return <id>null</id> if no matching dictionary id found for a column (i.e. the result for the filter
+   * <p>Return <code>null</code> if no matching dictionary id found for a column (i.e. the result for the filter
    * operator is empty).
    */
   private StarTreeResult traverseStarTree() {

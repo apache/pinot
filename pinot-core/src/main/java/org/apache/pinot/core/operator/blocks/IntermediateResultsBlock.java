@@ -46,7 +46,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
- * The <id>IntermediateResultsBlock</id> class is the holder of the server side inter-segment results.
+ * The <code>IntermediateResultsBlock</code> class is the holder of the server side inter-segment results.
  */
 public class IntermediateResultsBlock implements Block {
   private DataSchema _dataSchema;

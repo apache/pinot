@@ -31,7 +31,7 @@ public interface SegmentPruner {
   void init(PinotConfiguration config);
 
   /**
-   * Returns <id>true</id> if the segment can be pruned based on the query request.
+   * Returns <code>true</code> if the segment can be pruned based on the query request.
    */
   boolean prune(IndexSegment segment, ServerQueryRequest queryRequest);
 }

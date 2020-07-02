@@ -147,7 +147,7 @@ public class GitHubAPICaller {
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
       } else {
         printStatus(Quickstart.Color.YELLOW,
-            "Status id " + githubAPIResponse.statusCode + " status message " + githubAPIResponse.statusMessage
+            "Status code " + githubAPIResponse.statusCode + " status message " + githubAPIResponse.statusMessage
                 + " uri " + request.getURI());
       }
     } catch (SocketTimeoutException e) {

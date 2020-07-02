@@ -50,7 +50,7 @@ public final class CleanerUtil {
   private CleanerUtil(){}
 
   /**
-   * <id>true</id>, if this platform supports unmapping mmapped files.
+   * <code>true</code>, if this platform supports unmapping mmapped files.
    */
   public static final boolean UNMAP_SUPPORTED;
 
@@ -118,7 +118,7 @@ public final class CleanerUtil {
 
         /*
          * "Compile" a MethodHandle that basically is equivalent
-         * to the following id:
+         * to the following code:
          *
          * void unmapper(ByteBuffer byteBuffer) {
          *   sun.misc.Cleaner cleaner =

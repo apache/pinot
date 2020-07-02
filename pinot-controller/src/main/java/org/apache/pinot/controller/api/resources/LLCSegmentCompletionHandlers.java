@@ -307,7 +307,7 @@ public class LLCSegmentCompletionHandlers {
         //    of the slower server.
         // In order to overcome controller restarts after the segment is moved to PinotFS, but before it is committed, we DO need to
         // check for existing segment file and remove it. So, the block cannot be removed altogether.
-        // For now, we live with these corner cases. Once we have split-commit enabled and working, this id will no longer
+        // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
         // be used.
         synchronized (SEGMENT_UPLOAD_LOCK) {
           if (pinotFS.exists(segmentFileURI)) {

@@ -39,9 +39,9 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The class <id>PinotTaskManager</id> is the component inside Pinot Controller to periodically check the Pinot
+ * The class <code>PinotTaskManager</code> is the component inside Pinot Controller to periodically check the Pinot
  * cluster status and schedule new tasks.
- * <p><id>PinotTaskManager</id> is also responsible for checking the health status on each type of tasks, detect and
+ * <p><code>PinotTaskManager</code> is also responsible for checking the health status on each type of tasks, detect and
  * fix issues accordingly.
  */
 public class PinotTaskManager extends ControllerPeriodicTask<Void> {

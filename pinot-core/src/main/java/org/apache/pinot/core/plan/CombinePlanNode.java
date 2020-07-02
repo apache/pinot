@@ -38,7 +38,7 @@ import org.apache.pinot.core.util.trace.TraceCallable;
 
 
 /**
- * The <id>CombinePlanNode</id> class provides the execution plan for combining results from multiple segments.
+ * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments.
  */
 public class CombinePlanNode implements PlanNode {
   // Use at most 10 or half of the processors threads for each query.

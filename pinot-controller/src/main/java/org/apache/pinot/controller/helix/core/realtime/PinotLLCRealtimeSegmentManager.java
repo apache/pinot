@@ -202,7 +202,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Make sure all the existing segments are HLC segments
     List<String> currentSegments = getAllSegments(realtimeTableName);
     for (String segmentName : currentSegments) {
-      // TODO: Should return 4xx HTTP status id. Currently all exceptions are returning 500
+      // TODO: Should return 4xx HTTP status code. Currently all exceptions are returning 500
       Preconditions.checkState(SegmentName.isHighLevelConsumerSegmentName(segmentName),
           "Cannot set up new LLC table: %s with existing non-HLC segment: %s", realtimeTableName, segmentName);
     }
@@ -462,7 +462,7 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    // hash id can be negative, so make sure we are getting a positive lock index
+    // hash code can be negative, so make sure we are getting a positive lock index
     int lockIndex = (realtimeTableName.hashCode() & Integer.MAX_VALUE) % _numIdealStateUpdateLocks;
     Lock lock = _idealStateUpdateLocks[lockIndex];
     try {

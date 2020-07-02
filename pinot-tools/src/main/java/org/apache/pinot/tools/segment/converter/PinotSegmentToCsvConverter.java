@@ -29,7 +29,7 @@ import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 
 
 /**
- * The <id>PinotSegmentToCsvConverter</id> class is the tool to convert Pinot segment to CSV format.
+ * The <code>PinotSegmentToCsvConverter</code> class is the tool to convert Pinot segment to CSV format.
  */
 public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
   private final String _segmentDir;

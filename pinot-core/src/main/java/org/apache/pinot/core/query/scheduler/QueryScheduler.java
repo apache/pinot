@@ -290,7 +290,7 @@ public abstract class QueryScheduler {
    * Error response future in case of internal error where query response is not available. This can happen
    * if the query can not be executed or
    * @param queryRequest
-   * @param error error id to send
+   * @param error error code to send
    * @return
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,

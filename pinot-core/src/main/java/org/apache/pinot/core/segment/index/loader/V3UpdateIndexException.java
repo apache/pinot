@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.index.loader;
 
 /**
- * The <id>V3UpdateIndexException</id> class extends {@link RuntimeException} and should be thrown out when trying
+ * The <code>V3UpdateIndexException</code> class extends {@link RuntimeException} and should be thrown out when trying
  * to update an index from Pinot V3 format segment.
  */
 public class V3UpdateIndexException extends RuntimeException {

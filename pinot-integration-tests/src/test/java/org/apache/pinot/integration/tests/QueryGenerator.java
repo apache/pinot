@@ -42,7 +42,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * The <id>QueryGenerator</id> class is used to generate random equivalent PQL/SQL query pairs based on Avro files.
+ * The <code>QueryGenerator</code> class is used to generate random equivalent PQL/SQL query pairs based on Avro files.
  * <ul>
  *   <li>
  *     Supports COMPARISON, IN and BETWEEN predicate for both single-value and multi-value columns.
@@ -104,7 +104,7 @@ public class QueryGenerator {
   private boolean _skipMultiValuePredicates = false;
 
   /**
-   * Constructor for <id>QueryGenerator</id>.
+   * Constructor for <code>QueryGenerator</code>.
    *
    * @param avroFiles list of Avro files.
    * @param pinotTableName Pinot table name.
@@ -270,7 +270,7 @@ public class QueryGenerator {
   }
 
   /**
-   * Helper method to finish initialization of the <id>QueryGenerator</id>, removing multi-value columns with too
+   * Helper method to finish initialization of the <code>QueryGenerator</code>, removing multi-value columns with too
    * many elements and dumping storage into the final map from column name to list of column values.
    * <p>Called after all Avro data loaded.
    */
@@ -436,7 +436,7 @@ public class QueryGenerator {
     private final LimitQueryFragment _limit;
 
     /**
-     * Constructor for <id>SelectionQuery</id>.
+     * Constructor for <code>SelectionQuery</code>.
      *
      * @param projectionColumns projection columns.
      * @param orderBy order by fragment.
@@ -488,7 +488,7 @@ public class QueryGenerator {
     private TopQueryFragment _top;
 
     /**
-     * Constructor for <id>AggregationQuery</id>.
+     * Constructor for <code>AggregationQuery</code>.
      *
      * @param aggregateColumnsAndFunctions aggregation functions.
      * @param predicate predicate fragment.
@@ -571,7 +571,7 @@ public class QueryGenerator {
     }
 
     /**
-     * Constructor for <id>StringQueryFragment</id> with different PQL and H2 SQL query fragment.
+     * Constructor for <code>StringQueryFragment</code> with different PQL and H2 SQL query fragment.
      *
      * @param pql PQL query fragment.
      * @param sql H2 SQL query fragment.
@@ -643,7 +643,7 @@ public class QueryGenerator {
     List<QueryFragment> _operators;
 
     /**
-     * Constructor for <id>PredicateQueryFragment</id>.
+     * Constructor for <code>PredicateQueryFragment</code>.
      *
      * @param predicates predicates.
      * @param operators operators between predicates.
@@ -703,7 +703,7 @@ public class QueryGenerator {
     private List<String> _havingClauseBooleanOperators;
 
     /**
-     * Constructor for <id>PredicateQueryFragment</id>.
+     * Constructor for <code>PredicateQueryFragment</code>.
      *
      * @param
      * @param
@@ -947,7 +947,7 @@ public class QueryGenerator {
   }
 
   /**
-   * Generator for single-value column <id>IN</id> predicate query fragment.
+   * Generator for single-value column <code>IN</code> predicate query fragment.
    */
   private class SingleValueInPredicateGenerator implements PredicateGenerator {
 
@@ -972,7 +972,7 @@ public class QueryGenerator {
   }
 
   /**
-   * Generator for single-value column <id>BETWEEN</id> predicate query fragment.
+   * Generator for single-value column <code>BETWEEN</code> predicate query fragment.
    */
   private class SingleValueBetweenPredicateGenerator implements PredicateGenerator {
 
@@ -986,7 +986,7 @@ public class QueryGenerator {
   }
 
   /**
-   * Generator for single-value column <id>REGEX</id> predicate query fragment.
+   * Generator for single-value column <code>REGEX</code> predicate query fragment.
    */
   private class SingleValueRegexPredicateGenerator implements PredicateGenerator {
     Random random = new Random();
@@ -1024,7 +1024,7 @@ public class QueryGenerator {
 
   /**
    * Generator for multi-value column comparison predicate query fragment.
-   * <p>DO NOT SUPPORT '<id>NOT EQUAL</id>'.
+   * <p>DO NOT SUPPORT '<code>NOT EQUAL</code>'.
    */
   private class MultiValueComparisonPredicateGenerator implements PredicateGenerator {
 
@@ -1050,8 +1050,8 @@ public class QueryGenerator {
   }
 
   /**
-   * Generator for multi-value column <id>IN</id> predicate query fragment.
-   * <p>DO NOT SUPPORT '<id>NOT IN</id>'.
+   * Generator for multi-value column <code>IN</code> predicate query fragment.
+   * <p>DO NOT SUPPORT '<code>NOT IN</code>'.
    */
   private class MultiValueInPredicateGenerator implements PredicateGenerator {
 
@@ -1078,7 +1078,7 @@ public class QueryGenerator {
   }
 
   /**
-   * Generator for multi-value column <id>BETWEEN</id> predicate query fragment.
+   * Generator for multi-value column <code>BETWEEN</code> predicate query fragment.
    */
   private class MultiValueBetweenPredicateGenerator implements PredicateGenerator {
 
