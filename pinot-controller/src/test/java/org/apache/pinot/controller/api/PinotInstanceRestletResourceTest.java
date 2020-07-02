@@ -119,6 +119,22 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     checkInstanceInfo("Broker_2.3.4.5_1234", "Broker_2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, null);
     checkInstanceInfo("Server_2.3.4.5_2345", "Server_2.3.4.5", 2345, new String[]{"tag_OFFLINE", "tag_REALTIME"},
         new String[]{"tag_OFFLINE", "tag_REALTIME"}, new int[]{0, 1});
+
+    // Test PUT Instance API
+    String newBrokerTag = "new-broker-tag";
+    Instance newBrokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null);
+    String brokerInstanceId = "Broker_1.2.3.4_1234";
+    String brokerInstanceUrl = _controllerRequestURLBuilder.forInstance(brokerInstanceId);
+    sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
+
+    String newServerTag = "new-server-tag";
+    Instance newServerInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null);
+    String serverInstanceId = "Server_1.2.3.4_2345";
+    String serverInstanceUrl = _controllerRequestURLBuilder.forInstance(serverInstanceId);
+    sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
+
+    checkInstanceInfo(brokerInstanceId, "Broker_1.2.3.4", 1234, new String[]{newBrokerTag}, null, null);
+    checkInstanceInfo(serverInstanceId, "Server_1.2.3.4", 2345, new String[]{newServerTag}, null, null);
   }
 
   private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
@@ -128,7 +144,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          String getResponse = sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation(instanceName));
+          String getResponse = sendGetRequest(_controllerRequestURLBuilder.forInstance(instanceName));
           JsonNode instance = JsonUtils.stringToJsonNode(getResponse);
           boolean result =
               (instance.get("instanceName") != null) && (instance.get("instanceName").asText().equals(instanceName))

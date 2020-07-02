@@ -45,15 +45,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "instances");
   }
 
-  public String forInstanceDelete(String instanceName) {
-    return StringUtil.join("/", _baseUrl, "instances", instanceName);
-  }
-
   public String forInstanceState(String instanceName) {
     return StringUtil.join("/", _baseUrl, "instances", instanceName, "state");
   }
 
-  public String forInstanceInformation(String instanceName) {
+  public String forInstance(String instanceName) {
     return StringUtil.join("/", _baseUrl, "instances", instanceName);
   }
 
