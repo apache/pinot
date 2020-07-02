@@ -21,6 +21,8 @@ package org.apache.pinot.thirdeye.datalayer.entity;
 
 public class DetectionConfigIndex extends AbstractIndexEntity {
   String name;
+  boolean active;
+  String createdBy;
 
   public String getName() {
     return name;
@@ -28,5 +30,21 @@ public class DetectionConfigIndex extends AbstractIndexEntity {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  public boolean isActive() {
+    return active;
+  }
+
+  public void setActive(boolean active) {
+    this.active = active;
+  }
+
+  public String getCreatedBy() {
+    return createdBy;
+  }
+
+  public void setCreatedBy(String createdBy) {
+    this.createdBy = createdBy;
   }
 }

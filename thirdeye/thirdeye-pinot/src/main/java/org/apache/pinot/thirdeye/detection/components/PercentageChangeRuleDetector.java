@@ -19,9 +19,11 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
@@ -31,6 +33,7 @@ import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.Pattern;
@@ -47,7 +50,9 @@ import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
+import org.joda.time.DateTime;
 import org.joda.time.Interval;
+import org.joda.time.Period;
 
 import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
@@ -67,6 +72,7 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
   private Pattern pattern;
   private String monitoringGranularity;
   private TimeGranularity timeGranularity;
+  private DayOfWeek weekStart;
 
   private static final String COL_CURR = "current";
   private static final String COL_CHANGE = "change";
@@ -76,16 +82,36 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
 
   @Override
   public DetectionResult runDetection(Interval window, String metricUrn) {
+    DateTime windowStart = window.getStart();
+
+    // align start day to the user specified week start
+    if (Objects.nonNull(this.weekStart)) {
+      windowStart = window.getStart().withTimeAtStartOfDay().withDayOfWeek(weekStart.getValue()).minusWeeks(1);
+    }
+
     MetricEntity me = MetricEntity.fromURN(metricUrn);
-    MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
+    MetricSlice slice = MetricSlice.from(me.getId(), windowStart.getMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
     List<MetricSlice> slices = new ArrayList<>(this.baseline.scatter(slice));
     slices.add(slice);
 
     InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices)
-        .withMetricIdsForDataset(Collections.singletonList(slice.getMetricId())));
-    DataFrame dfCurr = data.getTimeseries().get(slice).renameSeries(COL_VALUE, COL_CURR);
+        .withMetricIdsForDataset(Collections.singletonList(slice.getMetricId()))
+        .withMetricIds(Collections.singletonList(me.getId())));
     DataFrame dfBase = this.baseline.gather(slice, data.getTimeseries());
+    DataFrame dfCurr = data.getTimeseries().get(slice);
+    DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
+    MetricConfigDTO metricConfig = data.getMetrics().get(me.getId());
 
+    // aggregate data to specified weekly granularity
+    if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
+      Period monitoringGranularityPeriod = DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig);
+      long latestDataTimeStamp = dfCurr.getLong(COL_TIME, dfCurr.size() - 1);
+      dfCurr = DetectionUtils.aggregateByPeriod(dfCurr, windowStart, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
+      dfCurr = DetectionUtils.filterIncompleteAggregation(dfCurr, latestDataTimeStamp, datasetConfig.bucketTimeGranularity(), monitoringGranularityPeriod);
+      dfBase = DetectionUtils.aggregateByPeriod(dfBase, windowStart, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
+    }
+
+    dfCurr = dfCurr.renameSeries(COL_VALUE, COL_CURR);
     DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
 
     // calculate percentage change
@@ -112,7 +138,6 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
       df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_CHANGE_VIOLATION);
     }
 
-    DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
     List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
     DataFrame baselineWithBoundaries = constructPercentageChangeBoundaries(df);
@@ -161,10 +186,13 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     this.pattern = Pattern.valueOf(spec.getPattern().toUpperCase());
 
     this.monitoringGranularity = spec.getMonitoringGranularity();
-    if (this.monitoringGranularity.equals("1_MONTHS")) {
+    if (this.monitoringGranularity.endsWith(TimeGranularity.MONTHS) || this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       this.timeGranularity = MetricSlice.NATIVE_GRANULARITY;
     } else {
       this.timeGranularity = TimeGranularity.fromString(spec.getMonitoringGranularity());
+    }
+    if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
+      this.weekStart = DayOfWeek.valueOf(spec.getWeekStart());
     }
   }
 }

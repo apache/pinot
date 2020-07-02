@@ -26,8 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.config.Instance;
-import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
+import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +72,7 @@ public class InstanceTagPoolSelector {
 
       // Extract the pool information from the instance configs
       for (InstanceConfig instanceConfig : candidateInstanceConfigs) {
-        Map<String, String> poolMap = instanceConfig.getRecord().getMapField(Instance.POOL_KEY);
+        Map<String, String> poolMap = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
         if (poolMap != null && poolMap.containsKey(tag)) {
           int pool = Integer.parseInt(poolMap.get(tag));
           poolToInstanceConfigsMap.computeIfAbsent(pool, k -> new ArrayList<>()).add(instanceConfig);

@@ -23,31 +23,21 @@
 
 Docker image for [Superset](https://github.com/ApacheInfra/superset) with Pinot integration.
 
-This docker build project is based on Project [docker-superset](https://github.com/amancevice/docker-superset) and specialized for Pinot.
 
 ## How to build
 
-Please modify file `Makefile` to change `image` and `superset_version` accordingly.
-
-Below command will build docker image and tag it as `superset_version` and `latest`.
-
-```bash
-make latest
-```
+Below command will build docker image and tag it as `apachepinot/pinot-superset:0.36.0`.
 
 You can also build directly with `docker build` command by setting arguments:
+
 ```bash
-docker build \
-	--build-arg NODE_VERSION=latest \
-	--build-arg PYTHON_VERSION=3.6 \
-	--build-arg SUPERSET_VERSION=0.34.1 \
-	--tag fx19880617/pinot-superset:0.34.1 \
-	--target build .
+docker build --build-arg SUPERSET_VERSION=0.36.0 --tag apachepinot/pinot-superset:0.36.0 .
 ```
+
 ## How to push
 
 ```bash
-make push
+docker push apachepinot/pinot-superset:0.36.0
 ```
 
 ## Configuration
@@ -61,9 +51,9 @@ Place this file in a local directory and mount this directory to `/etc/superset`
 
 The image defines two data volumes: one for mounting configuration into the container, and one for data (logs, SQLite DBs, &c).
 
-The configuration volume is located alternatively at `/etc/superset` or `/home/superset`; either is acceptable. Both of these directories are included in the `PYTHONPATH` of the image. Mount any configuration (specifically the `superset_config.py` file) here to have it read by the app on startup.
+The configuration volume is located alternatively at `/etc/superset` or `/app/superset`; either is acceptable. Both of these directories are included in the `PYTHONPATH` of the image. Mount any configuration (specifically the `superset_config.py` file) here to have it read by the app on startup.
 
-The data volume is located at `/var/lib/superset` and it is where you would mount your SQLite file (if you are using that as your backend), or a volume to collect any logs that are routed there. This location is used as the value of the `SUPERSET_HOME` environmental variable.
+The data volume is located at `/app/superset_home` and it is where you would mount your SQLite file (if you are using that as your backend), or a volume to collect any logs that are routed there.
 
 ## Kubernetes Examples
 

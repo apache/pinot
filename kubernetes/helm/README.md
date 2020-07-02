@@ -245,14 +245,14 @@ kubectl get all -n pinot-quickstart
 
 ```bash
 helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
-helm install -n pinot-quickstart kafka incubator/kafka
+helm install -n pinot-quickstart kafka incubator/kafka --set replicas=1
 ```
 
 - For helm v2.12.1
 
 ```bash
 helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
-helm install --namespace "pinot-quickstart"  --name kafka incubator/kafka
+helm install --namespace "pinot-quickstart"  --name kafka incubator/kafka --set replicas=1
 ```
 
 #### Create Kafka topic
@@ -284,14 +284,14 @@ following configurable parameters:
 
 | Parameter                                      | Description                                                                                                                                                                | Default                                                            |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
-| `image.repository`                             | Pinot Container image repo                                                                                                                                                 | `winedepot/pinot`                                                  |
-| `image.tag`                                    | Pinot Container image tag                                                                                                                                                  | `0.1.13-SNAPSHOT`                                                  |
+| `image.repository`                             | Pinot Container image repo                                                                                                                                                 | `apachepinot/pinot`                                                |
+| `image.tag`                                    | Pinot Container image tag                                                                                                                                                  | `0.3.0-SNAPSHOT`                                                   |
 | `image.pullPolicy`                             | Pinot Container image pull policy                                                                                                                                          | `IfNotPresent`                                                     |
 | `cluster.name`                                 | Pinot Cluster name                                                                                                                                                         | `pinot-quickstart`                                                 |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
 | `controller.name`                              | Name of Pinot Controller                                                                                                                                                   | `controller`                                                       |
 | `controller.port`                              | Pinot controller port                                                                                                                                                      | `9000`                                                             |
-| `controller.replicaCount`                      | Pinot controller replicas                                                                                                                                                  | `2`                                                                |
+| `controller.replicaCount`                      | Pinot controller replicas                                                                                                                                                  | `1`                                                                |
 | `controller.data.dir`                          | Pinot controller data directory, should be same as `controller.persistence.mountPath` or a sub directory of it                                                             | `/var/pinot/controller/data`                                       |
 | `controller.vip.host`                          | Pinot Vip host                                                                                                                                                             | `pinot-controller`                                                 |
 | `controller.vip.port`                          | Pinot Vip port                                                                                                                                                             | `9000`                                                             |
@@ -300,8 +300,9 @@ following configurable parameters:
 | `controller.persistence.size`                  | Size of data volume                                                                                                                                                        | `1G`                                                               |
 | `controller.persistence.mountPath`             | Mount path of controller data volume                                                                                                                                       | `/var/pinot/controller/data`                                       |
 | `controller.persistence.storageClass`          | Storage class of backing PVC                                                                                                                                               | `""`                                                               |
-| `controller.jvmOpts`                           | Pinot Controller JVM Options                                                                                                                                               | `-Xms4G -Xmx4G`                                                    |
+| `controller.jvmOpts`                           | Pinot Controller JVM Options                                                                                                                                               | `-Xms256M -Xmx1G`                                                  |
 | `controller.log4j2ConfFile`                    | Pinot Controller log4j2 configuration file                                                                                                                                 | `/opt/pinot/conf/pinot-controller-log4j2.xml`                      |
+| `controller.pluginsDir`                        | Pinot Controller plugins directory                                                                                                                                         | `/opt/pinot/plugins`                                               |
 | `controller.service.port`                      | Service Port                                                                                                                                                               | `9000`                                                             |
 | `controller.external.enabled`                  | If True, exposes Pinot Controller externally                                                                                                                               | `false`                                                            |
 | `controller.external.type`                     | Service Type                                                                                                                                                               | `LoadBalancer`                                                     |
@@ -315,9 +316,10 @@ following configurable parameters:
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
 | `broker.name`                                  | Name of Pinot Broker                                                                                                                                                       | `broker`                                                           |
 | `broker.port`                                  | Pinot broker port                                                                                                                                                          | `8099`                                                             |
-| `broker.replicaCount`                          | Pinot broker replicas                                                                                                                                                      | `2`                                                                |
-| `broker.jvmOpts`                               | Pinot Broker JVM Options                                                                                                                                                   | `-Xms4G -Xmx4G`                                                    |
+| `broker.replicaCount`                          | Pinot broker replicas                                                                                                                                                      | `1`                                                                |
+| `broker.jvmOpts`                               | Pinot Broker JVM Options                                                                                                                                                   | `-Xms256M -Xmx1G`                                                  |
 | `broker.log4j2ConfFile`                        | Pinot Broker log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/pinot-broker-log4j2.xml`                          |
+| `broker.pluginsDir`                            | Pinot Broker plugins directory                                                                                                                                             | `/opt/pinot/plugins`                                               |
 | `broker.service.port`                          | Service Port                                                                                                                                                               | `8099`                                                             |
 | `broker.external.enabled`                      | If True, exposes Pinot Broker externally                                                                                                                                   | `false`                                                            |
 | `broker.external.type`                         | External service Type                                                                                                                                                      | `LoadBalancer`                                                     |
@@ -333,7 +335,7 @@ following configurable parameters:
 | `server.name`                                  | Name of Pinot Server                                                                                                                                                       | `server`                                                           |
 | `server.port.netty`                            | Pinot server netty port                                                                                                                                                    | `8098`                                                             |
 | `server.port.admin`                            | Pinot server admin port                                                                                                                                                    | `8097`                                                             |
-| `server.replicaCount`                          | Pinot server replicas                                                                                                                                                      | `2`                                                                |
+| `server.replicaCount`                          | Pinot server replicas                                                                                                                                                      | `1`                                                                |
 | `server.dataDir`                               | Pinot server data directory, should be same as `server.persistence.mountPath` or a sub directory of it                                                                     | `/var/pinot/server/data/index`                                     |
 | `server.segmentTarDir`                         | Pinot server segment directory, should be same as `server.persistence.mountPath` or a sub directory of it                                                                  | `/var/pinot/server/data/segments`                                  |
 | `server.persistence.enabled`                   | Use a PVC to persist Pinot Server data                                                                                                                                     | `true`                                                             |
@@ -341,8 +343,9 @@ following configurable parameters:
 | `server.persistence.size`                      | Size of data volume                                                                                                                                                        | `4G`                                                               |
 | `server.persistence.mountPath`                 | Mount path of server data volume                                                                                                                                           | `/var/pinot/server/data`                                           |
 | `server.persistence.storageClass`              | Storage class of backing PVC                                                                                                                                               | `""`                                                               |
-| `server.jvmOpts`                               | Pinot Server JVM Options                                                                                                                                                   | `-Xms4G -Xmx4G -XX:MaxDirectMemorySize=10g`                        |
+| `server.jvmOpts`                               | Pinot Server JVM Options                                                                                                                                                   | `-Xms512M -Xmx1G`                                                  |
 | `server.log4j2ConfFile`                        | Pinot Server log4j2 configuration file                                                                                                                                     | `/opt/pinot/conf/pinot-server-log4j2.xml`                          |
+| `server.pluginsDir`                            | Pinot Server plugins directory                                                                                                                                             | `/opt/pinot/plugins`                                               |
 | `server.service.port`                          | Service Port                                                                                                                                                               | `8098`                                                             |
 | `server.resources`                             | Pinot Server resource requests and limits                                                                                                                                  | `{}`                                                               |
 | `server.nodeSelector`                          | Node labels for server pod assignment                                                                                                                                      | `{}`                                                               |
@@ -353,7 +356,7 @@ following configurable parameters:
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
 | `zookeeper.enabled`                            | If True, installs Zookeeper Chart                                                                                                                                          | `true`                                                             |
 | `zookeeper.resources`                          | Zookeeper resource requests and limits                                                                                                                                     | `{}`                                                               |
-| `zookeeper.env`                                | Environmental variables provided to Zookeeper Zookeeper                                                                                                                    | `{ZK_HEAP_SIZE: "1G"}`                                             |
+| `zookeeper.env`                                | Environmental variables provided to Zookeeper Zookeeper                                                                                                                    | `{ZK_HEAP_SIZE: "256M"}`                                           |
 | `zookeeper.storage`                            | Zookeeper Persistent volume size                                                                                                                                           | `2Gi`                                                              |
 | `zookeeper.image.PullPolicy`                   | Zookeeper Container pull policy                                                                                                                                            | `IfNotPresent`                                                     |
 | `zookeeper.url`                                | URL of Zookeeper Cluster (unneeded if installing Zookeeper Chart)                                                                                                          | `""`                                                               |
@@ -367,6 +370,18 @@ Alternatively a YAML file that specifies the values for the parameters can be pr
 
 ```bash
 helm install --name pinot -f values.yaml .
+```
+
+If you are using GKE, Create a storageClass:
+
+```
+kubectl apply -f gke-ssd.yaml
+```
+
+or If you want to use pd-standard storageClass:
+
+```bash
+kubectl apply -f gke-pd.yaml
 ```
 
 ## Use superset to query Pinot
@@ -415,6 +430,12 @@ You can run below command to deploy a customized Presto with Pinot plugin.
 
 ```bash
 kubectl apply -f presto-coordinator.yaml
+```
+
+### Presto UI
+Please use below script to do local port-forwarding and open Presto UI on your web browser.
+```bash
+./launch-presto-ui.sh
 ```
 
 ### Query Presto using Presto CLI
@@ -495,6 +516,30 @@ presto:default> select count(*) as cnt from pinot.dontcare.airlinestats limit 10
 Query 20191112_051114_00006_xkm4g, FINISHED, 1 node
 Splits: 17 total, 17 done (100.00%)
 0:00 [1 rows, 8B] [2 rows/s, 19B/s]
+```
+
+### (Optional) Deploy more Presto workers
+
+You can run below command to deploy more presto workers if needed.
+
+```bash
+kubectl apply -f presto-worker.yaml
+```
+
+Then you could verify the new worker nodes are added by:
+
+```bash
+presto:default> select * from system.runtime.nodes;
+               node_id                |         http_uri         |      node_version      | coordinator | state
+--------------------------------------+--------------------------+------------------------+-------------+--------
+ 38959968-6262-46a1-a321-ee0db6cbcbd3 | http://10.244.0.182:8080 | 0.230-SNAPSHOT-4e66289 | false       | active
+ 83851b8c-fe7f-49fe-ae0c-e3daf6d92bef | http://10.244.2.183:8080 | 0.230-SNAPSHOT-4e66289 | false       | active
+ presto-coordinator                   | http://10.244.1.25:8080  | 0.230-SNAPSHOT-4e66289 | true        | active
+(3 rows)
+
+Query 20191206_095812_00027_na99c, FINISHED, 2 nodes
+Splits: 17 total, 17 done (100.00%)
+0:00 [3 rows, 248B] [11 rows/s, 984B/s]
 ```
 
 ## How to clean up Pinot deployment

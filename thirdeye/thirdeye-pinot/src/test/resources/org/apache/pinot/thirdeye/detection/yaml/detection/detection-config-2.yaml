@@ -1,4 +1,4 @@
-detectionName: testPipeline
+detectionName: test_detection_2
 description: My modified pipeline
 type: METRIC_ALERT
 metric: test_metric

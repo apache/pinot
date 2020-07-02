@@ -25,6 +25,8 @@ module.exports = function(environment) {
 
     https_only: false,
 
+    timeZone: "America/Los_Angeles",
+
     moment: {
       includeTimezone: 'all'
     },
@@ -37,7 +39,8 @@ module.exports = function(environment) {
     docs: {
       createAlert: "/link/to/create/alert/wiki",
       detectionConfig: "/link/to/DetectionConfiguration/wiki",
-      subscriptionConfig: "/link/to/NotificationConfiguration/wiki"
+      subscriptionConfig: "/link/to/NotificationConfiguration/wiki",
+      cubeWiki: "/link/to/cubeAlgorithm/wiki"
     },
 
     EmberENV: {

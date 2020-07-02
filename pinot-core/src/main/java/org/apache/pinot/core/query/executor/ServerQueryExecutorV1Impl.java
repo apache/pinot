@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
@@ -32,11 +31,10 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
@@ -50,6 +48,8 @@ import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +64,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
   private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
-  private final Map<String, Long> _tableTimeoutMs = new ConcurrentHashMap<>();
   private ServerMetrics _serverMetrics;
 
   @Override
@@ -108,8 +107,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long requestId = queryRequest.getRequestId();
     BrokerRequest brokerRequest = queryRequest.getBrokerRequest();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
-    String tableNameWithType = queryRequest.getTableNameWithType();
-    long queryTimeoutMs = _tableTimeoutMs.getOrDefault(tableNameWithType, _defaultTimeOutMs);
+    // Use the timeout passed from the request if exists, or the instance-level timeout
+    long queryTimeoutMs = _defaultTimeOutMs;
+    Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+    if (queryOptions != null) {
+      Long timeoutFromQueryOptions = QueryOptions.getTimeoutMs(queryOptions);
+      if (timeoutFromQueryOptions != null) {
+        queryTimeoutMs = timeoutFromQueryOptions;
+      }
+    }
     long remainingTimeMs = queryTimeoutMs - querySchedulingTimeMs;
 
     // Query scheduler wait time already exceeds query timeout, directly return
@@ -124,6 +130,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return dataTable;
     }
 
+    String tableNameWithType = queryRequest.getTableNameWithType();
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
 
@@ -183,14 +190,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTable dataTable = null;
     try {
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      long totalRawDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
+      long numTotalDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
       segmentPruneTimer.stopAndRecord();
       int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
       LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
       if (numSegmentsMatchedAfterPruning == 0) {
-        dataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
+        dataTable = DataTableUtils.buildEmptyDataTable(brokerRequest);
         Map<String, String> metadata = dataTable.getMetadata();
-        metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+        metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(numTotalDocs));
         metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
         metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
         metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
@@ -214,7 +221,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         planExecTimer.stopAndRecord();
 
         // Update the total docs in the metadata based on un-pruned segments.
-        dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(totalRawDocs));
+        dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(numTotalDocs));
       }
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(brokerRequest, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
@@ -267,25 +274,20 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    */
   private long pruneSegments(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
       ServerQueryRequest serverQueryRequest) {
-    long totalRawDocs = 0;
+    long numTotalDocs = 0;
 
     Iterator<SegmentDataManager> iterator = segmentDataManagers.iterator();
     while (iterator.hasNext()) {
       SegmentDataManager segmentDataManager = iterator.next();
       IndexSegment indexSegment = segmentDataManager.getSegment();
       // We need to compute the total raw docs for the table before any pruning.
-      totalRawDocs += indexSegment.getSegmentMetadata().getTotalRawDocs();
+      numTotalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
       if (_segmentPrunerService.prune(indexSegment, serverQueryRequest)) {
         iterator.remove();
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
 
-    return totalRawDocs;
-  }
-
-  @Override
-  public void setTableTimeoutMs(String tableNameWithType, long timeOutMs) {
-    _tableTimeoutMs.put(tableNameWithType, timeOutMs);
+    return numTotalDocs;
   }
 }

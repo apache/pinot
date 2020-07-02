@@ -21,14 +21,11 @@ package org.apache.pinot.core.startree;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 
@@ -42,7 +39,7 @@ public class StarTreeUtils {
   /**
    * Returns whether star-tree is disabled in broker request.
    */
-  public static boolean isStarTreeDisabled(@Nonnull BrokerRequest brokerRequest) {
+  public static boolean isStarTreeDisabled(BrokerRequest brokerRequest) {
     Map<String, String> debugOptions = brokerRequest.getDebugOptions();
     return debugOptions != null && "false".equalsIgnoreCase(debugOptions.get(USE_STAR_TREE_KEY));
   }
@@ -56,9 +53,9 @@ public class StarTreeUtils {
    *   <li>All predicates are conjoined by AND</li>
    * </ul>
    */
-  public static boolean isFitForStarTree(@Nonnull StarTreeV2Metadata starTreeV2Metadata,
-      @Nonnull Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs,
-      @Nullable Set<TransformExpressionTree> groupByExpressions, @Nullable FilterQueryTree rootFilterNode) {
+  public static boolean isFitForStarTree(StarTreeV2Metadata starTreeV2Metadata,
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs,
+      @Nullable TransformExpressionTree[] groupByExpressions, @Nullable FilterQueryTree rootFilterNode) {
     // Check aggregations
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       if (!starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)) {
@@ -86,7 +83,7 @@ public class StarTreeUtils {
    * Helper method to check whether all columns in predicates are star-tree dimensions, and all predicates are
    * conjoined by AND.
    */
-  private static boolean checkFilters(@Nonnull FilterQueryTree filterNode, @Nonnull Set<String> starTreeDimensions) {
+  private static boolean checkFilters(FilterQueryTree filterNode, Set<String> starTreeDimensions) {
     FilterOperator operator = filterNode.getOperator();
     if (operator == FilterOperator.OR) {
       return false;
@@ -101,31 +98,5 @@ public class StarTreeUtils {
     }
     String column = filterNode.getColumn();
     return starTreeDimensions.contains(column);
-  }
-
-  /**
-   * Creates a {@link AggregationFunctionContext} from the given context but replace the column with the function-column
-   * pair.
-   */
-  public static AggregationFunctionContext createStarTreeFunctionContext(
-      @Nonnull AggregationFunctionContext functionContext) {
-    AggregationFunction function = functionContext.getAggregationFunction();
-    AggregationFunctionColumnPair functionColumnPair =
-        new AggregationFunctionColumnPair(function.getType(), functionContext.getColumn());
-    return new AggregationFunctionContext(function, functionColumnPair.toColumnName());
-  }
-
-  /**
-   * Creates an array of {@link AggregationFunctionContext}s from the given contexts but replace the column with the
-   * function-column pair.
-   */
-  public static AggregationFunctionContext[] createStarTreeFunctionContexts(
-      @Nonnull AggregationFunctionContext[] functionContexts) {
-    int numContexts = functionContexts.length;
-    AggregationFunctionContext[] starTreeFunctionContexts = new AggregationFunctionContext[numContexts];
-    for (int i = 0; i < numContexts; i++) {
-      starTreeFunctionContexts[i] = createStarTreeFunctionContext(functionContexts[i]);
-    }
-    return starTreeFunctionContexts;
   }
 }

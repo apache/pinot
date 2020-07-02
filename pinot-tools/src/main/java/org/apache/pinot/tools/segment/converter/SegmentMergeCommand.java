@@ -28,17 +28,22 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.minion.rollup.MergeRollupSegmentConverter;
 import org.apache.pinot.core.minion.rollup.MergeType;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.kohsuke.args4j.Option;
@@ -146,7 +151,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       // Read table config
       String tableConfigString =
           new String(Files.readAllBytes(Paths.get(_tableConfigFilePath)), StandardCharsets.UTF_8);
-      TableConfig tableConfig = TableConfig.fromJsonString(tableConfigString);
+      TableConfig tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
 
       // Read schema
       Schema schema = Schema.fromFile(new File(_schemaFilePath));
@@ -190,7 +195,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
       MergeRollupSegmentConverter mergeRollupSegmentConverter =
           new MergeRollupSegmentConverter.Builder().setMergeType(_mergeType).setSegmentName(_outputSegmentName)
-              .setInputIndexDirs(inputIndexDirs).setWorkingDir(workingDir).setTableName(tableName).build();
+              .setInputIndexDirs(inputIndexDirs).setWorkingDir(workingDir).setTableName(tableName)
+              .setTableConfig(tableConfig).build();
 
       List<File> outputSegments = mergeRollupSegmentConverter.convert();
       Preconditions.checkState(outputSegments.size() == 1);
@@ -242,13 +248,19 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     // Fetch time related configurations from schema and table config.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String pushFrequency = validationConfig.getSegmentPushFrequency();
-    TimeUnit timeType = validationConfig.getTimeType();
     String pushType = validationConfig.getSegmentPushType();
-    String timeFormat = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat();
+    String timeColumnName = validationConfig.getTimeColumnName();
+    DateTimeFormatSpec dateTimeFormatSpec = null;
+    if (timeColumnName != null) {
+      DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumnName);
+      if (dateTimeSpec != null) {
+        dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
+      }
+    }
 
     // Generate the final segment name using segment name generator
     NormalizedDateSegmentNameGenerator segmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, timeType, timeFormat);
+        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, dateTimeFormatSpec);
 
     return segmentNameGenerator.generateSegmentName(DEFAULT_SEQUENCE_ID, minStartTime, maxEndTime);
   }

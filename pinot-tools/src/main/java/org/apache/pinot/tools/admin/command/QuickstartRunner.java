@@ -19,16 +19,24 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.tools.QuickstartTableRequest;
+import org.apache.pinot.tools.utils.JarUtils;
+import org.yaml.snakeyaml.Yaml;
 
 
 public class QuickstartRunner {
@@ -42,6 +50,11 @@ public class QuickstartRunner {
   private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
   private static final int DEFAULT_BROKER_PORT = 8000;
   private static final int DEFAULT_CONTROLLER_PORT = 9000;
+
+  private static final String DEFAULT_ZK_DIR = "PinotZkDir";
+  private static final String DEFAULT_CONTROLLER_DIR = "PinotControllerDir";
+  private static final String DEFAULT_SERVER_DATA_DIR = "PinotServerDataDir";
+  private static final String DEFAULT_SERVER_SEGMENT_DIR = "PinotServerSegmentDir";
 
   private final List<QuickstartTableRequest> _tableRequests;
   private final int _numServers;
@@ -77,6 +90,7 @@ public class QuickstartRunner {
       throws IOException {
     StartZookeeperCommand zkStarter = new StartZookeeperCommand();
     zkStarter.setPort(ZK_PORT);
+    zkStarter.setDataDir(new File(_tempDir, DEFAULT_ZK_DIR).getAbsolutePath());
     zkStarter.execute();
   }
 
@@ -85,7 +99,8 @@ public class QuickstartRunner {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i)).setZkAddress(ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation);
+          .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
+          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath());
       controllerStarter.execute();
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
     }
@@ -107,8 +122,8 @@ public class QuickstartRunner {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
-          .setDataDir(new File(_tempDir, "PinotServerData" + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, "PinotServerSegment" + i).getAbsolutePath());
+          .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
       serverStarter.execute();
     }
   }
@@ -153,42 +168,36 @@ public class QuickstartRunner {
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
   }
 
-  public void addSchema()
-      throws Exception {
-    for (QuickstartTableRequest request : _tableRequests) {
-      new AddSchemaCommand().setControllerPort(String.valueOf(_controllerPorts.get(0)))
-          .setSchemaFilePath(request.getSchemaFile().getAbsolutePath()).setExecute(true).execute();
-    }
-  }
-
   public void addTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
-      new AddTableCommand().setFilePath(request.getTableRequestFile().getAbsolutePath())
+      new AddTableCommand().setSchemaFile(request.getSchemaFile().getAbsolutePath())
+          .setTableConfigFile(request.getTableRequestFile().getAbsolutePath())
           .setControllerPort(String.valueOf(_controllerPorts.get(0))).setExecute(true).execute();
     }
   }
 
-  public void buildSegment()
+  public void launchDataIngestionJob()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       if (request.getTableType() == TableType.OFFLINE) {
-        File tempDir = new File(_tempDir, request.getTableName() + "_segment");
-        new CreateSegmentCommand().setDataDir(request.getDataDir().getAbsolutePath())
-            .setFormat(request.getSegmentFileFormat()).setSchemaFile(request.getSchemaFile().getAbsolutePath())
-            .setTableName(request.getTableName())
-            .setSegmentName(request.getTableName() + "_" + System.currentTimeMillis())
-            .setOutDir(tempDir.getAbsolutePath()).execute();
-        _segmentDirs.add(tempDir.getAbsolutePath());
+        try (Reader reader = new BufferedReader(new FileReader(request.getIngestionJobFile().getAbsolutePath()))) {
+          SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
+          String inputDirURI = spec.getInputDirURI();
+          if (!new File(inputDirURI).exists()) {
+            URL resolvedInputDirURI = QuickstartRunner.class.getClassLoader().getResource(inputDirURI);
+            if (resolvedInputDirURI.getProtocol().equals("jar")) {
+              String[] splits = resolvedInputDirURI.getFile().split("!");
+              String inputDir = new File(_tempDir, "inputData").toString();
+              JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir);
+              spec.setInputDirURI(inputDir);
+            } else {
+              spec.setInputDirURI(resolvedInputDirURI.toString());
+            }
+          }
+          IngestionJobLauncher.runIngestionJob(spec);
+        }
       }
-    }
-  }
-
-  public void pushSegment()
-      throws Exception {
-    for (String segmentDir : _segmentDirs) {
-      new UploadSegmentCommand().setControllerPort(String.valueOf(_controllerPorts.get(0))).setSegmentDir(segmentDir)
-          .execute();
     }
   }
 

@@ -48,14 +48,16 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.metrics.ValidationMetrics;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
+import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
+import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -71,10 +73,10 @@ import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
-import org.apache.pinot.core.crypt.PinotCrypterFactory;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
-import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -261,10 +263,12 @@ public class ControllerStarter {
 
   private void setUpPinotController() {
     // Set up Pinot cluster in Helix if needed
-    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode);
+    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode,
+        _config.getLeadControllerResourceRebalanceStrategy());
 
     // Start all components
     initPinotFSFactory();
+    initControllerFilePathProvider();
     initSegmentFetcherFactory();
     initPinotCrypterFactory();
 
@@ -418,10 +422,15 @@ public class ControllerStarter {
   private void initPinotFSFactory() {
     Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     LOGGER.info("Initializing PinotFSFactory");
+    PinotFSFactory.init(pinotFSConfig);
+  }
+
+  private void initControllerFilePathProvider() {
+    LOGGER.info("Initializing ControllerFilePathProvider");
     try {
-      PinotFSFactory.init(pinotFSConfig);
-    } catch (Exception e) {
-      Utils.rethrowException(e);
+      ControllerFilePathProvider.init(_config);
+    } catch (InvalidControllerConfigException e) {
+      throw new RuntimeException("Caught exception while initializing ControllerFilePathProvider", e);
     }
   }
 
@@ -430,7 +439,7 @@ public class ControllerStarter {
         _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
-      SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+      SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
     }

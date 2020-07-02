@@ -19,8 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.tdunning.math.stats.TDigest;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -28,17 +29,19 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * TDigest based Percentile aggregation function.
  */
-public class PercentileTDigestAggregationFunction implements AggregationFunction<TDigest, Double> {
+public class PercentileTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   protected final int _percentile;
 
-  public PercentileTDigestAggregationFunction(int percentile) {
+  public PercentileTDigestAggregationFunction(String column, int percentile) {
+    super(column);
     _percentile = percentile;
   }
 
@@ -48,8 +51,13 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + column;
+  public String getColumnName() {
+    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + _column;
+  }
+
+  @Override
+  public String getResultColumnName() {
+    return AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + _percentile + "(" + _column + ")";
   }
 
   @Override
@@ -68,16 +76,18 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       TDigest tDigest = getDefaultTDigest(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
         tDigest.add(doubleValues[i]);
       }
     } else {
       // Serialized TDigest
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       TDigest tDigest = aggregationResultHolder.getResult();
       if (tDigest != null) {
         for (int i = 0; i < length; i++) {
@@ -95,15 +105,16 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {
         getDefaultTDigest(groupByResultHolder, groupKeyArray[i]).add(doubleValues[i]);
       }
     } else {
       // Serialized TDigest
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
         int groupKey = groupKeyArray[i];
@@ -119,9 +130,10 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {
         double value = doubleValues[i];
         for (int groupKey : groupKeysArray[i]) {
@@ -130,7 +142,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
       }
     } else {
       // Serialized QuantileDigest
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
         for (int groupKey : groupKeysArray[i]) {

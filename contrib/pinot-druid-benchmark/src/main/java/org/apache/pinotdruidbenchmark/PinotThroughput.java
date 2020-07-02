@@ -33,7 +33,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-
+import org.apache.http.util.EntityUtils;
 
 /**
  * Test throughput for Pinot.
@@ -90,8 +90,9 @@ public class PinotThroughput {
           try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             while (System.currentTimeMillis() < endTime) {
               long startTime = System.currentTimeMillis();
-              CloseableHttpResponse httpResponse = httpClient.execute(httpPosts[RANDOM.nextInt(numQueries)]);
-              httpResponse.close();
+              try (CloseableHttpResponse httpResponse = httpClient.execute(httpPosts[RANDOM.nextInt(numQueries)])) {
+                EntityUtils.consume(httpResponse.getEntity());
+              }
               long responseTime = System.currentTimeMillis() - startTime;
               counter.getAndIncrement();
               totalResponseTime.getAndAdd(responseTime);

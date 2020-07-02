@@ -67,20 +67,9 @@ $(document).ready(function() {
     // execute query and draw the results
     var query = EDITOR.getValue().trim();
     var traceEnabled = document.getElementById('trace-enabled').checked;
-    var groupByModeSQL = document.getElementById('group-by-mode-sql').checked;
-    var responseFormatSQL = document.getElementById('response-format-sql').checked;
-    var queryOptions = undefined;
-    if (groupByModeSQL === true) {
-      queryOptions = "groupByMode=sql";
-    }
-    if (responseFormatSQL === true) {
-      if (queryOptions === undefined) {
-        queryOptions = "responseFormat=sql";
-      } else {
-        queryOptions = queryOptions + ";responseFormat=sql";
-      }
-    }
-    HELPERS.executeQuery(query, traceEnabled, queryOptions, function(data) {
+    var querySyntaxPQL = document.getElementById('pql').checked;
+
+    HELPERS.executeQuery(query, querySyntaxPQL, traceEnabled, function(data) {
       RESULTS.setValue(js_beautify(data, JS_BEAUTIFY_SETTINGS));
 
       var queryResponse = null;
@@ -98,41 +87,49 @@ $(document).ready(function() {
 
       var dataArray = [];
       var columnList = [];
+      if (querySyntaxPQL === true) {
+        if (queryResponse) {
+          if (queryResponse["selectionResults"]) {
+            // Selection query
+            columnList = _.map(queryResponse.selectionResults.columns, function (columnName) {
+              return {"title": columnName};
+            });
+            dataArray = queryResponse.selectionResults.results;
+          } else if (queryResponse["aggregationResults"] && queryResponse.aggregationResults.length > 0
+              && !queryResponse.aggregationResults[0]["groupByResult"]) {
+            // Simple aggregation query
+            columnList = _.map(queryResponse.aggregationResults, function (aggregationResult) {
+              return {"title": aggregationResult.function};
+            });
 
-      if (queryResponse) {
-        if (queryResponse["selectionResults"]) {
-          // Selection query
-          columnList = _.map(queryResponse.selectionResults.columns, function (columnName) {
+            dataArray.push(_.map(queryResponse.aggregationResults, function (aggregationResult) {
+              return aggregationResult.value;
+            }));
+          } else if (queryResponse["aggregationResults"] && queryResponse.aggregationResults.length > 0
+              && queryResponse.aggregationResults[0]["groupByResult"]) {
+            // Aggregation group by query
+            var columns = queryResponse.aggregationResults[0].groupByColumns;
+            columns.push(queryResponse.aggregationResults[0].function);
+            columnList = _.map(columns, function (columnName) {
+              return {"title": columnName};
+            });
+
+            dataArray = _.map(queryResponse.aggregationResults[0].groupByResult, function (aggregationGroup) {
+              var row = aggregationGroup.group;
+              row.push(aggregationGroup.value);
+              return row;
+            });
+          }
+        }
+      } else {
+        if (queryResponse["resultTable"] && queryResponse.resultTable["rows"]
+          && queryResponse.resultTable.rows.length > 0) {
+          columnList = _.map(queryResponse.resultTable.dataSchema.columnNames, function (columnName) {
             return {"title": columnName};
           });
-          dataArray = queryResponse.selectionResults.results;
-        } else if (queryResponse["aggregationResults"] && queryResponse.aggregationResults.length > 0
-            && !queryResponse.aggregationResults[0]["groupByResult"]) {
-          // Simple aggregation query
-          columnList = _.map(queryResponse.aggregationResults, function (aggregationResult) {
-            return {"title": aggregationResult.function};
-          });
-
-          dataArray.push(_.map(queryResponse.aggregationResults, function (aggregationResult) {
-            return aggregationResult.value;
-          }));
-        } else if (queryResponse["aggregationResults"] && queryResponse.aggregationResults.length > 0
-            && queryResponse.aggregationResults[0]["groupByResult"]) {
-          // Aggregation group by query
-          var columns = queryResponse.aggregationResults[0].groupByColumns;
-          columns.push(queryResponse.aggregationResults[0].function);
-          columnList = _.map(columns, function (columnName) {
-            return {"title": columnName};
-          });
-
-          dataArray = _.map(queryResponse.aggregationResults[0].groupByResult, function (aggregationGroup) {
-            var row = aggregationGroup.group;
-            row.push(aggregationGroup.value);
-            return row;
-          });
+          dataArray = queryResponse.resultTable.rows;
         }
       }
-
       HELPERS.resetResultsTable();
 
       table = $('#query-results-table').DataTable({
@@ -214,13 +211,22 @@ var HELPERS = {
     var query = EDITOR.getValue().trim();
   },
 
-  executeQuery: function(query, traceEnabled, queryOptions, callback) {
-    var url = "/pql";
-    var params = JSON.stringify({
-      "pql": query,
-      "trace": traceEnabled,
-      "queryOptions" : queryOptions
-    });
+  executeQuery: function(query, querySyntaxPQL, traceEnabled, callback) {
+    var url = undefined;
+    var params = undefined;
+    if (querySyntaxPQL === true) {
+      url = "/pql";
+      params = JSON.stringify({
+        "pql": query,
+        "trace": traceEnabled
+      });
+    } else {
+      url = "/sql";
+      params = JSON.stringify({
+        "sql": query,
+        "trace": traceEnabled
+      });
+    }
     $.ajax({
       type: 'POST',
       url: url,

@@ -21,13 +21,10 @@ package org.apache.pinot.core.operator.dociditerators;
 import java.util.Arrays;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
+// TODO: Optimize this
 public final class AndDocIdIterator implements BlockDocIdIterator {
-
-  static final Logger LOGGER = LoggerFactory.getLogger(AndDocIdIterator.class);
   public final BlockDocIdIterator[] docIdIterators;
   public ScanBasedDocIdIterator[] scanBasedDocIdIterators;
   public final int[] docIdPointers;

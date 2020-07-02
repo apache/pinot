@@ -26,7 +26,6 @@ import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
@@ -46,6 +45,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.util.QueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
@@ -130,7 +130,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       indexSegments.add(segmentDataManager.getSegment());
     }
-    BrokerRequestPreProcessor.preProcess(indexSegments, brokerRequest);
 
     List<PlanNode> planNodes = new ArrayList<>();
     for (IndexSegment indexSegment : indexSegments) {
@@ -184,10 +183,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @return True if query can be served using dictionary, false otherwise.
    */
   public static boolean isFitForDictionaryBasedPlan(BrokerRequest brokerRequest, IndexSegment indexSegment) {
-    // Skipping dictionary in case of star tree. Results from dictionary won't be correct
-    // because of aggregated values in metrics, and ALL value in dimension
-    if ((brokerRequest.getFilterQuery() != null) || brokerRequest.isSetGroupBy() || indexSegment.getSegmentMetadata()
-        .hasStarTree()) {
+    if ((brokerRequest.getFilterQuery() != null) || brokerRequest.isSetGroupBy()) {
       return false;
     }
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
@@ -208,9 +204,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
     if (functionType
         .isOfType(AggregationFunctionType.MIN, AggregationFunctionType.MAX, AggregationFunctionType.MINMAXRANGE)) {
-      String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
-      if (TransformExpressionTree.compileToExpressionTree(expression).isColumn()) {
-        Dictionary dictionary = indexSegment.getDataSource(expression).getDictionary();
+      String column = AggregationFunctionUtils.getArguments(aggregationInfo).get(0);
+      if (indexSegment.getColumnNames().contains(column)) {
+        Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
         return dictionary != null && dictionary.isSorted();
       }
     }

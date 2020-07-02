@@ -19,6 +19,8 @@
 package org.apache.pinot.tools;
 
 import java.lang.reflect.Field;
+import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.tools.filesystem.PinotFSBenchmarkRunner;
 import org.apache.pinot.tools.perf.PerfBenchmarkRunner;
 import org.apache.pinot.tools.perf.QueryRunner;
 import org.kohsuke.args4j.Argument;
@@ -37,7 +39,14 @@ public class PinotToolLauncher {
 
   // @formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
-  @SubCommands({@SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class), @SubCommand(name = "AutoAddInvertedIndex", impl = AutoAddInvertedIndexTool.class), @SubCommand(name = "ValidateTableRetention", impl = ValidateTableRetention.class), @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class), @SubCommand(name = "QueryRunner", impl = QueryRunner.class)})
+  @SubCommands({
+      @SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class),
+      @SubCommand(name = "AutoAddInvertedIndex", impl = AutoAddInvertedIndexTool.class),
+      @SubCommand(name = "ValidateTableRetention", impl = ValidateTableRetention.class),
+      @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class),
+      @SubCommand(name = "QueryRunner", impl = QueryRunner.class),
+      @SubCommand(name = "PinotFSBenchmarkRunner", impl = PinotFSBenchmarkRunner.class)
+  })
   Command _subCommand;
   // @formatter:on
 
@@ -66,6 +75,7 @@ public class PinotToolLauncher {
 
   public static void main(String[] args)
       throws Exception {
+    PluginManager.get().init();
     new PinotToolLauncher().execute(args);
   }
 

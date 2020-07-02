@@ -18,33 +18,32 @@
  */
 package org.apache.pinot.tools.scan.query;
 
-import java.util.HashSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class InPredicateFilter implements PredicateFilter {
-  private static final String SEPARATOR = "\t\t";
-  HashSet<Integer> inSet = new HashSet<>();
+  private final IntSet _inSet;
 
-  public InPredicateFilter(Dictionary dictionaryReader, List<String> predicateValue) {
-    for (String values : predicateValue) {
-      for (String value : values.split(SEPARATOR)) {
-        inSet.add(dictionaryReader.indexOf(value));
-      }
+  public InPredicateFilter(Dictionary dictionary, List<String> values) {
+    _inSet = new IntOpenHashSet(values.size());
+    for (String value : values) {
+      _inSet.add(dictionary.indexOf(value));
     }
   }
 
   @Override
   public boolean apply(int dictId) {
-    return (inSet.contains(dictId));
+    return (_inSet.contains(dictId));
   }
 
   @Override
   public boolean apply(int[] dictIds, int length) {
     // length <= dictIds.length
     for (int i = 0; i < length; ++i) {
-      if (inSet.contains(dictIds[i])) {
+      if (_inSet.contains(dictIds[i])) {
         return true;
       }
     }

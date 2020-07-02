@@ -29,6 +29,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.commons.compress.archivers.ArchiveException;
@@ -171,22 +172,34 @@ public class TarGzCompressionUtils {
           throw new IOException("Tar file must not be untarred outside of the target output directory!");
         }
         if (entry.isDirectory()) {
+          // creating directory
           LOGGER.debug(String.format("Attempting to write output directory %s.", outputFile.getAbsolutePath()));
           if (!outputFile.exists()) {
+            // does not exist
             LOGGER.debug(String.format("Attempting to create output directory %s.", outputFile.getAbsolutePath()));
-            if (!outputFile.mkdirs()) {
-              throw new IllegalStateException(
-                  String.format("Couldn't create directory %s.", outputFile.getAbsolutePath()));
+            try {
+              // create the directory including any non-existent parent directories
+              Files.createDirectories(outputFile.toPath());
+            } catch (Exception e) {
+              LOGGER.error("Caught exception while creating directory: {}, error: {}", outputFile.getAbsolutePath(), e);
+              throw e;
             }
           } else {
+            // directory already exists
             LOGGER.error("The directory already there. Deleting - " + outputFile.getAbsolutePath());
             FileUtils.deleteDirectory(outputFile);
           }
         } else {
+          // creating file
           LOGGER.debug(String.format("Creating output file %s.", outputFile.getAbsolutePath()));
-          File directory = outputFile.getParentFile();
-          if (!directory.exists()) {
-            directory.mkdirs();
+          File parentDirectory = outputFile.getParentFile();
+          if (!parentDirectory.exists()) {
+            try {
+              Files.createDirectories(parentDirectory.toPath());
+            } catch (Exception e) {
+              LOGGER.error("Caught exception while creating parent : {}, error: {}", parentDirectory.getAbsolutePath(), e);
+              throw e;
+            }
           }
           OutputStream outputFileStream = null;
           try {

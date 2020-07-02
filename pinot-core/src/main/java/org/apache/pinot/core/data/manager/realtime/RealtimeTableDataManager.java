@@ -23,27 +23,27 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -51,6 +51,11 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 
 
 @ThreadSafe
@@ -60,6 +65,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
   private final Semaphore _segmentBuildSemaphore;
+  // Maintains a map of partitionIds to semaphores.
+  // The semaphore ensures that exactly one PartitionConsumer instance consumes from any stream partition.
+  // In some streams, it's possible that having multiple consumers (with the same consumer name on the same host) consuming from the same stream partition can lead to bugs.
+  // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
+  // We expect that there will be a small number of semaphores, but that may be ok.
+  private final Map<Integer, Semaphore> _partitionIdToSemaphoreMap = new ConcurrentHashMap<>();
 
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
@@ -226,7 +237,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         _logger.error("Not adding segment {}", segmentName);
         throw new RuntimeException("Mismatching schema/table config for " + _tableNameWithType);
       }
-      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
+      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
 
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
 
@@ -241,8 +252,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           downloadAndReplaceSegment(segmentName, llcSegmentMetadata, indexLoadingConfig);
           return;
         }
-        manager = new LLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, this,
-            _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
+
+        // Generates only one semaphore for every partitionId
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+        int streamPartitionId = llcSegmentName.getPartitionId();
+        _partitionIdToSemaphoreMap.putIfAbsent(streamPartitionId, new Semaphore(1));
+        manager =
+            new LLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
+                indexLoadingConfig, schema, llcSegmentName, _partitionIdToSemaphoreMap.get(streamPartitionId),
+                _serverMetrics);
       }
       _logger.info("Initialize RealtimeSegmentDataManager - " + segmentName);
       _segmentDataManagerMap.put(segmentName, manager);
@@ -257,7 +275,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     final File segmentFolder = new File(_indexDir, segmentName);
     FileUtils.deleteQuietly(segmentFolder);
     try {
-      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
+      SegmentFetcherFactory.fetchSegmentToLocal(uri, tempFile);
       _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
       _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
@@ -324,7 +342,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // 1. Make sure that the sorted column is not a multi-value field.
     List<String> sortedColumns = indexingConfig.getSortedColumn();
     boolean isValid = true;
-    if (!sortedColumns.isEmpty()) {
+    if (CollectionUtils.isNotEmpty(sortedColumns)) {
       final String sortedColumn = sortedColumns.get(0);
       if (sortedColumns.size() > 1) {
         _logger.warn("More than one sorted column configured. Using {}", sortedColumn);
@@ -336,7 +354,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       }
     }
     // 2. We want to get the schema errors, if any, even if isValid is false;
-    if (!schema.validate(_logger)) {
+    if (!SchemaUtils.validate(schema, _logger)) {
       isValid = false;
     }
 

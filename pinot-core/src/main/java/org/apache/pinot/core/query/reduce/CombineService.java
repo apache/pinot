@@ -18,18 +18,16 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.PriorityQueue;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,8 +43,8 @@ public class CombineService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CombineService.class);
 
-  public static void mergeTwoBlocks(@Nonnull BrokerRequest brokerRequest, @Nonnull IntermediateResultsBlock mergedBlock,
-      @Nonnull IntermediateResultsBlock blockToMerge) {
+  public static void mergeTwoBlocks(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock,
+      IntermediateResultsBlock blockToMerge) {
     // Combine processing exceptions.
     List<ProcessingException> mergedProcessingExceptions = mergedBlock.getProcessingExceptions();
     List<ProcessingException> processingExceptionsToMerge = blockToMerge.getProcessingExceptions();
@@ -70,19 +68,19 @@ public class CombineService {
           return;
         }
 
-        AggregationFunctionContext[] mergedAggregationFunctionContexts = mergedBlock.getAggregationFunctionContexts();
-        if (mergedAggregationFunctionContexts == null) {
+        AggregationFunction[] mergedAggregationFunctions = mergedBlock.getAggregationFunctions();
+        if (mergedAggregationFunctions == null) {
           // No data in merged block.
-          mergedBlock.setAggregationFunctionContexts(blockToMerge.getAggregationFunctionContexts());
+          mergedBlock.setAggregationFunctions(blockToMerge.getAggregationFunctions());
           mergedBlock.setAggregationResults(aggregationResultToMerge);
-        }
-
-        // Merge two block.
-        List<Object> mergedAggregationResult = mergedBlock.getAggregationResult();
-        int numAggregationFunctions = mergedAggregationFunctionContexts.length;
-        for (int i = 0; i < numAggregationFunctions; i++) {
-          mergedAggregationResult.set(i, mergedAggregationFunctionContexts[i].getAggregationFunction()
-              .merge(mergedAggregationResult.get(i), aggregationResultToMerge.get(i)));
+        } else {
+          // Merge two blocks.
+          List<Object> mergedAggregationResult = mergedBlock.getAggregationResult();
+          int numAggregationFunctions = mergedAggregationFunctions.length;
+          for (int i = 0; i < numAggregationFunctions; i++) {
+            mergedAggregationResult.set(i,
+                mergedAggregationFunctions[i].merge(mergedAggregationResult.get(i), aggregationResultToMerge.get(i)));
+          }
         }
       } else {
         // Combine aggregation group-by result, which should not come into CombineService.
@@ -95,8 +93,8 @@ public class CombineService {
       // Result set size will be zero if no row matches the predicate.
       DataSchema mergedBlockSchema = mergedBlock.getDataSchema();
       DataSchema blockToMergeSchema = blockToMerge.getDataSchema();
-      Collection<Serializable[]> mergedBlockResultSet = mergedBlock.getSelectionResult();
-      Collection<Serializable[]> blockToMergeResultSet = blockToMerge.getSelectionResult();
+      Collection<Object[]> mergedBlockResultSet = mergedBlock.getSelectionResult();
+      Collection<Object[]> blockToMergeResultSet = blockToMerge.getSelectionResult();
 
       if (mergedBlockSchema == null || mergedBlockResultSet.size() == 0) {
         // No data in merged block.
@@ -130,7 +128,7 @@ public class CombineService {
             if (isSelectionOrderBy) {
               // Combine selection order-by.
               SelectionOperatorUtils
-                  .mergeWithOrdering((PriorityQueue<Serializable[]>) mergedBlockResultSet, blockToMergeResultSet,
+                  .mergeWithOrdering((PriorityQueue<Object[]>) mergedBlockResultSet, blockToMergeResultSet,
                       selection.getOffset() + selectionSize);
             } else {
               // Combine selection only.

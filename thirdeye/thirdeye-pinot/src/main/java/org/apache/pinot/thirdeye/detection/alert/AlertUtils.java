@@ -36,6 +36,7 @@ import javax.mail.internet.InternetAddress;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 
+
 public class AlertUtils {
   private AlertUtils() {
     //left blank
@@ -82,17 +83,10 @@ public class AlertUtils {
         });
   }
 
-  public static long getHighWaterMark(Collection<MergedAnomalyResultDTO> anomalies) {
-    if (anomalies.isEmpty()) {
-      return 0;
-    }
-    return Collections.max(Collections2.transform(anomalies, mergedAnomalyResultDTO -> mergedAnomalyResultDTO.getId()));
-  }
-
   private static long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies, long startTime) {
     long lastTimeStamp = startTime;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
+      lastTimeStamp = Math.max(anomaly.getCreatedTime(), lastTimeStamp);
     }
     return lastTimeStamp;
   }
@@ -119,8 +113,12 @@ public class AlertUtils {
 
   public static Map<Long, Long> mergeVectorClock(Map<Long, Long> a, Map<Long, Long> b) {
     Set<Long> keySet = new HashSet<>();
-    keySet.addAll(a.keySet());
-    keySet.addAll(b.keySet());
+    if (a != null) {
+      keySet.addAll(a.keySet());
+    }
+    if (b != null) {
+      keySet.addAll(b.keySet());
+    }
 
     Map<Long, Long> result = new HashMap<>();
     for (Long detectionId : keySet) {

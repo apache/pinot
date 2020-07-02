@@ -30,6 +30,9 @@ import org.joda.time.PeriodType;
 
 
 public class TimeGranularity {
+  public static final String WEEKS = "WEEKS";
+  public static final String MONTHS = "MONTHS";
+
   private final int size;
   private final TimeUnit unit;
 

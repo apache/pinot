@@ -1,0 +1,38 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType": "LONG",
+      "name": "views"
+    },
+    {
+      "dataType": "LONG",
+      "name": "clicks"
+    },
+    {
+      "dataType": "LONG",
+      "name": "errors"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "country"
+    },
+    {
+      "dataType": "STRING",
+      "name": "browser"
+    },
+    {
+      "dataType": "STRING",
+      "name": "platform"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "HOURS",
+      "dataType": "LONG",
+      "name": "hoursSinceEpoch"
+    }
+  },
+  "schemaName": "complexWebsite"
+}

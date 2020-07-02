@@ -144,18 +144,18 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       return value;
     }
 
-    @Override
-    public void close()
-        throws IOException {
-      _pinotDataBuffer.close();
-    }
-
     private int getSize() {
       return _size;
     }
 
     private int getStartIndex() {
       return _startIndex;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      // NOTE: DO NOT close the PinotDataBuffer here because it is tracked in the PinotDataBufferMemoryManager.
     }
   }
 
@@ -245,11 +245,9 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   @Override
   public void close()
       throws IOException {
-    _numElements = 0;
     for (Buffer buffer : _buffers) {
       buffer.close();
     }
-    _buffers.clear();
   }
 
   public long getTotalOffHeapMemUsed() {

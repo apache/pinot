@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -27,17 +29,16 @@ import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-public class SumAggregationFunction implements AggregationFunction<Double, Double> {
+public class SumAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_VALUE = 0.0;
+
+  public SumAggregationFunction(String column) {
+    super(column);
+  }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.SUM;
-  }
-
-  @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.SUM.getName() + "_" + column;
   }
 
   @Override
@@ -56,8 +57,9 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     double sum = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
       sum += valueArray[i];
@@ -67,8 +69,8 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
@@ -77,8 +79,8 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

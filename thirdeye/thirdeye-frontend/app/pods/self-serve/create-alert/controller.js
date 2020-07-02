@@ -85,6 +85,12 @@ export default Controller.extend({
   subscriptionYaml:  null,            // The YAML for the subscription group
   alertDataIsCurrent: true,
   disableYamlSave: true,
+  detectionError: false,
+  detectionErrorMsg: null,
+  detectionErrorInfo: null,
+  previewError: false,
+  previewErrorMsg: null,
+  previewErrorInfo: null,
 
 
 
@@ -1067,6 +1073,19 @@ export default Controller.extend({
     },
 
     /**
+     * set preview error for pushing down to detection-yaml component
+     * @method setPreviewError
+     * @return {undefined}
+     */
+    setPreviewError(bubbledObject) {
+      this.setProperties({
+        previewError: bubbledObject.previewError,
+        previewErrorMsg: bubbledObject.previewErrorMsg,
+        previewErrorInfo: bubbledObject.previewErrorInfo
+      });
+    },
+
+    /**
      * update the subscription yaml string
      * @method updateSubscriptionYaml
      * @return {undefined}
@@ -1092,6 +1111,7 @@ export default Controller.extend({
      * Grabs YAML content and sends it
      */
     createAlertYamlAction() {
+      set(this, 'detectionError', false);
       const content = {
         detection: get(this, 'detectionYaml'),
         subscription: get(this, 'subscriptionYaml')
@@ -1107,19 +1127,26 @@ export default Controller.extend({
       fetch(url, postProps).then((res) => {
         res.json().then((result) => {
           if(result){
-            if (result.detectionMsg) {
-              set(this, 'detectionMsg', result.detectionMsg);
-            }
-            if (result.subscriptionMsg) {
-              set(this, 'subscriptionMsg', result.subscriptionMsg);
-            }
-            if (result.detectionAlertConfigId && result.detectionConfigId) {
+            if (result.subscriptionConfigId && result.detectionConfigId) {
               notifications.success('Created alert successfully.', 'Created', toastOptions);
+              this.transitionToRoute('manage.explore', result.detectionConfigId);
+            } else {
+              notifications.error(result.message, 'Error', toastOptions);
+              this.setProperties({
+                detectionError: true,
+                detectionErrorMsg: result.message,
+                detectionErrorInfo: result["more-info"]
+              });
             }
           }
         });
       }).catch((error) => {
         notifications.error('Create alert failed.', error, toastOptions);
+        this.setProperties({
+          detectionError: true,
+          detectionErrorMsg: 'Create alert failed.',
+          detectionErrorInfo: error
+        });
       });
     },
 

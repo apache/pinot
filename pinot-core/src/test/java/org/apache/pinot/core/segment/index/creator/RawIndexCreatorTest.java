@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -42,6 +44,7 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -84,8 +87,10 @@ public class RawIndexCreatorTest {
     schema.addField(new DimensionFieldSpec(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE, true));
     schema.addField(new DimensionFieldSpec(STRING_COLUMN, FieldSpec.DataType.STRING, true));
 
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+
     _random = new Random(System.nanoTime());
-    _recordReader = buildIndex(schema);
+    _recordReader = buildIndex(tableConfig, schema);
   }
 
   /**
@@ -202,9 +207,9 @@ public class RawIndexCreatorTest {
    * @return Array of string values for the rows in the generated index.
    * @throws Exception
    */
-  private RecordReader buildIndex(Schema schema)
+  private RecordReader buildIndex(TableConfig tableConfig, Schema schema)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setRawIndexCreationColumns(schema.getDimensionNames());
 
     config.setOutDir(SEGMENT_DIR_NAME);
@@ -226,7 +231,7 @@ public class RawIndexCreatorTest {
       rows.add(genericRow);
     }
 
-    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+    RecordReader recordReader = new GenericRowRecordReader(rows);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, recordReader);
     driver.build();

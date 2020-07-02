@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 Record Reader
 =============
 
@@ -81,7 +83,7 @@ record.reader.path: org.apache.pinot.orc.data.readers.ORCRecordReader
 Implement Your Own Record Reader
 --------------------------------
 
-For other file formats, we provide a general interface for record reader - `RecordReader <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/data/readers/RecordReader.java>`_.
+For other file formats, we provide a general interface for record reader - `RecordReader <https://github.com/apache/incubator-pinot/blob/master/pinot-spi/src/main/java/org/apache/pinot/spi/data/readers/RecordReader.java>`_.
 To index the file into Pinot segment, simply implement the interface and plug it into the index engine - `SegmentCreationDriverImpl <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/segment/creator/impl/SegmentIndexCreationDriverImpl.java>`_.
 We use a 2-passes algorithm to index the file into Pinot segment, hence the *rewind()* method is required for the record
 reader.

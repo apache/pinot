@@ -21,7 +21,6 @@ package org.apache.pinot.common.utils;
 import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
-import org.apache.pinot.common.response.BrokerResponseFactory;
 
 
 public class CommonConstants {
@@ -43,6 +42,7 @@ public class CommonConstants {
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
 
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
+    public static final String ENABLE_CASE_INSENSITIVE_PQL_KEY = "enable.case.insensitive.pql";
 
     // More information on why these numbers are set can be found in the following doc:
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
@@ -97,20 +97,6 @@ public class CommonConstants {
       public static final String ADMIN_PORT_KEY = "adminPort";
     }
 
-    public enum InstanceType {
-      CONTROLLER, BROKER, SERVER, MINION
-    }
-
-    public enum TableType {
-      OFFLINE, REALTIME;
-
-      public ServerType getServerType() {
-        if (this == OFFLINE) {
-          return ServerType.OFFLINE;
-        }
-        return ServerType.REALTIME;
-      }
-    }
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
 
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";
@@ -140,10 +126,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_DELAY_SHUTDOWN_TIME_MS = "pinot.broker.delayShutdownTimeMs";
     public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
     public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
-    public static final String CONFIG_OF_REQUEST_HANDLER_TYPE = "pinot.broker.requestHandlerType";
-    public static final String SINGLE_CONNECTION_REQUEST_HANDLER_TYPE = "singleConnection";
-    public static final String CONNECTION_POOL_REQUEST_HANDLER_TYPE = "connectionPool";
-    public static final String DEFAULT_REQUEST_HANDLER_TYPE = SINGLE_CONNECTION_REQUEST_HANDLER_TYPE;
 
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
@@ -155,19 +137,13 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
-    public static final BrokerResponseFactory.ResponseType DEFAULT_BROKER_RESPONSE_TYPE =
-        BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
-    // The sleep interval time of the thread used by the Brokers to refresh TimeboundaryInfo upon segment refreshing
-    // events.
-    public static final String CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL =
-        "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
-    public static final long DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS = 10000L;
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
     public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+    public static final String CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE = "pinot.broker.enable.query.limit.override";
 
     public static class Request {
       public static final String PQL = "pql";
@@ -177,6 +153,7 @@ public class CommonConstants {
       public static final String QUERY_OPTIONS = "queryOptions";
 
       public static class QueryOptionKey {
+        public static final String TIMEOUT_MS = "timeoutMs";
         public static final String PRESERVE_TYPE = "preserveType";
         public static final String RESPONSE_FORMAT = "responseFormat";
         public static final String GROUP_BY_MODE = "groupByMode";
@@ -190,6 +167,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_CONSUMER_DIR = "pinot.server.instance.consumerDir";
     public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
     public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
+    public static final String CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT =
+        "pinot.server.instance.reload.consumingSegment";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS = "pinot.server.query.executor.pruner.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
@@ -219,6 +198,8 @@ public class CommonConstants {
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";
+    // Whether to reload consuming segment on scheme update. Will change default behavior to true when this feature is stabilized
+    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = false;
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
@@ -262,21 +243,6 @@ public class CommonConstants {
         "pinot.server.shutdown.resourceCheckIntervalMs";
     public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
 
-    // TODO: remove the deprecated config keys in the new release
-    @Deprecated
-    public static final String CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK =
-        "pinot.server.starter.enableSegmentsLoadingCheck";
-    @Deprecated
-    public static final String CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS = "pinot.server.starter.timeoutInSeconds";
-    @Deprecated
-    public static final String CONFIG_OF_ENABLE_SHUTDOWN_DELAY = "pinot.server.instance.enable.shutdown.delay";
-    @Deprecated
-    public static final String CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME =
-        "pinot.server.instance.starter.maxShutdownWaitTime";
-    @Deprecated
-    public static final String CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME =
-        "pinot.server.instance.starter.checkIntervalTime";
-
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
 
     public static class SegmentCompletionProtocol {
@@ -292,6 +258,9 @@ public class CommonConstants {
 
     public static final String DEFAULT_METRICS_PREFIX = "pinot.server.";
     public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
+    public static final String ACCESS_CONTROL_FACTORY_CLASS = "pinot.server.admin.access.control.factory.class";
+    public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
+        "org.apache.pinot.server.api.access.AllowAllAccessFactory";
   }
 
   public static class Controller {
@@ -339,8 +308,10 @@ public class CommonConstants {
        * During realtime segment completion, the value of this enum decides how  non-winner servers should replace  the completed segment.
        */
       public enum CompletionMode {
-        DEFAULT, // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
-        DOWNLOAD // non-winner servers always download the segment, never build it
+        // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
+        DEFAULT,
+        // non-winner servers always download the segment, never build it
+        DOWNLOAD
       }
 
       public static final String STATUS = "segment.realtime.status";
@@ -388,28 +359,14 @@ public class CommonConstants {
       public static String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
     }
 
+    public static class BuiltInVirtualColumn {
+      public static final String DOCID = "$docId";
+      public static final String HOSTNAME = "$hostName";
+      public static final String SEGMENTNAME = "$segmentName";
+    }
+
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
-  }
-
-  public static class SegmentOperations {
-    public static class HadoopSegmentOperations {
-      public static final String PRINCIPAL = "hadoop.kerberos.principle";
-      public static final String KEYTAB = "hadoop.kerberos.keytab";
-      public static final String HADOOP_CONF_PATH = "hadoop.conf.path";
-    }
-
-    public static class AzureSegmentOperations {
-      public static final String ACCOUNT_ID = "accountId";
-      public static final String AUTH_ENDPOINT = "authEndpoint";
-      public static final String CLIENT_ID = "clientId";
-      public static final String CLIENT_SECRET = "clientSecret";
-    }
-
-    public static final String RETRY = "retry.count";
-    public static final int RETRY_DEFAULT = 3;
-    public static final String RETRY_WAITIME_MS = "retry.wait.ms";
-    public static final int RETRY_WAITIME_MS_DEFAULT = 100;
   }
 
   public enum UpdateSemantic {

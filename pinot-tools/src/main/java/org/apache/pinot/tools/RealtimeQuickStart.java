@@ -24,12 +24,13 @@ import java.io.File;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
-import org.apache.pinot.core.realtime.stream.StreamDataProvider;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.MeetupRsvpStream;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
@@ -38,37 +39,33 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class RealtimeQuickStart {
   private StreamDataServerStartable _kafkaStarter;
 
-  private RealtimeQuickStart() {
-  }
-
   public static void main(String[] args)
       throws Exception {
+    PluginManager.get().init();
     new RealtimeQuickStart().execute();
   }
 
   public void execute()
       throws Exception {
-    final File quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
+    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File configDir = new File(quickstartTmpDir, "configs");
+    File dataDir = new File(quickstartTmpDir, "data");
+    Preconditions.checkState(configDir.mkdirs());
+    Preconditions.checkState(dataDir.mkdirs());
 
-    if (!quickStartDataDir.exists()) {
-      Preconditions.checkState(quickStartDataDir.mkdirs());
-    }
-
-    File schemaFile = new File(quickStartDataDir, "meetupRsvp_schema.json");
-    File tableConfigFile = new File(quickStartDataDir, "meetupRsvp_realtime_table_config.json");
+    File schemaFile = new File(configDir, "meetupRsvp_schema.json");
+    File tableConfigFile = new File(configDir, "meetupRsvp_realtime_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("sample_data/meetupRsvp_schema.json");
+    URL resource = classLoader.getResource("examples/stream/meetupRsvp/meetupRsvp_schema.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
-    resource = classLoader.getResource("sample_data/meetupRsvp_realtime_table_config.json");
+    resource = classLoader.getResource("examples/stream/meetupRsvp/meetupRsvp_realtime_table_config.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
-    Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schemaFile, tableConfigFile);
-    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, dataDir);
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
@@ -82,8 +79,6 @@ public class RealtimeQuickStart {
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, server and broker *****");
     runner.startAll();
-    printStatus(Color.CYAN, "***** Adding meetupRSVP schema *****");
-    runner.addSchema();
     printStatus(Color.CYAN, "***** Adding meetupRSVP table *****");
     runner.addTable();
     printStatus(Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
@@ -101,7 +96,7 @@ public class RealtimeQuickStart {
           runner.stop();
           _kafkaStarter.stop();
           ZkStarter.stopLocalZkServer(zookeeperInstance);
-          FileUtils.deleteDirectory(quickStartDataDir);
+          FileUtils.deleteDirectory(quickstartTmpDir);
         } catch (Exception e) {
           e.printStackTrace();
         }

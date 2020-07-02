@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tools.streams;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -28,24 +26,31 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
-import org.apache.pinot.core.realtime.stream.StreamDataProducer;
-import org.apache.pinot.core.realtime.stream.StreamDataProvider;
+import org.apache.pinot.spi.stream.StreamDataProducer;
+import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.tools.Quickstart;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This is used in Hybrid Quickstart.
+ */
 public class AirlineDataStream {
   private static final Logger logger = LoggerFactory.getLogger(AirlineDataStream.class);
 
   Schema pinotSchema;
+  String timeColumnName;
   File avroFile;
   DataFileStream<GenericRecord> avroDataStream;
   Integer currentTimeValue = 16102;
@@ -54,9 +59,10 @@ public class AirlineDataStream {
   int counter = 0;
   private StreamDataProducer producer;
 
-  public AirlineDataStream(Schema pinotSchema, File avroFile)
+  public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile)
       throws Exception {
     this.pinotSchema = pinotSchema;
+    this.timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     this.avroFile = avroFile;
     createStream();
     Properties properties = new Properties();
@@ -68,7 +74,7 @@ public class AirlineDataStream {
 
     service = Executors.newFixedThreadPool(1);
     Quickstart.printStatus(Quickstart.Color.YELLOW,
-        "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time every 3000 events *****");
+        "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time every 60 events (which is approximately 60 seconds) *****");
   }
 
   public void shutdown() {
@@ -80,23 +86,22 @@ public class AirlineDataStream {
   }
 
   private void createStream()
-      throws FileNotFoundException, IOException {
+      throws IOException {
     if (keepIndexing) {
-      avroDataStream =
-          new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+      avroDataStream = new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<>());
       return;
     }
     avroDataStream = null;
   }
 
-  private void publish(JsonNode message)
+  private void publish(GenericRecord message)
       throws IOException {
     if (!keepIndexing) {
       avroDataStream.close();
       avroDataStream = null;
       return;
     }
-    producer.produce("airlineStatsEvents", message.toString().getBytes("UTF-8"));
+    producer.produce("flights-realtime", message.toString().getBytes("UTF-8"));
   }
 
   public void run() {
@@ -107,31 +112,31 @@ public class AirlineDataStream {
       public void run() {
         while (true) {
           while (avroDataStream.hasNext()) {
-            if (keepIndexing == false) {
+            if (!keepIndexing) {
               return;
             }
 
             GenericRecord record = avroDataStream.next();
-            ObjectNode message = JsonUtils.newObjectNode();
+
+            GenericRecord message = new GenericData.Record(AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema));
 
             for (FieldSpec spec : pinotSchema.getDimensionFieldSpecs()) {
-              message.set(spec.getName(), JsonUtils.objectToJsonNode(record.get(spec.getName())));
+              message.put(spec.getName(), record.get(spec.getName()));
             }
 
-            for (FieldSpec spec : pinotSchema.getDimensionFieldSpecs()) {
-              message.set(spec.getName(), JsonUtils.objectToJsonNode(record.get(spec.getName())));
+            for (FieldSpec spec : pinotSchema.getMetricFieldSpecs()) {
+              message.put(spec.getName(), record.get(spec.getName()));
             }
 
-            TimeFieldSpec spec = pinotSchema.getTimeFieldSpec();
-            String timeColumn = spec.getIncomingTimeColumnName();
-            message.put(timeColumn, currentTimeValue);
+            message.put(timeColumnName, currentTimeValue);
 
             try {
               publish(message);
               counter++;
-              if (counter % 3000 == 0) {
+              if (counter % 60 == 0) {
                 currentTimeValue = currentTimeValue + 1;
               }
+              Thread.sleep(1000);
             } catch (Exception e) {
               logger.error(e.getMessage());
             }

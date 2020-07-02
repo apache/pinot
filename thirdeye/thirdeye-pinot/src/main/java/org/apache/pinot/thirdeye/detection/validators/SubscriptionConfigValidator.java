@@ -24,10 +24,12 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.quartz.CronExpression;
 
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.PROP_RECIPIENTS;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
@@ -36,22 +38,17 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
   private static final String PROP_CLASS_NAME = "className";
 
   /**
-   * Perform validation on the alert config like verifying if all the required fields are set
+   * Perform validation on the parsed & constructed subscription config
    */
   @Override
   public void validateConfig(DetectionAlertConfigDTO alertConfig) throws IllegalArgumentException {
     Preconditions.checkNotNull(alertConfig);
 
     // Check for all the required fields in the alert
-    Preconditions.checkArgument(!StringUtils.isEmpty(alertConfig.getName()), "Subscription group name field cannot be left empty.");
-    Preconditions.checkArgument(!StringUtils.isEmpty(alertConfig.getApplication()), "Application field cannot be left empty");
-    Preconditions.checkArgument(!StringUtils.isEmpty(alertConfig.getFrom()), "From address field cannot be left empty");
-
-    // Empty subscription properties
-    Preconditions.checkArgument((alertConfig.getProperties() != null
-            && alertConfig.getProperties().get(PROP_CLASS_NAME) != null
-            && StringUtils.isNotEmpty((alertConfig.getProperties().get(PROP_CLASS_NAME).toString()))),
-        "'Type' field cannot be left empty.");
+    Preconditions.checkArgument(!StringUtils.isEmpty(alertConfig.getName()),
+        "Subscription group name field cannot be left empty.");
+    Preconditions.checkArgument(!StringUtils.isEmpty(alertConfig.getApplication()),
+        "Application field cannot be left empty");
 
     // Application name should be valid
     Preconditions.checkArgument(!DAORegistry.getInstance().getApplicationDAO().findByName(alertConfig.getApplication()).isEmpty(),
@@ -62,7 +59,13 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
     // Cron Validator
     Preconditions.checkArgument(CronExpression.isValidExpression(alertConfig.getCronExpression()),
         "The subscription cron specified is incorrect. Please verify your cron expression using online cron"
-            + " makers.");
+        + " makers.");
+
+    // Empty subscription properties
+    Preconditions.checkArgument((alertConfig.getProperties() != null
+            && alertConfig.getProperties().get(PROP_CLASS_NAME) != null
+            && StringUtils.isNotEmpty((alertConfig.getProperties().get(PROP_CLASS_NAME).toString()))),
+        "'Type' field cannot be left empty.");
 
     // At least one alertScheme is required
     Preconditions.checkArgument((alertConfig.getAlertSchemes() != null && !alertConfig.getAlertSchemes().isEmpty()),
@@ -75,17 +78,31 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
 
     // detectionConfigIds cannot be empty
     List<Long> detectionIds = ConfigUtils.getLongs(alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS));
-    Preconditions.checkArgument((detectionIds != null && !detectionIds.isEmpty()),
-        "A notification group should subscribe to at least one alert. If you wish to unsubscribe, set active"
-            + " to false.");
+    Preconditions.checkArgument(!detectionIds.isEmpty(),
+        "A notification group should subscribe to at least one alert. If you wish to unsubscribe, set"
+            + " active to false.");
 
     // TODO add more checks like email validity, alert type check, scheme type check etc.
   }
 
-  // Validate the raw subscription yaml configuration
+  /**
+   * Checks to ensure the fields adhere to the syntax
+   */
   @Override
   public void validateYaml(Map<String, Object> config) throws IllegalArgumentException {
-    // Add validations
+    // Subscription group must subscribe to at least one alert
+    List<String> detectionNames = ConfigUtils.getList(config.get(PROP_DETECTION_NAMES));
+    Preconditions.checkArgument(!detectionNames.isEmpty(),
+        "A subscription group should subscribe to at least one alert. If you wish to unsubscribe, set"
+            + " active to false in the subscription config.");
+
+    // Make sure the subscribed detections are valid
+    for (String detectionName : detectionNames) {
+      Preconditions.checkArgument(!DAORegistry.getInstance().getDetectionConfigManager()
+              .findByPredicate(Predicate.EQ("name", detectionName)).isEmpty(),
+          "Cannot find detection " + detectionName + " - Please ensure the detections listed under "
+              + PROP_DETECTION_NAMES + " exist and are correctly configured.");
+    }
   }
 
   /**
@@ -99,11 +116,6 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
     Preconditions.checkNotNull(oldAlertConfig);
 
     Preconditions.checkArgument(updatedAlertConfig.getId().equals(oldAlertConfig.getId()));
-    Long newHighWatermark = updatedAlertConfig.getHighWaterMark();
-    Long oldHighWatermark = oldAlertConfig.getHighWaterMark();
-    if (newHighWatermark != null && oldHighWatermark != null && newHighWatermark.longValue() != oldHighWatermark) {
-      throw new IllegalArgumentException("HighWaterMark has been modified. This is not allowed");
-    }
     if (updatedAlertConfig.getVectorClocks() != null) {
       for (Map.Entry<Long, Long> vectorClock : updatedAlertConfig.getVectorClocks().entrySet()) {
         if (!oldAlertConfig.getVectorClocks().containsKey(vectorClock.getKey())

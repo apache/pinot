@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.query.comparison;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -27,11 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 
 
 /**
@@ -54,8 +48,6 @@ public class StarTreeQueryGenerator {
   private static final int MAX_NUM_IN_VALUES = 5;
   private static final int SHUFFLE_THRESHOLD = 5 * MAX_NUM_IN_VALUES;
   private static final Random RANDOM = new Random();
-  // Add more functions here to generate them in the queries.
-  private static final List<String> DEFAULT_AGGREGATION_FUNCTIONS = Collections.singletonList("SUM");
   // Add more comparators here to generate them in the 'WHERE' clause.
   private static final List<String> COMPARATORS = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
 
@@ -72,12 +64,6 @@ public class StarTreeQueryGenerator {
     _metricColumns = metricColumns;
     _singleValueDimensionValuesMap = singleValueDimensionValuesMap;
     _aggregationFunctions = aggregationFunctions;
-  }
-
-  public StarTreeQueryGenerator(String tableName, List<String> singleValueDimensionColumns, List<String> metricColumns,
-      Map<String, List<Object>> singleValueDimensionValuesMap) {
-    this(tableName, singleValueDimensionColumns, metricColumns, singleValueDimensionValuesMap,
-        DEFAULT_AGGREGATION_FUNCTIONS);
   }
 
   /**
@@ -313,48 +299,5 @@ public class StarTreeQueryGenerator {
    */
   public String nextQuery() {
     return buildQuery(generateAggregations(), generatePredicates(), generateGroupBys());
-  }
-
-  /**
-   * Given star tree segments directory and number of queries, generate star tree queries.
-   * Usage: StarTreeQueryGenerator starTreeSegmentsDirectory numQueries
-   *
-   * @param args arguments.
-   */
-  public static void main(String[] args)
-      throws Exception {
-    if (args.length != 2) {
-      System.err.println("Usage: StarTreeQueryGenerator tableName starTreeSegmentsDirectory numQueries");
-      return;
-    }
-
-    // Get segment metadata for the first segment to get table name and verify query is fit for star tree.
-    String tableName = args[0];
-    File segmentsDir = new File(args[1]);
-    Preconditions.checkState(segmentsDir.exists());
-    Preconditions.checkState(segmentsDir.isDirectory());
-    File[] segments = segmentsDir.listFiles();
-    Preconditions.checkNotNull(segments);
-    File segment = segments[0];
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(segment, ReadMode.heap);
-    SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-
-    // Set up star tree query generator.
-    int numQueries = Integer.parseInt(args[2]);
-    SegmentInfoProvider infoProvider = new SegmentInfoProvider(args[1]);
-    StarTreeQueryGenerator generator =
-        new StarTreeQueryGenerator(tableName, infoProvider.getSingleValueDimensionColumns(),
-            infoProvider.getMetricColumns(), infoProvider.getSingleValueDimensionValuesMap());
-    Pql2Compiler compiler = new Pql2Compiler();
-
-    for (int i = 0; i < numQueries; i++) {
-      String query = generator.nextQuery();
-      System.out.println(query);
-
-      // Verify that query is fit for star tree.
-//      BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
-//      Preconditions.checkState(RequestUtils.isFitForStarTreeIndex(segmentMetadata, brokerRequest,
-//          RequestUtils.generateFilterQueryTree(brokerRequest)));
-    }
   }
 }

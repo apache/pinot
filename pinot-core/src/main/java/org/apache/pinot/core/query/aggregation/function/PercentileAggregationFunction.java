@@ -20,7 +20,9 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.Arrays;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -29,12 +31,13 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 
 
-public class PercentileAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
+public class PercentileAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   protected final int _percentile;
 
-  public PercentileAggregationFunction(int percentile) {
+  public PercentileAggregationFunction(String column, int percentile) {
+    super(column);
     _percentile = percentile;
   }
 
@@ -44,8 +47,13 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + column;
+  public String getColumnName() {
+    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + _column;
+  }
+
+  @Override
+  public String getResultColumnName() {
+    return AggregationFunctionType.PERCENTILE.getName().toLowerCase() + _percentile + "(" + _column + ")";
   }
 
   @Override
@@ -64,9 +72,10 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     DoubleArrayList valueList = getValueList(aggregationResultHolder);
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       valueList.add(valueArray[i]);
     }
@@ -74,8 +83,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
       valueList.add(valueArray[i]);
@@ -84,8 +93,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

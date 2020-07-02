@@ -19,7 +19,7 @@
 package org.apache.pinot.controller.util;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.joda.time.Duration;
 
 

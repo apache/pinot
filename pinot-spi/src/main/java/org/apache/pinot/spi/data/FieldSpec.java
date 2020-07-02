@@ -160,6 +160,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     return _defaultNullValue;
   }
 
+  public String getDefaultNullValueString() {
+    return getStringValue(_defaultNullValue);
+  }
+
   /**
    * Helper method to return the String value for the given object.
    * This is required as not all data types have a toString() (eg byte[]).
@@ -244,7 +248,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setTransformFunction(String transformFunction) {
+  public void setTransformFunction(@Nullable String transformFunction) {
     _transformFunction = transformFunction;
   }
 
@@ -267,6 +271,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
       jsonObject.put("maxLength", _maxLength);
     }
     appendDefaultNullValue(jsonObject);
+    if (_transformFunction != null) {
+      jsonObject.put("transformFunction", _transformFunction);
+    }
     return jsonObject;
   }
 
@@ -296,7 +303,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength);
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction);
   }
 
   @Override
@@ -306,6 +313,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
+    result = EqualityUtils.hashCodeOf(result, _transformFunction);
     return result;
   }
 
@@ -318,14 +326,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
-    DIMENSION, METRIC, TIME, DATE_TIME
+    DIMENSION, METRIC, TIME, DATE_TIME, COMPLEX
   }
 
   /**
    * The <code>DataType</code> enum is used to demonstrate the data type of a field.
    */
   public enum DataType {
-    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES;
+    // LIST is for complex lists which is different from multi-value column of primitives
+    // STRUCT, MAP and LIST are composable to form a COMPLEX field
+    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES, STRUCT, MAP, LIST;
 
     /**
      * Returns the data type stored in Pinot.
@@ -347,9 +357,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
           return Float.BYTES;
         case DOUBLE:
           return Double.BYTES;
-        case BYTES:
-          // TODO: Metric size is only used for Star-tree generation, which is not supported yet.
-          return MetricFieldSpec.UNDEFINED_METRIC_SIZE;
         default:
           throw new IllegalStateException("Cannot get number of bytes for: " + this);
       }
@@ -375,6 +382,18 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
         default:
           throw new UnsupportedOperationException("Unsupported data type: " + this);
       }
+    }
+
+    /**
+     * Check if the data type is for fixed width data (INT, LONG, FLOAT, DOUBLE)
+     * or variable width data (STRING, BYTES)
+     */
+    public boolean isFixedWidth() {
+      return this != STRING && this != BYTES;
+    }
+
+    public boolean isNumeric() {
+      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
     }
   }
 

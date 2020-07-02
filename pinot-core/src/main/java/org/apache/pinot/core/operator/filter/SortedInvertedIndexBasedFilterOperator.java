@@ -28,6 +28,7 @@ import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.OfflineDictionaryBasedRangePredicateEvaluator;
 
 
 public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
@@ -74,85 +75,99 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     // range predicate relative to the cardinality. However, as adjacent ranges get merged before returning the final
     // list of ranges, the only drawback is that we use a lot of memory during the filter block evaluation.
 
-    boolean exclusive = _predicateEvaluator.isExclusive();
-    int[] dictIds = exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
+      if (_predicateEvaluator instanceof OfflineDictionaryBasedRangePredicateEvaluator) {
+        // optimized path for RANGE predicate evaluation using sorted index.
+        // dictIds will already be sorted since we use sorted index based evaluation
+        // for RANGE predicates only on offline segments.
+        // so build a pair with startDocId and endDocId
+        OfflineDictionaryBasedRangePredicateEvaluator evaluator = (OfflineDictionaryBasedRangePredicateEvaluator)_predicateEvaluator;
+        IntPair pair1 = invertedIndex.getDocIds(evaluator.getStartDictId());
+        // The endDictId is always exclusive as computed by the predicate evaluator.
+        // However, when we query the inverted index to get the corresponding docIds,
+        // we need to do endDictId - 1
+        IntPair pair2 = invertedIndex.getDocIds(evaluator.getEndDictId() - 1);
+        IntPair pair = new IntPair(pair1.getLeft(), pair2.getRight());
+        pairs.add(pair);
+      } else {
+        boolean exclusive = _predicateEvaluator.isExclusive();
+        int[] dictIds = exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
+        if (0 < dictIds.length) {
+          // Sort the dictIds in ascending order, so that their respective ranges are adjacent if their dictIds are adjacent
+          Arrays.sort(dictIds);
 
-    if (0 < dictIds.length) {
-      // Sort the dictIds in ascending order, so that their respective ranges are adjacent if their dictIds are adjacent
-      Arrays.sort(dictIds);
+          IntPair lastPair = invertedIndex.getDocIds(dictIds[0]);
+          IntRanges.clip(lastPair, _startDocId, _endDocId);
 
-      IntPair lastPair = invertedIndex.getDocIds(dictIds[0]);
-      IntRanges.clip(lastPair, _startDocId, _endDocId);
+          for (int i = 1; i < dictIds.length; i++) {
+            IntPair currentPair = invertedIndex.getDocIds(dictIds[i]);
+            IntRanges.clip(currentPair, _startDocId, _endDocId);
 
-      for (int i = 1; i < dictIds.length; i++) {
-        IntPair currentPair = invertedIndex.getDocIds(dictIds[i]);
-        IntRanges.clip(currentPair, _startDocId, _endDocId);
+            // If the previous range is degenerate, just keep the current one
+            if (IntRanges.isInvalid(lastPair)) {
+              lastPair = currentPair;
+              continue;
+            }
 
-        // If the previous range is degenerate, just keep the current one
-        if (IntRanges.isInvalid(lastPair)) {
-          lastPair = currentPair;
-          continue;
-        }
+            // If the current range is adjacent or overlaps with the previous range, merge it into the previous range,
+            // otherwise add the previous range and keep the current one to be added
+            if (IntRanges.rangesAreMergeable(lastPair, currentPair)) {
+              IntRanges.mergeIntoFirst(lastPair, currentPair);
+            } else {
+              if (!IntRanges.isInvalid(lastPair)) {
+                pairs.add(lastPair);
+              }
+              lastPair = currentPair;
+            }
+          }
 
-        // If the current range is adjacent or overlaps with the previous range, merge it into the previous range,
-        // otherwise add the previous range and keep the current one to be added
-        if (IntRanges.rangesAreMergeable(lastPair, currentPair)) {
-          IntRanges.mergeIntoFirst(lastPair, currentPair);
-        } else {
+          // Add the last range if it's valid
           if (!IntRanges.isInvalid(lastPair)) {
             pairs.add(lastPair);
           }
-          lastPair = currentPair;
-        }
-      }
-
-      // Add the last range if it's valid
-      if (!IntRanges.isInvalid(lastPair)) {
-        pairs.add(lastPair);
-      }
-    }
-
-    if (exclusive) {
-      // If the ranges are not additive ranges, our list of pairs is a list of "holes" in the [startDocId; endDocId]
-      // range. We need to take this list of pairs and invert it. To do so, there are three cases:
-      //
-      // - No holes, in which case the final range is [startDocId; endDocId]
-      // - One or more hole, in which case the final ranges are [startDocId; firstHoleStartDocId - 1] and
-      //   [lastHoleEndDocId + 1; endDocId] and ranges in between other holes
-      List<IntPair> newPairs = new ArrayList<>();
-      if (pairs.isEmpty()) {
-        newPairs.add(new IntPair(_startDocId, _endDocId));
-      } else {
-        // Add the first filled area (between startDocId and the first hole)
-        IntPair firstHole = pairs.get(0);
-        IntPair firstRange = new IntPair(_startDocId, firstHole.getLeft() - 1);
-
-        if (!IntRanges.isInvalid(firstRange)) {
-          newPairs.add(firstRange);
         }
 
-        // Add the filled areas between contiguous holes
-        int pairCount = pairs.size();
-        for (int i = 1; i < pairCount; i++) {
-          IntPair previousHole = pairs.get(i - 1);
-          IntPair currentHole = pairs.get(i);
-          IntPair range = new IntPair(previousHole.getRight() + 1, currentHole.getLeft() - 1);
-          if (!IntRanges.isInvalid(range)) {
-            newPairs.add(range);
+        if (exclusive) {
+          // If the ranges are not additive ranges, our list of pairs is a list of "holes" in the [startDocId; endDocId]
+          // range. We need to take this list of pairs and invert it. To do so, there are three cases:
+          //
+          // - No holes, in which case the final range is [startDocId; endDocId]
+          // - One or more hole, in which case the final ranges are [startDocId; firstHoleStartDocId - 1] and
+          //   [lastHoleEndDocId + 1; endDocId] and ranges in between other holes
+          List<IntPair> newPairs = new ArrayList<>();
+          if (pairs.isEmpty()) {
+            newPairs.add(new IntPair(_startDocId, _endDocId));
+          } else {
+            // Add the first filled area (between startDocId and the first hole)
+            IntPair firstHole = pairs.get(0);
+            IntPair firstRange = new IntPair(_startDocId, firstHole.getLeft() - 1);
+
+            if (!IntRanges.isInvalid(firstRange)) {
+              newPairs.add(firstRange);
+            }
+
+            // Add the filled areas between contiguous holes
+            int pairCount = pairs.size();
+            for (int i = 1; i < pairCount; i++) {
+              IntPair previousHole = pairs.get(i - 1);
+              IntPair currentHole = pairs.get(i);
+              IntPair range = new IntPair(previousHole.getRight() + 1, currentHole.getLeft() - 1);
+              if (!IntRanges.isInvalid(range)) {
+                newPairs.add(range);
+              }
+            }
+
+            // Add the last filled area (between the last hole and endDocId)
+            IntPair lastHole = pairs.get(pairs.size() - 1);
+            IntPair lastRange = new IntPair(lastHole.getRight() + 1, _endDocId);
+
+            if (!IntRanges.isInvalid(lastRange)) {
+              newPairs.add(lastRange);
+            }
           }
-        }
 
-        // Add the last filled area (between the last hole and endDocId)
-        IntPair lastHole = pairs.get(pairs.size() - 1);
-        IntPair lastRange = new IntPair(lastHole.getRight() + 1, _endDocId);
-
-        if (!IntRanges.isInvalid(lastRange)) {
-          newPairs.add(lastRange);
+          pairs = newPairs;
         }
       }
-
-      pairs = newPairs;
-    }
 
     return new FilterBlock(new SortedDocIdSet(_dataSource.getOperatorName(), pairs));
   }

@@ -40,6 +40,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
   // Scatter phase.
   NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
+  REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS("exceptions", false),
   REQUEST_SEND_EXCEPTIONS("exceptions", false),
   // Gather phase.
   RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
@@ -89,6 +90,9 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // tracks a case a segment is not hosted by any server
   // this is different from NO_SERVER_FOUND_EXCEPTIONS which tracks unavailability across all segments
   NO_SERVING_HOST_FOR_SEGMENT("badResponses", false),
+
+  // Track the case where selected server is missing in RoutingManager
+  SERVER_MISSING_FOR_ROUTING("badResponses", false),
 
   // Netty connection metrics
   NETTY_CONNECTION_REQUESTS_SENT("nettyConnection", true),

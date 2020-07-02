@@ -19,18 +19,19 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.pql.parsers.pql2.ast.SelectAstNode;
 
 
 /**
  * Factory class to create instances of aggregation function of the given name.
  */
 public class AggregationFunctionFactory {
+
   private AggregationFunctionFactory() {
   }
 
@@ -43,89 +44,127 @@ public class AggregationFunctionFactory {
   public static AggregationFunction getAggregationFunction(AggregationInfo aggregationInfo,
       @Nullable BrokerRequest brokerRequest) {
     String functionName = aggregationInfo.getAggregationType();
+    List<String> arguments = AggregationFunctionUtils.getArguments(aggregationInfo);
+
     try {
       String upperCaseFunctionName = functionName.toUpperCase();
+      String column = arguments.get(0);
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
-        if (remainingFunctionName.matches("\\d+")) {
-          // Percentile
-          return new PercentileAggregationFunction(parsePercentile(remainingFunctionName));
-        } else if (remainingFunctionName.matches("EST\\d+")) {
-          // PercentileEst
-          return new PercentileEstAggregationFunction(parsePercentile(remainingFunctionName.substring(3)));
-        } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
-          // PercentileTDigest
-          return new PercentileTDigestAggregationFunction(parsePercentile(remainingFunctionName.substring(7)));
-        } else if (remainingFunctionName.matches("\\d+MV")) {
-          // PercentileMV
-          return new PercentileMVAggregationFunction(
-              parsePercentile(remainingFunctionName.substring(0, remainingFunctionName.length() - 2)));
-        } else if (remainingFunctionName.matches("EST\\d+MV")) {
-          // PercentileEstMV
-          return new PercentileEstMVAggregationFunction(
-              parsePercentile(remainingFunctionName.substring(3, remainingFunctionName.length() - 2)));
-        } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
-          // PercentileTDigestMV
-          return new PercentileTDigestMVAggregationFunction(
-              parsePercentile(remainingFunctionName.substring(7, remainingFunctionName.length() - 2)));
-        } else {
-          throw new IllegalArgumentException();
+        int numArguments = arguments.size();
+        if (numArguments == 1) {
+          // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
+          if (remainingFunctionName.matches("\\d+")) {
+            // Percentile
+            return new PercentileAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(remainingFunctionName));
+          } else if (remainingFunctionName.matches("EST\\d+")) {
+            // PercentileEst
+            String percentileString = remainingFunctionName.substring(3);
+            return new PercentileEstAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
+            // PercentileTDigest
+            String percentileString = remainingFunctionName.substring(7);
+            return new PercentileTDigestAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          } else if (remainingFunctionName.matches("\\d+MV")) {
+            // PercentileMV
+            String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
+            return new PercentileMVAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          } else if (remainingFunctionName.matches("EST\\d+MV")) {
+            // PercentileEstMV
+            String percentileString = remainingFunctionName.substring(3, remainingFunctionName.length() - 2);
+            return new PercentileEstMVAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
+            // PercentileTDigestMV
+            String percentileString = remainingFunctionName.substring(7, remainingFunctionName.length() - 2);
+            return new PercentileTDigestMVAggregationFunction(column,
+                AggregationFunctionUtils.parsePercentile(percentileString));
+          }
+        } else if (numArguments == 2) {
+          // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.)
+          int percentile = AggregationFunctionUtils.parsePercentile(arguments.get(1));
+          if (remainingFunctionName.isEmpty()) {
+            // Percentile
+            return new PercentileAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("EST")) {
+            // PercentileEst
+            return new PercentileEstAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("TDIGEST")) {
+            // PercentileTDigest
+            return new PercentileTDigestAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("MV")) {
+            // PercentileMV
+            return new PercentileMVAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("ESTMV")) {
+            // PercentileEstMV
+            return new PercentileEstMVAggregationFunction(column, percentile);
+          }
+          if (remainingFunctionName.equals("TDIGESTMV")) {
+            // PercentileTDigestMV
+            return new PercentileTDigestMVAggregationFunction(column, percentile);
+          }
         }
+        throw new IllegalArgumentException("Invalid percentile function");
       } else {
         switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
           case COUNT:
             return new CountAggregationFunction();
           case MIN:
-            return new MinAggregationFunction();
+            return new MinAggregationFunction(column);
           case MAX:
-            return new MaxAggregationFunction();
+            return new MaxAggregationFunction(column);
           case SUM:
-            return new SumAggregationFunction();
+            return new SumAggregationFunction(column);
           case AVG:
-            return new AvgAggregationFunction();
+            return new AvgAggregationFunction(column);
           case MINMAXRANGE:
-            return new MinMaxRangeAggregationFunction();
+            return new MinMaxRangeAggregationFunction(column);
           case DISTINCTCOUNT:
-            return new DistinctCountAggregationFunction();
+            return new DistinctCountAggregationFunction(column);
           case DISTINCTCOUNTHLL:
-            return new DistinctCountHLLAggregationFunction();
+            return new DistinctCountHLLAggregationFunction(column);
           case DISTINCTCOUNTRAWHLL:
-            return new DistinctCountRawHLLAggregationFunction();
+            return new DistinctCountRawHLLAggregationFunction(column);
           case FASTHLL:
-            return new FastHLLAggregationFunction();
+            return new FastHLLAggregationFunction(column);
+          case DISTINCTCOUNTTHETASKETCH:
+            return new DistinctCountThetaSketchAggregationFunction(arguments);
           case COUNTMV:
-            return new CountMVAggregationFunction();
+            return new CountMVAggregationFunction(column);
           case MINMV:
-            return new MinMVAggregationFunction();
+            return new MinMVAggregationFunction(column);
           case MAXMV:
-            return new MaxMVAggregationFunction();
+            return new MaxMVAggregationFunction(column);
           case SUMMV:
-            return new SumMVAggregationFunction();
+            return new SumMVAggregationFunction(column);
           case AVGMV:
-            return new AvgMVAggregationFunction();
+            return new AvgMVAggregationFunction(column);
           case MINMAXRANGEMV:
-            return new MinMaxRangeMVAggregationFunction();
+            return new MinMaxRangeMVAggregationFunction(column);
           case DISTINCTCOUNTMV:
-            return new DistinctCountMVAggregationFunction();
+            return new DistinctCountMVAggregationFunction(column);
           case DISTINCTCOUNTHLLMV:
-            return new DistinctCountHLLMVAggregationFunction();
+            return new DistinctCountHLLMVAggregationFunction(column);
           case DISTINCTCOUNTRAWHLLMV:
-            return new DistinctCountRawHLLMVAggregationFunction();
+            return new DistinctCountRawHLLMVAggregationFunction(column);
           case DISTINCT:
-            return new DistinctAggregationFunction(AggregationFunctionUtils.getColumn(aggregationInfo),
-                brokerRequest != null ? brokerRequest.getLimit() : SelectAstNode.DEFAULT_RECORD_LIMIT, brokerRequest.getOrderBy());
+            Preconditions.checkState(brokerRequest != null,
+                "Broker request must be provided for 'DISTINCT' aggregation function");
+            return new DistinctAggregationFunction(arguments, brokerRequest.getOrderBy(), brokerRequest.getLimit());
           default:
             throw new IllegalArgumentException();
         }
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException("Invalid aggregation function name: " + functionName);
+      throw new BadQueryRequestException("Invalid aggregation: " + aggregationInfo);
     }
-  }
-
-  private static int parsePercentile(String percentileString) {
-    int percentile = Integer.parseInt(percentileString);
-    Preconditions.checkState(percentile >= 0 && percentile <= 100);
-    return percentile;
   }
 }

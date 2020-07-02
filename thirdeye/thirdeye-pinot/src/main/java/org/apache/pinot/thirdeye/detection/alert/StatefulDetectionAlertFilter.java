@@ -21,14 +21,16 @@ package org.apache.pinot.thirdeye.detection.alert;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -46,39 +48,42 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
   public static final String PROP_BCC = "bcc";
   public static final String PROP_RECIPIENTS = "recipients";
 
+  // Time beyond which we do not want to notify anomalies
+  private static final long ANOMALY_NOTIFICATION_LOOKBACK_TIME = TimeUnit.DAYS.toMillis(14);
+
   public StatefulDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
   }
 
-  @Override
-  public DetectionAlertFilterResult run() throws Exception {
-    return this.run(this.config.getVectorClocks(), this.getAnomalyMinId());
-  }
-
-  protected abstract DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark);
-
-  protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks, final long minId) {
+  protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks) {
     // retrieve all candidate anomalies
     Set<MergedAnomalyResultDTO> allAnomalies = new HashSet<>();
     for (Long detectionId : vectorClocks.keySet()) {
+      // Ignore disabled detections
+      DetectionConfigDTO detection = DAORegistry.getInstance().getDetectionConfigManager().findById(detectionId);
+      if (detection == null || !detection.isActive()) {
+        return allAnomalies;
+      }
+
+      // No point in fetching anomalies older than MAX_ANOMALY_NOTIFICATION_LOOKBACK
       long startTime = vectorClocks.get(detectionId);
+      if (startTime < this.endTime - ANOMALY_NOTIFICATION_LOOKBACK_TIME) {
+        startTime = this.endTime - ANOMALY_NOTIFICATION_LOOKBACK_TIME;
+      }
 
-      AnomalySlice slice = new AnomalySlice()
-          .withDetectionId(detectionId)
-          .withStart(startTime)
-          .withEnd(this.endTime);
-      Collection<MergedAnomalyResultDTO> candidates;
-      candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
+      Collection<MergedAnomalyResultDTO> candidates = DAORegistry.getInstance().getMergedAnomalyResultDAO()
+          .findByCreatedTimeInRangeAndDetectionConfigId(startTime + 1,  this.endTime, detectionId);
 
+      long finalStartTime = startTime;
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
             @Override
-            public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
-              return mergedAnomalyResultDTO != null
-                  && !mergedAnomalyResultDTO.isChild()
-                  && !AlertUtils.hasFeedback(mergedAnomalyResultDTO)
-                  && (mergedAnomalyResultDTO.getId() == null || mergedAnomalyResultDTO.getId() >= minId)
-                  && mergedAnomalyResultDTO.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
+            public boolean apply(@Nullable MergedAnomalyResultDTO anomaly) {
+              return anomaly != null && !anomaly.isChild()
+                  && !AlertUtils.hasFeedback(anomaly)
+                  && anomaly.getCreatedTime() > finalStartTime
+                  && (anomaly.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION) ||
+                  anomaly.getAnomalyResultSource().equals(AnomalyResultSource.DATA_QUALITY_DETECTION));
             }
           });
 
@@ -97,13 +102,6 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     return clocks;
   }
 
-  private long getAnomalyMinId() {
-    if (this.config.getHighWaterMark() != null) {
-      return this.config.getHighWaterMark();
-    }
-    return 0;
-  }
-
   protected Set<String> cleanupRecipients(Set<String> recipient) {
     Set<String> filteredRecipients = new HashSet<>();
     if (recipient != null) {
@@ -114,27 +112,29 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     return filteredRecipients;
   }
 
-  protected Map<String, Object> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
+  /**
+   * Extracts the alert schemes from config and also merges (overrides)
+   * recipients explicitly defined outside the scope of alert schemes.
+   */
+  protected Map<String, Object> generateAlertSchemeProps(DetectionAlertConfigDTO config,
       Set<String> to, Set<String> cc, Set<String> bcc) {
     Map<String, Object> notificationSchemeProps = new HashMap<>();
 
-    if (config.getAlertSchemes() == null) {
-      Map<String, Map<String, Object>> alertSchemes = new HashMap<>();
-      alertSchemes.put(PROP_EMAIL_SCHEME, new HashMap<>());
-      config.setAlertSchemes(alertSchemes);
+    // Make a copy of the current alert schemes
+    if (config.getAlertSchemes() != null) {
+      for (Map.Entry<Object, Object> alertSchemeEntry : ConfigUtils.getMap(config.getAlertSchemes()).entrySet()) {
+        notificationSchemeProps.put(alertSchemeEntry.getKey().toString(), ConfigUtils.getMap(alertSchemeEntry.getValue()));
+      }
     }
 
-    for (Map.Entry<String, Map<String, Object>> schemeProps : config.getAlertSchemes().entrySet()) {
-      notificationSchemeProps.put(schemeProps.getKey(), new HashMap<>(schemeProps.getValue()));
-    }
-
-    if (notificationSchemeProps.get(PROP_EMAIL_SCHEME) != null) {
-      Map<String, Set<String>> recipients = new HashMap<>();
-      recipients.put(PROP_TO, cleanupRecipients(to));
-      recipients.put(PROP_CC, cleanupRecipients(cc));
-      recipients.put(PROP_BCC, cleanupRecipients(bcc));
-      ((Map<String, Object>) notificationSchemeProps.get(PROP_EMAIL_SCHEME)).put(PROP_RECIPIENTS, recipients);
-    }
+    // Override the email alert scheme
+    Map<String, Object> recipients = new HashMap<>();
+    recipients.put(PROP_TO, cleanupRecipients(to));
+    recipients.put(PROP_CC, cleanupRecipients(cc));
+    recipients.put(PROP_BCC, cleanupRecipients(bcc));
+    Map<String, Object> recipientsHolder = new HashMap<>();
+    recipientsHolder.put(PROP_RECIPIENTS, recipients);
+    ((Map<String, Object>) notificationSchemeProps.get(PROP_EMAIL_SCHEME)).putAll(recipientsHolder);
 
     return notificationSchemeProps;
   }

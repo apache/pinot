@@ -510,6 +510,12 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     });
   }
 
+  public BooleanSeries neq(final long constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map((LongConditional) values -> values[0] != constant);
+  }
+
   public BooleanSeries gt(final long constant) {
     if(isNull(constant))
       return BooleanSeries.nulls(this.size());

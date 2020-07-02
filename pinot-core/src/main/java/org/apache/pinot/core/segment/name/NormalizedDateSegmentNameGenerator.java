@@ -25,7 +25,8 @@ import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 
 
 /**
@@ -44,8 +45,8 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   private SimpleDateFormat _inputSDF;
 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
-      boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency, @Nullable TimeUnit timeType,
-      @Nullable String timeFormat) {
+      boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency, @Nullable
+      DateTimeFormatSpec dateTimeFormatSpec) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
@@ -60,16 +61,16 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       }
       _outputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
 
-      // Parse input time format: 'EPOCH' or 'SIMPLE_DATE_FORMAT:<pattern>'
-      if (Preconditions.checkNotNull(timeFormat).equals(TimeFormat.EPOCH.toString())) {
-        _inputTimeUnit = timeType;
+      // Parse input time format: 'EPOCH' or 'SIMPLE_DATE_FORMAT' using pattern
+      Preconditions.checkNotNull(dateTimeFormatSpec);
+      TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
+      if (timeFormat == TimeFormat.EPOCH) {
+        _inputTimeUnit = dateTimeFormatSpec.getColumnUnit();
         _inputSDF = null;
       } else {
-        Preconditions.checkArgument(timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-            "Invalid time format: %s, must be one of '%s' or '%s:<pattern>'", timeFormat, TimeFormat.EPOCH,
-            TimeFormat.SIMPLE_DATE_FORMAT);
+        Preconditions.checkNotNull(dateTimeFormatSpec.getSDFPattern(), "Must provide pattern for SIMPLE_DATE_FORMAT");
         _inputTimeUnit = null;
-        _inputSDF = new SimpleDateFormat(timeFormat.substring(timeFormat.indexOf(':') + 1));
+        _inputSDF = new SimpleDateFormat(dateTimeFormatSpec.getSDFPattern());
         _inputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
       }
     } else {

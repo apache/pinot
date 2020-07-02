@@ -27,43 +27,47 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class FixedByteSingleValueMultiColWriter implements Closeable {
-  private final int[] columnOffsets;
-  // To deal with a multi-threading scenario in query processing threads
-  // (which are currently non-interruptible), a segment could be dropped by
-  // the parent thread and the child query thread could still be using
-  // segment memory which may have been unmapped depending on when the
-  // drop was completed. To protect against this scenario, the data buffer
-  // is made volatile and set to null in close() operation after releasing
-  // the buffer. This ensures that concurrent thread(s) trying to invoke
-  // set**() operations on this class will hit NPE as opposed accessing
-  // illegal/invalid memory (which will crash the JVM).
-  private volatile PinotDataBuffer indexDataBuffer;
-  private int rowSizeInBytes;
+  private final int[] _columnOffsets;
+  private final int _rowSizeInBytes;
+  private final PinotDataBuffer _dataBuffer;
+  private final boolean _shouldCloseDataBuffer;
 
   public FixedByteSingleValueMultiColWriter(File file, int rows, int cols, int[] columnSizes)
       throws IOException {
-    this.columnOffsets = new int[cols];
-    rowSizeInBytes = 0;
-    for (int i = 0; i < columnSizes.length; i++) {
-      columnOffsets[i] = rowSizeInBytes;
+    _columnOffsets = new int[cols];
+    int rowSizeInBytes = 0;
+    for (int i = 0; i < cols; i++) {
+      _columnOffsets[i] = rowSizeInBytes;
       int colSize = columnSizes[i];
       rowSizeInBytes += colSize;
     }
+    _rowSizeInBytes = rowSizeInBytes;
     int totalSize = rowSizeInBytes * rows;
     // Backward-compatible: index file is always big-endian
-    indexDataBuffer =
-        PinotDataBuffer.mapFile(file, false, 0, totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+    _dataBuffer = PinotDataBuffer.mapFile(file, false, 0, totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+    _shouldCloseDataBuffer = true;
   }
 
   public FixedByteSingleValueMultiColWriter(PinotDataBuffer dataBuffer, int cols, int[] columnSizes) {
-    this.columnOffsets = new int[cols];
-    rowSizeInBytes = 0;
-    for (int i = 0; i < columnSizes.length; i++) {
-      columnOffsets[i] = rowSizeInBytes;
+    _columnOffsets = new int[cols];
+    int rowSizeInBytes = 0;
+    for (int i = 0; i < cols; i++) {
+      _columnOffsets[i] = rowSizeInBytes;
       int colSize = columnSizes[i];
       rowSizeInBytes += colSize;
     }
-    indexDataBuffer = dataBuffer;
+    _rowSizeInBytes = rowSizeInBytes;
+    _dataBuffer = dataBuffer;
+    // For passed in PinotDataBuffer, the caller is responsible of closing the PinotDataBuffer.
+    _shouldCloseDataBuffer = false;
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    if (_shouldCloseDataBuffer) {
+      _dataBuffer.close();
+    }
   }
 
   public boolean open() {
@@ -71,33 +75,33 @@ public class FixedByteSingleValueMultiColWriter implements Closeable {
   }
 
   public void setChar(int row, int col, char ch) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putChar(offset, ch);
+    int offset = _rowSizeInBytes * row + _columnOffsets[col];
+    _dataBuffer.putChar(offset, ch);
   }
 
   public void setInt(int row, int col, int i) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putInt(offset, i);
+    int offset = _rowSizeInBytes * row + _columnOffsets[col];
+    _dataBuffer.putInt(offset, i);
   }
 
   public void setShort(int row, int col, short s) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putShort(offset, s);
+    int offset = _rowSizeInBytes * row + _columnOffsets[col];
+    _dataBuffer.putShort(offset, s);
   }
 
   public void setLong(int row, int col, long l) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putLong(offset, l);
+    int offset = _rowSizeInBytes * row + _columnOffsets[col];
+    _dataBuffer.putLong(offset, l);
   }
 
   public void setFloat(int row, int col, float f) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putFloat(offset, f);
+    int offset = _rowSizeInBytes * row + _columnOffsets[col];
+    _dataBuffer.putFloat(offset, f);
   }
 
   public void setDouble(int row, int col, double d) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putDouble(offset, d);
+    int offset = _rowSizeInBytes * row + _columnOffsets[col];
+    _dataBuffer.putDouble(offset, d);
   }
 
   public void setString(int row, int col, String string) {
@@ -105,16 +109,7 @@ public class FixedByteSingleValueMultiColWriter implements Closeable {
   }
 
   public void setBytes(int row, int col, byte[] bytes) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.readFrom(offset, bytes);
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    if (this.indexDataBuffer != null) {
-      this.indexDataBuffer.close();
-      this.indexDataBuffer = null;
-    }
+    int offset = _rowSizeInBytes * row + _columnOffsets[col];
+    _dataBuffer.readFrom(offset, bytes);
   }
 }

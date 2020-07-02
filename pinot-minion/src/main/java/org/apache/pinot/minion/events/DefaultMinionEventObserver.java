@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.minion.events;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**
@@ -29,18 +28,18 @@ import org.apache.pinot.common.config.PinotTaskConfig;
 public class DefaultMinionEventObserver implements MinionEventObserver {
 
   @Override
-  public void notifyTaskStart(@Nonnull PinotTaskConfig pinotTaskConfig) {
+  public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
   }
 
   @Override
-  public void notifyTaskSuccess(@Nonnull PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
+  public void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
   }
 
   @Override
-  public void notifyTaskCancelled(@Nonnull PinotTaskConfig pinotTaskConfig) {
+  public void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
   }
 
   @Override
-  public void notifyTaskError(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull Exception exception) {
+  public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
   }
 }

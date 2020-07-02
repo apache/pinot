@@ -23,11 +23,11 @@ import java.util.Map;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 
 
 public class ZKMetadataUtils {
@@ -45,7 +45,7 @@ public class ZKMetadataUtils {
       offlineSegmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
       offlineSegmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
     }
-    offlineSegmentZKMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
+    offlineSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
     offlineSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     offlineSegmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
 

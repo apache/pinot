@@ -26,7 +26,7 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import javax.annotation.concurrent.ThreadSafe;
-import sun.nio.ch.DirectBuffer;
+import org.apache.pinot.core.util.CleanerUtil;
 
 
 @ThreadSafe
@@ -326,9 +326,10 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  protected void release() {
-    if (((DirectBuffer) _buffer).cleaner() != null) {
-      ((DirectBuffer) _buffer).cleaner().clean();
+  protected void release()
+      throws IOException {
+    if (CleanerUtil.UNMAP_SUPPORTED) {
+      CleanerUtil.getCleaner().freeBuffer(_buffer);
     }
   }
 }

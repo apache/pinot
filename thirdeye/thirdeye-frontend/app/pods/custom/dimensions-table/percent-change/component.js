@@ -1,7 +1,7 @@
 /**
  * Custom model table component
- * Renders data for the percent-change column with some color-coding logic
- * @module custom/dimensions-table/percent-change
+ * Renders data for the contribution-change column with some color-coding logic
+ * @module custom/dimensions-table/contribution-change
  */
 import { set } from '@ember/object';
 import Component from "@ember/component";

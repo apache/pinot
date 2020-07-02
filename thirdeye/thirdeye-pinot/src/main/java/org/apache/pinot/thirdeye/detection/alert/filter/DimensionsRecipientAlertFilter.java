@@ -20,12 +20,10 @@
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
 import com.google.common.collect.Multimap;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -41,6 +39,9 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
  * The detection alert filter that can send notifications through multiple channels
  * to a set of unconditional and another set of conditional recipients, based on the
  * value of a specified anomaly dimension combinations.
+ *
+ * You can configure multiple dimension combinations along with a variety of alerting
+ * channels and reference links.
  *
  * <pre>
  * dimensionRecipients:
@@ -69,45 +70,40 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
   public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   public static final String PROP_DIMENSION = "dimensions";
   public static final String PROP_NOTIFY = "notify";
+  public static final String PROP_REF_LINKS = "referenceLinks";
   public static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
-  private static final String PROP_SEND_ONCE = "sendOnce";
 
-  private Map<String, Object> defaultNotificationSchemeProps = new HashMap<>();
   final List<Map<String, Object>> dimensionRecipients;
   final List<Long> detectionConfigIds;
-  final boolean sendOnce;
 
   public DimensionsRecipientAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
-    for (Map.Entry<String, Map<String, Object>> schemeProps : this.config.getAlertSchemes().entrySet()) {
-      defaultNotificationSchemeProps.put(schemeProps.getKey(), new HashMap<>(schemeProps.getValue()));
-    }
     this.dimensionRecipients = ConfigUtils.getList(this.config.getProperties().get(PROP_DIMENSION_RECIPIENTS));
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
-    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
-  public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark) {
+  public DetectionAlertFilterResult run() {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    final long minId = getMinId(highWaterMark);
 
-    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
+    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds));
 
     // Prepare mapping from dimension-recipients to anomalies
     for (Map<String, Object> dimensionRecipient : this.dimensionRecipients) {
       Multimap<String, String> dimensionFilters = ConfigUtils.getMultimap(dimensionRecipient.get(PROP_DIMENSION));
       Set<MergedAnomalyResultDTO> notifyAnomalies = new HashSet<>();
       for (MergedAnomalyResultDTO anomaly : anomalies) {
-        Multimap<String, String> anamolousDims = MetricEntity.fromURN(anomaly.getMetricUrn()).getFilters();
-        if (anamolousDims.entries().containsAll(dimensionFilters.entries())) {
+        Multimap<String, String> anomalousDims = MetricEntity.fromURN(anomaly.getMetricUrn()).getFilters();
+        if (anomalousDims.entries().containsAll(dimensionFilters.entries())) {
           notifyAnomalies.add(anomaly);
         }
       }
 
       if (!notifyAnomalies.isEmpty()) {
+        DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(config,
+            ConfigUtils.getMap(dimensionRecipient.get(PROP_NOTIFY)), ConfigUtils.getMap(dimensionRecipient.get(PROP_REF_LINKS)));
         result.addMapping(
-            new DetectionAlertFilterNotification(ConfigUtils.getMap(dimensionRecipient.get(PROP_NOTIFY)), dimensionFilters),
+            new DetectionAlertFilterNotification(subsConfig, dimensionFilters),
             notifyAnomalies);
       }
     }
@@ -121,17 +117,9 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
       }
     }
     if (!defaultAnomalies.isEmpty()) {
-      result.addMapping(new DetectionAlertFilterNotification(defaultNotificationSchemeProps), defaultAnomalies);
+      result.addMapping(new DetectionAlertFilterNotification(config), defaultAnomalies);
     }
 
     return result;
-  }
-
-  private long getMinId(long highWaterMark) {
-    if (this.sendOnce) {
-      return highWaterMark + 1;
-    } else {
-      return 0;
-    }
   }
 }

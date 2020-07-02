@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
+import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.spi.data.FieldSpec;
+import java.util.Map;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
@@ -28,8 +29,8 @@ import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
@@ -39,16 +40,19 @@ import org.apache.pinot.core.segment.index.readers.FloatDictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.OnHeapDoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
-import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
+import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,24 +62,29 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
+  private final InvertedIndexReader _rangeIndex;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfig indexLoadingConfig)
+      IndexLoadingConfig indexLoadingConfig, File segmentIndexDir)
       throws IOException {
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = false;
+    boolean loadRangeIndex = false;
+    boolean loadTextIndex = false;
     boolean loadOnHeapDictionary = false;
     boolean loadBloomFilter = false;
     if (indexLoadingConfig != null) {
       loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
+      loadRangeIndex = indexLoadingConfig.getRangeIndexColumns().contains(columnName);
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
       loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
+      loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
     }
 
-    if(segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
+    if (segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
       PinotDataBuffer nullValueVectorBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR);
       _nullValueVectorReader = new NullValueVectorReaderImpl(nullValueVectorBuffer);
     } else {
@@ -102,6 +111,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           SortedIndexReader sortedIndexReader = new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
+          _rangeIndex = null;
           return;
         } else {
           // Unsorted
@@ -121,12 +131,24 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       } else {
         _invertedIndex = null;
       }
+      if (loadRangeIndex) {
+        _rangeIndex = new RangeIndexReader(segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX));
+      } else {
+        _rangeIndex = null;
+      }
     } else {
       // Raw index
       _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
-      _invertedIndex = null;
       _dictionary = null;
       _bloomFilterReader = null;
+      _rangeIndex = null;
+      if (loadTextIndex) {
+        Map<String, Map<String, String>> columnProperties = indexLoadingConfig.getColumnProperties();
+        _invertedIndex = new LuceneTextIndexReader(columnName, segmentIndexDir, metadata.getTotalDocs(),
+            columnProperties.get(columnName));
+      } else {
+        _invertedIndex = null;
+      }
     }
   }
 
@@ -138,6 +160,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public InvertedIndexReader getInvertedIndex() {
     return _invertedIndex;
+  }
+
+  @Override
+  public InvertedIndexReader getRangeIndex() {
+    return _rangeIndex;
   }
 
   @Override
@@ -155,7 +182,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     return _nullValueVectorReader;
   }
 
-  private static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
+  //TODO: move this to a DictionaryLoader class
+  public static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
       boolean loadOnHeap) {
     FieldSpec.DataType dataType = metadata.getDataType();
     if (loadOnHeap) {
@@ -210,6 +238,21 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         return new VarByteChunkSingleValueReader(forwardIndexBuffer);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
+    }
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    _forwardIndex.close();
+    if (_invertedIndex != null) {
+      _invertedIndex.close();
+    }
+    if (_rangeIndex != null) {
+      _rangeIndex.close();
+    }
+    if (_dictionary != null) {
+      _dictionary.close();
     }
   }
 }

@@ -86,13 +86,12 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     if (!Double.isNaN(this.min)) {
       df.addSeries(COL_TOO_LOW, df.getDoubles(COL_CURRENT).lt(this.min));
     }
-    // predicted value is the same as the current value
-    df.addSeries(COL_VALUE, df.get(COL_CURRENT));
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
     List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime,
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
-    DataFrame baselineWithBoundaries = constructThresholdBoundaries(df);
+    DataFrame baselineWithBoundaries = constructBaselineAndBoundaries(df);
+
     return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(baselineWithBoundaries));
   }
 
@@ -101,15 +100,24 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     InputData data =
         this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(Collections.singletonList(slice)));
     DataFrame df = data.getTimeseries().get(slice);
-    return TimeSeries.fromDataFrame(constructThresholdBoundaries(df));
+    return TimeSeries.fromDataFrame(constructBaselineAndBoundaries(df));
   }
 
-  private DataFrame constructThresholdBoundaries(DataFrame df) {
+  /**
+   * Populate the dataframe with upper/lower boundaries and baseline
+   */
+  private DataFrame constructBaselineAndBoundaries(DataFrame df) {
+    // Set default baseline as the actual value
+    df.addSeries(COL_VALUE, df.get(COL_CURRENT));
     if (!Double.isNaN(this.min)) {
       df.addSeries(COL_LOWER_BOUND, DoubleSeries.fillValues(df.size(), this.min));
+      // set baseline value as the lower bound when actual value across below the mark
+      df.mapInPlace(DoubleSeries.MAX, COL_VALUE, COL_LOWER_BOUND, COL_VALUE);
     }
     if (!Double.isNaN(this.max)) {
       df.addSeries(COL_UPPER_BOUND, DoubleSeries.fillValues(df.size(), this.max));
+      // set baseline value as the upper bound when actual value across above the mark
+      df.mapInPlace(DoubleSeries.MIN, COL_VALUE, COL_UPPER_BOUND, COL_VALUE);
     }
     return df;
   }

@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-import java.io.File;
-import java.io.IOException;
+import com.google.common.base.Preconditions;
 import java.lang.ref.SoftReference;
-import java.nio.ByteBuffer;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -31,25 +29,26 @@ import org.slf4j.LoggerFactory;
 public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
-  final private int numberOfBitmaps;
-  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;
+  private final PinotDataBuffer _dataBuffer;
+  private final int _numBitmaps;
 
-  private PinotDataBuffer buffer;
-
-  private File file;
+  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps;
 
   /**
    * Constructs an inverted index with the specified size.
+   * @param dataBuffer data buffer for the inverted index.
    * @param cardinality the number of bitmaps in the inverted index, which should be the same as the
    *          number of values in
    *          the dictionary.
-   * @throws IOException
    */
-  public BitmapInvertedIndexReader(PinotDataBuffer indexDataBuffer, int cardinality)
-      throws IOException {
-    this.file = file;
-    numberOfBitmaps = cardinality;
-    load(indexDataBuffer);
+  public BitmapInvertedIndexReader(PinotDataBuffer dataBuffer, int cardinality) {
+    _dataBuffer = dataBuffer;
+    _numBitmaps = cardinality;
+
+    int lastOffset = _dataBuffer.getInt(_numBitmaps * Integer.BYTES);
+    Preconditions.checkState(lastOffset == _dataBuffer.size(),
+        "The last offset should be equal to buffer size! Current lastOffset: " + lastOffset + ", buffer size: "
+            + _dataBuffer.size());
   }
 
   /**
@@ -59,8 +58,8 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   public ImmutableRoaringBitmap getDocIds(int dictId) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
     // Return the bitmap if it's still on heap
-    if (bitmaps != null) {
-      bitmapArrayReference = bitmaps.get();
+    if (_bitmaps != null) {
+      bitmapArrayReference = _bitmaps.get();
       if (bitmapArrayReference != null) {
         SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
         if (bitmapReference != null) {
@@ -70,12 +69,12 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
           }
         }
       } else {
-        bitmapArrayReference = new SoftReference[numberOfBitmaps];
-        bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
+        bitmapArrayReference = new SoftReference[_numBitmaps];
+        _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
       }
     } else {
-      bitmapArrayReference = new SoftReference[numberOfBitmaps];
-      bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
+      bitmapArrayReference = new SoftReference[_numBitmaps];
+      _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
     }
     synchronized (this) {
       ImmutableRoaringBitmap value;
@@ -89,38 +88,26 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
     }
   }
 
-  private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
-    final int currentOffset = getOffset(index);
-    final int nextOffset = getOffset(index + 1);
-    final int bufferLength = nextOffset - currentOffset;
+  @Override
+  public ImmutableRoaringBitmap getDocIds(Object value) {
+    // This should not be called from anywhere. If it happens, there is a bug
+    // and that's why we throw illegal state exception
+    throw new IllegalStateException("bitmap inverted index reader supports lookup only on dictionary id");
+  }
 
-    // Slice the buffer appropriately for Roaring Bitmap
-    ByteBuffer bb = buffer.toDirectByteBuffer(currentOffset, bufferLength);
-    ImmutableRoaringBitmap immutableRoaringBitmap = null;
-    try {
-      immutableRoaringBitmap = new ImmutableRoaringBitmap(bb);
-    } catch (Exception e) {
-      LOGGER.error(
-          "Error creating immutableRoaringBitmap for dictionary id:{} currentOffset:{} bufferLength:{} slice position{} limit:{} file:{}",
-          index, currentOffset, bufferLength, bb.position(), bb.limit(), file.getAbsolutePath());
-    }
-    return immutableRoaringBitmap;
+  private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
+    int currentOffset = getOffset(index);
+    int bufferLength = getOffset(index + 1) - currentOffset;
+    return new ImmutableRoaringBitmap(_dataBuffer.toDirectByteBuffer(currentOffset, bufferLength));
   }
 
   private int getOffset(final int index) {
-    return buffer.getInt(index * Integer.BYTES);
-  }
-
-  private void load(PinotDataBuffer indexDataBuffer)
-      throws IOException {
-    final int lastOffset = indexDataBuffer.getInt(numberOfBitmaps * Integer.BYTES);
-    assert lastOffset == indexDataBuffer.size();
-    this.buffer = indexDataBuffer;
+    return _dataBuffer.getInt(index * Integer.BYTES);
   }
 
   @Override
-  public void close()
-      throws IOException {
-    buffer.close();
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
   }
 }

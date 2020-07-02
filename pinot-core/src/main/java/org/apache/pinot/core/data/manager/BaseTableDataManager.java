@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -35,6 +34,7 @@ import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,7 +112,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentName = immutableSegment.getSegmentName();
     _logger.info("Adding immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
-        immutableSegment.getSegmentMetadata().getTotalRawDocs());
+        immutableSegment.getSegmentMetadata().getTotalDocs());
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
@@ -202,7 +202,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, -1L);
     _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_SEGMENT_COUNT, 1L);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
-        -segmentDataManager.getSegment().getSegmentMetadata().getTotalRawDocs());
+        -segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs());
     segmentDataManager.destroy();
     _logger.info("Closed segment: {} of table: {}", segmentName, _tableNameWithType);
   }
@@ -210,5 +210,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public String getTableName() {
     return _tableNameWithType;
+  }
+
+  @Override
+  public File getTableDataDir() {
+    return _indexDir;
   }
 }

@@ -17,8 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.events;
-
-import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 

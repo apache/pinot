@@ -25,11 +25,11 @@ import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.config.table.TableType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -85,11 +85,7 @@ public class QueryRoutingTest {
 
     // Start the server
     QueryServer queryServer = getQueryServer(0, responseBytes);
-    Thread thread = new Thread(queryServer);
-    thread.start();
-    while (queryServer.isNotReady()) {
-      Thread.sleep(100L);
-    }
+    queryServer.start();
 
     // OFFLINE only
     AsyncQueryResponse asyncQueryResponse =
@@ -127,7 +123,6 @@ public class QueryRoutingTest {
 
     // Shut down the server
     queryServer.shutDown();
-    thread.join();
   }
 
   @Test
@@ -137,11 +132,7 @@ public class QueryRoutingTest {
 
     // Start the server
     QueryServer queryServer = getQueryServer(0, new byte[0]);
-    Thread thread = new Thread(queryServer);
-    thread.start();
-    while (queryServer.isNotReady()) {
-      Thread.sleep(100L);
-    }
+    queryServer.start();
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
@@ -159,7 +150,6 @@ public class QueryRoutingTest {
 
     // Shut down the server
     queryServer.shutDown();
-    thread.join();
   }
 
   @Test
@@ -172,11 +162,7 @@ public class QueryRoutingTest {
 
     // Start the server
     QueryServer queryServer = getQueryServer(0, responseBytes);
-    Thread thread = new Thread(queryServer);
-    thread.start();
-    while (queryServer.isNotReady()) {
-      Thread.sleep(100L);
-    }
+    queryServer.start();
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
@@ -194,7 +180,6 @@ public class QueryRoutingTest {
 
     // Shut down the server
     queryServer.shutDown();
-    thread.join();
   }
 
   @Test
@@ -207,11 +192,7 @@ public class QueryRoutingTest {
 
     // Start the server
     QueryServer queryServer = getQueryServer(500, responseBytes);
-    Thread thread = new Thread(queryServer);
-    thread.start();
-    while (queryServer.isNotReady()) {
-      Thread.sleep(100L);
-    }
+    queryServer.start();
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
@@ -219,7 +200,6 @@ public class QueryRoutingTest {
 
     // Shut down the server before getting the response
     queryServer.shutDown();
-    thread.join();
 
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
     assertEquals(response.size(), 1);

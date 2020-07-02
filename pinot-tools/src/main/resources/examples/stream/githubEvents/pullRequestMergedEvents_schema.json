@@ -1,0 +1,151 @@
+{
+  "schemaName": "pullRequestMergedEvents",
+  "dimensionFieldSpecs": [
+    {
+      "name": "title",
+      "dataType": "STRING",
+      "defaultNullValue": ""
+    },
+    {
+      "name": "labels",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "userId",
+      "dataType": "STRING",
+      "defaultNullValue": ""
+    },
+    {
+      "name": "userType",
+      "dataType": "STRING",
+      "defaultNullValue": ""
+    },
+    {
+      "name": "authorAssociation",
+      "dataType": "STRING",
+      "defaultNullValue": ""
+    },
+    {
+      "name": "mergedBy",
+      "dataType": "STRING",
+      "defaultNullValue": ""
+    },
+    {
+      "name": "assignees",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "authors",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "committers",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "requestedReviewers",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "requestedTeams",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "reviewers",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "commenters",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "repo",
+      "dataType": "STRING",
+      "defaultNullValue": ""
+    },
+    {
+      "name": "organization",
+      "dataType": "STRING",
+      "defaultNullValue": ""
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "count",
+      "dataType": "LONG",
+      "defaultNullValue": 1
+    },
+    {
+      "name": "numComments",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numReviewComments",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numCommits",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numLinesAdded",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numLinesDeleted",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numFilesChanged",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numAuthors",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numCommitters",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numReviewers",
+      "dataType": "LONG"
+    },
+    {
+      "name": "numCommenters",
+      "dataType": "LONG"
+    },
+    {
+      "name": "createdTimeMillis",
+      "dataType": "LONG"
+    },
+    {
+      "name": "elapsedTimeMillis",
+      "dataType": "LONG"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "MILLISECONDS",
+      "timeFormat": "EPOCH",
+      "dataType": "LONG",
+      "name": "mergedTimeMillis"
+    }
+  }
+}

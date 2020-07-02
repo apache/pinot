@@ -16,14 +16,28 @@
 
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.anomaly.AnomalyType;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
 import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionJiraAlerter.*;
+import static org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient.*;
 
 
 public class AlertFilterUtils {
@@ -37,17 +51,28 @@ public class AlertFilterUtils {
   public static final Set<String> PROP_CC_VALUE = new HashSet<>(Arrays.asList("cctest@example.com", "cctest@example.org"));
   public static final Set<String> PROP_BCC_VALUE = new HashSet<>(Arrays.asList("bcctest@example.com", "bcctest@example.org"));
 
-  static DetectionAlertFilterNotification makeEmailNotifications() {
-    return makeEmailNotifications(new HashSet<String>());
+  static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config) {
+    return makeEmailNotifications(config, new HashSet<String>());
   }
 
-  static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients) {
+  static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config, Set<String> toRecipients) {
     Set<String> recipients = new HashSet<>(toRecipients);
     recipients.addAll(PROP_TO_VALUE);
-    return makeEmailNotifications(recipients, PROP_CC_VALUE, PROP_BCC_VALUE);
+    return makeEmailNotifications(config, recipients, PROP_CC_VALUE, PROP_BCC_VALUE);
   }
 
-  static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients, Set<String> ccRecipients, Set<String> bccRecipients) {
+  static DetectionAlertFilterNotification makeJiraNotifications(DetectionAlertConfigDTO config, String assignee) {
+    Map<String, Object> alertProps = new HashMap<>();
+    Map<String, Object> jiraParams = new HashMap<>();
+    jiraParams.put(PROP_ASSIGNEE, assignee);
+    alertProps.put(PROP_JIRA_SCHEME, jiraParams);
+
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(config, alertProps, config.getReferenceLinks());
+    return new DetectionAlertFilterNotification(subsConfig);
+  }
+
+  static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config,
+      Set<String> toRecipients, Set<String> ccRecipients, Set<String> bccRecipients) {
     Map<String, Object> alertProps = new HashMap<>();
 
     Map<String, Set<String>> recipients = new HashMap<>();
@@ -59,6 +84,42 @@ public class AlertFilterUtils {
     emailRecipients.put(PROP_RECIPIENTS, recipients);
 
     alertProps.put(PROP_EMAIL_SCHEME, emailRecipients);
-    return new DetectionAlertFilterNotification(alertProps);
+
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(config, alertProps, config.getReferenceLinks());
+
+    return new DetectionAlertFilterNotification(subsConfig);
+  }
+
+  static MergedAnomalyResultDTO makeAnomaly(Long configId, long baseTime, long start, long end,
+      Map<String, String> dimensions, AnomalyFeedbackDTO feedback) {
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(configId, baseTime + start, baseTime + end);
+    anomaly.setType(AnomalyType.DEVIATION);
+    anomaly.setChildIds(Collections.emptySet());
+
+    Multimap<String, String> filters = HashMultimap.create();
+    for (Map.Entry<String, String> dimension : dimensions.entrySet()) {
+      filters.put(dimension.getKey(), dimension.getValue());
+    }
+    anomaly.setMetricUrn(MetricEntity.fromMetric(1.0, 1l, filters).getUrn());
+
+    DimensionMap dimMap = new DimensionMap();
+    dimMap.putAll(dimensions);
+    anomaly.setDimensions(dimMap);
+
+    anomaly.setCreatedBy("no-auth-user");
+    anomaly.setUpdatedBy("no-auth-user");
+    anomaly.setId(DAORegistry.getInstance().getMergedAnomalyResultDAO().save(anomaly));
+
+    if (feedback != null) {
+      anomaly.setFeedback(feedback);
+      anomaly.setDimensions(null);
+      DAORegistry.getInstance().getMergedAnomalyResultDAO().updateAnomalyFeedback(anomaly);
+    }
+
+    return anomaly;
+  }
+
+  static MergedAnomalyResultDTO makeAnomaly(Long configId, long baseTime, long start, long end) {
+    return makeAnomaly(configId, baseTime, start, end, Collections.emptyMap(), null);
   }
 }

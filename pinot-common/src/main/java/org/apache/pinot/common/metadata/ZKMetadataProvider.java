@@ -27,17 +27,18 @@ import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -212,7 +213,7 @@ public class ZKMetadataProvider {
       return null;
     }
     try {
-      return TableConfig.fromZnRecord(znRecord);
+      return TableConfigUtils.fromZNRecord(znRecord);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting table configuration for table: {}", tableNameWithType, e);
       return null;
@@ -268,16 +269,16 @@ public class ZKMetadataProvider {
     }
 
     // For backward compatible where schema name is not the same as raw table name
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     // Try to fetch realtime schema first
-    if (tableType == null || tableType == CommonConstants.Helix.TableType.REALTIME) {
+    if (tableType == null || tableType == TableType.REALTIME) {
       TableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, tableName);
       if (realtimeTableConfig != null) {
         schema = getSchema(propertyStore, realtimeTableConfig.getValidationConfig().getSchemaName());
       }
     }
     // Try to fetch offline schema if realtime schema does not exist
-    if (schema == null && (tableType == null || tableType == CommonConstants.Helix.TableType.OFFLINE)) {
+    if (schema == null && (tableType == null || tableType == TableType.OFFLINE)) {
       schema = getSchema(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
     }
     if (schema != null) {
@@ -434,7 +435,7 @@ public class ZKMetadataProvider {
     String controllerConfigPath = constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);
     if (propertyStore.exists(controllerConfigPath, AccessOption.PERSISTENT)) {
       ZNRecord znRecord = propertyStore.get(controllerConfigPath, null, AccessOption.PERSISTENT);
-      if (znRecord.getSimpleFields().keySet().contains(CLUSTER_TENANT_ISOLATION_ENABLED_KEY)) {
+      if (znRecord.getSimpleFields().containsKey(CLUSTER_TENANT_ISOLATION_ENABLED_KEY)) {
         return znRecord.getBooleanField(CLUSTER_TENANT_ISOLATION_ENABLED_KEY, true);
       } else {
         return true;

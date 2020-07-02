@@ -31,9 +31,9 @@ body {
 @import 'wrapper/styles';
 
 // Components
+@import 'components/alert-details';
 @import 'components/anomaly-id';
 @import 'components/anomaly-graph';
-@import 'components/contribution-table';
 @import 'components/te-navbar';
 @import 'components/button';
 @import 'components/links';

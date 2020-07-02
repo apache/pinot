@@ -28,20 +28,19 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.ITestResult;
@@ -89,14 +88,14 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
   public static void printUsage() {
     System.err.println(
-        "Usage: pinot-hybrid-cluster.sh [--llc] tableName schemaFile dataDir invertedIndexColumns sortedColumn");
+        "Usage: pinot-hybrid-cluster.sh [--llc] tableName schemaFile timeColumnName dataDir invertedIndexColumns sortedColumn");
     System.exit(1);
   }
 
   public static void main(String[] args)
       throws Exception {
     int numArgs = args.length;
-    if (!((numArgs == 5) || (numArgs == 6 && args[0].equals("--llc")))) {
+    if (!((numArgs == 6) || (numArgs == 7 && args[0].equals("--llc")))) {
       printUsage();
     }
 
@@ -110,8 +109,10 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
     CustomHybridClusterIntegrationTest._tableName = args[argIdx++];
     File schemaFile = new File(args[argIdx++]);
-    Preconditions.checkState(schemaFile.isFile());
-    CustomHybridClusterIntegrationTest._schemaFile = schemaFile;
+    CustomHybridClusterIntegrationTest._schema = Schema.fromFile(schemaFile);
+    String timeColumnName = args[argIdx++];
+    CustomHybridClusterIntegrationTest._timeColumnName =
+        (CustomHybridClusterIntegrationTest._schema.getFieldSpecFor(timeColumnName) != null) ? timeColumnName : null;
     File dataDir = new File(args[argIdx++]);
     Preconditions.checkState(dataDir.isDirectory());
     CustomHybridClusterIntegrationTest._dataDir = dataDir;
@@ -163,11 +164,11 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     private static final String TENANT_NAME = "TestTenant";
     private static final int ZK_PORT = 3191;
     private static final String ZK_STR = "localhost:" + ZK_PORT;
-    private static final String KAFKA_ZK_STR = ZK_STR + "/kafka";
+    private static final int NUM_KAFKA_BROKERS = 1;
     private static final int KAFKA_PORT = 20092;
-    private static final String KAFKA_BROKER = "localhost:" + KAFKA_PORT;
+    private static final String KAFKA_ZK_STR = ZK_STR + "/kafka";
     private static final int CONTROLLER_PORT = 9998;
-    private static final int BROKER_BASE_PORT = 19099;
+    private static final int BROKER_PORT = 19099;
     private static final int SERVER_BASE_ADMIN_API_PORT = 9097;
     private static final int SERVER_BASE_NETTY_PORT = 9098;
 
@@ -179,7 +180,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     private static boolean _enabled = false;
     private static boolean _useLlc = false;
     private static String _tableName;
-    private static File _schemaFile;
+    private static Schema _schema;
+    private static String _timeColumnName;
     private static File _dataDir;
     private static List<String> _invertedIndexColumns;
     private static String _sortedColumn;
@@ -188,7 +190,6 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     private List<File> _realtimeAvroFiles;
     private File _queryFile;
     private File _responseFile;
-    private StreamDataServerStartable _kafkaStarter;
     private long _countStarResult;
 
     public CustomHybridClusterIntegrationTest() {
@@ -220,10 +221,20 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       Assert.assertTrue(_responseFile.isFile());
     }
 
-    @Nonnull
     @Override
     protected String getTableName() {
       return _tableName;
+    }
+
+    @Override
+    protected String getSchemaName() {
+      return _schema.getSchemaName();
+    }
+
+    @Nullable
+    @Override
+    protected String getTimeColumnName() {
+      return _timeColumnName;
     }
 
     @Override
@@ -239,6 +250,64 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     @Override
     protected int getRealtimeSegmentFlushSize() {
       return super.getRealtimeSegmentFlushSize() * 100;
+    }
+
+    @Override
+    protected int getNumKafkaBrokers() {
+      return NUM_KAFKA_BROKERS;
+    }
+
+    @Override
+    protected int getBaseKafkaPort() {
+      return KAFKA_PORT;
+    }
+
+    @Override
+    protected String getKafkaZKAddress() {
+      return KAFKA_ZK_STR;
+    }
+
+    @Override
+    protected String getSortedColumn() {
+      return _sortedColumn;
+    }
+
+    @Override
+    protected List<String> getInvertedIndexColumns() {
+      return _invertedIndexColumns;
+    }
+
+    @Nullable
+    @Override
+    protected List<String> getNoDictionaryColumns() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    protected List<String> getRangeIndexColumns() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    protected List<String> getBloomFilterColumns() {
+      return null;
+    }
+
+    @Override
+    protected String getLoadMode() {
+      return ReadMode.mmap.name();
+    }
+
+    @Override
+    protected String getBrokerTenant() {
+      return TENANT_NAME;
+    }
+
+    @Override
+    protected String getServerTenant() {
+      return TENANT_NAME;
     }
 
     @Override
@@ -258,11 +327,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
       // Start Zk and Kafka
       startZk(ZK_PORT);
-      _kafkaStarter = KafkaStarterUtils.startServer(KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID, KAFKA_ZK_STR,
-          KafkaStarterUtils.getDefaultKafkaConfiguration());
-
-      // Create Kafka topic
-      _kafkaStarter.createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
+      startKafka();
 
       // Start the Pinot cluster
       ControllerConf config = getDefaultControllerConfiguration();
@@ -270,35 +335,22 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       config.setZkStr(ZK_STR);
       config.setTenantIsolationEnabled(false);
       startController(config);
-      startBroker(BROKER_BASE_PORT, ZK_STR);
+      startBroker(BROKER_PORT, ZK_STR);
       startServers(2, SERVER_BASE_ADMIN_API_PORT, SERVER_BASE_NETTY_PORT, ZK_STR);
 
       // Create tenants
       createBrokerTenant(TENANT_NAME, 1);
       createServerTenant(TENANT_NAME, 1, 1);
 
-      // Create segments from Avro data
-      ExecutorService executor = Executors.newCachedThreadPool();
-      Schema schema = Schema.fromFile(_schemaFile);
+      // Create and upload the schema and table config
+      addSchema(_schema);
+      TableConfig offlineTableConfig = createOfflineTableConfig();
+      addTableConfig(offlineTableConfig);
+      addTableConfig(createRealtimeTableConfig(_realtimeAvroFiles.get(0)));
+
+      // Create and upload segments
       ClusterIntegrationTestUtils
-          .buildSegmentsFromAvro(_offlineAvroFiles, 0, _segmentDir, _tarDir, _tableName, false, null,
-              getRawIndexColumns(), schema, executor);
-      executor.shutdown();
-      executor.awaitTermination(10, TimeUnit.MINUTES);
-
-      // Create Pinot table
-      String schemaName = schema.getSchemaName();
-      addSchema(_schemaFile, schemaName);
-      String timeColumnName = schema.getTimeColumnName();
-      Assert.assertNotNull(timeColumnName);
-      TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
-      Assert.assertNotNull(outgoingTimeUnit);
-      String timeType = outgoingTimeUnit.toString();
-      addHybridTable(_tableName, _useLlc, KAFKA_BROKER, KAFKA_ZK_STR, getKafkaTopic(), getRealtimeSegmentFlushSize(),
-          _realtimeAvroFiles.get(0), timeColumnName, timeType, schemaName, TENANT_NAME, TENANT_NAME, "MMAP",
-          _sortedColumn, _invertedIndexColumns, null, null, null, getStreamConsumerFactoryClassName(), null);
-
-      // Upload all segments
+          .buildSegmentsFromAvro(_offlineAvroFiles, offlineTableConfig, _schema, 0, _segmentDir, _tarDir);
       uploadSegments(getTableName(), _tarDir);
     }
 
@@ -316,9 +368,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       try (BufferedReader responseFileReader = new BufferedReader(new FileReader(_responseFile))) {
         for (File realtimeAvroFile : _realtimeAvroFiles) {
           // Push one avro file into the Kafka topic
-          ClusterIntegrationTestUtils
-              .pushAvroIntoKafka(Collections.singletonList(realtimeAvroFile), KAFKA_BROKER, getKafkaTopic(),
-                  getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+          pushAvroIntoKafka(Collections.singletonList(realtimeAvroFile));
 
           try (BufferedReader queryFileReader = new BufferedReader(new FileReader(_queryFile))) {
             // Set the expected COUNT(*) result and wait for all documents loaded
@@ -340,7 +390,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
                 public void run() {
                   try {
                     JsonNode actualResponse =
-                        postQuery(new PinotQueryRequest("pql", currentQuery), "http://localhost:" + BROKER_BASE_PORT);
+                        postQuery(new PinotQueryRequest("pql", currentQuery), "http://localhost:" + BROKER_PORT);
                     if (QueryComparison.compareWithEmpty(actualResponse, expectedResponse)
                         == QueryComparison.ComparisonStatus.FAILED) {
                       numFailedQueries.getAndIncrement();
@@ -379,7 +429,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       stopServer();
       stopBroker();
       stopController();
-      _kafkaStarter.stop();
+      stopKafka();
       stopZk();
 
       FileUtils.deleteDirectory(_tempDir);

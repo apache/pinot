@@ -26,11 +26,13 @@ import java.net.SocketException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.CommonConstants;
+import java.nio.charset.StandardCharsets;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
@@ -70,7 +72,6 @@ public class ClusterStarter {
   private String _segmentDirName;
 
   private boolean _startZookeeper;
-  private boolean _enableStarTreeIndex;
 
   private static final long TIMEOUT_IN_MILLISECONDS = 200 * 1000;
 
@@ -98,8 +99,6 @@ public class ClusterStarter {
     _timeColumnName = config.getTimeColumnName();
     _timeUnit = config.getTimeUnit();
     _tableConfigFile = config.getTableConfigFile();
-
-    _enableStarTreeIndex = false;
   }
 
   public ClusterStarter setControllerPort(String controllerPort) {
@@ -139,11 +138,6 @@ public class ClusterStarter {
 
   public ClusterStarter setSegmentDirName(String segmentDirName) {
     _segmentDirName = segmentDirName;
-    return this;
-  }
-
-  public ClusterStarter setEnableStarTree(boolean value) {
-    _enableStarTreeIndex = value;
     return this;
   }
 
@@ -192,7 +186,8 @@ public class ClusterStarter {
       throws Exception {
     if (_tableConfigFile != null) {
       AddTableCommand addTableCommand =
-          new AddTableCommand().setControllerPort(_controllerPort).setFilePath(_tableConfigFile).setExecute(true);
+          new AddTableCommand().setControllerPort(_controllerPort).setSchemaFile(_schemaFileName)
+              .setTableConfigFile(_tableConfigFile).setExecute(true);
       addTableCommand.execute();
       return;
     }
@@ -203,11 +198,11 @@ public class ClusterStarter {
     }
 
     String controllerAddress = "http://" + _localhost + ":" + _controllerPort;
-    String tableJSONConfigString =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(_tableName)
-            .setTimeColumnName(_timeColumnName).setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker")
-            .setServerTenant("server").build().toJsonConfigString();
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(), tableJSONConfigString);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(_tableName).setTimeColumnName(_timeColumnName)
+            .setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker").setServerTenant("server").build();
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
+        tableConfig.toJsonString());
   }
 
   private void uploadData()
@@ -223,9 +218,8 @@ public class ClusterStarter {
       throws Exception {
     if (_inputDataDir != null) {
       CreateSegmentCommand segmentCreator =
-          new CreateSegmentCommand().setDataDir(_inputDataDir).setSchemaFile(_schemaFileName).setTableName(_tableName)
-              .setSegmentName(_segmentName).setOutDir(_segmentDirName).setOverwrite(true)
-              .setEnableStarTreeIndex(_enableStarTreeIndex);
+          new CreateSegmentCommand().setDataDir(_inputDataDir).setOutDir(_segmentDirName).setOverwrite(true)
+              .setTableConfigFile(_tableConfigFile).setSchemaFile(_schemaFileName);
 
       segmentCreator.execute();
     }
@@ -264,7 +258,7 @@ public class ClusterStarter {
     InputStream input = conn.getInputStream();
     long endTime = System.currentTimeMillis();
 
-    BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));
+    BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
     StringBuilder sb = new StringBuilder();
     String line;
     while ((line = reader.readLine()) != null) {

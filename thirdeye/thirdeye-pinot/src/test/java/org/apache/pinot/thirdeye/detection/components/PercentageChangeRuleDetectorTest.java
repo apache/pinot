@@ -16,6 +16,14 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.time.DayOfWeek;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -24,22 +32,14 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
-import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.algorithm.AlgorithmUtils;
 import org.apache.pinot.thirdeye.detection.spec.PercentageChangeRuleDetectorSpec;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorException;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -61,6 +61,12 @@ public class PercentageChangeRuleDetectorTest {
       this.data.addSeries(COL_TIME, this.data.getLongs(COL_TIME).multiply(1000));
     }
 
+    DataFrame weeklyData;
+    try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("timeseries-2y.csv"))) {
+      weeklyData = DataFrame.fromCsv(dataReader);
+      weeklyData.setIndex(COL_TIME);
+    }
+
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setId(1L);
     metricConfigDTO.setName("thirdeye-test");
@@ -76,6 +82,9 @@ public class PercentageChangeRuleDetectorTest {
     timeseries.put(MetricSlice.from(1L, 604800000L, 1209600000L), this.data);
     timeseries.put(MetricSlice.from(1L, 1209600000L, 1814400000L), this.data);
     timeseries.put(MetricSlice.from(1L, 1814400000L, 2419200000L), this.data);
+    timeseries.put(MetricSlice.from(1L, 1560816000000L, 1562025600000L), weeklyData);
+    timeseries.put(MetricSlice.from(1L, 1561420800000L, 1562630400000L), weeklyData);
+
     timeseries.put(MetricSlice.from(1L, 1546214400000L, 1551312000000L),
         new DataFrame().addSeries(COL_TIME, 1546214400000L, 1548892800000L).addSeries(COL_VALUE, 100, 200));
     timeseries.put(MetricSlice.from(1L, 1543536000000L, 1548633600000L),
@@ -208,6 +217,21 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 1551484800000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 1551488400000L);
+  }
+
+  @Test
+  public void testWeeklyDetection() throws DetectorException {
+    AnomalyDetector<PercentageChangeRuleDetectorSpec> percentageRule = new PercentageChangeRuleDetector();
+    PercentageChangeRuleDetectorSpec spec = new PercentageChangeRuleDetectorSpec();
+    spec.setWeekStart(DayOfWeek.TUESDAY.toString());
+    spec.setPercentageChange(0.01);
+    spec.setOffset("wo1w");
+    spec.setMonitoringGranularity("1_WEEKS");
+    percentageRule.init(spec, new DefaultInputDataFetcher(this.provider, -1));
+    List<MergedAnomalyResultDTO> anomalies = percentageRule.runDetection(new Interval(1562025600000L, 1562630400000L, DateTimeZone.UTC), "thirdeye:metric:1").getAnomalies();
+    Assert.assertEquals(anomalies.size(), 1);
+    Assert.assertEquals(anomalies.get(0).getStartTime(), 1561420800000L);
+    Assert.assertEquals(anomalies.get(0).getEndTime(), 1562025600000L);
   }
 
   private void checkPercentageUpperBounds(TimeSeries ts, double percentageChange) {

@@ -1,0 +1,17 @@
+{
+  "tableName": "simpleWebsite",
+  "segmentsConfig" : {
+    "replication" : "1",
+    "schemaName" : "simpleWebsite"
+  },
+  "tableIndexConfig" : {
+    "invertedIndexColumns" : [],
+    "loadMode"  : "HEAP"
+  },
+  "tenants" : {
+    "broker":"DefaultTenant",
+    "server":"DefaultTenant"
+  },
+  "tableType":"OFFLINE",
+  "metadata": {}
+}

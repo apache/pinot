@@ -25,7 +25,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
@@ -53,19 +52,28 @@ public class FilterOperatorUtils {
     // TODO: make it exclusive
     int endDocId = numDocs - 1;
 
-    // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     Predicate.Type predicateType = predicateEvaluator.getPredicateType();
-    if (dataSourceMetadata.hasInvertedIndex() && (predicateType != Predicate.Type.RANGE) && (predicateType
-        != Predicate.Type.REGEXP_LIKE)) {
-      if (dataSourceMetadata.isSorted()) {
+
+    //Only for dictionary encoded columns and offline data sources
+    if (predicateType == Predicate.Type.RANGE && dataSource.getDictionary() != null
+        && dataSource.getRangeIndex() != null) {
+      return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
+    }
+
+    if (predicateType == Predicate.Type.TEXT_MATCH) {
+      return new TextMatchFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
+    }
+
+    // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
+    if (dataSource.getInvertedIndex() != null && predicateType != Predicate.Type.REGEXP_LIKE) {
+      if (dataSource.getDataSourceMetadata().isSorted()) {
         return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
-      } else {
+      } else if (predicateType != Predicate.Type.RANGE) {
+        // TODO: add support for bitmap inverted index operator can be used for RANGE predicate
         return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
       }
-    } else {
-      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
     }
+    return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
   }
 
   /**
@@ -142,14 +150,20 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof BitmapBasedFilterOperator) {
           return 1;
         }
-        if (filterOperator instanceof AndFilterOperator) {
+        if (filterOperator instanceof RangeIndexBasedFilterOperator) {
           return 2;
         }
-        if (filterOperator instanceof OrFilterOperator) {
+        if (filterOperator instanceof TextMatchFilterOperator) {
           return 3;
         }
+        if (filterOperator instanceof AndFilterOperator) {
+          return 4;
+        }
+        if (filterOperator instanceof OrFilterOperator) {
+          return 5;
+        }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 4, debugOptions);
+          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 6, debugOptions);
         }
         if (filterOperator instanceof ExpressionFilterOperator) {
           return 10;
@@ -172,17 +186,16 @@ public class FilterOperatorUtils {
    */
   private static int getScanBasedFilterPriority(ScanBasedFilterOperator scanBasedFilterOperator, int basePriority,
       @Nullable Map<String, String> debugOptions) {
-    boolean disabled = false;
     if (debugOptions != null
         && StringUtils.compareIgnoreCase(debugOptions.get(USE_SCAN_REORDER_OPTIMIZATION), "false") == 0) {
-      disabled = true;
-    }
-    DataSourceMetadata metadata = scanBasedFilterOperator.getDataSourceMetadata();
-    if (disabled || metadata == null || metadata.isSingleValue()) {
       return basePriority;
     }
 
-    // lower priority for multivalue
-    return basePriority + 1;
+    if (scanBasedFilterOperator.getDataSourceMetadata().isSingleValue()) {
+      return basePriority;
+    } else {
+      // Lower priority for multi-value column
+      return basePriority + 1;
+    }
   }
 }

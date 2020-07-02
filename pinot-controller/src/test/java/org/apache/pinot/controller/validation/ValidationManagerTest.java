@@ -24,18 +24,19 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -68,8 +69,7 @@ public class ValidationManagerTest extends ControllerTest {
     addFakeServerInstancesToAutoJoinHelixCluster(2, true);
 
     _offlineTableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setNumReplicas(2)
-            .build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setNumReplicas(2).build();
     _helixResourceManager.addTable(_offlineTableConfig);
   }
 
@@ -87,8 +87,7 @@ public class ValidationManagerTest extends ControllerTest {
     _helixResourceManager.rebuildBrokerResourceFromHelixTags(partitionName);
 
     // Add another table that needs to be rebuilt
-    TableConfig offlineTableConfigTwo =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TEST_TABLE_TWO).build();
+    TableConfig offlineTableConfigTwo = new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_TWO).build();
     _helixResourceManager.addTable(offlineTableConfigTwo);
     String partitionNameTwo = offlineTableConfigTwo.getTableName();
 
@@ -127,14 +126,14 @@ public class ValidationManagerTest extends ControllerTest {
 
     // Refresh the segment
     // NOTE: In order to send the refresh message, the segment need to be in the ExternalView
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
     TestUtils.waitForCondition(aVoid -> {
-      ExternalView externalView = _helixAdmin
-          .getResourceExternalView(getHelixClusterName(), TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME));
+      ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(), offlineTableName);
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
     _helixResourceManager
-        .refreshSegment(TEST_TABLE_NAME, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl", null);
+        .refreshSegment(offlineTableName, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl", null);
 
     offlineSegmentZKMetadata = _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time

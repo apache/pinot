@@ -20,17 +20,11 @@ package org.apache.pinot.core.segment.store;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -38,8 +32,6 @@ import org.testng.annotations.Test;
 
 
 public class SegmentLocalFSDirectoryTest {
-  private static Logger LOGGER = LoggerFactory.getLogger(SegmentLocalFSDirectoryTest.class);
-
   private static final File TEST_DIRECTORY = new File(SingleFileIndexDirectoryTest.class.toString());
   SegmentLocalFSDirectory segmentDirectory;
   SegmentMetadataImpl metadata;
@@ -118,29 +110,6 @@ public class SegmentLocalFSDirectoryTest {
       Assert.assertNotNull(reader);
       PinotDataBuffer newDataBuffer = reader.getIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX);
       verifyData(newDataBuffer);
-    }
-  }
-
-  @Test
-  public void testStarTree()
-      throws IOException, ConfigurationException {
-    Assert.assertFalse(segmentDirectory.hasStarTree());
-    FileUtils.touch(new File(segmentDirectory.getPath().toFile(), V1Constants.STAR_TREE_INDEX_FILE));
-    String data = "This is star tree";
-    try (SegmentDirectory.Writer writer = segmentDirectory.createWriter();
-        OutputStream starTreeOstream = writer.starTreeOutputStream()) {
-      starTreeOstream.write(data.getBytes());
-    }
-    try (SegmentDirectory.Reader reader = segmentDirectory.createReader();
-        InputStream starTreeIstream = reader.getStarTreeStream()) {
-      byte[] fileDataBytes = new byte[data.length()];
-      starTreeIstream.read(fileDataBytes, 0, fileDataBytes.length);
-      String fileData = new String(fileDataBytes);
-      Assert.assertEquals(fileData, data);
-    }
-    try (SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
-      writer.removeStarTree();
-      Assert.assertFalse(segmentDirectory.hasStarTree());
     }
   }
 

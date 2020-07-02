@@ -19,8 +19,11 @@
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 import java.io.File;
+import java.util.Set;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,15 +31,16 @@ import org.slf4j.LoggerFactory;
 public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(V1DefaultColumnHandler.class);
 
-  public V1DefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata) {
-    super(indexDir, schema, segmentMetadata);
+  public V1DefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata,
+      SegmentDirectory.Writer segmentWriter) {
+    super(indexDir, schema, segmentMetadata, segmentWriter);
   }
 
   /**
    * {@inheritDoc}
    */
   @Override
-  protected void updateDefaultColumn(String column, DefaultColumnAction action)
+  protected void updateDefaultColumn(String column, DefaultColumnAction action, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
@@ -45,9 +49,16 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
       removeColumnV1Indices(column);
     }
 
+    Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
+
     // For ADD and UPDATE action, create new dictionary and forward index, and update column metadata
     if (action.isAddAction() || action.isUpdateAction()) {
-      createColumnV1Indices(column);
+      if (textIndexColumns.contains(column)) {
+        // create forward index for this text index enabled column
+        createV1ForwardIndexForTextIndex(column, indexLoadingConfig);
+      } else {
+        createColumnV1Indices(column);
+      }
     }
   }
 }

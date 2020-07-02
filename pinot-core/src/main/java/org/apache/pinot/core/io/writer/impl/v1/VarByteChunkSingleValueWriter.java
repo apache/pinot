@@ -36,7 +36,11 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
  *   <li> Integer: Total number of chunks. </li>
  *   <li> Integer: Number of docs per chunk. </li>
  *   <li> Integer: Length of longest entry (in bytes). </li>
- *   <li> Integer array: Integer offsets for all chunks in the data .</li>
+ *   <li> Integer: Total number of docs (version 2 onwards). </li>
+ *   <li> Integer: Compression type enum value (version 2 onwards). </li>
+ *   <li> Integer: Start offset of data header (version 2 onwards). </li>
+ *   <li> Integer array: Integer offsets for all chunks in the data (upto version 2),
+ *   Long array: Long offsets for all chunks in the data (version 3 onwards) </li>
  * </ul>
  *
  * <p> Individual Chunks: </p>
@@ -49,7 +53,8 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
  */
 @NotThreadSafe
 public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
-  private static final int CURRENT_VERSION = 2;
+  private static final int CURRENT_VERSION = 3;
+  public static final int CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE = Integer.BYTES;
 
   private final int _chunkHeaderSize;
   private int _chunkHeaderOffset;
@@ -70,11 +75,11 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
       throws FileNotFoundException {
 
     super(file, compressionType, totalDocs, numDocsPerChunk,
-        ((numDocsPerChunk * Integer.BYTES) + (lengthOfLongestEntry * numDocsPerChunk)), // chunkSize
+        numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + lengthOfLongestEntry), // chunkSize
         lengthOfLongestEntry, CURRENT_VERSION);
 
     _chunkHeaderOffset = 0;
-    _chunkHeaderSize = numDocsPerChunk * Integer.BYTES;
+    _chunkHeaderSize = numDocsPerChunk * CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
     _chunkDataOffSet = _chunkHeaderSize;
   }
 
@@ -87,7 +92,7 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
   @Override
   public void setBytes(int row, byte[] bytes) {
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
-    _chunkHeaderOffset += Integer.BYTES;
+    _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
     _chunkBuffer.position(_chunkDataOffSet);
     _chunkBuffer.put(bytes);

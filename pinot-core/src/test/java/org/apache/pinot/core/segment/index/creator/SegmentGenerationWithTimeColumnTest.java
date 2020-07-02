@@ -26,17 +26,21 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.data.readers.GenericRowRecordReader;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.LocalDateTime;
@@ -65,9 +69,11 @@ public class SegmentGenerationWithTimeColumnTest {
   private long minTime;
   private long maxTime;
   private long startTime = System.currentTimeMillis();
+  private TableConfig _tableConfig;
 
   @BeforeClass
-  public void printSeed() {
+  public void setup() {
+    _tableConfig = createTableConfig();
     System.out.println("Seed is: " + seed);
   }
 
@@ -82,7 +88,20 @@ public class SegmentGenerationWithTimeColumnTest {
   public void testSimpleDateSegmentGeneration()
       throws Exception {
     Schema schema = createSchema(true);
-    File segmentDir = buildSegment(schema, true, false);
+    File segmentDir = buildSegment(_tableConfig, schema, true, false);
+    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
+    Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
+  }
+
+  /**
+   * Tests using DateTimeFieldSpec as time column
+   */
+  @Test
+  public void testSimpleDateSegmentGenerationNew()
+      throws Exception {
+    Schema schema = createDateTimeFieldSpecSchema(true);
+    File segmentDir = buildSegment(_tableConfig, schema, true, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
     Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
@@ -92,41 +111,78 @@ public class SegmentGenerationWithTimeColumnTest {
   public void testEpochDateSegmentGeneration()
       throws Exception {
     Schema schema = createSchema(false);
-    File segmentDir = buildSegment(schema, false, false);
+    File segmentDir = buildSegment(_tableConfig, schema, false, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), minTime);
     Assert.assertEquals(metadata.getEndTime(), maxTime);
   }
 
+  /**
+   * Tests using DateTimeFieldSpec as time column
+   */
+  @Test
+  public void testEpochDateSegmentGenerationNew()
+      throws Exception {
+    Schema schema = createDateTimeFieldSpecSchema(false);
+    File segmentDir = buildSegment(_tableConfig, schema, false, false);
+    SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
+    Assert.assertEquals(metadata.getStartTime(), minTime);
+    Assert.assertEquals(metadata.getEndTime(), maxTime);
+  }
+
+
   @Test(expectedExceptions = IllegalStateException.class)
   public void testSegmentGenerationWithInvalidTime()
       throws Exception {
     Schema schema = createSchema(false);
-    buildSegment(schema, false, true);
+    buildSegment(_tableConfig, schema, false, true);
+  }
+
+  /**
+   * Tests using DateTimeFieldSpec as time column
+   */
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testSegmentGenerationWithInvalidTimeNew()
+      throws Exception {
+    Schema schema = createDateTimeFieldSpecSchema(false);
+    buildSegment(_tableConfig, schema, false, true);
   }
 
   private Schema createSchema(boolean isSimpleDate) {
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(STRING_COL_NAME, FieldSpec.DataType.STRING, true));
+    Schema.SchemaBuilder builder =
+        new Schema.SchemaBuilder().addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING);
     if (isSimpleDate) {
-      schema.addField(new TimeFieldSpec(TIME_COL_NAME, FieldSpec.DataType.INT, TimeUnit.DAYS));
+      builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS,
+          TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString() + ":" + TIME_COL_FORMAT, TIME_COL_NAME), null);
     } else {
-      schema.addField(new TimeFieldSpec(TIME_COL_NAME, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
+      builder.addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COL_NAME), null);
     }
-    return schema;
+    return builder.build();
   }
 
-  private File buildSegment(final Schema schema, final boolean isSimpleDate, final boolean isInvalidDate)
-      throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    config.setRawIndexCreationColumns(schema.getDimensionNames());
+  private Schema createDateTimeFieldSpecSchema(boolean isSimpleDate) {
+    Schema.SchemaBuilder builder =
+        new Schema.SchemaBuilder().addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING);
+    if (isSimpleDate) {
+      builder.addDateTime(TIME_COL_NAME, FieldSpec.DataType.INT, "1:DAYS:SIMPLE_DATE_FORMAT:"+TIME_COL_FORMAT, "1:DAYS");
+    } else {
+      builder.addDateTime(TIME_COL_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
+    }
+    builder.addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS");
+    return builder.build();
+  }
 
+  private TableConfig createTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COL_NAME).build();
+  }
+
+  private File buildSegment(final TableConfig tableConfig, final Schema schema, final boolean isSimpleDate,
+      final boolean isInvalidDate)
+      throws Exception {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setRawIndexCreationColumns(schema.getDimensionNames());
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setTimeColumnName(TIME_COL_NAME);
-    if (isSimpleDate) {
-      config.setSimpleDateFormat(TIME_COL_FORMAT);
-    }
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -145,7 +201,7 @@ public class SegmentGenerationWithTimeColumnTest {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     driver.getOutputDirectory().deleteOnExit();
     return driver.getOutputDirectory();

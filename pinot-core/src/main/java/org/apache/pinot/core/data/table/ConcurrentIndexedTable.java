@@ -27,9 +27,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,13 +52,13 @@ public class ConcurrentIndexedTable extends IndexedTable {
   /**
    * Initializes the data structures needed for this Table
    * @param dataSchema data schema of the record's keys and values
-   * @param aggregationInfos aggregation infos for the aggregations in record's values
+   * @param aggregationFunctions aggregation functions for the record's values
    * @param orderBy list of {@link SelectionSort} defining the order by
    * @param capacity the capacity of the table
    */
-  public ConcurrentIndexedTable(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int capacity) {
-    super(dataSchema, aggregationInfos, orderBy, capacity);
+  public ConcurrentIndexedTable(DataSchema dataSchema, AggregationFunction[] aggregationFunctions,
+      List<SelectionSort> orderBy, int capacity) {
+    super(dataSchema, aggregationFunctions, orderBy, capacity);
 
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();

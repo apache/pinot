@@ -21,6 +21,8 @@ package org.apache.pinot.core.realtime.impl.invertedindex;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -60,6 +62,13 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
   }
 
   @Override
+  public MutableRoaringBitmap getDocIds(Object value) {
+    // This should not be called from anywhere. If it happens, there is a bug
+    // and that's why we throw illegal state exception
+    throw new IllegalStateException("realtime bitmap inverted index reader supports lookup only on dictionary id");
+  }
+
+  @Override
   public MutableRoaringBitmap getDocIds(int dictId) {
     ThreadSafeMutableRoaringBitmap bitmap;
     try {
@@ -80,29 +89,5 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
 
   @Override
   public void close() {
-  }
-
-  /**
-   * Helper wrapper class for {@link MutableRoaringBitmap} to make it thread-safe.
-   */
-  private static class ThreadSafeMutableRoaringBitmap {
-    private MutableRoaringBitmap _mutableRoaringBitmap;
-
-    public ThreadSafeMutableRoaringBitmap(int firstDocId) {
-      _mutableRoaringBitmap = new MutableRoaringBitmap();
-      _mutableRoaringBitmap.add(firstDocId);
-    }
-
-    public void checkAndAdd(int docId) {
-      if (!_mutableRoaringBitmap.contains(docId)) {
-        synchronized (this) {
-          _mutableRoaringBitmap.add(docId);
-        }
-      }
-    }
-
-    public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {
-      return _mutableRoaringBitmap.clone();
-    }
   }
 }

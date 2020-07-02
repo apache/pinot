@@ -31,4 +31,13 @@ public class FunctionDefinitionRegistry {
       return false;
     }
   }
+
+  public static boolean isTransformFunc(String functionName) {
+    try {
+      TransformFunctionType.getTransformFunctionType(functionName);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
 }

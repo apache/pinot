@@ -14,6 +14,7 @@ import {
 import { appendFilters } from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeFloat, humanizeChange, checkStatus } from 'thirdeye-frontend/utils/utils';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
+import config from 'thirdeye-frontend/config/environment';
 
 const queryParamsConfig = {
   refreshModel: true
@@ -64,12 +65,15 @@ export default Route.extend(AuthenticatedRouteMixin, {
   afterModel(model) {
     // Overrides with params if exists
     const appName = model.appName || null;
-    const startDate = Number(model.startDate) || get(this, 'startDate');//TODO: we can use ember transform here
-    const endDate = Number(model.endDate) || get(this, 'endDate');
+    let startDate = Number(model.startDate) || get(this, 'startDate');//TODO: we can use ember transform here
+    let endDate = Number(model.endDate) || get(this, 'endDate');
     const duration = model.duration || get(this, 'duration');
     const feedbackType = model.feedbackType || get(this, 'feedbackType');
     const shareId = model.shareId || get(this, 'shareId');
     const subGroup = model.subGroup || null;
+
+    [startDate, endDate] = this.get('setDatesFromDuration')(duration, startDate, endDate); // if there's a duration param, override dates.
+
     // Update props
     setProperties(this, {
       appName,
@@ -166,6 +170,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           const dimensions = get(anomaly, 'dimensions');
           const start = get(anomaly, 'start');
           const end = get(anomaly, 'end');
+          const timeZone = config.timeZone
 
           if (!map[metricName]) {
             map[metricName] = { 'metricId': metricId, items: {}, count: index };
@@ -180,7 +185,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           //build new urn
           const metricUrn = appendFilters(`thirdeye:metric:${metricId}`, filteredDimensions);
           //Get all in the following order - current,wo2w,median4w
-          const offsets = await fetch(`/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=wo1w,wo2w,median4w&timezone=America/Los_Angeles`).then(checkStatus).then(res => res);
+          const offsets = await fetch(`/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=wo1w,wo2w,median4w&timezone=${timeZone}`).then(checkStatus).then(res => res);
 
           const current = get(anomaly, 'current');
           const wow = humanizeFloat(offsets[0]);
@@ -211,6 +216,34 @@ export default Route.extend(AuthenticatedRouteMixin, {
     return anomalyMapping;
   }).drop(),
 
+  /**
+   * Overrides startDate and endDate params if duration present
+   * @return {Undefined}
+   */
+  setDatesFromDuration(duration, start, end) {
+    if (duration) {
+      switch(duration) {
+        case 'today':
+          start = moment().startOf('day').valueOf();
+          end = moment().startOf('day').add(1, 'days').valueOf();
+          break;
+        case '2d':
+          start = moment().subtract(1, 'day').startOf('day').valueOf();
+          end = moment().startOf('day').valueOf();
+          break;
+        case '1d':
+          start = moment().subtract(24, 'hour').startOf('hour').valueOf();
+          end = moment().startOf('hour').valueOf();
+          break;
+        case '1w':
+          start = moment().subtract(1, 'week').startOf('day').valueOf();
+          end = moment().startOf('day').add(1, 'days').valueOf();
+          break;
+      }
+    }
+    return [start, end];
+  },
+
   actions: {
     willTransition: function(transition){
       //saving session url - TODO: add a util or service - lohuynh
@@ -237,7 +270,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     this._super(...arguments);
     //set and reset controller props as needed
     controller.setProperties({
-      shareTemplateConfig: model.shareTemplateConfig.data || {},
+      shareTemplateConfig: (model.shareTemplateConfig || {}).data || {},
       columns,
       start: get(this, 'startDate'),
       end: get(this, 'endDate'),

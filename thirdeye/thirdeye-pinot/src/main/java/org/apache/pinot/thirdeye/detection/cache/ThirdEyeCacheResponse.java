@@ -26,6 +26,8 @@ import java.util.Map;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.util.IntervalUtils;
+import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,26 +129,30 @@ public class ThirdEyeCacheResponse {
    */
   private void checkAndLogMissingMiddleSlices() {
 
-    List<String> missingTimestamps = new ArrayList<>();
-    long timeGranularity = request.getRequest().getGroupByTimeGranularity().toMillis();
+    if (!this.timeSeriesRows.isEmpty()) {
+      List<Interval> missingPeriods = new ArrayList<>();
+      long timeGranularity = request.getRequest().getGroupByTimeGranularity().toMillis();
 
-    // remember that we return the cached timeseries in sorted order,
-    // but this assumption is not necessarily true if mergeSliceIntoRows() has been called.
-    for (int i = 1; i < timeSeriesRows.size(); i++) {
-      long previousTimestamp = timeSeriesRows.get(i - 1).getTimestamp();
-      long currentTimestamp = timeSeriesRows.get(i).getTimestamp();
+      // remember that we return the cached timeseries in sorted order,
+      // but this assumption is not necessarily true if mergeSliceIntoRows() has been called.
+      for (int i = 1; i < timeSeriesRows.size(); i++) {
+        long previousTimestamp = timeSeriesRows.get(i - 1).getTimestamp();
+        long currentTimestamp = timeSeriesRows.get(i).getTimestamp();
 
-      // add all missing timestamps between previous timestamp and current timestamp to
-      // the list of missing timestamps.
-      while (previousTimestamp + timeGranularity < currentTimestamp) {
-        missingTimestamps.add(String.valueOf(previousTimestamp + timeGranularity));
-        previousTimestamp += timeGranularity;
+        // add all missing timestamps between previous timestamp and current timestamp to
+        // the list of missing timestamps.
+        if (previousTimestamp + timeGranularity < currentTimestamp) {
+          long missingIntervalStart = previousTimestamp + timeGranularity;
+          long missingIntervalEnd = currentTimestamp - timeGranularity;
+          missingPeriods.add(new Interval(missingIntervalStart, missingIntervalEnd));
+        }
       }
-    }
 
-    if (missingTimestamps.size() > 0) {
-      LOG.info("cached time-series for metricUrn {} was missing data points in the middle for {} timestamps: {}",
-          request.getMetricUrn(), missingTimestamps.size(), String.join(",", missingTimestamps));
+      // we will need to evaluate whether this is generating too many logs.
+      if (missingPeriods.size() > 0) {
+        LOG.info("cached time-series for metricUrn {} was missing data for {} time slice(s) in the middle: {}",
+            request.getMetricUrn(), missingPeriods.size(), IntervalUtils.getIntervalRangesAsString(missingPeriods));
+      }
     }
   }
 

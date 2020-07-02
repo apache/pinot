@@ -5,7 +5,7 @@ import {
   getProperties
 } from '@ember/object';
 import Controller from '@ember/controller';
-import { humanizeFloat, stripNonFiniteValues } from 'thirdeye-frontend/utils/utils';
+import { humanizeFloat, buildBounds } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
 import _ from 'lodash';
 
@@ -90,23 +90,7 @@ export default Controller.extend({
         };
       }
 
-      if (predicted && !_.isEmpty(predicted.upper_bound)) {
-        series['Upper and lower bound'] = {
-          timestamps: predicted.timestamp,
-          values: stripNonFiniteValues(predicted.upper_bound),
-          type: 'line',
-          color: 'screenshot-bounds'
-        };
-      }
-
-      if (predicted && !_.isEmpty(predicted.lower_bound)) {
-        series['lowerBound'] = {
-          timestamps: predicted.timestamp,
-          values: stripNonFiniteValues(predicted.lower_bound),
-          type: 'line',
-          color: 'screenshot-bounds'
-        };
-      }
+      buildBounds(series, predicted, current, true);
 
       return series;
     }

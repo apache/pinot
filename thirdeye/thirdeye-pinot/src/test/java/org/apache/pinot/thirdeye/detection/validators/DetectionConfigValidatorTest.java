@@ -199,13 +199,4 @@ public class DetectionConfigValidatorTest {
     DetectionConfigValidator detectionConfigValidator = new DetectionConfigValidator(provider);
     detectionConfigValidator.validateYaml(this.yamlConfig2);
   }
-
-  // type is a compulsory field at sub-alert levels
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testNoTypeUnderAlertsValidation() {
-    ((Map<String, Object>) ConfigUtils.getList(this.yamlConfig2.get("alerts")).get(0)).remove("type");
-
-    DetectionConfigValidator detectionConfigValidator = new DetectionConfigValidator(provider);
-    detectionConfigValidator.validateYaml(this.yamlConfig2);
-  }
 }

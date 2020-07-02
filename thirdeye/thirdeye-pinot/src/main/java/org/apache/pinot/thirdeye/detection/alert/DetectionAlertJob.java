@@ -28,9 +28,11 @@ import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.TaskUtils;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -59,7 +61,7 @@ public class DetectionAlertJob implements Job {
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     LOG.debug("Running " + jobExecutionContext.getJobDetail().getKey().getName());
     String jobKey = jobExecutionContext.getJobDetail().getKey().getName();
-    long detectionAlertConfigId = getIdFromJobKey(jobKey);
+    long detectionAlertConfigId = TaskUtils.getIdFromJobKey(jobKey);
     DetectionAlertConfigDTO configDTO = alertConfigDAO.findById(detectionAlertConfigId);
     if (configDTO == null) {
       LOG.error("Subscription config {} does not exist", detectionAlertConfigId);
@@ -94,27 +96,22 @@ public class DetectionAlertJob implements Job {
       LOG.error("Exception when converting AlertTaskInfo {} to jsonString", taskInfo, e);
     }
 
-    TaskDTO taskDTO = new TaskDTO();
-    taskDTO.setTaskType(TaskConstants.TaskType.DETECTION_ALERT);
-    taskDTO.setJobName(jobName);
-    taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
-    taskDTO.setTaskInfo(taskInfoJson);
-
+    TaskDTO taskDTO = TaskUtils.buildTask(detectionAlertConfigId, taskInfoJson, TaskConstants.TaskType.DETECTION_ALERT);
     long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
+    LOG.info("Created {} task {} with settings {}", TaskConstants.TaskType.DETECTION_ALERT, taskId, taskDTO);
   }
 
   /**
-   * Check if we need to create a notification task.
-   * If there is no anomaly generated (by looking at anomaly start_time) between last notification time
+   * Check if we need to create a subscription task.
+   * If there is no anomaly generated (by looking at anomaly create_time) between last notification time
    * till now (left inclusive, right exclusive) then no need to create this task.
    *
-   * The reason we use start_time is end_time is not accurate due to anomaly merge.
-   * The timestamp stored in vectorLock is anomaly end_time, which should be fine.
-   * For example, if previous anomaly is from t1 to t2, then the timestamp in vectorLock is t2.
-   * If there is a new anomaly generated from t2 to t3 then we can still get this anomaly.
+   * Even if an anomaly gets merged (end_time updated) it will not renotify this anomaly as the create_time is not
+   * modified.
+   * For example, if previous anomaly is from t1 to t2 generated at t3, then the timestamp in vectorLock is t3.
+   * If there is a new anomaly from t2 to t4 generated at t5, then we can still get this anomaly as t5 > t3.
    *
-   * @param configDTO The DetectionAlert Configuration.
+   * @param configDTO The Subscription Configuration.
    * @return true if it needs notification task. false otherwise.
    */
   private boolean needNotification(DetectionAlertConfigDTO configDTO) {
@@ -122,17 +119,11 @@ public class DetectionAlertJob implements Job {
     for (Map.Entry<Long, Long> vectorLock : vectorLocks.entrySet()) {
       long configId = vectorLock.getKey();
       long lastNotifiedTime = vectorLock.getValue();
-      if (anomalyDAO.findByStartTimeInRangeAndDetectionConfigId(lastNotifiedTime, System.currentTimeMillis(), configId)
+      if (anomalyDAO.findByCreatedTimeInRangeAndDetectionConfigId(lastNotifiedTime, System.currentTimeMillis(), configId)
           .stream().anyMatch(x -> !x.isChild())) {
         return true;
       }
     }
     return false;
-  }
-
-  private Long getIdFromJobKey(String jobKey) {
-    String[] tokens = jobKey.split("_");
-    String id = tokens[tokens.length - 1];
-    return Long.valueOf(id);
   }
 }

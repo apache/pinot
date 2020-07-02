@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.anomaly.detection.trigger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,11 +44,14 @@ import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
+import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.TaskUtils;
 import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * This class is to schedule detection tasks based on data availability events.
@@ -56,21 +60,30 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DataAvailabilityTaskScheduler.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private ScheduledExecutorService executorService;
-  private long delayInSec;
+  private long sleepPerRunInSec;
   private long fallBackTimeInSec;
-  private Map<Long, Long> taskLastCreateTimeMap;
+  private long schedulingWindowInSec;
+  private long scheduleDelayInSec;
+
+  // Maintains mapping from each detection to the detection end time of it's last run.
+  // Fallback runs based on the last task run (successful or not).
+  private Map<Long, Long> detectionIdToLastTaskEndTimeMap;
+
   private TaskManager taskDAO;
   private DetectionConfigManager detectionConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
+
   /**
    * Construct an instance of {@link DataAvailabilityTaskScheduler}
-   * @param delayInSec delay after each run to avoid polling the database too often
+   * @param sleepPerRunInSec delay after each run to avoid polling the database too often
    * @param fallBackTimeInSec global threshold for fallback if detection level one is not set
    */
-  public DataAvailabilityTaskScheduler(long delayInSec, long fallBackTimeInSec) {
-    this.delayInSec = delayInSec;
+  public DataAvailabilityTaskScheduler(long sleepPerRunInSec, long fallBackTimeInSec, long schedulingWindowInSec, long scheduleDelayInSec) {
+    this.sleepPerRunInSec = sleepPerRunInSec;
     this.fallBackTimeInSec = fallBackTimeInSec;
-    this.taskLastCreateTimeMap = new HashMap<>();
+    this.schedulingWindowInSec = schedulingWindowInSec;
+    this.scheduleDelayInSec = scheduleDelayInSec;
+    this.detectionIdToLastTaskEndTimeMap = new HashMap<>();
     this.executorService = Executors.newSingleThreadScheduledExecutor();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
@@ -80,22 +93,42 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   @Override
   public void run() {
     Map<DetectionConfigDTO, Set<String>> detection2DatasetMap = new HashMap<>();
-    Map<String, Long> dataset2RefreshTimeMap = new HashMap<>();
-    populateDetectionMapAndDataset2RefreshTimeMap(detection2DatasetMap, dataset2RefreshTimeMap);
+    Map<String, DatasetConfigDTO> datasetConfigMap = new HashMap<>();
+    populateDetectionMapAndDatasetConfigMap(detection2DatasetMap, datasetConfigMap);
     Map<Long, TaskDTO> runningDetection = retrieveRunningDetectionTasks();
     int taskCount = 0;
     for (DetectionConfigDTO detectionConfig : detection2DatasetMap.keySet()) {
       try {
         long detectionConfigId = detectionConfig.getId();
         if (!runningDetection.containsKey(detectionConfigId)) {
-          if (isAllDatasetUpdated(detectionConfig, detection2DatasetMap.get(detectionConfig), dataset2RefreshTimeMap)) {
-            //TODO: additional check is required if detection is based on aggregated value across multiple data points
-            createDetectionTask(detectionConfig);
-            ThirdeyeMetricsUtil.eventScheduledTaskCounter.inc();
-            taskCount++;
-          } else if (needFallback(detectionConfig)) {
-            LOG.info("Scheduling a task for detection {} due to the fallback mechanism", detectionConfigId);
-            createDetectionTask(detectionConfig);
+          if (isAllDatasetUpdated(detectionConfig, detection2DatasetMap.get(detectionConfig), datasetConfigMap)) {
+            if (isWithinSchedulingWindow(detection2DatasetMap.get(detectionConfig), datasetConfigMap)) {
+              //TODO: additional check is required if detection is based on aggregated value across multiple data points
+              long endtime = System.currentTimeMillis();
+              createDetectionTask(detectionConfig, endtime);
+              detectionIdToLastTaskEndTimeMap.put(detectionConfig.getId(), endtime);
+              ThirdeyeMetricsUtil.eventScheduledTaskCounter.inc();
+              taskCount++;
+            } else {
+              LOG.warn("Unable to schedule a task for {}, because it is out of scheduling window.", detectionConfigId);
+            }
+          }
+
+          // Note: Fallback SLA & Data availability SLA are independent of each other.
+          // For example, if an event doesn't arrive within 24 hours, do a fallback.
+          // On the other hand, a user can setup an SLA alert if there is no data for 3 days.
+          if (needFallback(detectionConfig)) {
+            LOG.info("Scheduling a task for detection {} due to the fallback mechanism.", detectionConfigId);
+            long endtime = System.currentTimeMillis();
+            createDetectionTask(detectionConfig, endtime);
+
+            if (DetectionUtils.isDataQualityCheckEnabled(detectionConfig)) {
+              createDataQualityTask(detectionConfig, endtime);
+              LOG.info("Scheduling a task for data sla check on detection config {} due to the fallback mechanism.",
+                  detectionConfigId);
+            }
+
+            detectionIdToLastTaskEndTimeMap.put(detectionConfig.getId(), endtime);
             ThirdeyeMetricsUtil.eventScheduledTaskFallbackCounter.inc();
             taskCount++;
           }
@@ -111,20 +144,21 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   }
 
   public void start() {
-    executorService.scheduleWithFixedDelay(this, 0, delayInSec, TimeUnit.SECONDS);
+    executorService.scheduleWithFixedDelay(this, 0, sleepPerRunInSec, TimeUnit.SECONDS);
   }
 
   public void close() {
     executorService.shutdownNow();
   }
 
-  private void populateDetectionMapAndDataset2RefreshTimeMap(
-      Map<DetectionConfigDTO, Set<String>> dataset2DetectionMap, Map<String, Long> dataset2RefreshTimeMap) {
+  private void populateDetectionMapAndDatasetConfigMap(
+      Map<DetectionConfigDTO, Set<String>> dataset2DetectionMap,
+      Map<String, DatasetConfigDTO> datasetConfigMap) {
     Map<Long, Set<String>> metricCache = new HashMap<>();
     List<DetectionConfigDTO> detectionConfigs = detectionConfigDAO.findAllActive()
         .stream().filter(DetectionConfigBean::isDataAvailabilitySchedule).collect(Collectors.toList());
     for (DetectionConfigDTO detectionConfig : detectionConfigs) {
-      List<String> metricUrns = DetectionConfigFormatter
+      Set<String> metricUrns = DetectionConfigFormatter
           .extractMetricUrnsFromProperties(detectionConfig.getProperties());
       Set<String> datasets = new HashSet<>();
       for (String urn : metricUrns) {
@@ -140,14 +174,14 @@ public class DataAvailabilityTaskScheduler implements Runnable {
         }
       }
       if (datasets.isEmpty()) {
-        LOG.error("No valid dataset is found for detection {}", detectionConfig.getId());
+        LOG.error("No valid dataset is found for detection {}.", detectionConfig.getId());
         continue;
       }
       dataset2DetectionMap.put(detectionConfig, datasets);
       for (String dataset : datasets) {
-        if (!dataset2RefreshTimeMap.containsKey(dataset)) {
+        if (!datasetConfigMap.containsKey(dataset)) {
           DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
-          dataset2RefreshTimeMap.put(dataset, datasetConfig.getLastRefreshTime());
+          datasetConfigMap.put(dataset, datasetConfig);
         }
       }
     }
@@ -166,23 +200,22 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     return res;
   }
 
-  private long createDetectionTask(DetectionConfigDTO detectionConfig) throws JsonProcessingException {
-    long detectionConfigId = detectionConfig.getId();
-    // Make sure start time is not out of DETECTION_TASK_MAX_LOOKBACK_WINDOW
-    long end = System.currentTimeMillis();
-    long start = Math.max(detectionConfig.getLastTimestamp(),
-        end - ThirdEyeUtils.DETECTION_TASK_MAX_LOOKBACK_WINDOW);
-    DetectionPipelineTaskInfo taskInfo = new DetectionPipelineTaskInfo(detectionConfigId, start, end);
+  private long createTask(TaskConstants.TaskType taskType, DetectionConfigDTO detectionConfig, long end)
+      throws JsonProcessingException {
+    DetectionPipelineTaskInfo taskInfo = TaskUtils.buildTaskInfoFromDetectionConfig(detectionConfig, end);
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
-    TaskDTO taskDTO = new TaskDTO();
-    taskDTO.setTaskType(TaskConstants.TaskType.DETECTION);
-    taskDTO.setJobName(TaskConstants.TaskType.DETECTION.toString() + "_" + detectionConfigId);
-    taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
-    taskDTO.setTaskInfo(taskInfoJson);
-    long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
-    taskLastCreateTimeMap.put(detectionConfigId, end);
-    return taskId;
+    TaskDTO taskDTO = TaskUtils.buildTask(detectionConfig.getId(), taskInfoJson, taskType);
+    long id = taskDAO.save(taskDTO);
+    LOG.info("Created {} task {} with taskId {}", taskType, taskDTO, id);
+    return id;
+  }
+
+  private long createDetectionTask(DetectionConfigDTO detectionConfig, long end) throws JsonProcessingException {
+    return createTask(TaskConstants.TaskType.DETECTION, detectionConfig, end);
+  }
+
+  private long createDataQualityTask(DetectionConfigDTO detectionConfig, long end) throws JsonProcessingException {
+    return createTask(TaskConstants.TaskType.DATA_QUALITY, detectionConfig, end);
   }
 
   private void loadLatestTaskCreateTime(DetectionConfigDTO detectionConfig) throws Exception {
@@ -190,28 +223,43 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     List<TaskDTO> tasks = taskDAO.findByNameOrderByCreateTime(TaskConstants.TaskType.DETECTION.toString() +
         "_" + detectionConfigId, 1,false);
     if (tasks.size() == 0) {
-      taskLastCreateTimeMap.put(detectionConfigId, 0L);
+      detectionIdToLastTaskEndTimeMap.put(detectionConfigId, detectionConfig.getLastTimestamp());
     } else {
+      // Load the watermark
       DetectionPipelineTaskInfo taskInfo = (DetectionPipelineTaskInfo) TaskInfoFactory.getTaskInfoFromTaskType(
           TaskConstants.TaskType.DETECTION, tasks.get(0).getTaskInfo());
-      taskLastCreateTimeMap.put(detectionConfigId, taskInfo.getEnd());
+      detectionIdToLastTaskEndTimeMap.put(detectionConfigId, taskInfo.getEnd());
     }
   }
 
   private boolean isAllDatasetUpdated(DetectionConfigDTO detectionConfig, Set<String> datasets,
-      Map<String, Long> dataset2RefreshTimeMap) {
+      Map<String, DatasetConfigDTO> datasetConfigMap) {
     long lastTimestamp = detectionConfig.getLastTimestamp();
-    return datasets.stream().allMatch(d -> dataset2RefreshTimeMap.get(d) > lastTimestamp);
+    long curr = System.currentTimeMillis();
+    return datasets.stream().allMatch(d -> datasetConfigMap.get(d).getLastRefreshTime() > lastTimestamp
+        && curr - datasetConfigMap.get(d).getLastRefreshEventTime() >= TimeUnit.SECONDS.toMillis(scheduleDelayInSec));
   }
 
+  /* check if the fallback cron need to be triggered if the detection has not been run for long time */
   private boolean needFallback(DetectionConfigDTO detectionConfig) throws Exception {
     long detectionConfigId = detectionConfig.getId();
     long notRunThreshold = ((detectionConfig.getTaskTriggerFallBackTimeInSec() == 0) ?
         fallBackTimeInSec : detectionConfig.getTaskTriggerFallBackTimeInSec()) * 1000;
-    if (!taskLastCreateTimeMap.containsKey(detectionConfigId)) {
+    if (!detectionIdToLastTaskEndTimeMap.containsKey(detectionConfigId)) {
       loadLatestTaskCreateTime(detectionConfig);
     }
-    long lastRunTime = taskLastCreateTimeMap.get(detectionConfigId);
+    long lastRunTime = detectionIdToLastTaskEndTimeMap.get(detectionConfigId);
     return (System.currentTimeMillis() - lastRunTime >= notRunThreshold);
+  }
+
+  /*
+  check if the current time is within scheduling window to avoid repeating scheduling the same task if
+  detection watermark is not moving forward */
+  private boolean isWithinSchedulingWindow(Set<String> datasets,
+      Map<String, DatasetConfigDTO> datasetConfigMap) {
+    long maxEventTime = datasets.stream()
+        .map(dataset -> datasetConfigMap.get(dataset).getLastRefreshEventTime())
+        .max(Comparator.naturalOrder()).orElse(0L);
+    return System.currentTimeMillis() <= maxEventTime + schedulingWindowInSec * 1000;
   }
 }

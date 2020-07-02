@@ -19,17 +19,11 @@
 package org.apache.pinot.perf;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
-import org.apache.pinot.integration.tests.RealtimeClusterIntegrationTest;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 
 
@@ -37,13 +31,9 @@ import org.apache.pinot.util.TestUtils;
  * Benchmark that writes a configurable amount of rows in Kafka and checks how much time it takes to consume all of
  * them.
  */
-public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegrationTest {
+public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTest {
   private static final int ROW_COUNT = 100_000;
-  private static final int ROW_COUNT_FOR_SEGMENT_FLUSH = 10_000;
   private static final long TIMEOUT_MILLIS = 20 * 60 * 1000L; // Twenty minutes
-  private final File _tmpDir = new File("/tmp/" + getHelixClusterName());
-  private static final int SEGMENT_COUNT = 1;
-  private static final Random RANDOM = new Random(123456L);
 
   public static void main(String[] args) {
     try {
@@ -56,50 +46,34 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
 
   private void runBenchmark()
       throws Exception {
-    // Start ZK and Kafka
-    startZk();
-    StreamDataServerStartable kafkaStarter = KafkaStarterUtils
-        .startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
-            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
-
-    // Create Kafka topic
-    kafkaStarter.createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(10));
-
-    // Unpack data (needed to get the Avro schema)
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
-        RealtimeClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), _tmpDir);
-
-    _tmpDir.mkdirs();
-    final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
-    for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
-      avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
-    }
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
+    startZk();
     startController();
     startBroker();
     startServer();
 
-    // Create realtime table
-    setUpRealtimeTable(avroFiles.get(0));
+    // Start Kafka
+    startKafka();
 
-    // Wait a couple of seconds for all Helix state transitions to happen
-    Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
+    // Unpack the Avro files
+    File avroFile = unpackAvroData(_tempDir).get(0);
+
+    // Create and upload the schema and table config
+    addSchema(createSchema());
+    addTableConfig(createRealtimeTableConfig(avroFile));
 
     // Generate ROW_COUNT rows and write them into Kafka
-    new Thread() {
-      @Override
-      public void run() {
-        try {
-          ClusterIntegrationTestUtils
-              .pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(),
-                  ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
-        } catch (Exception e) {
-          // Ignored
-        }
+    new Thread(() -> {
+      try {
+        ClusterIntegrationTestUtils
+            .pushRandomAvroIntoKafka(avroFile, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(), ROW_COUNT,
+                getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+      } catch (Exception e) {
+        // Ignored
       }
-    }.start();
+    }).start();
 
     // Count how many seconds it takes for select count(*) to match with ROW_COUNT
     long startTime = System.currentTimeMillis();
@@ -127,5 +101,6 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
     long endTime = System.currentTimeMillis();
 
     System.out.println("Consumed " + ROW_COUNT + " rows in " + (endTime - startTime) / 1000.0 + " seconds");
+    FileUtils.deleteDirectory(_tempDir);
   }
 }

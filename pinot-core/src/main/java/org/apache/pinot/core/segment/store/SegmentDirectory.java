@@ -21,12 +21,10 @@ package org.apache.pinot.core.segment.store;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -120,6 +118,8 @@ public abstract class SegmentDirectory implements Closeable {
     return SegmentLocalFSDirectory.loadSegmentMetadata(directory);
   }
 
+  public abstract void reloadMetadata() throws Exception;
+
   /**
    * Get the path/URL for the directory
    * @return
@@ -142,24 +142,6 @@ public abstract class SegmentDirectory implements Closeable {
      */
     public abstract PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
         throws IOException;
-
-    /**
-     * Get StarTree index as InputStream
-     * @return InputStream representing serialized version of star tree.
-     */
-    public abstract InputStream getStarTreeStream();
-
-    /**
-     * Get the StarTree index file.
-     *
-     * @return File for StarTree index.
-     */
-    public abstract File getStarTreeFile();
-
-    /**
-     * Check if the segment has star tree
-     */
-    public abstract boolean hasStarTree();
 
     public abstract boolean hasIndexFor(String column, ColumnIndexType type);
 
@@ -189,12 +171,6 @@ public abstract class SegmentDirectory implements Closeable {
         throws IOException;
 
     /**
-     * Create star tree output stream
-     * @return Output stream to write serialized version of star tree
-     */
-    public abstract OutputStream starTreeOutputStream();
-
-    /**
      * Check if the removal of index is a supported operation
      * @return true if the index removal is supported
      */
@@ -206,11 +182,6 @@ public abstract class SegmentDirectory implements Closeable {
      * @param indexType column index type
      */
     public abstract void removeIndex(String columnName, ColumnIndexType indexType);
-
-    /**
-     * Remove existing star tree
-     */
-    public abstract void removeStarTree();
 
     /**
      * Save all the write and delete operations and close writer

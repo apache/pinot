@@ -21,7 +21,6 @@ package org.apache.pinot.core.util;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
 import java.util.Arrays;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
@@ -75,16 +74,6 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public void clear() {
-    try {
-      close();
-      init();
-    } catch (IOException e) {
-      Utils.rethrowException(e);
-    }
-  }
-
-  @Override
   protected void setValue(int dictId, Object value, byte[] serializedValue) {
     FixedIntArray intArray = (FixedIntArray) value;
     int[] values = intArray.elements();
@@ -125,12 +114,12 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public Object getMinVal() {
+  public Comparable getMinVal() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public Object getMaxVal() {
+  public Comparable getMaxVal() {
     throw new UnsupportedOperationException();
   }
 

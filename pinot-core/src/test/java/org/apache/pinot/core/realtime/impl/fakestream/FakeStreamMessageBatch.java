@@ -19,7 +19,7 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.util.List;
-import org.apache.pinot.core.realtime.stream.MessageBatch;
+import org.apache.pinot.spi.stream.MessageBatch;
 
 
 /**

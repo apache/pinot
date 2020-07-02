@@ -40,23 +40,25 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
-import org.apache.pinot.common.config.Instance;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.TagOverrideConfig;
-import org.apache.pinot.common.config.Tenant;
-import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.common.utils.TenantRole;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -171,7 +173,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertFalse(instances.contains(instanceName));
 
     // Add new instance.
-    Instance instance = new Instance("localhost", biggerRandomNumber, CommonConstants.Helix.InstanceType.SERVER,
+    Instance instance = new Instance("localhost", biggerRandomNumber, InstanceType.SERVER,
         Collections.singletonList(UNTAGGED_SERVER_INSTANCE), null);
     _helixResourceManager.addInstance(instance);
 
@@ -194,7 +196,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertTrue(response.isSuccessful());
 
     // Create the table
-    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(3)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(3)
         .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
     _helixResourceManager.addTable(tableConfig);
 
@@ -312,7 +314,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     _helixResourceManager.createBrokerTenant(brokerTenant);
 
     String rawTableName = "testTable";
-    TableConfig offlineTableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(rawTableName).build();
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
 
     // Empty broker tag (DefaultTenant_BROKER)
     try {
@@ -336,7 +338,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
 
     TableConfig realtimeTableConfig =
-        new TableConfig.Builder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
 
     // Empty server tag (serverTenant_REALTIME)

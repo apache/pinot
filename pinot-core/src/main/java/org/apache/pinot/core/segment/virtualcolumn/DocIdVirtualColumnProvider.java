@@ -19,16 +19,16 @@
 package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.core.segment.index.column.BaseVirtualColumnProvider;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.DocIdDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
@@ -51,9 +51,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
   public ColumnMetadata buildMetadata(VirtualColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
     columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setHasDictionary(true).setHasInvertedIndex(true)
-        .setFieldType(FieldSpec.FieldType.DIMENSION).setDataType(FieldSpec.DataType.INT).setSingleValue(true)
-        .setIsSorted(true);
-
+        .setSingleValue(true).setIsSorted(true);
     return columnMetadataBuilder.build();
   }
 
@@ -106,6 +104,13 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
+    public Pairs.IntPair getDocIds(Object value) {
+      // This should not be called from anywhere. If it happens, there is a bug
+      // and that's why we throw illegal state exception
+      throw new IllegalStateException("sorted inverted index reader supports lookup only using dictionary id");
+    }
+
+    @Override
     public void close()
         throws IOException {
     }
@@ -123,57 +128,6 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     @Override
     public int getInt(int rowId, SortedIndexReaderImpl.Context context) {
       return rowId;
-    }
-  }
-
-  private class DocIdDictionary extends BaseImmutableDictionary {
-    final int _numDocs;
-
-    DocIdDictionary(int numDocs) {
-      super(numDocs);
-      _numDocs = numDocs;
-    }
-
-    @Override
-    public int insertionIndexOf(String stringValue) {
-      int intValue = Integer.parseInt(stringValue);
-      if (intValue < 0) {
-        return -1;
-      } else if (intValue >= _numDocs) {
-        return -(_numDocs + 1);
-      } else {
-        return intValue;
-      }
-    }
-
-    @Override
-    public Integer get(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public int getIntValue(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public long getLongValue(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public float getFloatValue(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public double getDoubleValue(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public String getStringValue(int dictId) {
-      return Integer.toString(dictId);
     }
   }
 }

@@ -19,10 +19,10 @@
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 import java.io.File;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.data.Schema;
 
 
 public class DefaultColumnHandlerFactory {
@@ -34,7 +34,7 @@ public class DefaultColumnHandlerFactory {
     if (SegmentVersion.valueOf(segmentMetadata.getVersion()) == SegmentVersion.v3) {
       return new V3DefaultColumnHandler(indexDir, schema, segmentMetadata, segmentWriter);
     } else {
-      return new V1DefaultColumnHandler(indexDir, schema, segmentMetadata);
+      return new V1DefaultColumnHandler(indexDir, schema, segmentMetadata, segmentWriter);
     }
   }
 }

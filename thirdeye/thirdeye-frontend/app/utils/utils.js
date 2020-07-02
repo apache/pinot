@@ -19,7 +19,7 @@ export function checkStatus(response, mode = 'get', recoverBlank = false, isYaml
     throw new Error('401');
   } else if (response.status >= 200 && response.status < 300) {
     // Prevent parsing of null response
-    if (response.status === 204) {
+    if (mode === 'delete' || response.status === 204) {
       return '';
     } else {
       return (mode === 'get' || isYamlPreview) ? response.json() : JSON.parse(JSON.stringify(response));
@@ -177,6 +177,17 @@ export function putProps() {
 }
 
 /**
+ * Preps delete object
+ * @returns {Object}
+ */
+export function deleteProps() {
+  return {
+    method: 'delete',
+    headers: { 'content-type': 'Application/Json' }
+  };
+}
+
+/**
  * Format conversion helper
  * @param {String} dateStr - date to convert
  */
@@ -194,7 +205,7 @@ export function replaceNonFiniteWithCurrent(series1, series2) {
     return stripNonFiniteValues(series1);
   }
   for (let i = 0; i < series1.length; i++) {
-    if (!isFinite(series1[i]) || !series1[i]) {
+    if (!isFinite(series1[i]) || (!series1[i] && (series1[i] !== 0))) {
       let newValue = null;
       if (i < series2.length) {
         newValue = isFinite(series2[i]) ? series2[i] : null;
@@ -203,6 +214,60 @@ export function replaceNonFiniteWithCurrent(series1, series2) {
     }
   }
   return series1;
+}
+
+/**
+ * Check if all values in array are null
+ * @param {Array} toCheck - array to check for all nulls
+ */
+export function isAllNull(toCheck) {
+  return _.isEmpty(toCheck.filter(value => value !== null));
+}
+
+/**
+ * Builds upper and lower bounds, as relevant
+ * @param {Object} series - object that holds series that will be passed to time series chart component
+ * @param {Object} baseline - baseline object taken from json response
+ * @param {Object} timeseries - time series object taken from json response
+ * @param {Boolean} useCurrent - whether to use current or value, decided by caller
+ */
+export function buildBounds(series, baseline, timeseries, useCurrent) {
+  if (baseline) {
+    const upperExists = (!_.isEmpty(baseline.upper_bound) && !isAllNull(baseline.upper_bound));
+    const lowerExists = (!_.isEmpty(baseline.lower_bound) && !isAllNull(baseline.lower_bound));
+    if (upperExists && lowerExists) {
+      series['Upper and lower bound'] = {
+        timestamps: baseline.timestamp,
+        values: replaceNonFiniteWithCurrent(baseline.upper_bound,
+          useCurrent ? timeseries.current : timeseries.value),
+        type: 'line',
+        color: 'screenshot-bounds'
+      };
+      series['lowerBound'] = {
+        timestamps: baseline.timestamp,
+        values: replaceNonFiniteWithCurrent(baseline.lower_bound,
+          useCurrent ? timeseries.current : timeseries.value),
+        type: 'line',
+        color: 'screenshot-bounds'
+      };
+    } else if (upperExists) {
+      series['Upper Bound'] = {
+        timestamps: baseline.timestamp,
+        values: replaceNonFiniteWithCurrent(baseline.upper_bound,
+          useCurrent ? timeseries.current : timeseries.value),
+        type: 'line',
+        color: 'screenshot-bounds'
+      };
+    } else if (lowerExists) {
+      series['Lower Bound'] = {
+        timestamps: baseline.timestamp,
+        values: replaceNonFiniteWithCurrent(baseline.lower_bound,
+          useCurrent ? timeseries.current : timeseries.value),
+        type: 'line',
+        color: 'screenshot-bounds'
+      };
+    }
+  }
 }
 
 /**
@@ -223,9 +288,12 @@ export default {
   makeFilterString,
   parseProps,
   postProps,
+  deleteProps,
   putProps,
   toIso,
   replaceNonFiniteWithCurrent,
   stripNonFiniteValues,
-  getProps
+  getProps,
+  isAllNull,
+  buildBounds
 };

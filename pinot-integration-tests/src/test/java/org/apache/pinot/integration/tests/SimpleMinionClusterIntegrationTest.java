@@ -25,25 +25,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TableTaskConfig;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.events.MinionEventObserver;
 import org.apache.pinot.minion.events.MinionEventObserverFactory;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.BaseTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -63,7 +62,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "testTable2";
   private static final String TABLE_NAME_3 = "testTable3";
-  private static final int NUM_MINIONS = 1;
+  private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
+
   private static final AtomicBoolean HOLD = new AtomicBoolean();
   private static final AtomicBoolean TASK_START_NOTIFIED = new AtomicBoolean();
   private static final AtomicBoolean TASK_SUCCESS_NOTIFIED = new AtomicBoolean();
@@ -84,9 +84,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     // Add 3 offline tables, where 2 of them have TestTask enabled
     TableTaskConfig taskConfig =
         new TableTaskConfig(Collections.singletonMap(TestTaskGenerator.TASK_TYPE, Collections.emptyMap()));
-    addOfflineTable(TABLE_NAME_1, null, null, null, null, null, SegmentVersion.v1, null, null, taskConfig, null, null);
-    addOfflineTable(TABLE_NAME_2, null, null, null, null, null, SegmentVersion.v1, null, null, taskConfig, null, null);
-    addOfflineTable(TABLE_NAME_3, null, null, null, null, null, SegmentVersion.v1, null, null, null, null, null);
+    addTableConfig(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_1).setTaskConfig(taskConfig).build());
+    addTableConfig(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_2).setTaskConfig(taskConfig).build());
+    addTableConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_3).build());
 
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
@@ -98,12 +100,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
         Collections.singletonMap(TestTaskGenerator.TASK_TYPE, new TestTaskExecutorFactory());
     Map<String, MinionEventObserverFactory> eventObserverFactoryRegistry =
         Collections.singletonMap(TestTaskGenerator.TASK_TYPE, new TestEventObserverFactory());
-    startMinions(NUM_MINIONS, taskExecutorFactoryRegistry, eventObserverFactoryRegistry);
+    startMinion(taskExecutorFactoryRegistry, eventObserverFactoryRegistry);
   }
 
   @Test
-  public void testStopAndResumeTaskQueue()
-      throws Exception {
+  public void testStopResumeDeleteTaskQueue() {
     // Hold the task
     HOLD.set(true);
 
@@ -132,7 +133,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       assertFalse(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
-    }, 60_000L, "Failed to get all tasks IN_PROGRESS");
+    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks IN_PROGRESS");
 
     // Stop the task queue
     _helixTaskResourceManager.stopTaskQueue(TestTaskGenerator.TASK_TYPE);
@@ -151,7 +152,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       assertTrue(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
-    }, 60_000L, "Failed to get all tasks STOPPED");
+    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks STOPPED");
 
     // Resume the task queue, and let the task complete
     _helixTaskResourceManager.resumeTaskQueue(TestTaskGenerator.TASK_TYPE);
@@ -171,13 +172,15 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       assertTrue(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
-    }, 60_000L, "Failed to get all tasks COMPLETED");
+    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks COMPLETED");
 
     // Delete the task queue
-    // Note: Comment out the api for now since there is a known race condition
-    // where helix controller might write a deleted workflow back to ZK because it's still caching it.
-    // TODO: revert this after merging the fix
-//    _helixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE);
+    _helixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE, false);
+
+    // Wait at most 60 seconds for task queue to be deleted
+    TestUtils.waitForCondition(input -> {
+      return !_helixTaskResourceManager.getTaskTypes().contains(TestTaskGenerator.TASK_TYPE);
+    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to delete the task queue");
   }
 
   @AfterClass
@@ -202,15 +205,13 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       _clusterInfoProvider = clusterInfoProvider;
     }
 
-    @Nonnull
     @Override
     public String getTaskType() {
       return TASK_TYPE;
     }
 
-    @Nonnull
     @Override
-    public List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs) {
+    public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
       assertEquals(tableConfigs.size(), 2);
 
       // Generate at most 2 tasks
@@ -227,15 +228,6 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       }
       return taskConfigs;
     }
-
-    @Override
-    public int getNumConcurrentTasksPerInstance() {
-      return DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
-    }
-
-    @Override
-    public void nonLeaderCleanUp() {
-    }
   }
 
   public static class TestTaskExecutorFactory implements PinotTaskExecutorFactory {
@@ -243,10 +235,10 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     public PinotTaskExecutor create() {
       return new BaseTaskExecutor() {
         @Override
-        public Boolean executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
+        public Boolean executeTask(PinotTaskConfig pinotTaskConfig) {
           assertTrue(MINION_CONTEXT.getDataDir().exists());
           assertNotNull(MINION_CONTEXT.getMinionMetrics());
-          assertNotNull(MINION_CONTEXT.getMinionVersion());
+          assertNotNull(MINION_CONTEXT.getHelixPropertyStore());
 
           assertEquals(pinotTaskConfig.getTaskType(), TestTaskGenerator.TASK_TYPE);
           Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -274,24 +266,24 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     public MinionEventObserver create() {
       return new MinionEventObserver() {
         @Override
-        public void notifyTaskStart(@Nonnull PinotTaskConfig pinotTaskConfig) {
+        public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
           TASK_START_NOTIFIED.set(true);
         }
 
         @Override
-        public void notifyTaskSuccess(@Nonnull PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
+        public void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
           assertTrue(executionResult instanceof Boolean);
           assertTrue((Boolean) executionResult);
           TASK_SUCCESS_NOTIFIED.set(true);
         }
 
         @Override
-        public void notifyTaskCancelled(@Nonnull PinotTaskConfig pinotTaskConfig) {
+        public void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
           TASK_CANCELLED_NOTIFIED.set(true);
         }
 
         @Override
-        public void notifyTaskError(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull Exception exception) {
+        public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
           TASK_ERROR_NOTIFIED.set(true);
         }
       };

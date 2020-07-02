@@ -20,8 +20,9 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -29,19 +30,20 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class DistinctCountHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
-  public static final int DEFAULT_LOG2M = 8;
+public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
+  public static final int DEFAULT_LOG2M = 13;
+
+
+  public DistinctCountHLLAggregationFunction(String column) {
+    super(column);
+  }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTHLL;
-  }
-
-  @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.DISTINCTCOUNTHLL.getName() + "_" + column;
   }
 
   @Override
@@ -60,37 +62,40 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    DataType valueType = blockValSets[0].getValueType();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    DataType valueType = blockValSet.getValueType();
+
     if (valueType != DataType.BYTES) {
       HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
       switch (valueType) {
         case INT:
-          int[] intValues = blockValSets[0].getIntValuesSV();
+          int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < length; i++) {
             hyperLogLog.offer(intValues[i]);
           }
           break;
         case LONG:
-          long[] longValues = blockValSets[0].getLongValuesSV();
+          long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
             hyperLogLog.offer(longValues[i]);
           }
           break;
         case FLOAT:
-          float[] floatValues = blockValSets[0].getFloatValuesSV();
+          float[] floatValues = blockValSet.getFloatValuesSV();
           for (int i = 0; i < length; i++) {
             hyperLogLog.offer(floatValues[i]);
           }
           break;
         case DOUBLE:
-          double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+          double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
             hyperLogLog.offer(doubleValues[i]);
           }
           break;
         case STRING:
-          String[] stringValues = blockValSets[0].getStringValuesSV();
+          String[] stringValues = blockValSet.getStringValuesSV();
           for (int i = 0; i < length; i++) {
             hyperLogLog.offer(stringValues[i]);
           }
@@ -101,7 +106,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
       }
     } else {
       // Serialized HyperLogLog
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
         if (hyperLogLog != null) {
@@ -123,42 +128,44 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    DataType valueType = blockValSets[0].getValueType();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    DataType valueType = blockValSet.getValueType();
+
     switch (valueType) {
       case INT:
-        int[] intValues = blockValSets[0].getIntValuesSV();
+        int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
           getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(intValues[i]);
         }
         break;
       case LONG:
-        long[] longValues = blockValSets[0].getLongValuesSV();
+        long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < length; i++) {
           getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(longValues[i]);
         }
         break;
       case FLOAT:
-        float[] floatValues = blockValSets[0].getFloatValuesSV();
+        float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < length; i++) {
           getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(floatValues[i]);
         }
         break;
       case DOUBLE:
-        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+        double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(doubleValues[i]);
         }
         break;
       case STRING:
-        String[] stringValues = blockValSets[0].getStringValuesSV();
+        String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(stringValues[i]);
         }
         break;
       case BYTES:
         // Serialized HyperLogLog
-        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
             HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
@@ -181,11 +188,13 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    DataType valueType = blockValSets[0].getValueType();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    DataType valueType = blockValSet.getValueType();
+
     switch (valueType) {
       case INT:
-        int[] intValues = blockValSets[0].getIntValuesSV();
+        int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < length; i++) {
           int value = intValues[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -194,7 +203,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         }
         break;
       case LONG:
-        long[] longValues = blockValSets[0].getLongValuesSV();
+        long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < length; i++) {
           long value = longValues[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -203,7 +212,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         }
         break;
       case FLOAT:
-        float[] floatValues = blockValSets[0].getFloatValuesSV();
+        float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < length; i++) {
           float value = floatValues[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -212,7 +221,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         }
         break;
       case DOUBLE:
-        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+        double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           double value = doubleValues[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -221,7 +230,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         }
         break;
       case STRING:
-        String[] stringValues = blockValSets[0].getStringValuesSV();
+        String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           String value = stringValues[i];
           for (int groupKey : groupKeysArray[i]) {
@@ -231,7 +240,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         break;
       case BYTES:
         // Serialized HyperLogLog
-        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
             HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);

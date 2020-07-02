@@ -20,20 +20,14 @@ package org.apache.pinot.core.segment.store;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,6 +76,13 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       LOGGER.error("Failed to load segment, error: ", e);
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public void reloadMetadata()
+      throws Exception {
+    this.segmentMetadata = loadSegmentMetadata(segmentDirectory);
+    columnIndexDirectory.metadata = this.segmentMetadata;
   }
 
   private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
@@ -221,33 +222,12 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
-  protected File starTreeIndexFile() {
-    // this is not version dependent for now
-    return new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
-  }
-
   private PinotDataBuffer getIndexForColumn(String column, ColumnIndexType type)
       throws IOException {
     PinotDataBuffer buffer;
-    switch (type) {
-      case DICTIONARY:
-        buffer = columnIndexDirectory.getDictionaryBufferFor(column);
-        break;
-      case FORWARD_INDEX:
-        buffer = columnIndexDirectory.getForwardIndexBufferFor(column);
-        break;
-      case INVERTED_INDEX:
-        buffer = columnIndexDirectory.getInvertedIndexBufferFor(column);
-        break;
-      case BLOOM_FILTER:
-        buffer = columnIndexDirectory.getBloomFilterBufferFor(column);
-        break;
-      case NULLVALUE_VECTOR:
-        buffer = columnIndexDirectory.getNullValueVectorBufferFor(column);
-        break;
-      default:
-        throw new RuntimeException("Unknown index type: " + type.name());
-    }
+
+    buffer = columnIndexDirectory.getBuffer(column, type);
+
     if (readMode == ReadMode.mmap) {
       prefetchMmapData(buffer);
     }
@@ -299,24 +279,6 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     return columnIndexDirectory.hasIndexFor(column, type);
   }
 
-  private InputStream getStarTreeStream() {
-    File starTreeFile = starTreeIndexFile();
-    Preconditions.checkState(starTreeFile.exists(), "Star tree file for segment: {} does not exist");
-    Preconditions.checkState(starTreeFile.isFile(), "Star tree file: {} for segment: {} is not a regular file");
-
-    try {
-      return new FileInputStream(starTreeFile);
-    } catch (FileNotFoundException e) {
-      // we should not reach here
-      LOGGER.error("Star tree file for segment: {} is not found", segmentDirectory, e);
-      throw new IllegalStateException("Star tree file for segment: " + segmentDirectory + " is not found", e);
-    }
-  }
-
-  public boolean hasStarTree() {
-    return starTreeIndexFile().exists();
-  }
-
   /***************************  SegmentDirectory Reader *********************/
   public class Reader extends SegmentDirectory.Reader {
 
@@ -324,21 +286,6 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     public PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
         throws IOException {
       return getIndexForColumn(column, type);
-    }
-
-    @Override
-    public InputStream getStarTreeStream() {
-      return SegmentLocalFSDirectory.this.getStarTreeStream();
-    }
-
-    @Override
-    public File getStarTreeFile() {
-      return SegmentLocalFSDirectory.this.starTreeIndexFile();
-    }
-
-    @Override
-    public boolean hasStarTree() {
-      return SegmentLocalFSDirectory.this.hasStarTree();
     }
 
     @Override
@@ -374,34 +321,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public OutputStream starTreeOutputStream() {
-      // this checks about file's existence and if it's a regular file
-      try {
-        return new FileOutputStream(starTreeIndexFile());
-      } catch (FileNotFoundException e) {
-        LOGGER.error("Failed to open star tree output stream for segment: {}", segmentDirectory, e);
-        throw new RuntimeException("Failed to open star tree output stream for segment: " + segmentDirectory, e);
-      }
-    }
-
-    @Override
     public boolean isIndexRemovalSupported() {
       return columnIndexDirectory.isIndexRemovalSupported();
-    }
-
-    @Override
-    public InputStream getStarTreeStream() {
-      return SegmentLocalFSDirectory.this.getStarTreeStream();
-    }
-
-    @Override
-    public File getStarTreeFile() {
-      return SegmentLocalFSDirectory.this.starTreeIndexFile();
-    }
-
-    @Override
-    public boolean hasStarTree() {
-      return SegmentLocalFSDirectory.this.hasStarTree();
     }
 
     @Override
@@ -409,28 +330,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       columnIndexDirectory.removeIndex(columnName, indexType);
     }
 
-    @Override
-    public void removeStarTree() {
-      starTreeIndexFile().delete();
-    }
-
     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
         throws IOException {
-      ColumnIndexType indexType = key.type;
-      switch (indexType) {
-        case DICTIONARY:
-          return columnIndexDirectory.newDictionaryBuffer(key.name, sizeBytes);
-        case FORWARD_INDEX:
-          return columnIndexDirectory.newForwardIndexBuffer(key.name, sizeBytes);
-        case INVERTED_INDEX:
-          return columnIndexDirectory.newInvertedIndexBuffer(key.name, sizeBytes);
-        case BLOOM_FILTER:
-          return columnIndexDirectory.newBloomFilterBuffer(key.name, sizeBytes);
-        case NULLVALUE_VECTOR:
-          return columnIndexDirectory.newNullValueVectorBuffer(key.name, sizeBytes);
-        default:
-          throw new RuntimeException("Unknown index type: " + indexType.name() + " for directory: " + segmentDirectory);
-      }
+      return columnIndexDirectory.newBuffer(key.name, key.type, sizeBytes);
     }
 
     @Override
@@ -441,12 +343,10 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public void save()
-        throws IOException {
+    public void save() {
     }
 
     void abort() {
-
     }
 
     @Override

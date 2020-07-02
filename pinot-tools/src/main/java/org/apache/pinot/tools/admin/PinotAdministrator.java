@@ -19,26 +19,31 @@
 package org.apache.pinot.tools.admin;
 
 import java.lang.reflect.Field;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AddSchemaCommand;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.AddTenantCommand;
 import org.apache.pinot.tools.admin.command.AnonymizeDataCommand;
 import org.apache.pinot.tools.admin.command.AvroSchemaToPinotSchema;
-import org.apache.pinot.tools.admin.command.BackfillDateTimeColumnCommand;
 import org.apache.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
+import org.apache.pinot.tools.admin.command.GitHubEventsQuickStartCommand;
+import org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
 import org.apache.pinot.tools.admin.command.OfflineSegmentIntervalCheckerCommand;
+import org.apache.pinot.tools.admin.command.OperateClusterConfigCommand;
 import org.apache.pinot.tools.admin.command.PostQueryCommand;
+import org.apache.pinot.tools.admin.command.QuickStartCommand;
 import org.apache.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
 import org.apache.pinot.tools.admin.command.RebalanceTableCommand;
 import org.apache.pinot.tools.admin.command.ShowClusterInfoCommand;
 import org.apache.pinot.tools.admin.command.StartBrokerCommand;
 import org.apache.pinot.tools.admin.command.StartControllerCommand;
+import org.apache.pinot.tools.admin.command.StreamGitHubEventsCommand;
 import org.apache.pinot.tools.admin.command.StartKafkaCommand;
 import org.apache.pinot.tools.admin.command.StartServerCommand;
 import org.apache.pinot.tools.admin.command.StartZookeeperCommand;
@@ -71,8 +76,9 @@ import org.slf4j.LoggerFactory;
  *
  * Sample Usage in Commandline:
  *  JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true" \
- *  bin/pinot-admin.sh AddSchema \
- *    -schemaFile /my/path/to/schema/schema.json \
+ *  bin/pinot-admin.sh AddTable \
+ *    -schemaFile /my/path/to/table/schema.json \
+ *    -tableConfigFile /my/path/to/table/tableConfig.json \
  *    -controllerHost localhost \
  *    -controllerPort 9000 \
  *    -exec
@@ -84,7 +90,10 @@ public class PinotAdministrator {
   //@formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
+      @SubCommand(name = "QuickStart", impl = QuickStartCommand.class),
+      @SubCommand(name = "OperateClusterConfig", impl = OperateClusterConfigCommand.class),
       @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
+      @SubCommand(name = "LaunchDataIngestionJob", impl = LaunchDataIngestionJobCommand.class),
       @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
       @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
       @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class),
@@ -96,6 +105,7 @@ public class PinotAdministrator {
       @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
       @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
       @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
+      @SubCommand(name = "UpdateSchema", impl = AddSchemaCommand.class),
       @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
       @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
       @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
@@ -108,7 +118,6 @@ public class PinotAdministrator {
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
       @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
       @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
-      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
       @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
       @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class),
       @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class),
@@ -116,7 +125,9 @@ public class PinotAdministrator {
       @SubCommand(name = "CollectMetadataForIndexTuning", impl = CollectMetadataForIndexTuning.class),
       @SubCommand(name = "EntriesScannedQuantileReport", impl = EntriesScannedQuantileReport.class),
       @SubCommand(name = "IndexTuner", impl = IndexTunerCommand.class),
-      @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class)
+      @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class),
+      @SubCommand(name = "GitHubEventsQuickStart", impl = GitHubEventsQuickStartCommand.class),
+      @SubCommand(name = "StreamGitHubEvents", impl = StreamGitHubEventsCommand.class)
   })
   Command _subCommand;
   //@formatter:on
@@ -150,6 +161,7 @@ public class PinotAdministrator {
   }
 
   public static void main(String[] args) {
+    PluginManager.get().init();
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
     if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {

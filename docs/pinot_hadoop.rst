@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 .. _creating-segments:
 
 Creating Pinot segments
@@ -316,7 +318,7 @@ to consume from, using a table definition such as this one:
          "streamType": "kafka",
          "stream.kafka.consumer.type": "highLevel",
          "stream.kafka.topic.name": "flights-realtime",
-         "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+         "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
          "stream.kafka.zk.broker.url": "localhost:2181",
          "stream.kafka.hlc.zk.connect.string": "localhost:2181"
        }
@@ -341,7 +343,7 @@ will start consuming from the Kafka topic.
 
 .. code-block:: bash
 
-   bin/pinot-admin.sh AddTable -filePath flights-definition-realtime.json
+   bin/pinot-admin.sh AddTable -schemaFile flights-schema.json -tableConfigFile flights-definition-realtime.json -exec
 
 We can then query the table with the following query to see the events stream in:
 

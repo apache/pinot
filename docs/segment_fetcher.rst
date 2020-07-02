@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 .. _segment-fetcher:
 
 Segment Fetchers
@@ -77,7 +79,33 @@ For example, the following curl requests to Controller will notify it to downloa
 
 .. code-block:: none
 
+  curl -X POST -H "UPLOAD_TYPE:URI" -H "DOWNLOAD_URI:hdfs://nameservice1/hadoop/path/to/segment/file.gz" -H "content-type:application/json" -d '' localhost:9000/v2/segments
+
+
+Note that we have two versions of the segment endpoint. V1 is deprecated and in most cases, should not be used. In this endpoint, the segment is not moved. It is
+assumed that where the segment is currently stored in HDFS is where it will be served from.
+
+.. code-block:: none
+
   curl -X POST -H "UPLOAD_TYPE:URI" -H "DOWNLOAD_URI:hdfs://nameservice1/hadoop/path/to/segment/file.gz" -H "content-type:application/json" -d '' localhost:9000/segments
+
+In Pinot, users can also store encrypted segments in the deep storage of their choice. This is accomplished by the following.
+We have an option for users to implement their own crypter class based on the PinotCrypter interface.
+The simple class name of the crypter is declared inside the header during segment upload.
+
+After you implement your own crypter, you will be able to upload segments with the below command.
+
+.. code-block:: none
+
+  curl -X POST -F "UPLOAD_TYPE:URI" -H "DOWNLOAD_URI:hdfs://nameservice1/hadoop/path/to/segment/file.gz" -H "content-type:application/json" -d '' localhost:9000/segments --header "CRYPTER: ${CRYPTER_SIMPLE_CLASS_NAME}"
+
+On the server and controller side, you will need to configure several properties for your particular crypter class. All
+crypter classes are extended from the PinotCrypter interface - feel free to implement your own as well.
+
+.. code-block:: none
+
+    pinot.server.crypter.class.${SIMPLE_NAME_OF_CRYPTER}=${FULL_PATH_TO_CRYPTER}
+    pinot.server.crypter.lipinotcrypter.keyMap.${FIRST_KEY}=${KEY_VALUE}
 
 Implement your own segment fetcher for other systems
 ----------------------------------------------------

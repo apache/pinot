@@ -44,6 +44,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.CacheResource;
 import org.apache.pinot.thirdeye.dashboard.resources.CustomizedEventResource;
 import org.apache.pinot.thirdeye.dashboard.resources.DashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.DatasetConfigResource;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.alerts.AlertResource;
 import org.apache.pinot.thirdeye.dashboard.resources.DetectionJobResource;
 import org.apache.pinot.thirdeye.dashboard.resources.EmailResource;
 import org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResource;
@@ -74,10 +75,11 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
 import org.apache.pinot.thirdeye.detection.DetectionResource;
-import org.apache.pinot.thirdeye.detection.annotation.DetectionConfigurationResource;
+import org.apache.pinot.thirdeye.detection.DetectionConfigurationResource;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
 import org.apache.pinot.thirdeye.rootcause.RCAFramework;
 import org.apache.pinot.thirdeye.rootcause.impl.RCAFrameworkLoader;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
@@ -113,6 +115,7 @@ public class ThirdEyeDashboardApplication
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
 
   private RequestStatisticsLogger requestStatisticsLogger;
+  private ModelDownloaderManager modelDownloaderManager;
 
   @Override
   public String getName() {
@@ -189,8 +192,10 @@ public class ThirdEyeDashboardApplication
         DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
     env.jersey().register(new DetectionResource());
     env.jersey().register(new DetectionAlertResource(DAO_REGISTRY.getDetectionAlertConfigManager()));
-    env.jersey().register(new YamlResource(config.getDetectionPreviewConfig()));
+    env.jersey().register(new YamlResource(config.getAlerterConfiguration(), config.getDetectionPreviewConfig(),
+        config.getAlertOnboardingPermitPerSecond()));
     env.jersey().register(new SqlDataSourceResource());
+    env.jersey().register(new AlertResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
@@ -253,6 +258,11 @@ public class ThirdEyeDashboardApplication
       env.jersey().register(new AuthValueFactoryProvider.Binder<>(ThirdEyePrincipal.class));
     }
 
+    if (config.getModelDownloaderConfig() != null) {
+      modelDownloaderManager = new ModelDownloaderManager(config.getModelDownloaderConfig());
+      modelDownloaderManager.start();
+    }
+
     env.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
@@ -264,6 +274,9 @@ public class ThirdEyeDashboardApplication
       public void stop() throws Exception {
         if (requestStatisticsLogger != null) {
           requestStatisticsLogger.shutdown();
+        }
+        if (modelDownloaderManager != null) {
+          modelDownloaderManager.shutdown();
         }
       }
     });

@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.minion.executor;
 
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**
@@ -28,17 +27,13 @@ import org.apache.pinot.common.config.PinotTaskConfig;
 public interface PinotTaskExecutor {
 
   /**
-   * Execute the task based on the given {@link PinotTaskConfig}.
-   *
-   * @param pinotTaskConfig Pinot task config
-   * @return Execution result
-   * @throws Exception
+   * Executes the task based on the given task config and returns the execution result.
    */
-  Object executeTask(@Nonnull PinotTaskConfig pinotTaskConfig)
+  Object executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception;
 
   /**
-   * Try to cancel the task.
+   * Tries to cancel the task.
    */
   void cancel();
 }

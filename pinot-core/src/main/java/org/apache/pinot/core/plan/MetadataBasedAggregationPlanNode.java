@@ -24,12 +24,12 @@ import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +43,8 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfos;
-  private final BrokerRequest _brokerRequest;
+  private final AggregationFunction[] _aggregationFunctions;
+  private final Map<String, DataSource> _dataSourceMap;
 
   /**
    * Constructor for the class.
@@ -53,27 +54,21 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
    */
   public MetadataBasedAggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
-    _brokerRequest = brokerRequest;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
+    _aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
+    _dataSourceMap = new HashMap<>();
+    for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+      if (aggregationFunction.getType() != AggregationFunctionType.COUNT) {
+        String column = ((TransformExpressionTree) aggregationFunction.getInputExpressions().get(0)).getValue();
+        _dataSourceMap.computeIfAbsent(column, _indexSegment::getDataSource);
+      }
+    }
   }
 
   @Override
   public Operator run() {
-    SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
-    AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, segmentMetadata);
-
-    Map<String, DataSource> dataSourceMap = new HashMap<>();
-    for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
-      if (aggregationFunctionContext.getAggregationFunction().getType() != AggregationFunctionType.COUNT) {
-        String column = aggregationFunctionContext.getColumn();
-        if (!dataSourceMap.containsKey(column)) {
-          dataSourceMap.put(column, _indexSegment.getDataSource(column));
-        }
-      }
-    }
-
-    return new MetadataBasedAggregationOperator(aggregationFunctionContexts, segmentMetadata, dataSourceMap);
+    return new MetadataBasedAggregationOperator(_aggregationFunctions, _indexSegment.getSegmentMetadata(),
+        _dataSourceMap);
   }
 
   @Override

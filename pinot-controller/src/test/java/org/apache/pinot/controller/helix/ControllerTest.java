@@ -59,17 +59,21 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.Tenant;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.utils.TenantRole;
-import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerStarter;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -80,6 +84,8 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLE
 import static org.apache.pinot.common.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -157,8 +163,11 @@ public abstract class ControllerTest {
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
     _helixDataAccessor = _helixManager.getHelixDataAccessor();
-
+    ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
     switch (_controllerStarter.getControllerMode()) {
       case DUAL:
       case PINOT_ONLY:
@@ -167,16 +176,15 @@ public abstract class ControllerTest {
 
         // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
         //       https://github.com/apache/helix/issues/331. Remove this after Helix fixing the issue.
-        _helixAdmin.setConfig(
-            new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-                .build(),
-            Collections.singletonMap(ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000"));
+        configAccessor.set(scope, ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000");
         break;
       case HELIX_ONLY:
         _helixAdmin = _helixManager.getClusterManagmentTool();
         _propertyStore = _helixManager.getHelixPropertyStore();
         break;
     }
+    //enable case insensitive pql for test cases.
+    configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.TRUE.toString());
   }
 
   protected ControllerStarter getControllerStarter(ControllerConf config) {
@@ -404,7 +412,58 @@ public abstract class ControllerTest {
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
-    Assert.assertEquals(postMethod.getStatusCode(), 200);
+    assertEquals(postMethod.getStatusCode(), 200);
+  }
+
+  protected Schema getSchema(String schemaName) {
+    Schema schema = _helixResourceManager.getSchema(schemaName);
+    assertNotNull(schema);
+    return schema;
+  }
+
+  protected void addTableConfig(TableConfig tableConfig)
+      throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
+  }
+
+  protected void updateTableConfig(TableConfig tableConfig)
+      throws IOException {
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName()),
+        tableConfig.toJsonString());
+  }
+
+  protected TableConfig getOfflineTableConfig(String tableName) {
+    TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
+    Assert.assertNotNull(offlineTableConfig);
+    return offlineTableConfig;
+  }
+
+  protected TableConfig getRealtimeTableConfig(String tableName) {
+    TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
+    Assert.assertNotNull(realtimeTableConfig);
+    return realtimeTableConfig;
+  }
+
+  protected void dropOfflineTable(String tableName)
+      throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
+  }
+
+  protected void dropRealtimeTable(String tableName)
+      throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
+  }
+
+  protected void reloadOfflineTable(String tableName)
+      throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE.name()), null);
+  }
+
+  protected void reloadRealtimeTable(String tableName)
+      throws IOException {
+    sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.REALTIME.name()), null);
   }
 
   protected String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {

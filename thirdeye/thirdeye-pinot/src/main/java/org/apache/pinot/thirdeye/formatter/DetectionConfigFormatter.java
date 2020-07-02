@@ -23,10 +23,12 @@ package org.apache.pinot.thirdeye.formatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
@@ -44,15 +46,12 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import org.joda.time.DateTime;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator.*;
-import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.builder.DetectionConfigPropertiesBuilder.*;
 
 
 /**
@@ -77,20 +76,17 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   static final String ATTR_GRANULARITY = "monitoringGranularity";
   static final String ATTR_HEALTH = "health";
 
+  private static final String PROP_METRIC_URNS_KEY = "metricUrn";
   private static final String PROP_NESTED_METRIC_URNS_KEY = "nestedMetricUrns";
   private static final String PROP_NESTED_PROPERTIES_KEY = "nested";
   private static final String PROP_MONITORING_GRANULARITY = "monitoringGranularity";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
-  private static final String PROP_VARIABLES_BUCKET_PERIOD = "variables.bucketPeriod";
-
-  private static final Logger LOG = LoggerFactory.getLogger(DetectionConfigFormatter.class);
 
   private static final long DEFAULT_PRESENTING_WINDOW_SIZE_MINUTELY = TimeUnit.HOURS.toMillis(48);
   private static final long DEFAULT_PRESENTING_WINDOW_SIZE_DAILY = TimeUnit.DAYS.toMillis(30);
   private static final TimeGranularity DEFAULT_SHOW_GRANULARITY = new TimeGranularity(1, TimeUnit.DAYS);
 
   private static final String ALGORITHM_TYPE = "ALGORITHM";
-  private static final String MIGRATED_ALGORITHM_TYPE = "MIGRATED_ALGORITHM";
   private static final String CONFIGURATION = "configuration";
 
   private final MetricConfigManager metricDAO;
@@ -122,7 +118,7 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     output.put(ATTR_LAST_TIMESTAMP, config.getLastTimestamp());
     output.put(ATTR_HEALTH, getDetectionHealth(config));
 
-    List<String> metricUrns = extractMetricUrnsFromProperties(config.getProperties());
+    Set<String> metricUrns = extractMetricUrnsFromProperties(config.getProperties());
 
     Map<String, MetricConfigDTO> metricUrnToMetricDTOs = new HashMap<>();
     for (String metricUrn : metricUrns) {
@@ -157,8 +153,11 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
    * @param properties the detection config properties
    * @return the list of metric urns
    */
-  public static List<String> extractMetricUrnsFromProperties(Map<String, Object> properties) {
-    List<String> metricUrns = new ArrayList<>();
+  public static Set<String> extractMetricUrnsFromProperties(Map<String, Object> properties) {
+    Set<String> metricUrns = new HashSet<>();
+    if (properties.containsKey(PROP_METRIC_URNS_KEY)) {
+      metricUrns.add((String)properties.get(PROP_METRIC_URNS_KEY));
+    }
     if (properties.containsKey(PROP_NESTED_METRIC_URNS_KEY)) {
       metricUrns.addAll(ConfigUtils.getList(properties.get(PROP_NESTED_METRIC_URNS_KEY)));
     }
@@ -244,8 +243,6 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
       Map<String, Object> specs = (Map<String, Object>) entry.getValue();
       if (entry.getKey().equals(ALGORITHM_TYPE)) {
         extractTimeGranularitiesFromAlgorithmSpecs(specs, PROP_BUCKET_PERIOD).ifPresent(monitoringGranularities::add);
-      } else if (entry.getKey().equals(MIGRATED_ALGORITHM_TYPE)) {
-        extractTimeGranularitiesFromAlgorithmSpecs(specs, PROP_VARIABLES_BUCKET_PERIOD).ifPresent(monitoringGranularities::add);
       } else if (specs.containsKey(PROP_MONITORING_GRANULARITY)) {
         monitoringGranularities.add(TimeGranularity.fromString(MapUtils.getString(specs, (PROP_MONITORING_GRANULARITY))));
       }

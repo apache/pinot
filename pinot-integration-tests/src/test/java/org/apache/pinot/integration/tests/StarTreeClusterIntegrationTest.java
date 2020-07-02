@@ -19,16 +19,16 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
-import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
 import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
@@ -61,29 +61,37 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected static final String STAR_TREE_TABLE_NAME = "myStarTable";
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
-  private static final String QUERY_FILE_NAME = "OnTimeStarTreeQueries.txt";
+  private static final int NUM_STAR_TREE_DIMENSIONS = 5;
+  private static final int NUM_STAR_TREE_METRICS = 5;
+  private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES = Arrays
+      .asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+          AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE);
   private static final int NUM_QUERIES_TO_GENERATE = 100;
 
-  protected Schema _schema;
-  private StarTreeQueryGenerator _queryGenerator;
   private String _currentTable;
+  private StarTreeQueryGenerator _starTree1QueryGenerator;
+  private StarTreeQueryGenerator _starTree2QueryGenerator;
 
-  @Nonnull
   @Override
   protected String getTableName() {
     return _currentTable;
   }
 
-  @Nonnull
   @Override
   protected String getSchemaFileName() {
     return SCHEMA_FILE_NAME;
   }
 
+  // NOTE: Star-Tree and SegmentInfoProvider does not work on no-dictionary dimensions
+  @Override
+  protected List<String> getNoDictionaryColumns() {
+    return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay");
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
     startZk();
@@ -91,13 +99,57 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServers(2);
 
-    // Create the tables
-    addOfflineTable(DEFAULT_TABLE_NAME);
-    addOfflineTable(STAR_TREE_TABLE_NAME);
+    // Create and upload the schema and table config
+    Schema schema = createSchema();
+    addSchema(schema);
+    _currentTable = DEFAULT_TABLE_NAME;
+    TableConfig defaultTableConfig = createOfflineTableConfig();
+    addTableConfig(defaultTableConfig);
 
-    // Set up segments and query generator
-    _schema = Schema.fromFile(getSchemaFile());
-    setUpSegmentsAndQueryGenerator();
+    // Randomly pick some dimensions and metrics for star-trees
+    List<String> starTree1Dimensions = new ArrayList<>(NUM_STAR_TREE_DIMENSIONS);
+    List<String> starTree2Dimensions = new ArrayList<>(NUM_STAR_TREE_DIMENSIONS);
+    List<String> allDimensions = new ArrayList<>(schema.getDimensionNames());
+    Collections.shuffle(allDimensions);
+    for (int i = 0; i < NUM_STAR_TREE_DIMENSIONS; i++) {
+      starTree1Dimensions.add(allDimensions.get(2 * i));
+      starTree2Dimensions.add(allDimensions.get(2 * i + 1));
+    }
+    List<String> starTree1Metrics = new ArrayList<>(NUM_STAR_TREE_METRICS);
+    List<String> starTree2Metrics = new ArrayList<>(NUM_STAR_TREE_METRICS);
+    List<String> allMetrics = new ArrayList<>(schema.getMetricNames());
+    Collections.shuffle(allMetrics);
+    for (int i = 0; i < NUM_STAR_TREE_METRICS; i++) {
+      starTree1Metrics.add(allMetrics.get(2 * i));
+      starTree2Metrics.add(allMetrics.get(2 * i + 1));
+    }
+    _currentTable = STAR_TREE_TABLE_NAME;
+    TableConfig starTreeTableConfig = createOfflineTableConfig();
+    starTreeTableConfig.getIndexingConfig().setStarTreeIndexConfigs(Arrays
+        .asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics),
+            getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics)));
+    addTableConfig(starTreeTableConfig);
+
+    // Unpack the Avro files
+    List<File> avroFiles = unpackAvroData(_tempDir);
+
+    // Create and upload segments
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, defaultTableConfig, schema, 0, _segmentDir, _tarDir);
+    uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, starTreeTableConfig, schema, 0, _segmentDir, _tarDir);
+    uploadSegments(STAR_TREE_TABLE_NAME, _tarDir);
+
+    // Set up the query generators
+    SegmentInfoProvider segmentInfoProvider = new SegmentInfoProvider(_tarDir.getPath());
+    List<String> aggregationFunctions = new ArrayList<>(AGGREGATION_FUNCTION_TYPES.size());
+    for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
+      aggregationFunctions.add(functionType.getName());
+    }
+    _starTree1QueryGenerator = new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, starTree1Dimensions, starTree1Metrics,
+        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions);
+    _starTree2QueryGenerator = new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, starTree2Dimensions, starTree2Metrics,
+        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions);
 
     // Wait for all documents loaded
     _currentTable = DEFAULT_TABLE_NAME;
@@ -106,63 +158,23 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected void setUpSegmentsAndQueryGenerator()
-      throws Exception {
-    // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
-
-    // Create and upload segments without star tree indexes from Avro data
-    createAndUploadSegments(avroFiles, DEFAULT_TABLE_NAME, false);
-
-    // Initialize the query generator using segments without star tree indexes
-    SegmentInfoProvider segmentInfoProvider = new SegmentInfoProvider(_tarDir.getAbsolutePath());
-    _queryGenerator =
-        new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, segmentInfoProvider.getSingleValueDimensionColumns(),
-            segmentInfoProvider.getMetricColumns(), segmentInfoProvider.getSingleValueDimensionValuesMap());
-
-    // Create and upload segments with star tree indexes from Avro data
-    createAndUploadSegments(avroFiles, STAR_TREE_TABLE_NAME, true);
-  }
-
-  private void createAndUploadSegments(List<File> avroFiles, String tableName, boolean createStarTreeIndex)
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
-
-    ExecutorService executor = Executors.newCachedThreadPool();
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, createStarTreeIndex, null, null, _schema,
-            executor);
-    executor.shutdown();
-    executor.awaitTermination(10, TimeUnit.MINUTES);
-
-    uploadSegments(getTableName(), _tarDir);
-  }
-
-  @Test
-  public void testQueriesFromQueryFile()
-      throws Exception {
-    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(QUERY_FILE_NAME);
-    Assert.assertNotNull(resourceUrl);
-    File queryFile = new File(resourceUrl.getFile());
-
-    try (BufferedReader reader = new BufferedReader(new FileReader(queryFile))) {
-      String starQuery;
-      while ((starQuery = reader.readLine()) != null) {
-        testStarQuery(starQuery);
+  private static StarTreeIndexConfig getStarTreeIndexConfig(List<String> dimensions, List<String> metrics) {
+    List<String> functionColumnPairs = new ArrayList<>();
+    for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
+      for (String metric : metrics) {
+        functionColumnPairs.add(new AggregationFunctionColumnPair(functionType, metric).toColumnName());
       }
     }
+    return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, 0);
   }
 
   @Test
   public void testGeneratedQueries()
       throws Exception {
-    for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i++) {
-      testStarQuery(generateQuery());
+    for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i += 2) {
+      testStarQuery(_starTree1QueryGenerator.nextQuery());
+      testStarQuery(_starTree2QueryGenerator.nextQuery());
     }
-  }
-
-  protected String generateQuery() {
-    return _queryGenerator.nextQuery();
   }
 
   @Test

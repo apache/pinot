@@ -19,8 +19,9 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
+import java.net.URI;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
 
@@ -32,22 +33,19 @@ import org.slf4j.Logger;
 public class SplitSegmentCommitter implements SegmentCommitter {
   private final SegmentCompletionProtocol.Request.Params _params;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private final String _controllerVipUrl;
-  private final IndexLoadingConfig _indexLoadingConfig;
-
+  private final SegmentUploader _segmentUploader;
   private final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, String controllerVipUrl) {
+      SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
-    _indexLoadingConfig = indexLoadingConfig;
     _params = new SegmentCompletionProtocol.Request.Params(params);
-    _controllerVipUrl = controllerVipUrl;
+    _segmentUploader = segmentUploader;
   }
 
   @Override
-  public SegmentCompletionProtocol.Response commit(long currentOffset, int numRowsConsumed, LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
+  public SegmentCompletionProtocol.Response commit(LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
     final File segmentTarFile = new File(segmentBuildDescriptor.getSegmentTarFilePath());
 
     SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_params);
@@ -57,23 +55,14 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    SegmentCompletionProtocol.Response segmentCommitUploadResponse =
-        _protocolHandler.segmentCommitUpload(_params, segmentTarFile, _controllerVipUrl);
-    if (!segmentCommitUploadResponse.getStatus()
-        .equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
-      _segmentLogger.warn("Segment upload failed with response {}", segmentCommitUploadResponse.toJsonString());
+    URI segmentLocation = _segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(_params.getSegmentName()));
+    if (segmentLocation == null) {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
+    _params.withSegmentLocation(segmentLocation.toString());
 
-    _params.withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation());
-
-    SegmentCompletionProtocol.Response commitEndResponse;
-    if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
-      commitEndResponse =
-          _protocolHandler.segmentCommitEndWithMetadata(_params, segmentBuildDescriptor.getMetadataFiles());
-    } else {
-      commitEndResponse = _protocolHandler.segmentCommitEnd(_params);
-    }
+    SegmentCompletionProtocol.Response commitEndResponse =
+        _protocolHandler.segmentCommitEndWithMetadata(_params, segmentBuildDescriptor.getMetadataFiles());
 
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       _segmentLogger.warn("CommitEnd failed with response {}", commitEndResponse.toJsonString());

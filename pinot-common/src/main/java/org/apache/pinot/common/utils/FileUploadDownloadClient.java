@@ -29,6 +29,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -162,6 +163,11 @@ public class FileUploadDownloadClient implements Closeable {
     return getURI(HTTPS, host, port, SCHEMA_PATH);
   }
 
+  public static URI getUploadSchemaURI(URI controllerURI)
+      throws URISyntaxException {
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SCHEMA_PATH);
+  }
+
   /**
    * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
    * getUploadSegmentHttpURI to construct your request.
@@ -200,6 +206,11 @@ public class FileUploadDownloadClient implements Closeable {
   public static URI getUploadSegmentHttpsURI(String host, int port)
       throws URISyntaxException {
     return getURI(HTTPS, host, port, SEGMENT_PATH);
+  }
+
+  public static URI getUploadSegmentURI(URI controllerURI)
+      throws URISyntaxException {
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
   }
 
   private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,
@@ -242,8 +253,9 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile) {
-    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null,
+  private static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile, List<Header> headers,
+                                                    List<NameValuePair> parameters) {
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
         DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
@@ -412,7 +424,22 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile));
+    return addSchema(uri, schemaName, schemaFile, null, null);
+  }
+
+  /**
+   * Add schema.
+   *
+   * @param uri URI
+   * @param schemaName Schema name
+   * @param schemaFile Schema file
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile, List<Header> headers,
+                                      List<NameValuePair> parameters) throws IOException, HttpErrorStatusException {
+    return sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile, headers, parameters));
   }
 
   /**
@@ -487,19 +514,18 @@ public class FileUploadDownloadClient implements Closeable {
    * @param uri URI
    * @param segmentName Segment name
    * @param segmentFile Segment file
-   * @param rawTableName Raw table name
+   * @param tableName Table name with or without type suffix
    * @return Response
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String rawTableName)
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName)
       throws IOException, HttpErrorStatusException {
     // Add table name as a request parameter
-    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
-    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
+    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
+    List<NameValuePair> parameters = Collections.singletonList(tableNameValuePair);
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
-
 
   /**
    * Upload segment with segment file input stream.

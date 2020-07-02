@@ -102,7 +102,7 @@ public class ThresholdRuleDetectorTest {
     TimeSeries ts = result.getTimeseries();
     Assert.assertEquals(ts.getPredictedUpperBound(), DoubleSeries.fillValues(ts.size(), 500));
     Assert.assertEquals(ts.getPredictedLowerBound(), DoubleSeries.fillValues(ts.size(), 100));
-    Assert.assertEquals(ts.getPredictedBaseline(), ts.getCurrent());
+    Assert.assertEquals(ts.getPredictedBaseline().values(), new double[]{100, 100L, 200L, 500L, 500L});
   }
 
   @Test
@@ -128,7 +128,7 @@ public class ThresholdRuleDetectorTest {
     List<MergedAnomalyResultDTO> anomalies = thresholdRule.runDetection(new Interval(1546214400000L, 1551398400000L), "thirdeye:metric:123").getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 1551312000000L);
-    Assert.assertEquals(anomalies.get(0).getEndTime(), 1551398400000L);
+    Assert.assertEquals(anomalies.get(0).getEndTime(), 1553731200000L);
   }
 
 }

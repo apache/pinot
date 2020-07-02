@@ -43,6 +43,31 @@ public final class MultiValueIterator extends BlockMultiValIterator {
   }
 
   @Override
+  public int nextCharVal(char[] charArray) {
+    return _reader.getCharArray(_nextDocId++, charArray);
+  }
+
+  @Override
+  public int nextDoubleVal(double[] doubleArray) {
+    return _reader.getDoubleArray(_nextDocId++, doubleArray);
+  }
+
+  @Override
+  public int nextFloatVal(float[] floatArray) {
+    return _reader.getFloatArray(_nextDocId++, floatArray);
+  }
+
+  @Override
+  public int nextLongVal(long[] longArray) {
+    return _reader.getLongArray(_nextDocId++, longArray);
+  }
+
+  @Override
+  public int nextBytesArrayVal(byte[][] bytesArrays) {
+     return _reader.getBytesArray(_nextDocId++, bytesArrays);
+  }
+
+  @Override
   public boolean hasNext() {
     return _nextDocId < _numDocs;
   }

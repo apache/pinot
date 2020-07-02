@@ -22,8 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.time.TimeUtils;
-import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +89,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     }
 
     final long timeConsumed = System.currentTimeMillis() - committingSegmentZKMetadata.getCreationTime();
-    final long numRowsConsumed = committingSegmentZKMetadata.getTotalRawDocs();
+    final long numRowsConsumed = committingSegmentZKMetadata.getTotalDocs();
     final int numRowsThreshold = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
     LOGGER.info("{}: Data from committing segment: Time {}  numRows {} threshold {} segmentSize(bytes) {}",
         newSegmentName, TimeUtils.convertMillisToPeriod(timeConsumed), numRowsConsumed, numRowsThreshold,

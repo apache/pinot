@@ -28,26 +28,30 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.common.exception.SchemaNotFoundException;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.events.SchemaEventType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.slf4j.Logger;
@@ -117,8 +121,9 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
+      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
       FormDataMultiPart multiPart) {
-    return addOrUpdateSchema(schemaName, multiPart);
+    return updateSchema(schemaName, getSchemaFromMultiPart(multiPart), reload);
   }
 
   @PUT
@@ -127,30 +132,34 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse updateSchema(@ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
+  public SuccessResponse updateSchema(
+      @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
+      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
       Schema schema) {
-    return addOrUpdateSchema(schemaName, schema);
+    return updateSchema(schemaName, schema, reload);
   }
 
-  // TODO: This should not update if the schema already exists
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addSchema(FormDataMultiPart multiPart) {
-    return addOrUpdateSchema(null, multiPart);
+  public SuccessResponse addSchema(
+      @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
+      FormDataMultiPart multiPart) {
+    return addSchema(getSchemaFromMultiPart(multiPart), override);
   }
 
-  // TODO: This should not update if the schema already exists
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addSchema(Schema schema) {
-    return addOrUpdateSchema(null, schema);
+  public SuccessResponse addSchema(
+      @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
+      Schema schema) {
+    return addSchema(schema, override);
   }
 
   @POST
@@ -161,7 +170,7 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public String validateSchema(FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
-    if (!schema.validate(LOGGER)) {
+    if (!SchemaUtils.validate(schema, LOGGER)) {
       throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
           Response.Status.BAD_REQUEST);
     }
@@ -176,7 +185,7 @@ public class PinotSchemaRestletResource {
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public String validateSchema(Schema schema) {
-    if (!schema.validate(LOGGER)) {
+    if (!SchemaUtils.validate(schema, LOGGER)) {
       throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
           Response.Status.BAD_REQUEST);
     }
@@ -184,26 +193,43 @@ public class PinotSchemaRestletResource {
   }
 
   /**
-   * Internal method to add or update schema
-   * @param schemaName null value indicates new schema (POST request) where schemaName is
-   *                   not part of URI
+   * Internal method to add schema
+   * @param schema  schema
+   * @param override  set to true to override the existing schema with the same name
    * @return
    */
-  private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, FormDataMultiPart multiPart) {
-    return addOrUpdateSchema(schemaName, getSchemaFromMultiPart(multiPart));
+  private SuccessResponse addSchema(Schema schema, boolean override) {
+    if (!SchemaUtils.validate(schema, LOGGER)) {
+      throw new ControllerApplicationException(LOGGER, "Cannot add invalid schema " + schema.getSchemaName(),
+          Response.Status.BAD_REQUEST);
+    }
+
+    try {
+      _pinotHelixResourceManager.addSchema(schema, override);
+      // Best effort notification. If controller fails at this point, no notification is given.
+      LOGGER.info("Notifying metadata event for adding new schema {}", schema.getSchemaName());
+      _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.CREATE);
+
+      return new SuccessResponse(schema.getSchemaName() + " successfully added");
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to add new schema %s.", schema.getSchemaName()), Response.Status.INTERNAL_SERVER_ERROR,
+          e);
+    }
   }
 
   /**
-   * Internal method to add or update schema
-   * @param schemaName null value indicates new schema (POST request) where schemaName is
-   *                   not part of URI
+   * Internal method to update schema
+   * @param schemaName  name of the schema to update
+   * @param schema  schema
+   * @param reload  set to true to reload the tables using the schema, so committed segments can pick up the new schema
    * @return
    */
-  private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, Schema schema) {
-    final String schemaNameForLogging = (schemaName == null) ? "new schema" : schemaName + " schema";
-    if (!schema.validate(LOGGER)) {
-      LOGGER.info("Invalid schema during create/update of {}", schemaNameForLogging);
-      throw new ControllerApplicationException(LOGGER, "Invalid schema", Response.Status.BAD_REQUEST);
+  private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload) {
+    if (!SchemaUtils.validate(schema, LOGGER)) {
+      throw new ControllerApplicationException(LOGGER, "Cannot add invalid schema: " + schemaName,
+          Response.Status.BAD_REQUEST);
     }
 
     if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {
@@ -215,22 +241,23 @@ public class PinotSchemaRestletResource {
     }
 
     try {
-      SchemaEventType eventType = SchemaEventType.UPDATE;
-      if (schemaName == null) {
-        // New schema posted
-        eventType = SchemaEventType.CREATE;
-      }
-      _pinotHelixResourceManager.addOrUpdateSchema(schema);
-
+      _pinotHelixResourceManager.updateSchema(schema, reload);
       // Best effort notification. If controller fails at this point, no notification is given.
-      LOGGER.info("Metadata change notification for schema {}, type {}", schema, eventType);
-      _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, eventType);
-
+      LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
+      _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
+    } catch (SchemaNotFoundException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to find schema %s", schemaName),
+          Response.Status.NOT_FOUND, e);
+    } catch (TableNotFoundException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to find table %s to reload", schemaName),
+          Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to update schema %s", schemaNameForLogging), Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to update schema %s", schemaName),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

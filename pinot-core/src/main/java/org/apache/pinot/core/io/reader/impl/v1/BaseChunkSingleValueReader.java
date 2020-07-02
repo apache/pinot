@@ -24,6 +24,7 @@ import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.compression.ChunkDecompressor;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
+import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,24 +38,20 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleValueReader<ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSingleValueReader.class);
 
-  protected final PinotDataBuffer _dataBuffer;
-  protected final PinotDataBuffer _dataHeader;
   protected final int _chunkSize;
-  private final PinotDataBuffer _rawData;
-  private final boolean _isCompressed;
-  protected ChunkDecompressor _chunkDecompressor;
-
   protected final int _numDocsPerChunk;
   protected final int _numChunks;
   protected final int _lengthOfLongestEntry;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param pinotDataBuffer Data buffer
-   */
-  public BaseChunkSingleValueReader(PinotDataBuffer pinotDataBuffer) {
-    _dataBuffer = pinotDataBuffer;
+  private final PinotDataBuffer _dataBuffer;
+  private final PinotDataBuffer _dataHeader;
+  private final PinotDataBuffer _rawData;
+  private final boolean _isCompressed;
+  private final ChunkDecompressor _chunkDecompressor;
+  private final int _headerEntryChunkOffsetSize;
+
+  public BaseChunkSingleValueReader(PinotDataBuffer dataBuffer) {
+    _dataBuffer = dataBuffer;
 
     int headerOffset = 0;
     int version = _dataBuffer.getInt(headerOffset);
@@ -87,20 +84,15 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     }
 
     _chunkSize = (_lengthOfLongestEntry * _numDocsPerChunk);
+    _headerEntryChunkOffsetSize = BaseChunkSingleValueWriter.getHeaderEntryChunkOffsetSize(version);
 
     // Slice out the header from the data buffer.
-    int dataHeaderLength = _numChunks * Integer.BYTES;
+    int dataHeaderLength = _numChunks * _headerEntryChunkOffsetSize;
     int rawDataStart = dataHeaderStart + dataHeaderLength;
     _dataHeader = _dataBuffer.view(dataHeaderStart, rawDataStart);
 
     // Useful for uncompressed data.
     _rawData = _dataBuffer.view(rawDataStart, _dataBuffer.size());
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    _dataBuffer.close();
   }
 
   /**
@@ -120,14 +112,14 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     }
 
     int chunkSize;
-    int chunkPosition = getChunkPosition(chunkId);
+    long chunkPosition = getChunkPosition(chunkId);
 
     // Size of chunk can be determined using next chunks offset, or end of data buffer for last chunk.
     if (chunkId == (_numChunks - 1)) { // Last chunk.
       chunkSize = (int) (_dataBuffer.size() - chunkPosition);
     } else {
-      int nextChunkOffset = getChunkPosition(chunkId + 1);
-      chunkSize = nextChunkOffset - chunkPosition;
+      long nextChunkOffset = getChunkPosition(chunkId + 1);
+      chunkSize = (int) (nextChunkOffset - chunkPosition);
     }
 
     ByteBuffer decompressedBuffer = context.getChunkBuffer();
@@ -145,12 +137,15 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
 
   /**
    * Helper method to get the offset of the chunk in the data.
-   *
    * @param chunkId Id of the chunk for which to return the position.
    * @return Position (offset) of the chunk in the data.
    */
-  protected int getChunkPosition(int chunkId) {
-    return _dataHeader.getInt(chunkId * Integer.BYTES);
+  protected long getChunkPosition(int chunkId) {
+    if (_headerEntryChunkOffsetSize == Integer.BYTES) {
+      return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
+    } else {
+      return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
+    }
   }
 
   /**
@@ -159,7 +154,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
    * @return True if data is compressed, false otherwise.
    */
   protected boolean isCompressed() {
-    return (_isCompressed);
+    return _isCompressed;
   }
 
   /**
@@ -169,5 +164,11 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
    */
   protected PinotDataBuffer getRawData() {
     return _rawData;
+  }
+
+  @Override
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
   }
 }

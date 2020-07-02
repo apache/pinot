@@ -21,21 +21,23 @@ package org.apache.pinot.core.query.aggregation;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.BaseTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.spi.utils.ByteArray;
+
 
 /**
  * This serves the following purposes:
@@ -47,21 +49,18 @@ import org.apache.pinot.core.data.table.Record;
  * uses {@link Set} to store unique records.
  */
 public class DistinctTable extends BaseTable {
-  private static final double LOAD_FACTOR = 0.75;
   private static final int MAX_INITIAL_CAPACITY = 64 * 1024;
   private Set<Record> _uniqueRecordsSet;
   private boolean _noMoreNewRecords;
   private Iterator<Record> _sortedIterator;
 
-  public DistinctTable(DataSchema dataSchema, List<SelectionSort> orderBy, int limit) {
+  public DistinctTable(DataSchema dataSchema, List<SelectionSort> orderBy, int capacity) {
     // TODO: see if 64k is the right max initial capacity to use
-    // if it turns out that users always use LIMIT N > 0.75 * 64k and
-    // there are indeed that many records, then there will be resizes.
-    // The current method of setting the initial capacity as
-    // min(64k, limit/loadFactor) will not require resizes for LIMIT N
-    // where N <= 48000
-    super(dataSchema, Collections.emptyList(), orderBy, limit);
-    int initialCapacity = Math.min(MAX_INITIAL_CAPACITY, Math.abs(nextPowerOfTwo((int) (limit / LOAD_FACTOR))));
+    // NOTE: The passed in capacity is calculated based on the LIMIT in the query as Math.max(limit * 5, 5000). When
+    //       LIMIT is smaller than (64 * 1024 * 0.75 (load factor) / 5 = 9830), then it is guaranteed that no resize is
+    //       required.
+    super(dataSchema, new AggregationFunction[0], orderBy, capacity);
+    int initialCapacity = Math.min(MAX_INITIAL_CAPACITY, HashUtil.getHashMapCapacity(capacity));
     _uniqueRecordsSet = new HashSet<>(initialCapacity);
     _noMoreNewRecords = false;
   }
@@ -121,8 +120,9 @@ public class DistinctTable extends BaseTable {
     return dataTable.toBytes();
   }
 
-  private void serializeColumns(final Object[] columns, final DataSchema.ColumnDataType[] columnDataTypes,
-      final DataTableBuilder dataTableBuilder) {
+  private void serializeColumns(Object[] columns, DataSchema.ColumnDataType[] columnDataTypes,
+      DataTableBuilder dataTableBuilder)
+      throws IOException {
     for (int colIndex = 0; colIndex < columns.length; colIndex++) {
       switch (columnDataTypes[colIndex]) {
         case INT:
@@ -141,7 +141,11 @@ public class DistinctTable extends BaseTable {
           dataTableBuilder.setColumn(colIndex, ((String) columns[colIndex]));
           break;
         case BYTES:
-          dataTableBuilder.setColumn(colIndex, BytesUtils.toHexString((byte[]) columns[colIndex]));
+          dataTableBuilder.setColumn(colIndex, (ByteArray) columns[colIndex]);
+          break;
+        // Add other distinct column type supports here
+        default:
+          throw new IllegalStateException();
       }
     }
   }
@@ -151,13 +155,15 @@ public class DistinctTable extends BaseTable {
    * @param byteBuffer data to deserialize
    * @throws IOException
    */
-  public DistinctTable(ByteBuffer byteBuffer) throws IOException {
+  public DistinctTable(ByteBuffer byteBuffer)
+      throws IOException {
     // This is called by the BrokerReduceService when it de-serializes the
     // DISTINCT result from the DataTable. As of now we don't have all the
     // information to pass to super class so just pass null, empty lists
     // and the broker will set the correct information before merging the
     // data tables.
-    super(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), Collections.emptyList(), new ArrayList<>(), 0);
+    super(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), new AggregationFunction[0],
+        new ArrayList<>(), 0);
     DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
     _dataSchema = dataTable.getDataSchema();
     _uniqueRecordsSet = new HashSet<>();
@@ -187,7 +193,9 @@ public class DistinctTable extends BaseTable {
             columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
             break;
           case BYTES:
-            columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
+            columnValues[colIndex] = dataTable.getBytes(rowIndex, colIndex);
+            break;
+          // Add other distinct column type supports here
           default:
             throw new IllegalStateException(
                 "Unexpected column data type " + columnDataType + " while deserializing data table for DISTINCT query");
@@ -211,18 +219,6 @@ public class DistinctTable extends BaseTable {
    */
   public void addLimitAndOrderByInfo(BrokerRequest brokerRequest) {
     addCapacityAndOrderByInfo(brokerRequest.getOrderBy(), brokerRequest.getLimit());
-  }
-
-  private static int nextPowerOfTwo(int val) {
-    if (val == 0 || val == 1) {
-      return val + 1;
-    }
-    int highestBit = Integer.highestOneBit(val);
-    if (highestBit == val) {
-      return val;
-    } else {
-      return highestBit << 1;
-    }
   }
 
   private void resize(int trimToSize) {

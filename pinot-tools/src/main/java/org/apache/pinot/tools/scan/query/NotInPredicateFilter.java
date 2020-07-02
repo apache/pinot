@@ -18,20 +18,19 @@
  */
 package org.apache.pinot.tools.scan.query;
 
-import java.util.HashSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class NotInPredicateFilter implements PredicateFilter {
-  private static final String SEPARATOR = "\t\t";
-  HashSet<Integer> _notInSet = new HashSet<>();
+  private final IntSet _notInSet;
 
-  public NotInPredicateFilter(Dictionary dictionaryReader, List<String> predicateValue) {
-    for (String values : predicateValue) {
-      for (String value : values.split(SEPARATOR)) {
-        _notInSet.add(dictionaryReader.indexOf(value));
-      }
+  public NotInPredicateFilter(Dictionary dictionary, List<String> values) {
+    _notInSet = new IntOpenHashSet(values.size());
+    for (String value : values) {
+      _notInSet.add(dictionary.indexOf(value));
     }
   }
 

@@ -23,25 +23,24 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.core.segment.index.converter.SegmentFormatConverter;
 import org.apache.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +72,7 @@ public class ImmutableSegmentLoader {
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
     Preconditions
-        .checkArgument(indexDir.isDirectory(), "Index directory: {} does not exist or is not a directory", indexDir);
+        .checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory", indexDir);
 
     // Convert segment version if necessary
     // NOTE: this step may modify the segment metadata
@@ -109,8 +108,8 @@ public class ImmutableSegmentLoader {
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      indexContainerMap
-          .put(entry.getKey(), new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
+      indexContainerMap.put(entry.getKey(),
+          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, indexDir));
     }
 
     if (schema == null) {
@@ -118,16 +117,14 @@ public class ImmutableSegmentLoader {
     }
 
     // Ensure that the schema has the virtual columns added
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
 
     // Instantiate virtual columns
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (fieldSpec.isVirtualColumn()) {
         String columnName = fieldSpec.getName();
-        VirtualColumnProvider provider =
-            VirtualColumnProviderFactory.buildProvider(fieldSpec.getVirtualColumnProvider());
-        VirtualColumnContext context = new VirtualColumnContext(NetUtil.getHostnameOrAddress(), segmentName, columnName,
-            segmentMetadata.getTotalDocs());
+        VirtualColumnContext context = new VirtualColumnContext(fieldSpec, segmentMetadata.getTotalDocs());
+        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(context);
         indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
         segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
       }
@@ -135,7 +132,7 @@ public class ImmutableSegmentLoader {
 
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentMetadata.getStarTreeV2MetadataList() != null || segmentMetadata.getStarTreeMetadata() != null) {
+    if (segmentMetadata.getStarTreeV2MetadataList() != null) {
       starTreeIndexContainer =
           new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
               indexContainerMap, readMode);

@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -28,19 +29,19 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
+public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<AvgPair, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
+
+  public AvgAggregationFunction(String column) {
+    super(column);
+  }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.AVG;
-  }
-
-  @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.AVG.getName() + "_" + column;
   }
 
   @Override
@@ -59,17 +60,20 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       double sum = 0.0;
       for (int i = 0; i < length; i++) {
         sum += doubleValues[i];
       }
-      setAggregationResult(aggregationResultHolder, sum, (long) length);
+      setAggregationResult(aggregationResultHolder, sum, length);
     } else {
       // Serialized AvgPair
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       double sum = 0.0;
       long count = 0L;
       for (int i = 0; i < length; i++) {
@@ -92,15 +96,17 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {
         setGroupByResult(groupKeyArray[i], groupByResultHolder, doubleValues[i], 1L);
       }
     } else {
       // Serialized AvgPair
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
         setGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
@@ -110,9 +116,11 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    if (blockValSets[0].getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       for (int i = 0; i < length; i++) {
         double value = doubleValues[i];
         for (int groupKey : groupKeysArray[i]) {
@@ -121,7 +129,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
       }
     } else {
       // Serialized AvgPair
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
         double sum = avgPair.getSum();

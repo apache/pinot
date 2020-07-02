@@ -19,11 +19,11 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -54,7 +54,7 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
 
     // Add a table
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(),
-        new TableConfig.Builder(TableType.OFFLINE).setTableName("testTable").build().toJsonConfigString());
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build().toJsonString());
 
     // There should be 1 table on the tenant
     tableList = JsonUtils.stringToJsonNode(sendGetRequest(listTablesUrl));

@@ -29,12 +29,14 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -42,6 +44,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
 /**
@@ -77,11 +80,12 @@ public class StringDictionaryPerfTest {
 
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.STRING, true);
     schema.addField(fieldSpec);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
 
     _dictLength = dictLength;
     _inputStrings = new String[dictLength];
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(_indexDir.getParent());
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);
@@ -113,7 +117,7 @@ public class StringDictionaryPerfTest {
 
     long start = System.currentTimeMillis();
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
     System.out.println("Total time for building segment: " + (System.currentTimeMillis() - start));
   }

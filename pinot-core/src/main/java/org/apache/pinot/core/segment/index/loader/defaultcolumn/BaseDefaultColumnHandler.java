@@ -21,29 +21,36 @@ package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.ForwardIndexType;
 import org.apache.pinot.core.segment.creator.InvertedIndexType;
+import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,33 +60,49 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
   protected enum DefaultColumnAction {
     // Present in schema but not in segment.
-    ADD_DIMENSION, ADD_METRIC, // Present in schema & segment but default value doesn't match.
-    UPDATE_DIMENSION, UPDATE_METRIC, // Present in segment but not in schema, auto-generated.
-    REMOVE_DIMENSION, REMOVE_METRIC;
+    ADD_DIMENSION,
+    ADD_METRIC,
+    ADD_DATE_TIME,
+    // Present in segment but not in schema
+    REMOVE_DIMENSION,
+    REMOVE_METRIC,
+    REMOVE_DATE_TIME,
+    // Present in both segment and schema but one of the following updates is needed
+    UPDATE_DIMENSION_DATA_TYPE,
+    UPDATE_DIMENSION_DEFAULT_VALUE,
+    UPDATE_DIMENSION_NUMBER_OF_VALUES,
+    UPDATE_METRIC_DATA_TYPE,
+    UPDATE_METRIC_DEFAULT_VALUE,
+    UPDATE_METRIC_NUMBER_OF_VALUES,
+    UPDATE_DATE_TIME_DATA_TYPE,
+    UPDATE_DATE_TIME_DEFAULT_VALUE;
 
     boolean isAddAction() {
-      return this == ADD_DIMENSION || this == ADD_METRIC;
+      return this == ADD_DIMENSION || this == ADD_METRIC || this == ADD_DATE_TIME;
     }
 
     boolean isUpdateAction() {
-      return this == UPDATE_DIMENSION || this == UPDATE_METRIC;
+      return !(isAddAction() || isRemoveAction());
     }
 
     boolean isRemoveAction() {
-      return this == REMOVE_DIMENSION || this == REMOVE_METRIC;
+      return this == REMOVE_DIMENSION || this == REMOVE_METRIC || this == REMOVE_DATE_TIME;
     }
   }
 
   protected final File _indexDir;
   protected final Schema _schema;
   protected final SegmentMetadataImpl _segmentMetadata;
+  protected final SegmentDirectory.Writer _segmentWriter;
 
   private final PropertiesConfiguration _segmentProperties;
 
-  protected BaseDefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata) {
+  protected BaseDefaultColumnHandler(File indexDir, Schema schema, SegmentMetadataImpl segmentMetadata,
+      SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _schema = schema;
     _segmentMetadata = segmentMetadata;
+    _segmentWriter = segmentWriter;
     _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
   }
 
@@ -87,7 +110,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * {@inheritDoc}
    */
   @Override
-  public void updateDefaultColumns()
+  public void updateDefaultColumns(IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     // Compute the action needed for each column.
     Map<String, DefaultColumnAction> defaultColumnActionMap = computeDefaultColumnActionMap();
@@ -98,7 +121,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Update each default column based on the default column action.
     for (Map.Entry<String, DefaultColumnAction> entry : defaultColumnActionMap.entrySet()) {
       // This method updates the metadata properties, need to save it later.
-      updateDefaultColumn(entry.getKey(), entry.getValue());
+      updateDefaultColumn(entry.getKey(), entry.getValue(), indexLoadingConfig);
     }
 
     // Update the segment metadata.
@@ -106,6 +129,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.DIMENSIONS, _segmentProperties);
     List<String> metricColumns =
         LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.METRICS, _segmentProperties);
+    List<String> dateTimeColumns =
+        LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, _segmentProperties);
     for (Map.Entry<String, DefaultColumnAction> entry : defaultColumnActionMap.entrySet()) {
       String column = entry.getKey();
       DefaultColumnAction action = entry.getValue();
@@ -116,18 +141,24 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         case ADD_METRIC:
           metricColumns.add(column);
           break;
+        case ADD_DATE_TIME:
+          dateTimeColumns.add(column);
+          break;
         case REMOVE_DIMENSION:
           dimensionColumns.remove(column);
           break;
         case REMOVE_METRIC:
           metricColumns.remove(column);
           break;
+        case REMOVE_DATE_TIME:
+          dateTimeColumns.remove(column);
         default:
           break;
       }
     }
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DIMENSIONS, dimensionColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.METRICS, metricColumns);
+    _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, dateTimeColumns);
 
     // Create a back up for origin metadata.
     File metadataFile = _segmentProperties.getFile();
@@ -146,7 +177,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *
    * @return Action Map for each column.
    */
-  private Map<String, DefaultColumnAction> computeDefaultColumnActionMap() {
+  Map<String, DefaultColumnAction> computeDefaultColumnActionMap() {
     Map<String, DefaultColumnAction> defaultColumnActionMap = new HashMap<>();
 
     // Compute ADD and UPDATE actions.
@@ -188,13 +219,27 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           defaultValueInSchema = fieldSpecInSchema.getDefaultNullValue().toString();
         }
 
-        if (dataTypeInMetadata != dataTypeInSchema || isSingleValueInMetadata != isSingleValueInSchema
-            || !defaultValueInSchema.equals(defaultValueInMetadata)) {
-          if (fieldTypeInMetadata == FieldSpec.FieldType.DIMENSION) {
-            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DIMENSION);
-          } else {
-            Preconditions.checkState(fieldTypeInMetadata == FieldSpec.FieldType.METRIC);
-            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC);
+        if (fieldTypeInMetadata == FieldSpec.FieldType.DIMENSION) {
+          if (dataTypeInMetadata != dataTypeInSchema) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DIMENSION_DATA_TYPE);
+          } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DIMENSION_DEFAULT_VALUE);
+          } else if (isSingleValueInMetadata != isSingleValueInSchema) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DIMENSION_NUMBER_OF_VALUES);
+          }
+        } else if (fieldTypeInMetadata == FieldSpec.FieldType.METRIC){
+          if (dataTypeInMetadata != dataTypeInSchema) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_DATA_TYPE);
+          } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_DEFAULT_VALUE);
+          } else if (isSingleValueInMetadata != isSingleValueInSchema) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_METRIC_NUMBER_OF_VALUES);
+          }
+        } else if (fieldTypeInMetadata == FieldSpec.FieldType.DATE_TIME){
+          if (dataTypeInMetadata != dataTypeInSchema) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DATE_TIME_DATA_TYPE);
+          } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DATE_TIME_DEFAULT_VALUE);
           }
         }
       } else {
@@ -207,6 +252,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           case METRIC:
             defaultColumnActionMap.put(column, DefaultColumnAction.ADD_METRIC);
             break;
+          case DATE_TIME:
+            defaultColumnActionMap.put(column, DefaultColumnAction.ADD_DATE_TIME);
           default:
             LOGGER.warn("Skip adding default column for column: {} with field type: {}", column, fieldTypeInSchema);
             break;
@@ -225,9 +272,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           FieldSpec.FieldType fieldTypeInMetadata = columnMetadata.getFieldType();
           if (fieldTypeInMetadata == FieldSpec.FieldType.DIMENSION) {
             defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DIMENSION);
-          } else {
-            Preconditions.checkState(fieldTypeInMetadata == FieldSpec.FieldType.METRIC);
+          } else if (fieldTypeInMetadata == FieldSpec.FieldType.METRIC){
             defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_METRIC);
+          } else if (fieldTypeInMetadata == FieldSpec.FieldType.DATE_TIME) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DATE_TIME);
           }
         }
       }
@@ -244,7 +292,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * @param action default column action.
    * @throws Exception
    */
-  protected abstract void updateDefaultColumn(String column, DefaultColumnAction action)
+  protected abstract void updateDefaultColumn(String column, DefaultColumnAction action,
+      IndexLoadingConfig indexLoadingConfig)
       throws Exception;
 
   /**
@@ -268,6 +317,80 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   /**
+   * Right now the text index is supported on RAW (non-dictionary encoded)
+   * single-value STRING columns. Eventually we will relax the constraints
+   * step by step.
+   * For example, later on user should be able to create text index on
+   * a dictionary encoded STRING column that also has native Pinot's inverted
+   * index. We can also support it on BYTE columns later.
+   * @param column column name
+   * @param indexLoadingConfig index loading config
+   * @param fieldSpec field spec
+   */
+  private void checkUnsupportedOperationsForTextIndex(String column, IndexLoadingConfig indexLoadingConfig,
+      FieldSpec fieldSpec) {
+    if (!indexLoadingConfig.getNoDictionaryColumns().contains(column)) {
+      throw new UnsupportedOperationException(
+          "Text index is currently not supported on dictionary encoded column: " + column);
+    }
+
+    Set<String> sortedColumns = new HashSet<>(indexLoadingConfig.getSortedColumns());
+    if (sortedColumns.contains(column)) {
+      // since Pinot's current implementation doesn't support raw sorted columns,
+      // we need to check for this too
+      throw new UnsupportedOperationException("Text index is currently not supported on sorted column: " + column);
+    }
+
+    if (!fieldSpec.isSingleValueField()) {
+      throw new UnsupportedOperationException("Text index is currently not supported on multi-value column: " + column);
+    }
+
+    if (fieldSpec.getDataType() != FieldSpec.DataType.STRING) {
+      throw new UnsupportedOperationException("Text index is currently only supported on STRING column:" + column);
+    }
+  }
+
+  void createV1ForwardIndexForTextIndex(String column, IndexLoadingConfig indexLoadingConfig)
+      throws IOException {
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+    Preconditions.checkNotNull(fieldSpec);
+    checkUnsupportedOperationsForTextIndex(column, indexLoadingConfig, fieldSpec);
+
+    int totalDocs = _segmentMetadata.getTotalDocs();
+    Object defaultValue = fieldSpec.getDefaultNullValue();
+    String stringDefaultValue = (String) defaultValue;
+    int lengthOfLongestEntry = StringUtil.encodeUtf8(stringDefaultValue).length;
+    int dictionaryElementSize = 0;
+
+    boolean deriveNumDocsPerChunk = SegmentColumnarIndexCreator.shouldDeriveNumDocsPerChunk(column, indexLoadingConfig.getColumnProperties());
+    SingleValueVarByteRawIndexCreator rawIndexCreator =
+        new SingleValueVarByteRawIndexCreator(_indexDir, ChunkCompressorFactory.CompressionType.SNAPPY, column,
+            totalDocs, lengthOfLongestEntry, deriveNumDocsPerChunk);
+
+    for (int docId = 0; docId < totalDocs; docId++) {
+      rawIndexCreator.index(docId, defaultValue);
+    }
+
+    rawIndexCreator.close();
+
+    // even though the column is sorted, we should pass it as false so that during
+    // TEXT_MATCH query time, when index reader is created, we create TextIndexReader
+    // and not SortedIndexReader.
+    Object sortedArray = new String[]{(String) defaultValue};
+    DefaultColumnStatistics columnStatistics =
+        new DefaultColumnStatistics(defaultValue /* min */, defaultValue /* max */, sortedArray, false, totalDocs, 0);
+
+    ColumnIndexCreationInfo columnIndexCreationInfo =
+        new ColumnIndexCreationInfo(columnStatistics, false/*createDictionary*/, false, null, null,
+            true/*isAutoGenerated*/, defaultValue/*defaultNullValue*/);
+
+    // Add the column metadata information to the metadata properties.
+    SegmentColumnarIndexCreator
+        .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, fieldSpec,
+            false/*hasDictionary*/, dictionaryElementSize, false/*hasInvertedIndex*/, TextIndexType.NONE);
+  }
+
+  /**
    * Helper method to create the V1 indices (dictionary and forward index) for a column.
    *
    * @param column column name.
@@ -279,8 +402,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Generate column index creation information.
     final int totalDocs = _segmentMetadata.getTotalDocs();
-    final int totalRawDocs = _segmentMetadata.getTotalRawDocs();
-    final int totalAggDocs = totalDocs - totalRawDocs;
     final FieldSpec.DataType dataType = fieldSpec.getDataType();
     final Object defaultValue = fieldSpec.getDefaultNullValue();
     final boolean isSingleValue = fieldSpec.isSingleValueField();
@@ -315,7 +436,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       case BYTES:
         Preconditions.checkState(defaultValue instanceof byte[]);
         dictionaryElementSize = ((byte[]) defaultValue).length;
-        sortedArray = new ByteArray[] {new ByteArray((byte[]) defaultValue)};
+        sortedArray = new ByteArray[]{new ByteArray((byte[]) defaultValue)};
         break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);
@@ -331,8 +452,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Create dictionary.
     // We will have only one value in the dictionary.
-    try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator(sortedArray, fieldSpec, _indexDir, false)) {
+    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(sortedArray, fieldSpec, _indexDir, false)) {
       creator.build();
     }
 
@@ -361,8 +481,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata information to the metadata properties.
     SegmentColumnarIndexCreator
-        .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, totalRawDocs,
-            totalAggDocs, fieldSpec, true/*hasDictionary*/, dictionaryElementSize, true/*hasInvertedIndex*/,
-            null/*hllOriginColumn*/);
+        .addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs, fieldSpec,
+            true/*hasDictionary*/, dictionaryElementSize, true/*hasInvertedIndex*/, TextIndexType.NONE);
   }
 }

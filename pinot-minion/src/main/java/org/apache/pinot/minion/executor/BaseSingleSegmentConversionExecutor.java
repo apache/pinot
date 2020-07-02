@@ -23,22 +23,20 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,27 +51,18 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleSegmentConversionExecutor.class);
 
   /**
-   * Converts the segment based on the given {@link PinotTaskConfig}.
-   *
-   * @param pinotTaskConfig Task config
-   * @param originalIndexDir Index directory for the original segment
-   * @param workingDir Working directory for the converted segment
-   * @return Segment conversion result
-   * @throws Exception
+   * Converts the segment based on the given task config and returns the conversion result.
    */
-  protected abstract SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig,
-      @Nonnull File originalIndexDir, @Nonnull File workingDir)
+  protected abstract SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception;
 
   /**
    * Returns the segment ZK metadata custom map modifier.
-   *
-   * @return Segment ZK metadata custom map modifier
    */
   protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier();
 
   @Override
-  public SegmentConversionResult executeTask(@Nonnull PinotTaskConfig pinotTaskConfig)
+  public SegmentConversionResult executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -87,13 +76,12 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         tableNameWithType, segmentName, downloadURL, uploadURL);
 
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + System.nanoTime());
-    Preconditions.checkState(tempDataDir.mkdirs());
+    Preconditions.checkState(tempDataDir.mkdirs(), "Failed to create temporary directory: %s", tempDataDir);
     try {
       // Download the tarred segment file
-      File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile");
+      File tarredSegmentFile = new File(tempDataDir, "tarredSegment");
       LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
-      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURL)
-          .fetchSegmentToLocal(downloadURL, tarredSegmentFile);
+      SegmentFetcherFactory.fetchSegmentToLocal(downloadURL, tarredSegmentFile);
 
       // Un-tar the segment file
       File segmentDir = new File(tempDataDir, "segmentDir");
@@ -106,16 +94,14 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
       SegmentConversionResult segmentConversionResult = convert(pinotTaskConfig, indexDir, workingDir);
-      File convertedIndexDir = segmentConversionResult.getFile();
-      String convertedSegmentName = segmentConversionResult.getSegmentName();
-      Preconditions.checkState(convertedSegmentName.equals(segmentName));
+      Preconditions.checkState(segmentConversionResult.getSegmentName().equals(segmentName),
+          "Converted segment name: %s does not match original segment name: %s",
+          segmentConversionResult.getSegmentName(), segmentName);
 
       // Tar the converted segment
-      File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
-      Preconditions.checkState(convertedTarredSegmentDir.mkdir());
-      File convertedTarredSegmentFile = new File(TarGzCompressionUtils
-          .createTarGzOfDirectory(convertedIndexDir.getPath(),
-              new File(convertedTarredSegmentDir, convertedSegmentName).getPath()));
+      File convertedTarredSegment = new File(TarGzCompressionUtils
+          .createTarGzOfDirectory(segmentConversionResult.getFile().getPath(),
+              new File(tempDataDir, "convertedTarredSegment").getPath()));
 
       // Check whether the task get cancelled before uploading the segment
       if (_cancelled) {
@@ -136,8 +122,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
 
-      List<Header> httpHeaders =
-          Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
+      List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
 
       // Set parameters for upload request.
       NameValuePair enableParallelPushProtectionParameter =
@@ -147,12 +132,10 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
       // Upload the tarred segment
-      SegmentConversionUtils
-          .uploadSegment(configs, httpHeaders, parameters, tableNameWithType, convertedSegmentName, uploadURL,
-              convertedTarredSegmentFile);
+      SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName, uploadURL,
+          convertedTarredSegment);
 
-      LOGGER.info("Done executing {} on table: {}, input segment: {}, output segment: {}", taskType, tableNameWithType,
-          segmentName, convertedSegmentName);
+      LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
       return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);

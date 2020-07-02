@@ -28,6 +28,7 @@ import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityEvent
 import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityTaskScheduler;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventResource;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventsLoader;
+import org.apache.pinot.thirdeye.anomaly.events.MockEventsLoader;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import org.apache.pinot.thirdeye.anomaly.task.TaskDriver;
 import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
@@ -41,8 +42,9 @@ import org.apache.pinot.thirdeye.dashboard.resources.EmailResource;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineScheduler;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertScheduler;
+import org.apache.pinot.thirdeye.model.download.ModelDownloaderManager;
+import org.apache.pinot.thirdeye.scheduler.DetectionCronScheduler;
+import org.apache.pinot.thirdeye.scheduler.SubscriptionCronScheduler;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
@@ -72,11 +74,13 @@ public class ThirdEyeAnomalyApplication
   private ClassificationJobScheduler classificationJobScheduler = null;
   private EmailResource emailResource = null;
   private HolidayEventsLoader holidayEventsLoader = null;
+  private MockEventsLoader mockEventsLoader = null;
   private RequestStatisticsLogger requestStatisticsLogger = null;
-  private DetectionPipelineScheduler detectionPipelineScheduler = null;
-  private DetectionAlertScheduler detectionAlertScheduler = null;
   private DataAvailabilityEventListenerDriver dataAvailabilityEventListenerDriver = null;
   private DataAvailabilityTaskScheduler dataAvailabilityTaskScheduler = null;
+  private DetectionCronScheduler detectionScheduler = null;
+  private SubscriptionCronScheduler subscriptionScheduler = null;
+  private ModelDownloaderManager modelDownloaderManager = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -168,6 +172,10 @@ public class ThirdEyeAnomalyApplication
           holidayEventsLoader.start();
           environment.jersey().register(new HolidayEventResource(holidayEventsLoader));
         }
+        if (config.isMockEventsLoader()) {
+          mockEventsLoader = new MockEventsLoader(config.getMockEventsLoaderConfiguration(), DAORegistry.getInstance().getEventDAO());
+          mockEventsLoader.run();
+        }
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler = new DataCompletenessScheduler();
           dataCompletenessScheduler.start();
@@ -180,12 +188,12 @@ public class ThirdEyeAnomalyApplication
           environment.jersey().register(new PinotDataSourceResource());
         }
         if (config.isDetectionPipeline()) {
-          detectionPipelineScheduler = new DetectionPipelineScheduler(DAORegistry.getInstance().getDetectionConfigManager());
-          detectionPipelineScheduler.start();
+          detectionScheduler = new DetectionCronScheduler(DAORegistry.getInstance().getDetectionConfigManager());
+          detectionScheduler.start();
         }
         if (config.isDetectionAlert()) {
-          detectionAlertScheduler = new DetectionAlertScheduler();
-          detectionAlertScheduler.start();
+          subscriptionScheduler = new SubscriptionCronScheduler();
+          subscriptionScheduler.start();
         }
         if (config.isDataAvailabilityEventListener()) {
           dataAvailabilityEventListenerDriver = new DataAvailabilityEventListenerDriver(config.getDataAvailabilitySchedulingConfiguration());
@@ -194,8 +202,14 @@ public class ThirdEyeAnomalyApplication
         if (config.isDataAvailabilityTaskScheduler()) {
           dataAvailabilityTaskScheduler = new DataAvailabilityTaskScheduler(
               config.getDataAvailabilitySchedulingConfiguration().getSchedulerDelayInSec(),
-              config.getDataAvailabilitySchedulingConfiguration().getTaskTriggerFallBackTimeInSec());
+              config.getDataAvailabilitySchedulingConfiguration().getTaskTriggerFallBackTimeInSec(),
+              config.getDataAvailabilitySchedulingConfiguration().getSchedulingWindowInSec(),
+              config.getDataAvailabilitySchedulingConfiguration().getScheduleDelayInSec());
           dataAvailabilityTaskScheduler.start();
+        }
+        if (config.getModelDownloaderConfig() != null) {
+          modelDownloaderManager = new ModelDownloaderManager(config.getModelDownloaderConfig());
+          modelDownloaderManager.start();
         }
       }
 
@@ -228,11 +242,14 @@ public class ThirdEyeAnomalyApplication
         if (classificationJobScheduler != null) {
           classificationJobScheduler.shutdown();
         }
-        if (detectionPipelineScheduler != null) {
-          detectionPipelineScheduler.shutdown();
+        if (detectionScheduler != null) {
+          detectionScheduler.shutdown();
         }
         if (dataAvailabilityEventListenerDriver != null) {
           dataAvailabilityEventListenerDriver.shutdown();
+        }
+        if (modelDownloaderManager != null) {
+          modelDownloaderManager.shutdown();
         }
       }
     });

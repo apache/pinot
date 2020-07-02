@@ -22,6 +22,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 #####
 Pinot
 #####
@@ -48,6 +50,7 @@ Pinot
    tableconfig_schema
    schema
    in_production
+   batch_data_ingestion
    pinot_hadoop
    customizations
    tuning_pinot

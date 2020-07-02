@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.core.indexsegment.generator;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,28 +33,25 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.StarTreeIndexConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.core.data.readers.CSVRecordReaderConfig;
-import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.core.util.AvroUtils;
-import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,8 +60,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Configuration properties used in the creation of index segments.
  */
-@SuppressWarnings("unused")
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentGeneratorConfig {
   public enum TimeColumnType {
     EPOCH, SIMPLE_DATE
@@ -79,14 +71,13 @@ public class SegmentGeneratorConfig {
   private Set<String> _rawIndexCreationColumns = new HashSet<>();
   private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
+  private List<String> _textIndexCreationColumns = new ArrayList<>();
   private List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
-  private String _dataDir = null;
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
   private String _recordReaderPath = null; //TODO: this should be renamed to recordReaderClass or even better removed
   private String _outDir = null;
-  private boolean _overwrite = false;
   private String _tableName = null;
   private String _segmentName = null;
   private String _segmentNamePostfix = null;
@@ -96,15 +87,11 @@ public class SegmentGeneratorConfig {
   private String _segmentStartTime = null;
   private String _segmentEndTime = null;
   private SegmentVersion _segmentVersion = SegmentVersion.v3;
-  private String _schemaFile = null;
   private Schema _schema = null;
-  private String _readerConfigFile = null;
   private RecordReaderConfig _readerConfig = null;
-  private boolean _enableStarTreeIndex = false;
-  private StarTreeIndexSpec _starTreeIndexSpec = null;
+  private boolean _enableDefaultStarTree = false;
   private List<StarTreeV2BuilderConfig> _starTreeV2BuilderConfigs = null;
   private String _creatorVersion = null;
-  private HllConfig _hllConfig = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
   private int _sequenceId = -1;
@@ -115,117 +102,134 @@ public class SegmentGeneratorConfig {
   private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
 
+  // constructed from FieldConfig
+  private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
+
+  @Deprecated
   public SegmentGeneratorConfig() {
   }
 
   /**
-   * @deprecated To be replaced by a builder pattern. Use set methods in the meantime.
-   * For now, this works only if no setters are called after this copy constructor.
-   * @param config to copy from
+   * Construct the SegmentGeneratorConfig using schema and table config.
+   * If table config is passed, it will be used to initialize the time column details and the indexing config
+   * This constructor is used during offline data generation.
+   * @param tableConfig table config of the segment. Used for getting time column information and indexing information
+   * @param schema schema of the segment to be generated. The time column information should be taken from table config.
+   *               However, for maintaining backward compatibility, taking it from schema if table config is null.
+   *               This will not work once we start supporting multiple time columns (DateTimeFieldSpec)
    */
-  @Deprecated
-  public SegmentGeneratorConfig(SegmentGeneratorConfig config) {
-    Preconditions.checkNotNull(config);
-    _customProperties.putAll(config._customProperties);
-    _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
-    _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
-    _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
-    _columnSortOrder.addAll(config._columnSortOrder);
-    _varLengthDictionaryColumns.addAll(config._varLengthDictionaryColumns);
-    _dataDir = config._dataDir;
-    _inputFilePath = config._inputFilePath;
-    _format = config._format;
-    _outDir = config._outDir;
-    _overwrite = config._overwrite;
-    _tableName = config._tableName;
-    _segmentName = config._segmentName;
-    _segmentNamePostfix = config._segmentNamePostfix;
-    _segmentTimeColumnName = config._segmentTimeColumnName;
-    _segmentTimeUnit = config._segmentTimeUnit;
-    _segmentCreationTime = config._segmentCreationTime;
-    _segmentStartTime = config._segmentStartTime;
-    _segmentEndTime = config._segmentEndTime;
-    _segmentVersion = config._segmentVersion;
-    _schemaFile = config._schemaFile;
-    _schema = config._schema;
-    _readerConfigFile = config._readerConfigFile;
-    _readerConfig = config._readerConfig;
-    _enableStarTreeIndex = config._enableStarTreeIndex;
-    _starTreeIndexSpec = config._starTreeIndexSpec;
-    _starTreeV2BuilderConfigs = config._starTreeV2BuilderConfigs;
-    _creatorVersion = config._creatorVersion;
-    _hllConfig = config._hllConfig;
-    _segmentNameGenerator = config._segmentNameGenerator;
-    _segmentPartitionConfig = config._segmentPartitionConfig;
-    _sequenceId = config._sequenceId;
-    _timeColumnType = config._timeColumnType;
-    _simpleDateFormat = config._simpleDateFormat;
-    _onHeap = config._onHeap;
-    _recordReaderPath = config._recordReaderPath;
-    _skipTimeValueCheck = config._skipTimeValueCheck;
-    _nullHandlingEnabled = config._nullHandlingEnabled;
+  public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
+    Preconditions.checkNotNull(schema);
+    Preconditions.checkNotNull(tableConfig);
+    setSchema(schema);
+
+    // NOTE: SegmentGeneratorConfig#setSchema doesn't set the time column anymore. timeColumnName is expected to be read from table config.
+    String timeColumnName = null;
+    if (tableConfig.getValidationConfig() != null) {
+      timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    }
+    setTime(timeColumnName, schema);
+
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig != null) {
+      String segmentVersion = indexingConfig.getSegmentFormatVersion();
+      if (segmentVersion != null) {
+        _segmentVersion = SegmentVersion.valueOf(segmentVersion);
+      }
+
+      List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
+      Map<String, String> noDictionaryColumnMap = indexingConfig.getNoDictionaryConfig();
+
+      if (noDictionaryColumns != null) {
+        this.setRawIndexCreationColumns(noDictionaryColumns);
+
+        if (noDictionaryColumnMap != null) {
+          Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
+              noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                  e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType
+                      .valueOf(e.getValue())));
+          this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
+        }
+      }
+      if (indexingConfig.getVarLengthDictionaryColumns() != null) {
+        setVarLengthDictionaryColumns(indexingConfig.getVarLengthDictionaryColumns());
+      }
+      _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+
+      // Star-tree V2 configs
+      setEnableDefaultStarTree(indexingConfig.isEnableDefaultStarTree());
+      List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+      if (starTreeIndexConfigs != null && !starTreeIndexConfigs.isEmpty()) {
+        List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = new ArrayList<>(starTreeIndexConfigs.size());
+        for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
+          starTreeV2BuilderConfigs.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig));
+        }
+        setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
+      }
+
+      // NOTE: There are 2 ways to configure creating inverted index during segment generation:
+      //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
+      //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
+      // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
+      Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
+      if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
+          || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+        _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+      }
+
+      List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+      if (fieldConfigList != null) {
+        for (FieldConfig fieldConfig : fieldConfigList) {
+          _columnProperties.put(fieldConfig.getName(), fieldConfig.getProperties());
+        }
+      }
+
+      extractTextIndexColumnsFromTableConfig(tableConfig);
+
+      _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+    }
+  }
+
+  @Nonnull
+  public Map<String, Map<String, String>> getColumnProperties() {
+    return _columnProperties;
   }
 
   /**
-   * This constructor is used during offline data generation. Note that it has an option that will generate inverted
-   * index.
+   * Set time column details using the given time column
    */
-  public SegmentGeneratorConfig(@Nullable TableConfig tableConfig, Schema schema) {
-    Preconditions.checkNotNull(schema);
-    setSchema(schema);
-
-    if (tableConfig == null) {
-      return;
-    }
-
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
-    Map<String, String> noDictionaryColumnMap = indexingConfig.getNoDictionaryConfig();
-
-    if (noDictionaryColumns != null) {
-      this.setRawIndexCreationColumns(noDictionaryColumns);
-
-      if (noDictionaryColumnMap != null) {
-        Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
-            noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType
-                    .valueOf(e.getValue())));
-        this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
+  public void setTime(@Nullable String timeColumnName, Schema schema) {
+    if (timeColumnName != null) {
+      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
+      if (dateTimeFieldSpec != null) {
+        setTimeColumnName(dateTimeFieldSpec.getName());
+        DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+        if (formatSpec.getTimeFormat().equals(DateTimeFieldSpec.TimeFormat.EPOCH)) {
+          setSegmentTimeUnit(formatSpec.getColumnUnit());
+        } else {
+          setSimpleDateFormat(formatSpec.getSDFPattern());
+        }
       }
     }
-    if (indexingConfig.getVarLengthDictionaryColumns() != null) {
-      setVarLengthDictionaryColumns(indexingConfig.getVarLengthDictionaryColumns());
-    }
-    _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
-
-    // Star-tree V1 config
-    StarTreeIndexSpec starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
-    if (starTreeIndexSpec != null) {
-      enableStarTreeIndex(starTreeIndexSpec);
-    }
-
-    // Star-tree V2 configs
-    List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
-    if (starTreeIndexConfigs != null && !starTreeIndexConfigs.isEmpty()) {
-      List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = new ArrayList<>(starTreeIndexConfigs.size());
-      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
-        starTreeV2BuilderConfigs.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig));
-      }
-      setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
-    }
-
-    if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
-      _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
-    }
-
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    _hllConfig = validationConfig.getHllConfig();
-
-    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
   }
 
-  public SegmentGeneratorConfig(Schema schema) {
-    setSchema(schema);
+  /**
+   * Text index creation info for each column is specified
+   * using {@link FieldConfig} model of indicating per column
+   * encoding and indexing information. Since SegmentGeneratorConfig
+   * is created from TableConfig, we extract the text index info
+   * from fieldConfigList in TableConfig.
+   * @param tableConfig table config
+   */
+  private void extractTextIndexColumnsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
+          _textIndexCreationColumns.add(fieldConfig.getName());
+        }
+      }
+    }
   }
 
   public Map<String, String> getCustomProperties() {
@@ -268,6 +272,15 @@ public class SegmentGeneratorConfig {
     return _invertedIndexCreationColumns;
   }
 
+  /**
+   * Used by {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
+   * to get the list of text index columns.
+   * @return list of text index columns.
+   */
+  public List<String> getTextIndexCreationColumns() {
+    return _textIndexCreationColumns;
+  }
+
   public List<String> getColumnSortOrder() {
     return _columnSortOrder;
   }
@@ -277,9 +290,22 @@ public class SegmentGeneratorConfig {
     _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
   }
 
+  // NOTE: Should always be extracted from the table config
+  @Deprecated
   public void setInvertedIndexCreationColumns(List<String> indexCreationColumns) {
     Preconditions.checkNotNull(indexCreationColumns);
     _invertedIndexCreationColumns.addAll(indexCreationColumns);
+  }
+
+  /**
+   * Used by {@link org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter}
+   * and text search functional tests
+   * @param textIndexCreationColumns list of columns with text index creation enabled
+   */
+  public void setTextIndexCreationColumns(List<String> textIndexCreationColumns) {
+    if (textIndexCreationColumns != null) {
+      _textIndexCreationColumns.addAll(textIndexCreationColumns);
+    }
   }
 
   public void setColumnSortOrder(List<String> sortOrder) {
@@ -315,14 +341,6 @@ public class SegmentGeneratorConfig {
     for (FieldSpec spec : _schema.getAllFieldSpecs()) {
       _invertedIndexCreationColumns.add(spec.getName());
     }
-  }
-
-  public String getDataDir() {
-    return _dataDir;
-  }
-
-  public void setDataDir(String dataDir) {
-    _dataDir = dataDir;
   }
 
   public String getInputFilePath() {
@@ -365,14 +383,6 @@ public class SegmentGeneratorConfig {
       Preconditions.checkState(outputDir.mkdirs(), "Cannot create output dir: {}", dir);
     }
     _outDir = outputDir.getAbsolutePath();
-  }
-
-  public boolean isOverwrite() {
-    return _overwrite;
-  }
-
-  public void setOverwrite(boolean overwrite) {
-    _overwrite = overwrite;
   }
 
   public String getTableName() {
@@ -469,14 +479,6 @@ public class SegmentGeneratorConfig {
     _segmentVersion = segmentVersion;
   }
 
-  public String getSchemaFile() {
-    return _schemaFile;
-  }
-
-  public void setSchemaFile(String schemaFile) {
-    _schemaFile = schemaFile;
-  }
-
   public Schema getSchema() {
     return _schema;
   }
@@ -484,25 +486,6 @@ public class SegmentGeneratorConfig {
   public void setSchema(Schema schema) {
     Preconditions.checkNotNull(schema);
     _schema = schema;
-
-    // Set time related fields
-    // TODO: support datetime field as time column
-    TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
-    if (timeFieldSpec != null) {
-      TimeGranularitySpec timeGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
-      setTimeColumnName(timeGranularitySpec.getName());
-      String timeFormat = timeGranularitySpec.getTimeFormat();
-      if (timeFormat.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-        // Time format: 'EPOCH'
-        setSegmentTimeUnit(timeGranularitySpec.getTimeType());
-      } else {
-        // Time format: 'SIMPLE_DATE_FORMAT:<pattern>'
-        Preconditions.checkArgument(timeFormat.startsWith(TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-            "Invalid time format: %s, must be one of '%s' or '%s:<pattern>'", timeFormat,
-            TimeGranularitySpec.TimeFormat.EPOCH, TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT);
-        setSimpleDateFormat(timeFormat.substring(timeFormat.indexOf(':') + 1));
-      }
-    }
 
     // Remove inverted index columns not in schema
     // TODO: add a validate() method to perform all validations
@@ -518,14 +501,6 @@ public class SegmentGeneratorConfig {
     }
   }
 
-  public String getReaderConfigFile() {
-    return _readerConfigFile;
-  }
-
-  public void setReaderConfigFile(String readerConfigFile) {
-    _readerConfigFile = readerConfigFile;
-  }
-
   public RecordReaderConfig getReaderConfig() {
     return _readerConfig;
   }
@@ -534,31 +509,12 @@ public class SegmentGeneratorConfig {
     _readerConfig = readerConfig;
   }
 
-  public boolean isEnableStarTreeIndex() {
-    return _enableStarTreeIndex;
+  public boolean isEnableDefaultStarTree() {
+    return _enableDefaultStarTree;
   }
 
-  public void setEnableStarTreeIndex(boolean enableStarTreeIndex) {
-    _enableStarTreeIndex = enableStarTreeIndex;
-  }
-
-  public StarTreeIndexSpec getStarTreeIndexSpec() {
-    return _starTreeIndexSpec;
-  }
-
-  public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
-    _starTreeIndexSpec = starTreeIndexSpec;
-  }
-
-  /**
-   * Enable star tree generation with the given indexing spec.
-   * <p>NOTE: DO NOT remove the setter and getter for these two fields, they are required for ser/de.
-   *
-   * @param starTreeIndexSpec Optional indexing spec for star tree
-   */
-  public void enableStarTreeIndex(@Nullable StarTreeIndexSpec starTreeIndexSpec) {
-    setEnableStarTreeIndex(true);
-    setStarTreeIndexSpec(starTreeIndexSpec);
+  public void setEnableDefaultStarTree(boolean enableDefaultStarTree) {
+    _enableDefaultStarTree = enableDefaultStarTree;
   }
 
   public List<StarTreeV2BuilderConfig> getStarTreeV2BuilderConfigs() {
@@ -567,14 +523,6 @@ public class SegmentGeneratorConfig {
 
   public void setStarTreeV2BuilderConfigs(List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs) {
     _starTreeV2BuilderConfigs = starTreeV2BuilderConfigs;
-  }
-
-  public HllConfig getHllConfig() {
-    return _hllConfig;
-  }
-
-  public void setHllConfig(HllConfig hllConfig) {
-    _hllConfig = hllConfig;
   }
 
   public SegmentNameGenerator getSegmentNameGenerator() {
@@ -616,40 +564,14 @@ public class SegmentGeneratorConfig {
     _rawIndexCompressionType.putAll(rawIndexCompressionType);
   }
 
-  @JsonIgnore
   public String getMetrics() {
     return getQualifyingFields(FieldType.METRIC, true);
   }
 
-  /**
-   * @deprecated Load outside the class and use the setter for schema setting.
-   * @throws IOException
-   */
-  @Deprecated
-  public void loadConfigFiles()
-      throws IOException {
-    Schema schema;
-    if (_schemaFile != null) {
-      schema = Schema.fromFile(new File(_schemaFile));
-      setSchema(schema);
-    } else if (_format == FileFormat.AVRO) {
-      schema = AvroUtils.getPinotSchemaFromAvroDataFile(new File(_inputFilePath));
-      setSchema(schema);
-    } else {
-      throw new RuntimeException("Input format " + _format + " requires schema.");
-    }
-
-    if (_readerConfigFile != null) {
-      setReaderConfig(JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class));
-    }
-  }
-
-  @JsonIgnore
   public String getDimensions() {
     return getQualifyingFields(FieldType.DIMENSION, true);
   }
 
-  @JsonIgnore
   public String getDateTimeColumnNames() {
     return getQualifyingFields(FieldType.DATE_TIME, true);
   }
@@ -667,7 +589,6 @@ public class SegmentGeneratorConfig {
    * @param type FieldType to filter on
    * @return Comma separate qualifying fields names.
    */
-  @JsonIgnore
   private String getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 

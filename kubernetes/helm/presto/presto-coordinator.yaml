@@ -1,0 +1,159 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: presto-catalog
+  namespace: pinot-quickstart
+data:
+  pinot.properties: |-
+    connector.name=pinot
+    pinot.controller-urls=pinot-controller:9000
+    pinot.controller-rest-service=pinot-controller:9000
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: presto-etc
+  namespace: pinot-quickstart
+data:
+  config.properties: |-
+    coordinator=true
+    node-scheduler.include-coordinator=true
+    http-server.http.port=8080
+    query.max-memory=5GB
+    query.max-memory-per-node=1GB
+    query.max-total-memory-per-node=2GB
+    discovery-server.enabled=true
+    discovery.uri=http://presto-coordinator:8080
+
+  jvm.config: |-
+    -server
+    -Xmx16G
+    -XX:+UseG1GC
+    -XX:G1HeapRegionSize=32M
+    -XX:+UseGCOverheadLimit
+    -XX:+ExplicitGCInvokesConcurrent
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:+ExitOnOutOfMemoryError
+
+  log.properties: |-
+    com.facebook.presto=INFO
+
+  node.properties: |-
+    node.environment=production
+    node.id=presto-coordinator
+    node.data-dir=/home/presto/data
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: presto-coordinator
+  namespace: pinot-quickstart
+spec:
+  selector:
+    matchLabels:
+      app: presto-coordinator
+  serviceName: presto-coordinator
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: presto-coordinator
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsUser: 1000
+      containers:
+        - image: apachepinot/pinot-presto:latest
+          imagePullPolicy: Always
+          name: presto-coordinator
+          args: [ "run" ]
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              memory: 4Gi
+          volumeMounts:
+            - name: presto-data
+              mountPath: "/home/presto/data"
+            - name: presto-catalog
+              mountPath: "/home/presto/etc/catalog"
+              readOnly: true
+            - name: presto-etc
+              mountPath: "/home/presto/etc/config.properties"
+              subPath: config.properties
+              readOnly: true
+            - name: presto-etc
+              mountPath: "/home/presto/etc/log.properties"
+              subPath: log.properties
+              readOnly: true
+            - name: presto-etc
+              mountPath: "/home/presto/etc/node.properties"
+              subPath: node.properties
+              readOnly: true
+            - name: presto-etc
+              mountPath: "/home/presto/etc/jvm.config"
+              subPath: jvm.config
+              readOnly: true
+      nodeSelector: {}
+      restartPolicy: Always
+      volumes:
+        - name: presto-catalog
+          configMap:
+            name: presto-catalog
+        - name: presto-etc
+          configMap:
+            name: presto-etc
+  volumeClaimTemplates:
+    - metadata:
+        name: presto-data
+        annotations:
+          pv.beta.kubernetes.io/gid: "1000"
+          pv.beta.kubernetes.io/groups: "1000"
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: "default"        # "pd-ssd" or "standard" for GKE
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: presto-coordinator
+  namespace: pinot-quickstart
+spec:
+  ports:
+    # [podname].presto-coordinator.pinot-quickstart.svc.cluster.local
+    - port: 8080
+  clusterIP: None
+  selector:
+    app: presto-coordinator

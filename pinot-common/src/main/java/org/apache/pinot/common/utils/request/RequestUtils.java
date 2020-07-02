@@ -50,11 +50,10 @@ import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
+import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 public class RequestUtils {
-  private static String DELIMTER = "\t\t";
-
   private RequestUtils() {
   }
 
@@ -128,12 +127,59 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(String value) {
+  public static Expression createNewLiteralExpression() {
     Expression expression = new Expression(ExpressionType.LITERAL);
     Literal literal = new Literal();
-    literal.setStringValue(value);
     expression.setLiteral(literal);
     return expression;
+  }
+
+  public static Expression getLiteralExpression(String value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setStringValue(value);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(Integer value) {
+    return getLiteralExpression(value.longValue());
+  }
+
+  public static Expression getLiteralExpression(Long value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setLongValue(value);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(Float value) {
+    return getLiteralExpression(value.doubleValue());
+  }
+
+  public static Expression getLiteralExpression(Double value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setDoubleValue(value);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(Object object) {
+    if (object instanceof Integer) {
+      return RequestUtils.getLiteralExpression((Integer) object);
+    }
+    if (object instanceof Long) {
+      return RequestUtils.getLiteralExpression((Long) object);
+    }
+    if (object instanceof Float) {
+      return RequestUtils.getLiteralExpression((Float) object);
+    }
+    if (object instanceof Double) {
+      return RequestUtils.getLiteralExpression((Double) object);
+    }
+    if (object instanceof String) {
+      return RequestUtils.getLiteralExpression((String) object);
+    }
+    if(object instanceof SqlLiteral) {
+      return RequestUtils.getLiteralExpression((SqlLiteral) object);
+    }
+    throw new SqlCompilationException(new IllegalArgumentException("Unsupported Literal value type - " + object.getClass()));
   }
 
   public static Expression getFunctionExpression(String operator) {
@@ -322,5 +368,34 @@ public class RequestUtils {
     } else {
       throw new IllegalStateException("Cannot get expression from " + astNode.getClass().getSimpleName());
     }
+  }
+
+  public static String prettyPrint(Expression expression) {
+    if (expression == null) {
+      return "null";
+    }
+    if (expression.getIdentifier() != null) {
+      return expression.getIdentifier().getName();
+    }
+    if (expression.getLiteral() != null) {
+      if (expression.getLiteral().isSetLongValue()) {
+        return Long.toString(expression.getLiteral().getLongValue());
+      }
+    }
+    if (expression.getFunctionCall() != null) {
+      String res = expression.getFunctionCall().getOperator() + "(";
+      boolean isFirstParam = true;
+      for (Expression operand : expression.getFunctionCall().getOperands()) {
+        if (!isFirstParam) {
+          res += ", ";
+        } else {
+          isFirstParam = false;
+        }
+        res += prettyPrint(operand);
+      }
+      res += ")";
+      return res;
+    }
+    return null;
   }
 }

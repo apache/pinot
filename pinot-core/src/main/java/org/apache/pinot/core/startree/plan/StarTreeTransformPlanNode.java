@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree.plan;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -40,8 +41,8 @@ public class StarTreeTransformPlanNode implements PlanNode {
   private final StarTreeProjectionPlanNode _starTreeProjectionPlanNode;
 
   public StarTreeTransformPlanNode(StarTreeV2 starTreeV2,
-      Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs,
-      @Nullable Set<TransformExpressionTree> groupByExpressions, @Nullable FilterQueryTree rootFilterNode,
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs,
+      @Nullable TransformExpressionTree[] groupByExpressions, @Nullable FilterQueryTree rootFilterNode,
       @Nullable Map<String, String> debugOptions) {
     Set<String> projectionColumns = new HashSet<>();
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
@@ -49,7 +50,7 @@ public class StarTreeTransformPlanNode implements PlanNode {
     }
     Set<String> groupByColumns;
     if (groupByExpressions != null) {
-      _groupByExpressions = groupByExpressions;
+      _groupByExpressions = new HashSet<>(Arrays.asList(groupByExpressions));
       groupByColumns = new HashSet<>();
       for (TransformExpressionTree groupByExpression : groupByExpressions) {
         groupByExpression.getColumns(groupByColumns);
@@ -65,6 +66,9 @@ public class StarTreeTransformPlanNode implements PlanNode {
 
   @Override
   public TransformOperator run() {
+    // NOTE: Here we do not put aggregation expressions into TransformOperator based on the following assumptions:
+    //       - They are all columns (not functions or constants), where no transform is required
+    //       - We never call TransformOperator.getResultMetadata() or TransformOperator.getDictionary() on them
     return new TransformOperator(_starTreeProjectionPlanNode.run(), _groupByExpressions);
   }
 

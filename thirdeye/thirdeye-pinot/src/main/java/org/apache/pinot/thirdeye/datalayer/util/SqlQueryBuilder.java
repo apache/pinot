@@ -338,6 +338,46 @@ public class SqlQueryBuilder {
     return prepareStatement;
   }
 
+  public PreparedStatement createfindByParamsStatementWithLimit(Connection connection,
+      Class<? extends AbstractEntity> entityClass, Predicate predicate, Long limit, Long offset) throws Exception {
+    String tableName = entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
+    BiMap<String, String> entityNameToDBNameMapping =
+        entityMappingHolder.columnMappingPerTable.get(tableName).inverse();
+    StringBuilder sqlBuilder = new StringBuilder("SELECT * FROM " + tableName);
+    StringBuilder whereClause = new StringBuilder(" WHERE ");
+    List<Pair<String, Object>> parametersList = new ArrayList<>();
+    generateWhereClause(entityNameToDBNameMapping, predicate, parametersList, whereClause);
+    sqlBuilder.append(whereClause.toString());
+    sqlBuilder.append(" ORDER BY id DESC");
+    if (limit != null) {
+      sqlBuilder.append(" LIMIT ").append(limit);
+    }
+    if (offset != null) {
+      sqlBuilder.append(" OFFSET ").append(offset);
+    }
+    PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
+    int parameterIndex = 1;
+    LinkedHashMap<String, ColumnInfo> columnInfoMap =
+        entityMappingHolder.columnInfoPerTable.get(tableName);
+    for (Pair<String, Object> pair : parametersList) {
+      String dbFieldName = pair.getKey();
+      ColumnInfo info = columnInfoMap.get(dbFieldName);
+      Preconditions.checkNotNull(info, String.format("Found field '%s' but expected %s", dbFieldName, columnInfoMap.keySet()));
+      prepareStatement.setObject(parameterIndex++, pair.getValue(), info.sqlType);
+      LOG.debug("Setting {} to {}", pair.getKey(), pair.getValue());
+    }
+    return prepareStatement;
+  }
+
+  public PreparedStatement createCountStatement(Connection connection,
+      Class<? extends AbstractIndexEntity> indexEntityClass) throws Exception {
+    String tableName =
+        entityMappingHolder.tableToEntityNameMap.inverse().get(indexEntityClass.getSimpleName());
+    String sql = "Select count(*) from " + tableName;
+    PreparedStatement prepareStatement = connection.prepareStatement(sql);
+    return prepareStatement;
+  }
+
   private void generateWhereClause(BiMap<String, String> entityNameToDBNameMapping,
       Predicate predicate, List<Pair<String, Object>> parametersList, StringBuilder whereClause) {
     String columnName = null;

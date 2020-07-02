@@ -20,15 +20,21 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import java.util.Arrays;
 import java.util.Map;
-import org.apache.pinot.common.utils.CommonConstants;
+import java.util.TreeMap;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ERROR;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.OFFLINE;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class TableRebalancerTest {
-  private static final String ONLINE = CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE;
 
   @Test
   public void testDowntimeMode() {
@@ -183,5 +189,86 @@ public class TableRebalancerTest {
       }
     }
     return numCommonInstances;
+  }
+
+  @Test
+  public void testIsExternalViewConverged() {
+    String offlineTableName = "testTable_OFFLINE";
+    Map<String, Map<String, String>> externalViewSegmentStates = new TreeMap<>();
+    Map<String, Map<String, String>> idealStateSegmentStates = new TreeMap<>();
+
+    // Empty segment states should match
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+
+    // Do not check segment that does not exist in IdealState
+    Map<String, String> instanceStateMap = new TreeMap<>();
+    instanceStateMap.put("instance1", ONLINE);
+    externalViewSegmentStates.put("segment1", instanceStateMap);
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+
+    // Do not check segment that is OFFLINE in IdealState
+    instanceStateMap = new TreeMap<>();
+    instanceStateMap.put("instance1", OFFLINE);
+    idealStateSegmentStates.put("segment2", instanceStateMap);
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+
+    // Should fail when a segment has CONSUMING instance in IdealState but does not exist in ExternalView
+    instanceStateMap.put("instance2", CONSUMING);
+    assertFalse(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
+    assertFalse(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+
+    // Should fail when instance state does not exist
+    instanceStateMap = new TreeMap<>();
+    externalViewSegmentStates.put("segment2", instanceStateMap);
+    assertFalse(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
+    assertFalse(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+
+    // Should fail when instance state does not match
+    instanceStateMap.put("instance2", OFFLINE);
+    assertFalse(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
+    assertFalse(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+
+    // Should pass when instance state matches
+    instanceStateMap.put("instance2", CONSUMING);
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+
+    // Should pass when there are extra instances in ExternalView
+    instanceStateMap.put("instance3", CONSUMING);
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false));
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
+
+    // Should throw exception when instance state is ERROR in ExternalView and best-efforts is disabled
+    instanceStateMap.put("instance2", ERROR);
+    try {
+      TableRebalancer
+          .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, false);
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
+
+    // Should pass when instance state is ERROR in ExternalView and best-efforts is enabled
+    assertTrue(TableRebalancer
+        .isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates, true));
   }
 }

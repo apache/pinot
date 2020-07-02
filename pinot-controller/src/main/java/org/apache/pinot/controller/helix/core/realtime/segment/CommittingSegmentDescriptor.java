@@ -19,7 +19,8 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 /**
@@ -29,13 +30,13 @@ public class CommittingSegmentDescriptor {
   private String _segmentName;
   private long _segmentSizeBytes;
   private String _segmentLocation;
-  private long _nextOffset;
+  private StreamPartitionMsgOffset _nextOffset;
   private SegmentMetadataImpl _segmentMetadata;
 
   public static CommittingSegmentDescriptor fromSegmentCompletionReqParams(
       SegmentCompletionProtocol.Request.Params reqParams) {
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        new CommittingSegmentDescriptor(reqParams.getSegmentName(), reqParams.getOffset(),
+        new CommittingSegmentDescriptor(reqParams.getSegmentName(), reqParams.getStreamPartitionMsgOffset(),
             reqParams.getSegmentSizeBytes());
     committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
     return committingSegmentDescriptor;
@@ -49,13 +50,13 @@ public class CommittingSegmentDescriptor {
     return committingSegmentDescriptor;
   }
 
-  public CommittingSegmentDescriptor(String segmentName, long nextOffset, long segmentSizeBytes) {
+  public CommittingSegmentDescriptor(String segmentName, StreamPartitionMsgOffset nextOffset, long segmentSizeBytes) {
     _segmentName = segmentName;
     _nextOffset = nextOffset;
     _segmentSizeBytes = segmentSizeBytes;
   }
 
-  public CommittingSegmentDescriptor(String segmentName, long nextOffset, long segmentSizeBytes,
+  public CommittingSegmentDescriptor(String segmentName, StreamPartitionMsgOffset nextOffset, long segmentSizeBytes,
       String segmentLocation) {
     this(segmentName, nextOffset, segmentSizeBytes);
     _segmentLocation = segmentLocation;
@@ -85,12 +86,8 @@ public class CommittingSegmentDescriptor {
     _segmentLocation = segmentLocation;
   }
 
-  public long getNextOffset() {
+  public StreamPartitionMsgOffset getNextOffset() {
     return _nextOffset;
-  }
-
-  public void setNextOffset(long nextOffset) {
-    _nextOffset = nextOffset;
   }
 
   public SegmentMetadataImpl getSegmentMetadata() {

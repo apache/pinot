@@ -30,7 +30,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.3.3</version>
+  <version>0.4.0</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -40,22 +40,16 @@
     <module>pinot-spi</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
-    <module>pinot-api</module>
+    <module>pinot-clients</module>
     <module>pinot-server</module>
     <module>pinot-core</module>
     <module>pinot-controller</module>
-    <module>pinot-ingestion-jobs</module>
+    <module>pinot-minion</module>
+    <module>pinot-plugins</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
-    <module>pinot-transport</module>
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
-    <module>pinot-minion</module>
-    <module>pinot-hadoop-filesystem</module>
-    <module>pinot-azure-filesystem</module>
-    <module>pinot-orc</module>
-    <module>pinot-parquet</module>
-    <module>pinot-connectors</module>
   </modules>
 
   <licenses>
@@ -96,7 +90,7 @@
 
   <scm>
     <developerConnection>scm:git:gitolite@code.uber.internal:data/pinot</developerConnection>
-    <tag>pinot-0.3.3</tag>
+    <tag>pinot-0.4.0</tag>
   </scm>
   <distributionManagement>
     <repository>
@@ -108,10 +102,12 @@
       <url>http://artifactory.uber.internal:4587/artifactory/libs-snapshot-local/</url>
     </snapshotRepository>
   </distributionManagement>
-  <inceptionYear>2018</inceptionYear>
+  <inceptionYear>2014-2018</inceptionYear>
 
   <properties>
     <pinot.root>${basedir}</pinot.root>
+    <revision>0.4.0</revision>
+    <sha1>-SNAPSHOT</sha1>
     <build.profile.id>dev</build.profile.id>
     <jdk.version>1.8</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -127,33 +123,55 @@
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
     <parquet.version>1.8.0</parquet.version>
-    <helix.version>0.8.4</helix.version>
+    <helix.version>0.9.7</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.9.8</jackson.version>
     <async-http-client.version>1.9.21</async-http-client.version>
     <jersey.version>2.28</jersey.version>
     <swagger.version>1.5.16</swagger.version>
     <hadoop.version>2.7.0</hadoop.version>
+    <spark.version>2.2.0</spark.version>
+    <scala.binary.version>2.11</scala.binary.version>
+    <scala.version>2.11.11</scala.version>
     <antlr.version>4.6</antlr.version>
+    <jsonpath.version>2.4.0</jsonpath.version>
     <calcite.version>1.19.0</calcite.version>
+    <lucene.version>8.2.0</lucene.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
-    <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging-->
+    <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging -->
     <commons-logging.version>1.2</commons-logging.version>
+    <!-- hadoop-common, spark-core use commons-net -->
+    <commons-net.version>3.1</commons-net.version>
+    <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
+    <dropwizard-metrics.version>3.2.3</dropwizard-metrics.version>
     <snappy-java.version>1.1.1.7</snappy-java.version>
     <log4j.version>2.11.2</log4j.version>
+    <netty.version>4.1.42.Final</netty.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g</argLine>
+    <argLine>-Xms4g -Xmx4g</argLine>
 
     <!-- handle kafka imports
     kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
     To change kafka connector dependency, we only need to update this version number config.
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
-    <kafka.version>0.9</kafka.version>
+    <kafka.version>2.0</kafka.version>
   </properties>
 
   <profiles>
+    <profile>
+      <id>kafka-0.9</id>
+      <activation>
+        <property>
+          <name>kafka.version</name>
+          <value>0.9</value>
+        </property>
+      </activation>
+      <properties>
+        <kafka.version>0.9</kafka.version>
+      </properties>
+    </profile>
     <profile>
       <id>kafka-2.0</id>
       <activation>
@@ -237,12 +255,17 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-avro</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-spi</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-api</artifactId>
+        <artifactId>pinot-java-client</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -287,22 +310,17 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-hadoop-filesystem</artifactId>
+        <artifactId>pinot-hdfs</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-azure-filesystem</artifactId>
+        <artifactId>pinot-azure</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-orc</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-transport</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -315,6 +333,11 @@
         <artifactId>equalsverifier</artifactId>
         <version>1.7.2</version>
         <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.groovy</groupId>
+        <artifactId>groovy-all</artifactId>
+        <version>2.4.8</version>
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>
@@ -357,11 +380,6 @@
         <version>20.0</version>
       </dependency>
       <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>azure-data-lake-store-sdk</artifactId>
-        <version>2.1.5</version>
-      </dependency>
-      <dependency>
         <groupId>com.yammer.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>2.2.0</version>
@@ -391,17 +409,48 @@
         <artifactId>commons-io</artifactId>
         <version>2.4</version>
       </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-all</artifactId>
-        <version>4.1.28.Final</version>
-      </dependency>
+
       <!-- zkclient & helix-core use netty -->
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty</artifactId>
         <version>3.9.6.Final</version>
       </dependency>
+
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-all</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+
+      <!-- this part is for resolving dependency convergence error for pinot-adls -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-codec-http2</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-handler-proxy</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-codec-http</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-handler</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-transport-native-epoll</artifactId>
+        <version>${netty.version}</version>
+        <classifier>linux-x86_64</classifier>
+      </dependency>
+
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
@@ -410,7 +459,7 @@
       <dependency>
         <groupId>joda-time</groupId>
         <artifactId>joda-time</artifactId>
-        <version>2.0</version>
+        <version>2.10.5</version>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -454,6 +503,26 @@
         <version>2.0.1.Final</version>
       </dependency>
       <dependency>
+        <groupId>javax.activation</groupId>
+        <artifactId>activation</artifactId>
+        <version>1.1.1</version>
+      </dependency>
+      <dependency>
+        <groupId>javax.xml.bind</groupId>
+        <artifactId>jaxb-api</artifactId>
+        <version>2.3.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.sun.xml.bind</groupId>
+        <artifactId>jaxb-core</artifactId>
+        <version>2.3.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.sun.xml.bind</groupId>
+        <artifactId>jaxb-impl</artifactId>
+        <version>2.3.0</version>
+      </dependency>
+      <dependency>
         <groupId>org.apache.helix</groupId>
         <artifactId>helix-core</artifactId>
         <version>${helix.version}</version>
@@ -463,7 +532,7 @@
             <artifactId>zkclient</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.jboss.netty</groupId>
+            <groupId>org.jbossjboss.netty</groupId>
             <artifactId>netty</artifactId>
           </exclusion>
           <exclusion>
@@ -549,6 +618,11 @@
         <artifactId>commons-codec</artifactId>
         <version>1.6</version>
       </dependency>
+      <dependency>
+        <groupId>com.thoughtworks.paranamer</groupId>
+        <artifactId>paranamer</artifactId>
+        <version>2.6</version>
+      </dependency>
 
       <!-- Jackson -->
       <dependency>
@@ -597,20 +671,13 @@
         <version>${jackson.version}</version>
       </dependency>
 
-      <!-- Hadoop  -->
+      <!-- Hadoop -->
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-common</artifactId>
         <version>${hadoop.version}</version>
+        <scope>provided</scope>
         <exclusions>
-          <exclusion>
-            <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-server</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-client</artifactId>
-          </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
@@ -618,6 +685,10 @@
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-json</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.sun.jersey</groupId>
+            <artifactId>jersey-server</artifactId>
           </exclusion>
           <exclusion>
             <groupId>log4j</groupId>
@@ -631,9 +702,18 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-minicluster</artifactId>
+        <artifactId>hadoop-hdfs</artifactId>
         <version>${hadoop.version}</version>
+        <scope>provided</scope>
         <exclusions>
+          <exclusion>
+            <groupId>com.sun.jersey</groupId>
+            <artifactId>jersey-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.sun.jersey</groupId>
+            <artifactId>jersey-server</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
@@ -648,15 +728,8 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-client</artifactId>
         <version>${hadoop.version}</version>
+        <scope>provided</scope>
         <exclusions>
-          <exclusion>
-            <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-server</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-client</artifactId>
-          </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
@@ -666,6 +739,14 @@
             <artifactId>jersey-json</artifactId>
           </exclusion>
           <exclusion>
+            <groupId>com.sun.jersey</groupId>
+            <artifactId>jersey-server</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.sun.jersey</groupId>
+            <artifactId>jersey-client</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
           </exclusion>
@@ -675,40 +756,85 @@
           </exclusion>
         </exclusions>
       </dependency>
+
+      <!-- Spark -->
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-aws</artifactId>
-        <version>${hadoop.version}</version>
+        <groupId>org.apache.spark</groupId>
+        <artifactId>spark-core_${scala.binary.version}</artifactId>
+        <version>${spark.version}</version>
+        <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>com.twitter</groupId>
+            <artifactId>chill_2.11</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.twitter</groupId>
+            <artifactId>chill-java</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-recipes</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
+
+      <!-- Scala -->
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-library</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-reflect</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-compiler</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-scalap</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
+
+      <!-- Metrics -->
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+        <version>${dropwizard-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-jvm</artifactId>
+        <version>${dropwizard-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-json</artifactId>
+        <version>${dropwizard-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-graphite</artifactId>
+        <version>${dropwizard-metrics.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
-        <version>1.5.2</version>
-        <exclusions>
-          <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.orc</groupId>
-        <artifactId>orc-mapreduce</artifactId>
-        <version>1.5.2</version>
-        <exclusions>
-          <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-        </exclusions>
+        <version>1.5.9</version>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -747,6 +873,11 @@
         <version>2.7.0</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.datasketches</groupId>
+        <artifactId>datasketches-java</artifactId>
+        <version>1.2.0-incubating</version>
+      </dependency>
+      <dependency>
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
         <version>3.2</version>
@@ -755,6 +886,11 @@
         <groupId>org.antlr</groupId>
         <artifactId>antlr4-runtime</artifactId>
         <version>${antlr.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.jayway.jsonpath</groupId>
+        <artifactId>json-path</artifactId>
+        <version>${jsonpath.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.calcite</groupId>
@@ -836,6 +972,11 @@
         </exclusions>
       </dependency>
       <dependency>
+        <groupId>org.apache.calcite</groupId>
+        <artifactId>calcite-babel</artifactId>
+        <version>${calcite.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.jcabi</groupId>
         <artifactId>jcabi-log</artifactId>
         <version>0.17.1</version>
@@ -872,6 +1013,11 @@
         <version>${jersey.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.glassfish.jersey.core</groupId>
+        <artifactId>jersey-client</artifactId>
+        <version>${jersey.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.glassfish.jersey.inject</groupId>
         <artifactId>jersey-hk2</artifactId>
         <version>${jersey.version}</version>
@@ -885,12 +1031,6 @@
         <groupId>org.glassfish.jersey.media</groupId>
         <artifactId>jersey-media-json-jackson</artifactId>
         <version>${jersey.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-client</artifactId>
-        <version>1.9</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>io.swagger</groupId>
@@ -916,6 +1056,11 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-math</artifactId>
         <version>2.1</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven.surefire</groupId>
+        <artifactId>surefire-testng</artifactId>
+        <version>2.19</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -954,6 +1099,12 @@
         <artifactId>commons-math3</artifactId>
         <version>3.2</version>
       </dependency>
+      <!-- hadoop-common & google-cloud-storage use gson -->
+      <dependency>
+        <groupId>com.google.code.gson</groupId>
+        <artifactId>gson</artifactId>
+        <version>2.2.4</version>
+      </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
         <groupId>net.sf.jopt-simple</groupId>
@@ -970,8 +1121,12 @@
         <artifactId>commons-logging</artifactId>
         <version>${commons-logging.version}</version>
       </dependency>
+      <dependency>
+        <groupId>commons-net</groupId>
+        <artifactId>commons-net</artifactId>
+        <version>${commons-net.version}</version>
+      </dependency>
     </dependencies>
-
   </dependencyManagement>
   <build>
     <defaultGoal>clean install</defaultGoal>
@@ -1051,9 +1206,6 @@
           <executions>
             <execution>
               <id>attach-sources</id>
-              <goals>
-                <goal>jar-no-fork</goal>
-              </goals>
             </execution>
           </executions>
         </plugin>
@@ -1180,8 +1332,6 @@
           <!-- Excludes integration tests when unit tests are run. -->
           <excludes>
             <exclude>**/*IT.java</exclude>
-            <!-- TODO: re-enable the Minion tests when upgrading to Helix 0.9.1 -->
-            <exclude>**/*MinionClusterIntegrationTest.java</exclude>
           </excludes>
           <forkCount>1</forkCount>
           <reuseForks>false</reuseForks>
@@ -1286,12 +1436,19 @@
 
             <!-- Top level directories -->
             <exclude>thirdeye/**</exclude>
+            <exclude>website/**</exclude>
+            <exclude>docker/**</exclude>
+            <exclude>kubernetes/**</exclude>
+
+            <!-- Docker image configs -->
+            <exclude>docker/images/pinot-thirdeye/**</exclude>
 
             <!-- Note: this will exclude all single character directories under the root directory.
             We use this to exclude the temporary files generated during build -->
             <exclude>?/**</exclude>
 
             <!-- Top level files -->
+            <exclude>.arcconfig</exclude>
             <exclude>.codecov*</exclude>
             <exclude>HEADER</exclude>
             <exclude>LICENSE*</exclude>
@@ -1382,16 +1539,25 @@
             <exclude>**/*.iml</exclude>
 
             <!-- Top level -->
+            <exclude>.arcconfig</exclude>
             <exclude>.codecov*</exclude>
 
             <!-- Test Resources -->
             <exclude>**/test/resources/**</exclude>
+
+            <!-- Pinot Website (not part of the distribution) -->
+            <exclude>website/**</exclude>
+
+            <!-- Docker and Kubernetes (not part of the distribution) -->
+            <exclude>kubernetes/**</exclude>
+            <exclude>docker/**</exclude>
 
             <!-- Pinot-Druid Benchmark (not part of the distribution) -->
             <exclude>contrib/**</exclude>
 
             <!-- Third eye (not part of the distribution) -->
             <exclude>thirdeye/**</exclude>
+            <exclude>docker/images/pinot-thirdeye/**</exclude>
           </excludes>
         </configuration>
       </plugin>

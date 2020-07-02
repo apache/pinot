@@ -24,20 +24,16 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -50,6 +46,14 @@ import org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGr
 import org.apache.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -89,8 +93,14 @@ public class NoDictionaryGroupKeyGeneratorTest {
     // Create transform operator and block
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
     String query = String.format("SELECT COUNT(*) FROM table GROUP BY %s", StringUtils.join(COLUMN_NAMES, ", "));
+
+    // Compute the transform expressions
+    Set<TransformExpressionTree> expressionTrees = new LinkedHashSet<>();
+    for (String columnName : COLUMN_NAMES) {
+      expressionTrees.add(TransformExpressionTree.compileToExpressionTree(columnName));
+    }
     TransformPlanNode transformPlanNode =
-        new TransformPlanNode(indexSegment, new Pql2Compiler().compileToBrokerRequest(query));
+        new TransformPlanNode(indexSegment, new Pql2Compiler().compileToBrokerRequest(query), expressionTrees);
     _transformOperator = transformPlanNode.run();
     _transformBlock = _transformOperator.nextBlock();
   }
@@ -210,7 +220,9 @@ public class NoDictionaryGroupKeyGeneratorTest {
       schema.addField(dimensionFieldSpec);
     }
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setRawIndexCreationColumns(Arrays.asList(NO_DICT_COLUMN_NAMES));
 
     config.setOutDir(INDEX_DIR_PATH);
@@ -256,7 +268,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
       rows.add(genericRow);
     }
 
-    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+    RecordReader recordReader = new GenericRowRecordReader(rows);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, recordReader);
     driver.build();

@@ -1,0 +1,26 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType": "LONG",
+      "name": "views"
+    },
+    {
+      "dataType": "LONG",
+      "name": "clicks"
+    },
+    {
+      "dataType": "LONG",
+      "name": "errors"
+    }
+  ],
+  "dimensionFieldSpecs": [
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "HOURS",
+      "dataType": "LONG",
+      "name": "hoursSinceEpoch"
+    }
+  },
+  "schemaName": "simpleWebsite"
+}

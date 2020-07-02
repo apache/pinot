@@ -25,99 +25,66 @@ import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 
 
 public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private Long min = null;
-  private Long max = null;
-  private final LongSet rawLongSet;
-  private final LongSet aggregatedLongSet;
-  private long[] sortedLongList;
-  private boolean sealed = false;
+  private final LongSet _values = new LongOpenHashSet(INITIAL_HASH_SET_SIZE);
+
+  private long[] _sortedValues;
+  private boolean _sealed = false;
 
   public LongColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    rawLongSet = new LongOpenHashSet(INITIAL_HASH_SET_SIZE);
-    aggregatedLongSet = new LongOpenHashSet(INITIAL_HASH_SET_SIZE);
   }
 
-  /**
-   * Collect statistics for the given entry.
-   * - Add it to the passed in set (which could be raw or aggregated)
-   * - Update maximum number of values for Multi-valued entries
-   * - Update Total number of entries
-   * - Check if entry is sorted.
-   * @param entry
-   * @param set
-   */
-  private void collectEntry(Object entry, LongSet set) {
+  @Override
+  public void collect(Object entry) {
     if (entry instanceof Object[]) {
-      for (final Object e : (Object[]) entry) {
-        set.add(((Number) e).longValue());
+      Object[] values = (Object[]) entry;
+      for (Object obj : values) {
+        long value = (long) obj;
+        _values.add(value);
       }
-      if (maxNumberOfMultiValues < ((Object[]) entry).length) {
-        maxNumberOfMultiValues = ((Object[]) entry).length;
-      }
-      updateTotalNumberOfEntries((Object[]) entry);
+
+      maxNumberOfMultiValues = Math.max(maxNumberOfMultiValues, values.length);
+      updateTotalNumberOfEntries(values);
     } else {
-      long value = ((Number) entry).longValue();
+      long value = (long) entry;
       addressSorted(value);
       updatePartition(value);
-      set.add(value);
+      _values.add(value);
+
       totalNumberOfEntries++;
     }
   }
 
-  /**
-   * {@inheritDoc}
-   * @param entry Entry to be collected
-   * @param isAggregated True for aggregated, False for raw.
-   */
-  @Override
-  public void collect(Object entry, boolean isAggregated) {
-    if (isAggregated) {
-      collectEntry(entry, aggregatedLongSet);
-    } else {
-      collectEntry(entry, rawLongSet);
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   * @param entry Entry to be collected
-   */
-  @Override
-  public void collect(Object entry) {
-    collect(entry, false /* isAggregated */);
-  }
-
   @Override
   public Long getMinValue() {
-    if (sealed) {
-      return min;
+    if (_sealed) {
+      return _sortedValues[0];
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
   public Long getMaxValue() {
-    if (sealed) {
-      return max;
+    if (_sealed) {
+      return _sortedValues[_sortedValues.length - 1];
     }
-    throw new IllegalStateException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
   @Override
   public Object getUniqueValuesSet() {
-    if (sealed) {
-      return sortedLongList;
+    if (_sealed) {
+      return _sortedValues;
     }
-    throw new IllegalStateException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
 
   @Override
   public int getCardinality() {
-    if (sealed) {
-      return sortedLongList.length;
+    if (_sealed) {
+      return _sortedValues.length;
     }
-    throw new IllegalStateException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for cardinality");
   }
 
   @Override
@@ -127,29 +94,8 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
   @Override
   public void seal() {
-    sealed = true;
-    sortedLongList = new long[rawLongSet.size()];
-    rawLongSet.toArray(sortedLongList);
-
-    Arrays.sort(sortedLongList);
-
-    if (sortedLongList.length == 0) {
-      min = null;
-      max = null;
-      return;
-    }
-
-    // Update min/max based on raw docs.
-    min = sortedLongList[0];
-    max = sortedLongList[sortedLongList.length - 1];
-
-    // Merge the raw and aggregated docs, so stats for dictionary creation are collected correctly.
-    int numAggregated = aggregatedLongSet.size();
-    if (numAggregated > 0) {
-      rawLongSet.addAll(aggregatedLongSet);
-      sortedLongList = new long[rawLongSet.size()];
-      rawLongSet.toArray(sortedLongList);
-      Arrays.sort(sortedLongList);
-    }
+    _sortedValues = _values.toLongArray();
+    Arrays.sort(_sortedValues);
+    _sealed = true;
   }
 }

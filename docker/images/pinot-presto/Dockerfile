@@ -30,7 +30,7 @@ ENV PRESTO_BUILD_DIR=/home/presto/build
 # extra dependency for running launcher
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    vim wget curl git maven && \
+    vim wget curl git && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 999 presto && \
@@ -40,14 +40,15 @@ USER presto
 RUN git clone ${PRESTO_GIT_URL} ${PRESTO_BUILD_DIR} && \
     cd ${PRESTO_BUILD_DIR} && \
     git checkout ${PRESTO_BRANCH} && \
+    echo "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/3.6.3/apache-maven-3.6.3-bin.zip" > .mvn/wrapper/maven-wrapper.properties && \
     ./mvnw clean install -DskipTests && \
     mkdir -p ${PRESTO_HOME}/data && \
     cp -r presto-server/target/presto-server-*/presto-server-*/* ${PRESTO_HOME} && \
     mkdir -p ${PRESTO_HOME}/plugin/pinot && cp -r presto-pinot/target/presto-pinot-*/* ${PRESTO_HOME}/plugin/pinot/ && \
-    mvn dependency:purge-local-repository -DactTransitively=false -DreResolve=false --fail-at-end && \
-    rm -rf ${PRESTO_BUILD_DIR}
+    rm -rf ${PRESTO_BUILD_DIR} ${PRESTO_HOME}/.m2
 
 COPY etc ${PRESTO_HOME}/etc
+
 EXPOSE 8080
 
 VOLUME ["${PRESTO_HOME}/etc", "${PRESTO_HOME}/data"]

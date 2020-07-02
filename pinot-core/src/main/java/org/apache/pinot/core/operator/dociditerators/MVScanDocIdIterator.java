@@ -19,13 +19,13 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.Arrays;
-import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -38,7 +38,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private PredicateEvaluator evaluator;
 
   private String datasourceName;
-  private MutableInt _numEntriesScanned = new MutableInt(0);
+  private int _numEntriesScanned;
 
   public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
@@ -82,7 +82,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     valueIterator.skipTo(docId);
     int length = valueIterator.nextIntVal(intArray);
-    return evaluator.applyMV(intArray, length, _numEntriesScanned);
+    _numEntriesScanned += length;
+    return evaluator.applyMV(intArray, length);
   }
 
   @Override
@@ -100,8 +101,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     } else {
       currentDocId = targetDocId - 1;
       valueIterator.skipTo(targetDocId);
-      int next = next();
-      return next;
+      return next();
     }
   }
 
@@ -113,7 +113,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
       int length = valueIterator.nextIntVal(intArray);
-      if (evaluator.applyMV(intArray, length, _numEntriesScanned)) {
+      _numEntriesScanned += length;
+      if (evaluator.applyMV(intArray, length)) {
         return currentDocId;
       }
     }
@@ -132,20 +133,21 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
-  public MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer) {
+  public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
 
     MutableRoaringBitmap result = new MutableRoaringBitmap();
     if (evaluator.isAlwaysFalse()) {
       return result;
     }
-    IntIterator intIterator = answer.getIntIterator();
+    IntIterator intIterator = docIds.getIntIterator();
     int docId = -1, length;
     while (intIterator.hasNext() && docId < endDocId) {
       docId = intIterator.next();
       if (docId >= startDocId) {
         valueIterator.skipTo(docId);
         length = valueIterator.nextIntVal(intArray);
-        if (evaluator.applyMV(intArray, length, _numEntriesScanned)) {
+        _numEntriesScanned += length;
+        if (evaluator.applyMV(intArray, length)) {
           result.add(docId);
         }
       }
@@ -155,6 +157,6 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public int getNumEntriesScanned() {
-    return _numEntriesScanned.intValue();
+    return _numEntriesScanned;
   }
 }

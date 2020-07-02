@@ -18,54 +18,28 @@
  */
 package org.apache.pinot.core.realtime.impl.fakestream;
 
-import java.io.IOException;
 import java.util.Map;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.io.BinaryDecoder;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.pinot.spi.data.Schema;
+import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.realtime.stream.AvroRecordToPinotRowGenerator;
-import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
 
 /**
  * StreamMessageDecoder implementation for fake stream
  */
 public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FakeStreamMessageDecoder.class);
-
-  private org.apache.avro.Schema _avroSchema;
-  private DatumReader<GenericData.Record> _datumReader;
-  private AvroRecordToPinotRowGenerator _avroRecordConverter;
-  private BinaryDecoder _binaryDecoderToReuse;
-  private GenericData.Record _avroRecordToReuse;
 
   @Override
-  public void init(Map props, Schema indexingSchema, String topicName) throws Exception {
-    _avroSchema = new org.apache.avro.Schema.Parser().parse(FakeStreamConfigUtils.getAvroSchemaFile());
-    _datumReader = new GenericDatumReader<>(_avroSchema);
-    _avroRecordConverter = new AvroRecordToPinotRowGenerator(indexingSchema);
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
   }
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
-    return decode(payload, 0, payload.length, destination);
+    return null;
   }
 
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    _binaryDecoderToReuse = DecoderFactory.get().binaryDecoder(payload, offset, length, _binaryDecoderToReuse);
-    try {
-      _avroRecordToReuse = _datumReader.read(_avroRecordToReuse, _binaryDecoderToReuse);
-    } catch (IOException e) {
-      LOGGER.error("Caught exception while reading message using schema: {}", _avroSchema, e);
-      return null;
-    }
-    return _avroRecordConverter.transform(_avroRecordToReuse, destination);
+    return null;
   }
 }

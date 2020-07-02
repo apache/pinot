@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Function;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -29,15 +28,24 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -46,10 +54,14 @@ import org.testng.Assert;
  */
 @SuppressWarnings("unused")
 public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTestSet.class);
   private static final Random RANDOM = new Random();
 
   // Default settings
-  private static final String DEFAULT_QUERY_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K";
+  private static final String DEFAULT_PQL_QUERY_FILE_NAME =
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K";
+  private static final String DEFAULT_SQL_QUERY_FILE_NAME =
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
   private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
 
@@ -57,7 +69,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    * Can be overridden to change default setting
    */
   protected String getQueryFileName() {
-    return DEFAULT_QUERY_FILE_NAME;
+    return DEFAULT_PQL_QUERY_FILE_NAME;
+  }
+
+  /**
+   * Can be overridden to change default setting
+   */
+  protected String getSqlQueryFileName() {
+    return DEFAULT_SQL_QUERY_FILE_NAME;
   }
 
   /**
@@ -119,6 +138,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
         "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
     query =
+        "SELECT SUM(TotalAddGTime) FROM mytable WHERE DivArrDelay NOT IN (67, 260) AND Carrier IN ('F9', 'B6') OR DepTime BETWEEN 2144 AND 1926";
+    testQuery(query, Collections.singletonList(query));
+    query =
         "SELECT ActualElapsedTime, OriginStateFips, MIN(DivReachedDest), SUM(ArrDelay), AVG(CRSDepTime) FROM mytable "
             + "WHERE OriginCityName > 'Beaumont/Port Arthur, TX' OR FlightDate IN ('2014-12-09', '2014-10-05')"
             + " GROUP BY ActualElapsedTime, OriginStateFips "
@@ -146,40 +168,79 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
    *   </li>
    * </ul>
-   * <p>For queries with multiple aggregation functions, need to split each of them into a separate H2 SQL query.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</code>
-   *   </li>
-   * </ul>
    * <p>For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
    * <ul>
    *   <li>
    *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
    *   </li>
    * </ul>
-   *
-   * @throws Exception
+   * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
+   *  This list is very basic right now (aggregations only) and needs to be enriched
    */
   public void testHardcodedSqlQueries()
       throws Exception {
-    // Here are some sample queries.
     String query;
+    List<String> h2queries;
+    query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE ArrDelay > CarrierDelay LIMIT 1";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT count(*) FROM mytable WHERE AirlineID > 20355 AND OriginState BETWEEN 'PA' AND 'DE' AND DepTime <> 2202 LIMIT 21";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' ORDER BY ArrTime DESC";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303, 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
+    h2queries = Arrays.asList(
+        "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN (1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000");
+    testSqlQuery(query, h2queries);
+    query = "SELECT MAX(Quarter), MAX(FlightNum) FROM mytable LIMIT 8";
+    h2queries = Arrays.asList("SELECT MAX(Quarter),MAX(FlightNum) FROM mytable LIMIT 10000");
+    testSqlQuery(query, h2queries);
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
+    query = "SELECT SUM(ArrTime) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
+    query = "SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
+    query = "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
+    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
-    testSqlQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
-        "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
+    query = "SELECT COUNT(*), MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*), MAX(ArrTime), MIN(ArrTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT DaysSinceEpoch, COUNT(*), MAX(ArrTime), MIN(ArrTime) FROM mytable GROUP BY DaysSinceEpoch";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT ArrTime, ArrTime * 10 FROM mytable WHERE DaysSinceEpoch >= 16312";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT ArrTime, ArrTime - ArrTime % 10 FROM mytable WHERE DaysSinceEpoch >= 16312";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10 FROM mytable WHERE DaysSinceEpoch >= 16312";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10 FROM mytable WHERE ArrTime - 100 > 0";
+    testSqlQuery(query, Collections.singletonList(query));
+    query =
+        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ADD(ArrTime + 5, ArrDelay), ADD(ArrTime * 5, ArrDelay) FROM mytable WHERE mult((ArrTime - 100), (5 + ArrDelay))> 0";
+    h2queries = Collections.singletonList(
+        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0");
+    testSqlQuery(query, h2queries);
+    query = "SELECT COUNT(*) AS \"date\", MAX(ArrTime) AS \"group\", MIN(ArrTime) AS min FROM myTable";
+    testSqlQuery(query, Collections.singletonList(query));
   }
 
   /**
@@ -200,7 +261,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     for (String query : pqlQueries) {
       JsonNode response = postQuery(query);
       for (String statName : statNames) {
-        Assert.assertTrue(response.has(statName));
+        assertTrue(response.has(statName));
       }
     }
   }
@@ -210,7 +271,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     ResultSetGroup resultSetGroup = getPinotConnection().execute("select * from mytable");
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     for (int i = 0; i < resultSet.getColumnCount(); i++) {
-      Assert.assertFalse(resultSet.getColumnName(i).startsWith("$"),
+      assertFalse(resultSet.getColumnName(i).startsWith("$"),
           "Virtual column " + resultSet.getColumnName(i) + " is present in the results!");
     }
 
@@ -230,7 +291,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testQueriesFromQueryFile()
       throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
-    Assert.assertNotNull(resourceUrl);
+    assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
 
     int maxNumQueriesToSkipInQueryFile = getMaxNumQueriesToSkipInQueryFile();
@@ -262,37 +323,48 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   /**
    * Test random SQL queries from the query file.
-   * TODO: fix this test by adding the SQL query file
    */
   public void testSqlQueriesFromQueryFile()
       throws Exception {
-    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
-    Assert.assertNotNull(resourceUrl);
+    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getSqlQueryFileName());
+    assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
 
     int maxNumQueriesToSkipInQueryFile = getMaxNumQueriesToSkipInQueryFile();
+    int queryId = 0;
     try (BufferedReader reader = new BufferedReader(new FileReader(queryFile))) {
       while (true) {
         int numQueriesSkipped = RANDOM.nextInt(maxNumQueriesToSkipInQueryFile);
         for (int i = 0; i < numQueriesSkipped; i++) {
           reader.readLine();
+          queryId++;
         }
-
         String queryString = reader.readLine();
+        queryId++;
+        LOGGER.info("Processing query id - {}", queryId);
         // Reach end of file.
         if (queryString == null) {
           return;
         }
 
         JsonNode query = JsonUtils.stringToJsonNode(queryString);
-        String sqlQuery = query.get("pql").asText();
+        String sqlQuery = query.get("sql").asText();
         JsonNode hsqls = query.get("hsqls");
         List<String> sqlQueries = new ArrayList<>();
-        int length = hsqls.size();
-        for (int i = 0; i < length; i++) {
-          sqlQueries.add(hsqls.get(i).asText());
+        if (hsqls == null || hsqls.size() == 0) {
+          sqlQueries.add(sqlQuery);
+        } else {
+          for (int i = 0; i < hsqls.size(); i++) {
+            sqlQueries.add(hsqls.get(i).asText());
+          }
         }
-        testSqlQuery(sqlQuery, sqlQueries);
+        try {
+          testSqlQuery(sqlQuery, sqlQueries);
+        } catch (Exception e) {
+          e.printStackTrace();
+          LOGGER.error("Failed to test SQL query: {} with H2 queries: {}.", sqlQuery, sqlQueries, e);
+          throw e;
+        }
       }
     }
   }
@@ -344,7 +416,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   private void testQueryException(String query)
       throws Exception {
     JsonNode jsonObject = postQuery(query);
-    Assert.assertTrue(jsonObject.get("exceptions").size() > 0);
+    assertTrue(jsonObject.get("exceptions").size() > 0);
   }
 
   /**
@@ -355,7 +427,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testInstanceShutdown()
       throws Exception {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
-    Assert.assertFalse(instances.isEmpty(), "List of instances should not be empty");
+    assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
     // Mark all instances in the cluster as shutting down
     for (String instance : instances) {
@@ -378,109 +450,156 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     checkForEmptyRoutingTable(false);
 
     // Check on each server instance
-    for (String instanceName : instances) {
-      if (!instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+    for (String instance : instances) {
+      if (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
         continue;
       }
 
       // Ensure that the random instance is in the routing table
-      checkForInstanceInRoutingTable(true, instanceName);
+      checkForInstanceInRoutingTable(instance, true);
 
       // Mark the server instance as shutting down
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instanceName);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(getHelixClusterName(), instanceName, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
 
       // Check that it is not in the routing table
-      checkForInstanceInRoutingTable(false, instanceName);
+      checkForInstanceInRoutingTable(instance, false);
 
       // Re-enable the server instance
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(getHelixClusterName(), instanceName, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
 
       // Check that it is in the routing table
-      checkForInstanceInRoutingTable(true, instanceName);
+      checkForInstanceInRoutingTable(instance, true);
     }
   }
 
-  private void checkForInstanceInRoutingTable(final boolean shouldExist, final String instanceName) {
+  private void checkForInstanceInRoutingTable(String instance, boolean shouldExist) {
     String errorMessage;
     if (shouldExist) {
-      errorMessage = "Routing table does not contain expected instance: " + instanceName;
+      errorMessage = "Routing table does not contain expected instance: " + instance;
     } else {
-      errorMessage = "Routing table contains unexpected instance: " + instanceName;
+      errorMessage = "Routing table contains unexpected instance: " + instance;
     }
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          JsonNode routingTableSnapshot =
-              getDebugInfo("debug/routingTable/" + getTableName()).get("routingTableSnapshot");
-          int numTables = routingTableSnapshot.size();
-          for (int i = 0; i < numTables; i++) {
-            JsonNode tableRouting = routingTableSnapshot.get(i);
-            String tableNameWithType = tableRouting.get("tableName").asText();
-            if (TableNameBuilder.extractRawTableName(tableNameWithType).equals(getTableName())) {
-              JsonNode routingTableEntries = tableRouting.get("routingTableEntries");
-              int numRoutingTableEntries = routingTableEntries.size();
-              for (int j = 0; j < numRoutingTableEntries; j++) {
-                JsonNode routingTableEntry = routingTableEntries.get(j);
-                if (routingTableEntry.has(instanceName)) {
-                  return shouldExist;
-                }
-              }
-            }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
+        for (JsonNode routingTable : routingTables) {
+          if (routingTable.has(instance)) {
+            return shouldExist;
           }
-          return !shouldExist;
-        } catch (Exception e) {
-          return null;
         }
+        return !shouldExist;
+      } catch (Exception e) {
+        return null;
       }
     }, 60_000L, errorMessage);
   }
 
-  private void checkForEmptyRoutingTable(final boolean shouldBeEmpty)
-      throws Exception {
+  private void checkForEmptyRoutingTable(boolean shouldBeEmpty) {
     String errorMessage;
     if (shouldBeEmpty) {
       errorMessage = "Routing table is not empty";
     } else {
       errorMessage = "Routing table is empty";
     }
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          JsonNode routingTableSnapshot =
-              getDebugInfo("debug/routingTable/" + getTableName()).get("routingTableSnapshot");
-          int numTables = routingTableSnapshot.size();
-          for (int i = 0; i < numTables; i++) {
-            JsonNode tableRouting = routingTableSnapshot.get(i);
-            String tableNameWithType = tableRouting.get("tableName").asText();
-            if (TableNameBuilder.extractRawTableName(tableNameWithType).equals(getTableName())) {
-              JsonNode routingTableEntries = tableRouting.get("routingTableEntries");
-              int numRoutingTableEntries = routingTableEntries.size();
-              for (int j = 0; j < numRoutingTableEntries; j++) {
-                JsonNode routingTableEntry = routingTableEntries.get(j);
-                if (routingTableEntry.size() == 0) {
-                  if (!shouldBeEmpty) {
-                    return false;
-                  }
-                } else {
-                  if (shouldBeEmpty) {
-                    return false;
-                  }
-                }
-              }
-            }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
+        for (JsonNode routingTable : routingTables) {
+          if ((routingTable.size() == 0) != shouldBeEmpty) {
+            return false;
           }
-          return true;
-        } catch (Exception e) {
-          return null;
         }
+        return true;
+      } catch (Exception e) {
+        return null;
       }
     }, 60_000L, errorMessage);
+  }
+
+  /**
+   * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
+   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns()}.
+   */
+  public void testReload(boolean includeOfflineTable)
+      throws Exception {
+    String rawTableName = getTableName();
+    Schema schema = getSchema();
+
+    String selectStarQuery = "SELECT * FROM " + rawTableName;
+    JsonNode queryResponse = postQuery(selectStarQuery);
+    assertEquals(queryResponse.get("selectionResults").get("columns").size(), schema.size());
+    long numTotalDocs = queryResponse.get("totalDocs").asLong();
+
+    schema.addField(constructNewDimension(FieldSpec.DataType.INT, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.LONG, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.FLOAT, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.DOUBLE, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.STRING, true));
+    schema.addField(constructNewDimension(FieldSpec.DataType.INT, false));
+    schema.addField(constructNewDimension(FieldSpec.DataType.LONG, false));
+    schema.addField(constructNewDimension(FieldSpec.DataType.FLOAT, false));
+    schema.addField(constructNewDimension(FieldSpec.DataType.DOUBLE, false));
+    schema.addField(constructNewDimension(FieldSpec.DataType.STRING, false));
+    schema.addField(constructNewMetric(FieldSpec.DataType.INT));
+    schema.addField(constructNewMetric(FieldSpec.DataType.LONG));
+    schema.addField(constructNewMetric(FieldSpec.DataType.FLOAT));
+    schema.addField(constructNewMetric(FieldSpec.DataType.DOUBLE));
+    schema.addField(constructNewMetric(FieldSpec.DataType.BYTES));
+
+    // Upload the schema with extra columns
+    addSchema(schema);
+
+    // Reload the table
+    if (includeOfflineTable) {
+      reloadOfflineTable(rawTableName);
+    }
+    reloadRealtimeTable(rawTableName);
+
+    // Wait for all segments to finish reloading, and test querying the new columns
+    // NOTE: Use count query to prevent schema inconsistency error
+    String testQuery = "SELECT COUNT(*) FROM " + rawTableName + " WHERE NewIntSVDimension < 0";
+    long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(testQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0);
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return testQueryResponse.get("aggregationResults").get(0).get("value").asLong() == countStarResult;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to generate default values for new columns");
+
+    // Select star query should return all the columns
+    queryResponse = postQuery(selectStarQuery);
+    assertEquals(queryResponse.get("exceptions").size(), 0);
+    JsonNode selectionResults = queryResponse.get("selectionResults");
+    assertEquals(selectionResults.get("columns").size(), schema.size());
+    assertEquals(selectionResults.get("results").size(), 10);
+
+    // Test filter on all new added columns
+    String countStarQuery = "SELECT COUNT(*) FROM " + rawTableName
+        + " WHERE NewIntSVDimension < 0 AND NewLongSVDimension < 0 AND NewFloatSVDimension < 0 AND NewDoubleSVDimension < 0 AND NewStringSVDimension = 'null'"
+        + " AND NewIntMVDimension < 0 AND NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension < 0 AND NewStringMVDimension = 'null'"
+        + " AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
+    queryResponse = postQuery(countStarQuery);
+    assertEquals(queryResponse.get("exceptions").size(), 0);
+    assertEquals(queryResponse.get("aggregationResults").get(0).get("value").asLong(), countStarResult);
+  }
+
+  private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {
+    String column =
+        "New" + StringUtils.capitalize(dataType.toString().toLowerCase()) + (singleValue ? "SV" : "MV") + "Dimension";
+    return new DimensionFieldSpec(column, dataType, singleValue);
+  }
+
+  private MetricFieldSpec constructNewMetric(FieldSpec.DataType dataType) {
+    String column = "New" + StringUtils.capitalize(dataType.toString().toLowerCase()) + "Metric";
+    return new MetricFieldSpec(column, dataType);
   }
 }

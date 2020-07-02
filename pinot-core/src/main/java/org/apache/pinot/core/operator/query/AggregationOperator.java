@@ -18,16 +18,14 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 
 
@@ -37,48 +35,38 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationOperator";
 
-  private final AggregationFunctionContext[] _functionContexts;
+  private final AggregationFunction[] _aggregationFunctions;
   private final TransformOperator _transformOperator;
-  private final long _numTotalRawDocs;
+  private final long _numTotalDocs;
   private final boolean _useStarTree;
 
-  private ExecutionStatistics _executionStatistics;
+  private int _numDocsScanned = 0;
 
-  public AggregationOperator(@Nonnull AggregationFunctionContext[] functionContexts,
-      @Nonnull TransformOperator transformOperator, long numTotalRawDocs, boolean useStarTree) {
-    _functionContexts = functionContexts;
+  public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
+      long numTotalDocs, boolean useStarTree) {
+    _aggregationFunctions = aggregationFunctions;
     _transformOperator = transformOperator;
-    _numTotalRawDocs = numTotalRawDocs;
+    _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numDocsScanned = 0;
-
     // Perform aggregation on all the transform blocks
     AggregationExecutor aggregationExecutor;
     if (_useStarTree) {
-      aggregationExecutor = new StarTreeAggregationExecutor(_functionContexts);
+      aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
     } else {
-      aggregationExecutor = new DefaultAggregationExecutor(_functionContexts);
+      aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      numDocsScanned += transformBlock.getNumDocs();
+      _numDocsScanned += transformBlock.getNumDocs();
       aggregationExecutor.aggregate(transformBlock);
     }
-    List<Object> aggregationResult = aggregationExecutor.getResult();
-
-    // Create execution statistics
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
-    _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            _numTotalRawDocs);
 
     // Build intermediate result block based on aggregation result from the executor
-    return new IntermediateResultsBlock(_functionContexts, aggregationResult, false);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(), false);
   }
 
   @Override
@@ -88,6 +76,9 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _executionStatistics;
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+        _numTotalDocs);
   }
 }

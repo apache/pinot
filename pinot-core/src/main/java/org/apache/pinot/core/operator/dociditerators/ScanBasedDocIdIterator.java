@@ -19,24 +19,22 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * All scan based filter iterators must implement this interface. This allows interesection to be
+ * All scan based filter iterators must implement this interface. This allows intersection to be
  * optimized.
  * For example, if the we have two iterators one index based and another scan based, instead of
  * iterating on both iterators while doing intersection, we iterate of index based and simply look
  * up on scan based iterator to check if docId matches
  */
 public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
-  /**
-   * @param docId
-   * @return true if the doc id matches
-   */
+
   boolean isMatch(int docId);
 
-  MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer);
+  MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds);
 
   /**
    * Get number of entries scanned.

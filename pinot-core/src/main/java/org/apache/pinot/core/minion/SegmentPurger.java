@@ -21,22 +21,17 @@ package org.apache.pinot.core.minion;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.store.ColumnIndexType;
-import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,31 +43,31 @@ import org.slf4j.LoggerFactory;
 public class SegmentPurger {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPurger.class);
 
-  private final String _rawTableName;
-  private final File _originalIndexDir;
+  private final File _indexDir;
   private final File _workingDir;
+  private final TableConfig _tableConfig;
   private final RecordPurger _recordPurger;
   private final RecordModifier _recordModifier;
 
   private int _numRecordsPurged;
   private int _numRecordsModified;
 
-  public SegmentPurger(String rawTableName, File originalIndexDir, File workingDir, @Nullable RecordPurger recordPurger,
+  public SegmentPurger(File indexDir, File workingDir, TableConfig tableConfig, @Nullable RecordPurger recordPurger,
       @Nullable RecordModifier recordModifier) {
     Preconditions.checkArgument(recordPurger != null || recordModifier != null,
         "At least one of record purger and modifier should be non-null");
-    _rawTableName = rawTableName;
-    _originalIndexDir = originalIndexDir;
+    _indexDir = indexDir;
     _workingDir = workingDir;
+    _tableConfig = tableConfig;
     _recordPurger = recordPurger;
     _recordModifier = recordModifier;
   }
 
   public File purgeSegment()
       throws Exception {
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_originalIndexDir);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     String segmentName = segmentMetadata.getName();
-    LOGGER.info("Start purging table: {}, segment: {}", _rawTableName, segmentName);
+    LOGGER.info("Start purging table: {}, segment: {}", _tableConfig.getTableName(), segmentName);
 
     try (PurgeRecordReader purgeRecordReader = new PurgeRecordReader()) {
       // Make a first pass through the data to see if records need to be purged or modified
@@ -85,10 +80,8 @@ public class SegmentPurger {
         return null;
       }
 
-      Schema schema = purgeRecordReader.getSchema();
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, purgeRecordReader.getSchema());
       config.setOutDir(_workingDir.getPath());
-      config.setTableName(_rawTableName);
       config.setSegmentName(segmentName);
 
       // Keep index creation time the same as original segment because both segments use the same raw data.
@@ -99,32 +92,10 @@ public class SegmentPurger {
       // The time column type info is not stored in the segment metadata.
       // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
       if (segmentMetadata.getTimeInterval() != null) {
-        config.setTimeColumnName(segmentMetadata.getTimeColumn());
+        config.setTimeColumnName(_tableConfig.getValidationConfig().getTimeColumnName());
         config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
         config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
         config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
-      }
-
-      // Generate inverted index if it exists in the original segment
-      // TODO: once the column metadata correctly reflects whether inverted index exists for the column, use that
-      //       instead of reading the segment
-      // TODO: uniform the behavior of Pinot Hadoop segment generation, segment converter and purger
-      List<String> invertedIndexCreationColumns = new ArrayList<>();
-      try (SegmentDirectory segmentDirectory = SegmentDirectory
-          .createFromLocalFS(_originalIndexDir, segmentMetadata, ReadMode.mmap);
-          SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-        for (String column : schema.getColumnNames()) {
-          if (reader.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
-            invertedIndexCreationColumns.add(column);
-          }
-        }
-      }
-      config.setInvertedIndexCreationColumns(invertedIndexCreationColumns);
-
-      // Generate star-tree if it exists in the original segment
-      StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
-      if (starTreeMetadata != null) {
-        config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
       }
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -133,8 +104,8 @@ public class SegmentPurger {
       driver.build();
     }
 
-    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", _rawTableName,
-        segmentName, _numRecordsPurged, _numRecordsModified);
+    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records",
+        _tableConfig.getTableName(), segmentName, _numRecordsPurged, _numRecordsModified);
     return new File(_workingDir, segmentName);
   }
 
@@ -155,7 +126,7 @@ public class SegmentPurger {
   }
 
   private class PurgeRecordReader implements RecordReader {
-    final PinotSegmentRecordReader _recordReader;
+    final PinotSegmentRecordReader _pinotSegmentRecordReader;
 
     // Reusable generic row to store the next row to return
     GenericRow _nextRow = new GenericRow();
@@ -166,17 +137,21 @@ public class SegmentPurger {
 
     PurgeRecordReader()
         throws Exception {
-      _recordReader = new PinotSegmentRecordReader(_originalIndexDir);
+      _pinotSegmentRecordReader = new PinotSegmentRecordReader(_indexDir);
+    }
+
+    public Schema getSchema() {
+      return _pinotSegmentRecordReader.getSchema();
     }
 
     @Override
-    public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
+    public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
     }
 
     @Override
     public boolean hasNext() {
       if (_recordPurger == null) {
-        return _recordReader.hasNext();
+        return _pinotSegmentRecordReader.hasNext();
       } else {
         // If all records have already been iterated, return false
         if (_finished) {
@@ -189,8 +164,8 @@ public class SegmentPurger {
         }
 
         // Try to get the next row to return
-        while (_recordReader.hasNext()) {
-          _nextRow = _recordReader.next(_nextRow);
+        while (_pinotSegmentRecordReader.hasNext()) {
+          _nextRow = _pinotSegmentRecordReader.next(_nextRow);
 
           if (_recordPurger.shouldPurge(_nextRow)) {
             _numRecordsPurged++;
@@ -214,7 +189,7 @@ public class SegmentPurger {
     @Override
     public GenericRow next(GenericRow reuse) {
       if (_recordPurger == null) {
-        reuse = _recordReader.next(reuse);
+        reuse = _pinotSegmentRecordReader.next(reuse);
       } else {
         Preconditions.checkState(!_nextRowReturned);
         reuse.init(_nextRow);
@@ -232,7 +207,7 @@ public class SegmentPurger {
 
     @Override
     public void rewind() {
-      _recordReader.rewind();
+      _pinotSegmentRecordReader.rewind();
       _nextRowReturned = true;
       _finished = false;
 
@@ -241,14 +216,9 @@ public class SegmentPurger {
     }
 
     @Override
-    public Schema getSchema() {
-      return _recordReader.getSchema();
-    }
-
-    @Override
     public void close()
         throws IOException {
-      _recordReader.close();
+      _pinotSegmentRecordReader.close();
     }
   }
 

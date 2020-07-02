@@ -27,4 +27,5 @@ ThirdEye
    introduction
    configuration
    datasources
+   caches
    alert_setup

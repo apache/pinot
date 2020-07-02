@@ -27,16 +27,17 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.ConvertToRawIndexTask;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -49,7 +50,6 @@ import org.testng.annotations.Test;
  * columns' index into raw index for OFFLINE segments.
  */
 public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridClusterIntegrationTest {
-  private static final int NUM_MINIONS = 3;
   private static final String COLUMNS_TO_CONVERT = "ActualElapsedTime,ArrDelay,DepDelay,CRSDepTime";
 
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
@@ -57,8 +57,14 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
 
   @Nullable
   @Override
-  protected List<String> getRawIndexColumns() {
+  protected List<String> getNoDictionaryColumns() {
     return null;
+  }
+
+  // NOTE: Only allow converting raw index for v1 segment
+  @Override
+  protected String getSegmentVersion() {
+    return SegmentVersion.v1.name();
   }
 
   @Override
@@ -75,8 +81,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     // The parent setUp() sets up Zookeeper, Kafka, controller, broker and servers
     super.setUp();
 
-    startMinions(NUM_MINIONS, null, null);
-
+    startMinion(null, null);
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
   }
@@ -84,14 +89,14 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   @Test
   public void testConvertToRawIndexTask()
       throws Exception {
-    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     File testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-0", offlineTableName);
     if (!testDataDir.isDirectory()) {
       testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-1", offlineTableName);
     }
     Assert.assertTrue(testDataDir.isDirectory());
-    final File tableDataDir = testDataDir;
+    File tableDataDir = testDataDir;
 
     // Check that all columns have dictionary
     File[] indexDirs = tableDataDir.listFiles();
@@ -168,8 +173,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   @Test
   public void testPinotHelixResourceManagerAPIs() {
     // Instance APIs
-    Assert.assertEquals(_helixResourceManager.getAllInstances().size(), 7);
-    Assert.assertEquals(_helixResourceManager.getOnlineInstanceList().size(), 7);
+    Assert.assertEquals(_helixResourceManager.getAllInstances().size(), 5);
+    Assert.assertEquals(_helixResourceManager.getOnlineInstanceList().size(), 5);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), 0);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);
 

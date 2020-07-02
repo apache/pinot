@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
@@ -27,8 +29,8 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 public class PercentileEstMVAggregationFunction extends PercentileEstAggregationFunction {
 
-  public PercentileEstMVAggregationFunction(int percentile) {
-    super(percentile);
+  public PercentileEstMVAggregationFunction(String column, int percentile) {
+    super(column, percentile);
   }
 
   @Override
@@ -37,8 +39,13 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + column;
+  public String getColumnName() {
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + _column;
+  }
+
+  @Override
+  public String getResultColumnName() {
+    return AggregationFunctionType.PERCENTILEEST.getName().toLowerCase() + _percentile + "mv(" + _column + ")";
   }
 
   @Override
@@ -47,8 +54,9 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    long[][] valuesArray = blockValSets[0].getLongValuesMV();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
     QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
       for (long value : valuesArray[i]) {
@@ -59,8 +67,8 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    long[][] valuesArray = blockValSets[0].getLongValuesMV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
     for (int i = 0; i < length; i++) {
       QuantileDigest quantileDigest = getDefaultQuantileDigest(groupByResultHolder, groupKeyArray[i]);
       for (long value : valuesArray[i]) {
@@ -71,8 +79,8 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    long[][] valuesArray = blockValSets[0].getLongValuesMV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    long[][] valuesArray = blockValSetMap.get(_expression).getLongValuesMV();
     for (int i = 0; i < length; i++) {
       long[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {

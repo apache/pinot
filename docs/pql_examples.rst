@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 .. _pql:
 
 PQL
@@ -262,6 +264,9 @@ Supported transform functions
    begins on 1/1, 4/1, 7/1, 10/1 in Los Angelese timezone). The output is
    expressed as hours since UTC epoch (note that the output is not Los Angeles
    timezone)
+
+``ARRAYLENGTH``
+   Takes a multi-valued column and returns the length of the column
 
 ``VALUEIN``
    Takes at least 2 arguments, where the first argument is a multi-valued column, and the following arguments are constant values.

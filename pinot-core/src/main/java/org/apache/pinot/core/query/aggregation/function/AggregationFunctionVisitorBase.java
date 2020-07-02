@@ -95,5 +95,8 @@ public class AggregationFunctionVisitorBase {
 
   public void visit(SumMVAggregationFunction function) {
   }
+
+  public void visit(DistinctCountThetaSketchAggregationFunction function) {
+  }
 }
 

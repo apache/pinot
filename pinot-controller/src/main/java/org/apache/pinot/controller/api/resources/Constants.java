@@ -20,7 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 public class Constants {
   private static final Logger LOGGER = LoggerFactory.getLogger(Constants.class);
 
+  public static final String CLUSTER_TAG = "Cluster";
   public static final String TABLE_TAG = "Table";
   public static final String VERSION_TAG = "Version";
   public static final String HEALTH_TAG = "Health";
@@ -39,12 +40,12 @@ public class Constants {
   public static final String LEAD_CONTROLLER_TAG = "Leader";
   public static final String TABLE_NAME = "tableName";
 
-  public static CommonConstants.Helix.TableType validateTableType(String tableTypeStr) {
+  public static TableType validateTableType(String tableTypeStr) {
     if (tableTypeStr == null || tableTypeStr.isEmpty()) {
       return null;
     }
     try {
-      return CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
+      return TableType.valueOf(tableTypeStr.toUpperCase());
     } catch (IllegalArgumentException e) {
       LOGGER.info("Illegal table type '{}'", tableTypeStr);
       throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'", Status.BAD_REQUEST);

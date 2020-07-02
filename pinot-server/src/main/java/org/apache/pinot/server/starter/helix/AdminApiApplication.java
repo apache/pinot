@@ -26,6 +26,7 @@ import java.net.URLClassLoader;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
@@ -41,18 +42,21 @@ public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
 
   private final ServerInstance serverInstance;
+  private final AccessControlFactory accessControlFactory;
   private URI baseUri;
   private boolean started = false;
   private HttpServer httpServer;
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
 
-  public AdminApiApplication(ServerInstance instance) {
+  public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory) {
     this.serverInstance = instance;
+    this.accessControlFactory = accessControlFactory;
     packages(RESOURCE_PACKAGE);
     register(new AbstractBinder() {
       @Override
       protected void configure() {
         bind(serverInstance).to(ServerInstance.class);
+        bind(accessControlFactory).to(AccessControlFactory.class);
       }
     });
 

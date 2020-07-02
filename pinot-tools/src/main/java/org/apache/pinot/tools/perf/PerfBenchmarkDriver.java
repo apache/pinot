@@ -44,17 +44,21 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.Tenant;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.common.utils.TenantRole;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -177,13 +181,12 @@ public class PerfBenchmarkDriver {
 
   private void startZookeeper()
       throws Exception {
-    int zkPort = _conf.getZkPort();
     if (!_conf.isStartZookeeper()) {
       LOGGER.info("Skipping start zookeeper step. Assumes zookeeper is already started.");
       return;
     }
-    ZookeeperLauncher launcher = new ZookeeperLauncher(_tempDir);
-    launcher.start(zkPort);
+    int zkPort = _conf.getZkPort();
+    ZkStarter.startLocalZkServer(zkPort);
   }
 
   private void startController() {
@@ -234,10 +237,11 @@ public class PerfBenchmarkDriver {
     serverConfiguration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, _serverInstanceDataDir);
     serverConfiguration
         .addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, _serverInstanceSegmentTarDir);
+    serverConfiguration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
     if (_segmentFormatVersion != null) {
       serverConfiguration.setProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
     }
-    serverConfiguration.setProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, _serverInstanceName);
+    serverConfiguration.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _serverInstanceName);
     LOGGER.info("Starting server instance: {}", _serverInstanceName);
     new HelixServerStarter(_clusterName, _zkAddress, serverConfiguration);
   }
@@ -306,7 +310,7 @@ public class PerfBenchmarkDriver {
 
   public void configureTable(String tableName, List<String> invertedIndexColumns, List<String> bloomFilterColumns)
       throws Exception {
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
         .setSegmentAssignmentStrategy(_segmentAssignmentStrategy).setNumReplicas(_numReplicas)
         .setBrokerTenant(_brokerTenantName).setServerTenant(_serverTenantName).setLoadMode(_loadMode)
         .setSegmentVersion(_segmentFormatVersion).setInvertedIndexColumns(invertedIndexColumns)
@@ -443,6 +447,7 @@ public class PerfBenchmarkDriver {
 
   public static void main(String[] args)
       throws Exception {
+    PluginManager.get().init();
     PerfBenchmarkDriverConf conf = (PerfBenchmarkDriverConf) new Yaml().load(new FileInputStream(args[0]));
     PerfBenchmarkDriver perfBenchmarkDriver = new PerfBenchmarkDriver(conf);
     perfBenchmarkDriver.run();

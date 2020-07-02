@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -41,7 +44,18 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /**
    * Returns the result column name for the given aggregation column, e.g. 'SUM(foo)' -> 'sum_foo'.
    */
-  String getColumnName(String column);
+  String getColumnName();
+
+  /**
+   * Returns the column name to be used in the data schema of results. e.g. 'MINMAXRANGEMV( foo)' -> 'minmaxrangemv(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
+   */
+  String getResultColumnName();
+
+  /**
+   * Returns a list of input expressions needed for performing aggregation.
+   *
+   */
+  List<TransformExpressionTree> getInputExpressions();
 
   /**
    * Accepts an aggregation function visitor to visit.
@@ -62,21 +76,22 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /**
    * Performs aggregation on the given block value sets (aggregation only).
    */
-  void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets);
+  void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap);
 
   /**
    * Performs aggregation on the given group key array and block value sets (aggregation group-by on single-value
    * columns).
    */
   void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap);
 
   /**
    * Performs aggregation on the given group keys array and block value sets (aggregation group-by on multi-value
    * columns).
    */
   void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets);
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap);
 
   /**
    * Extracts the intermediate result from the aggregation result holder (aggregation only).

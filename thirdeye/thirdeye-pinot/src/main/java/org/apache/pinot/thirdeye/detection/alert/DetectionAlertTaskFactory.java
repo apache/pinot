@@ -27,13 +27,13 @@ import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
@@ -45,6 +45,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +73,8 @@ public class DetectionAlertTaskFactory {
         ThirdEyeCacheRegistry.getInstance().getQueryCache(),
         ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyMergedResultDAO, evaluationDAO,
-        timeseriesLoader, aggregationLoader, new DetectionPipelineLoader());
+        timeseriesLoader, aggregationLoader, new DetectionPipelineLoader(), TimeSeriesCacheBuilder.getInstance(),
+        AnomaliesCacheBuilder.getInstance());
   }
 
   public DetectionAlertFilter loadAlertFilter(DetectionAlertConfigDTO alertConfig, long endTime)
@@ -88,7 +91,7 @@ public class DetectionAlertTaskFactory {
   public Set<DetectionAlertScheme> loadAlertSchemes(DetectionAlertConfigDTO alertConfig,
       ThirdEyeAnomalyConfiguration thirdeyeConfig, DetectionAlertFilterResult result) throws Exception {
     Preconditions.checkNotNull(alertConfig);
-    Map<String, Map<String, Object>> alertSchemes = alertConfig.getAlertSchemes();
+    Map<String, Object> alertSchemes = alertConfig.getAlertSchemes();
     if (alertSchemes == null || alertSchemes.isEmpty()) {
       Map<String, Object> emailScheme = new HashMap<>();
       emailScheme.put(PROP_CLASS_NAME, DEFAULT_ALERT_SCHEME);
@@ -98,8 +101,9 @@ public class DetectionAlertTaskFactory {
     for (String alertSchemeType : alertSchemes.keySet()) {
       LOG.debug("Loading Alert Scheme : {}", alertSchemeType);
       Preconditions.checkNotNull(alertSchemes.get(alertSchemeType));
-      Preconditions.checkNotNull(alertSchemes.get(alertSchemeType).get(PROP_CLASS_NAME));
-      Constructor<?> constructor = Class.forName(alertSchemes.get(alertSchemeType).get(PROP_CLASS_NAME).toString().trim())
+      Preconditions.checkNotNull(ConfigUtils.getMap(alertSchemes.get(alertSchemeType)).get(PROP_CLASS_NAME));
+      Constructor<?> constructor = Class.forName(ConfigUtils.getMap(alertSchemes.get(alertSchemeType))
+          .get(PROP_CLASS_NAME).toString().trim())
           .getConstructor(DetectionAlertConfigDTO.class, ThirdEyeAnomalyConfiguration.class, DetectionAlertFilterResult.class);
       detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(alertConfig, thirdeyeConfig, result));
     }
@@ -109,7 +113,7 @@ public class DetectionAlertTaskFactory {
   public Set<DetectionAlertSuppressor> loadAlertSuppressors(DetectionAlertConfigDTO alertConfig) throws Exception {
     Preconditions.checkNotNull(alertConfig);
     Set<DetectionAlertSuppressor> detectionAlertSuppressors = new HashSet<>();
-    Map<String, Map<String, Object>> alertSuppressors = alertConfig.getAlertSuppressors();
+    Map<String, Object> alertSuppressors = alertConfig.getAlertSuppressors();
     if (alertSuppressors == null || alertSuppressors.isEmpty()) {
       return detectionAlertSuppressors;
     }
@@ -117,8 +121,9 @@ public class DetectionAlertTaskFactory {
     for (String alertSuppressor : alertSuppressors.keySet()) {
       LOG.debug("Loading Alert Suppressor : {}", alertSuppressor);
       Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor));
-      Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor).get(PROP_CLASS_NAME));
-      Constructor<?> constructor = Class.forName(alertSuppressors.get(alertSuppressor).get(PROP_CLASS_NAME).toString().trim())
+      Preconditions.checkNotNull(ConfigUtils.getMap(alertSuppressors.get(alertSuppressor)).get(PROP_CLASS_NAME));
+      Constructor<?> constructor = Class.forName(ConfigUtils.getMap(alertSuppressors.get(alertSuppressor))
+          .get(PROP_CLASS_NAME).toString().trim())
           .getConstructor(DetectionAlertConfigDTO.class);
       detectionAlertSuppressors.add((DetectionAlertSuppressor) constructor.newInstance(alertConfig));
     }

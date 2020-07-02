@@ -21,13 +21,11 @@ package org.apache.pinot.queries;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -175,7 +173,6 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
    */
   @Test
   public void testSingleColumnDistinct() {
-    Pql2Compiler.ENABLE_DISTINCT = true;
     String query = "SELECT DISTINCT(column1) FROM testTable LIMIT 1000000";
     AggregationOperator aggregationOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
@@ -208,7 +205,6 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
    */
   @Test
   public void testMultiColumnDistinct() {
-    Pql2Compiler.ENABLE_DISTINCT = true;
     String query = "SELECT DISTINCT(column1, column3) FROM testTable LIMIT 1000000";
     AggregationOperator aggregationOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();

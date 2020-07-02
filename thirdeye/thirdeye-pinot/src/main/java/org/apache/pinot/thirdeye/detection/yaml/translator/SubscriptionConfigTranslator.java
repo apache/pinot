@@ -57,8 +57,9 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   public static final String PROP_DETECTION_NAMES = "subscribedDetections";
   public static final String PROP_TYPE = "type";
   public static final String PROP_CLASS_NAME = "className";
+  public static final String PROP_PARAM = "params";
+  public static final String DEFAULT_ALERTER_PIPELINE = "DEFAULT_ALERTER_PIPELINE";
 
-  static final String PROP_PARAM = "params";
   static final String PROP_ALERT_SUPPRESSORS = "alertSuppressors";
   static final String PROP_REFERENCE_LINKS = "referenceLinks";
   static final String PROP_TIME_WINDOWS = "timeWindows";
@@ -92,7 +93,7 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
     Map<String, Object> properties = new HashMap<>();
 
     // Default subscription type is "DEFAULT_ALERTER_PIPELINE"
-    alertYamlConfigs.putIfAbsent(PROP_TYPE, "DEFAULT_ALERTER_PIPELINE");
+    alertYamlConfigs.putIfAbsent(PROP_TYPE, DEFAULT_ALERTER_PIPELINE);
 
     for (Map.Entry<String, Object> entry : alertYamlConfigs.entrySet()) {
       if (entry.getKey().equals(PROP_TYPE)) {
@@ -108,9 +109,9 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String,Map<String,Object>> buildAlertSuppressors(Map<String,Object> yamlAlertConfig) {
+  private Map<String, Object> buildAlertSuppressors(Map<String, Object> yamlAlertConfig) {
     List<Map<String, Object>> alertSuppressors = ConfigUtils.getList(yamlAlertConfig.get(PROP_ALERT_SUPPRESSORS));
-    Map<String, Map<String, Object>> alertSuppressorsHolder = new HashMap<>();
+    Map<String, Object> alertSuppressorsHolder = new HashMap<>();
     Map<String, Object> alertSuppressorsParsed = new HashMap<>();
     if (!alertSuppressors.isEmpty()) {
       for (Map<String, Object> alertSuppressor : alertSuppressors) {
@@ -137,9 +138,9 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String,Map<String,Object>>  buildAlertSchemes(Map<String,Object> yamlAlertConfig) {
+  private Map<String, Object>  buildAlertSchemes(Map<String,Object> yamlAlertConfig) {
     List<Map<String, Object>> alertSchemes = ConfigUtils.getList(yamlAlertConfig.get(PROP_ALERT_SCHEMES));
-    Map<String, Map<String, Object>> alertSchemesHolder = new HashMap<>();
+    Map<String, Object> alertSchemesHolder = new HashMap<>();
     if (!alertSchemes.isEmpty()) {
       for (Map<String, Object> alertScheme : alertSchemes) {
         Map<String, Object> alertSchemesParsed = new HashMap<>();
@@ -186,14 +187,14 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
       yamlConfigMap.put(PROP_REFERENCE_LINKS, refLinks);
     }
     if (refLinks.isEmpty()) {
+      refLinks.put("How to label Anomalies?", "https://go/howtolabel");
       refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
-      refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
+      refLinks.put("See how to add links", "https://go/thirdeyealertreflink");
     }
     alertConfigDTO.setReferenceLinks(ConfigUtils.getMap(yamlConfigMap.get(PROP_REFERENCE_LINKS)));
 
     alertConfigDTO.setAlertSchemes(buildAlertSchemes(yamlConfigMap));
     alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(yamlConfigMap));
-    alertConfigDTO.setHighWaterMark(0L);
 
     // NOTE: The below fields will/should be hidden from the YAML/UI. They will only be updated by the backend pipeline.
     List<Long> detectionConfigIds = new ArrayList<>();

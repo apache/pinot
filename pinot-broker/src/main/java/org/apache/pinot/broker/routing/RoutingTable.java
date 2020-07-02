@@ -20,37 +20,23 @@ package org.apache.pinot.broker.routing;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
-/**
- * Instance level routing table manager.
- */
-public interface RoutingTable {
+public class RoutingTable {
+  private final Map<ServerInstance, List<String>> _serverInstanceToSegmentsMap;
+  private final List<String> _unavailableSegments;
 
-  /**
-   * Returns the routing table (map from server instance to list of segments hosted by the server) based on the lookup
-   * request.
-   *
-   * @param request Routing table lookup request
-   * @return Map from server instance to list of segments hosted by the server
-   */
-  Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request);
+  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap, List<String> unavailableSegments) {
+    _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
+    _unavailableSegments = unavailableSegments;
+  }
 
-  /**
-   * Returns whether the routing table for the given table exists.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return Whether the routing table exists
-   */
-  boolean routingTableExists(String tableNameWithType);
+  public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap() {
+    return _serverInstanceToSegmentsMap;
+  }
 
-  /**
-   * Dumps a snapshot of all the routing tables for the given table.
-   *
-   * @param tableName Table name (with or without type suffix) or null for all tables
-   */
-  String dumpSnapshot(@Nullable String tableName)
-      throws Exception;
+  public List<String> getUnavailableSegments() {
+    return _unavailableSegments;
+  }
 }

@@ -86,7 +86,7 @@ import org.slf4j.LoggerFactory;
  * </code>
  *
  */
-
+// TODO: Check thread-safety
 public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColumnMultiValueReaderWriter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleColumnMultiValueReaderWriter.class);
@@ -100,24 +100,21 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private static final int INCREMENT_PERCENTAGE = 100;
   //Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
-  private PinotDataBuffer _headerBuffer;
-  private List<PinotDataBuffer> _dataBuffers = new ArrayList<>();
-  private List<PinotDataBuffer> _headerBuffers = new ArrayList<>();
-  private List<FixedByteSingleValueMultiColReader> _headerReaders = new ArrayList<>();
-  private List<FixedByteSingleValueMultiColWriter> _headerWriters = new ArrayList<>();
-  private FixedByteSingleValueMultiColWriter _curHeaderWriter;
-  private List<FixedByteSingleValueMultiColWriter> _dataWriters = new ArrayList<>();
-  private List<FixedByteSingleValueMultiColReader> _dataReaders = new ArrayList<>();
-  private FixedByteSingleValueMultiColWriter _currentDataWriter;
-  private int _currentDataWriterIndex = -1;
-  private int _currentCapacity = 0;
-  private int _headerSize;
-  private int _incrementalCapacity;
-  private int _columnSizeInBytes;
-  private int _maxNumberOfMultiValuesPerRow;
+  private final List<FixedByteSingleValueMultiColWriter> _headerWriters = new ArrayList<>();
+  private final List<FixedByteSingleValueMultiColReader> _headerReaders = new ArrayList<>();
+  private final List<FixedByteSingleValueMultiColWriter> _dataWriters = new ArrayList<>();
+  private final List<FixedByteSingleValueMultiColReader> _dataReaders = new ArrayList<>();
+  private final int _headerSize;
+  private final int _incrementalCapacity;
+  private final int _columnSizeInBytes;
+  private final int _maxNumberOfMultiValuesPerRow;
   private final int _rowCountPerChunk;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final String _context;
+
+  private FixedByteSingleValueMultiColWriter _curHeaderWriter;
+  private FixedByteSingleValueMultiColWriter _currentDataWriter;
+  private int _currentCapacity = 0;
   private int _prevRowStartIndex = 0;  // Offset in the data-buffer for the last row added.
   private int _prevRowLength = 0;  // Number of values in the column for the last row added.
 
@@ -132,47 +129,40 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
     _maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
     _headerSize = rowCountPerChunk * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     _rowCountPerChunk = rowCountPerChunk;
-    addHeaderBuffers();
+    addHeaderBuffer();
     //at least create space for million entries, which for INT translates into 4mb buffer
     _incrementalCapacity = incrementalCapacity;
-    addDataBuffers(initialCapacity);
+    addDataBuffer(initialCapacity);
     //init(_rowCountPerChunk, _columnSizeInBytes, _maxNumberOfMultiValuesPerRow, initialCapacity, _incrementalCapacity);
   }
 
-  private void addHeaderBuffers() {
+  private void addHeaderBuffer() {
     LOGGER.info("Allocating header buffer of size {} for: {}", _headerSize, _context);
-    _headerBuffer = _memoryManager.allocate(_headerSize, _context);
+    // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
+    PinotDataBuffer headerBuffer = _memoryManager.allocate(_headerSize, _context);
     // dataBufferId, startIndex, length
     _curHeaderWriter =
-        new FixedByteSingleValueMultiColWriter(_headerBuffer, 3, new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
-    FixedByteSingleValueMultiColReader curHeaderReader =
-        new FixedByteSingleValueMultiColReader(_headerBuffer, _rowCountPerChunk,
-            new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
-    _headerBuffers.add(_headerBuffer);
+        new FixedByteSingleValueMultiColWriter(headerBuffer, 3, new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
     _headerWriters.add(_curHeaderWriter);
-    _headerReaders.add(curHeaderReader);
+    _headerReaders.add(new FixedByteSingleValueMultiColReader(headerBuffer, _rowCountPerChunk,
+        new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT}));
   }
 
   /**
    * This method automatically computes the space needed based on the _columnSizeInBytes
    * @param rowCapacity Additional capacity to be added in terms of number of rows
    */
-  private void addDataBuffers(int rowCapacity) {
-    PinotDataBuffer dataBuffer;
+  private void addDataBuffer(int rowCapacity) {
     try {
-      final long size = rowCapacity * _columnSizeInBytes;
+      long size = rowCapacity * _columnSizeInBytes;
       LOGGER.info("Allocating data buffer of size {} for column {}", size, _context);
-      dataBuffer = _memoryManager.allocate(size, _context);
-      _dataBuffers.add(dataBuffer);
+      // NOTE: PinotDataBuffer is tracked in PinotDataBufferMemoryManager. No need to track and close inside the class.
+      PinotDataBuffer dataBuffer = _memoryManager.allocate(size, _context);
       _currentDataWriter = new FixedByteSingleValueMultiColWriter(dataBuffer, 1, new int[]{_columnSizeInBytes});
       _dataWriters.add(_currentDataWriter);
-
-      FixedByteSingleValueMultiColReader dataFileReader =
-          new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, new int[]{_columnSizeInBytes});
-      _dataReaders.add(dataFileReader);
+      _dataReaders.add(new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, new int[]{_columnSizeInBytes}));
       //update the capacity
       _currentCapacity = rowCapacity;
-      _currentDataWriterIndex = _currentDataWriterIndex + 1;
     } catch (Exception e) {
       throw new RuntimeException(
           "Error while expanding the capacity by allocating additional buffer with capacity:" + rowCapacity, e);
@@ -182,32 +172,23 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   @Override
   public void close()
       throws IOException {
-    for (PinotDataBuffer dataBuffer : _dataBuffers) {
-      dataBuffer.close();
-    }
-    _dataBuffers.clear();
-    for (PinotDataBuffer headerBuffer : _headerBuffers) {
-      headerBuffer.close();
-    }
-    _headerBuffers.clear();
-    _headerBuffer = null;
-    for (FixedByteSingleValueMultiColReader reader : _headerReaders) {
-      reader.close();
-    }
-    for (FixedByteSingleValueMultiColReader reader : _dataReaders) {
-      reader.close();
-    }
     for (FixedByteSingleValueMultiColWriter writer : _headerWriters) {
       writer.close();
+    }
+    for (FixedByteSingleValueMultiColReader reader : _headerReaders) {
+      reader.close();
     }
     for (FixedByteSingleValueMultiColWriter writer : _dataWriters) {
       writer.close();
     }
+    for (FixedByteSingleValueMultiColReader reader : _dataReaders) {
+      reader.close();
+    }
   }
 
   private void writeIntoHeader(int row, int dataWriterIndex, int startIndex, int length) {
-    if (row >= _headerBuffers.size() * _rowCountPerChunk) {
-      addHeaderBuffers();
+    if (row >= _headerWriters.size() * _rowCountPerChunk) {
+      addHeaderBuffer();
     }
     _curHeaderWriter.setInt(getRowInCurrentHeader(row), 0, dataWriterIndex);
     _curHeaderWriter.setInt(getRowInCurrentHeader(row), 1, startIndex);
@@ -228,12 +209,12 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
     assert (numValues <= _maxNumberOfMultiValuesPerRow);
     int newStartIndex = _prevRowStartIndex + _prevRowLength;
     if (newStartIndex + numValues > _currentCapacity) {
-      addDataBuffers(_incrementalCapacity);
+      addDataBuffer(_incrementalCapacity);
       _prevRowStartIndex = 0;
       _prevRowLength = 0;
       newStartIndex = 0;
     }
-    writeIntoHeader(row, _currentDataWriterIndex, newStartIndex, numValues);
+    writeIntoHeader(row, _dataWriters.size() - 1, newStartIndex, numValues);
     _prevRowStartIndex = newStartIndex;
     _prevRowLength = numValues;
     return newStartIndex;

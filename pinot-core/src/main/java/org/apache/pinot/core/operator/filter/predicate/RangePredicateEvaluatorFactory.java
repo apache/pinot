@@ -19,14 +19,14 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -41,14 +41,16 @@ public class RangePredicateEvaluatorFactory {
    *
    * @param rangePredicate RANGE predicate to evaluate
    * @param dictionary Dictionary for the column
+   * @param dataType Data type for the column
    * @return Dictionary based RANGE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(RangePredicate rangePredicate,
-      Dictionary dictionary) {
+      Dictionary dictionary, DataType dataType) {
     if (dictionary instanceof BaseImmutableDictionary) {
       return new OfflineDictionaryBasedRangePredicateEvaluator(rangePredicate, (BaseImmutableDictionary) dictionary);
     } else {
-      return new RealtimeDictionaryBasedRangePredicateEvaluator(rangePredicate, (BaseMutableDictionary) dictionary);
+      return new RealtimeDictionaryBasedRangePredicateEvaluator(rangePredicate, (BaseMutableDictionary) dictionary,
+          dataType);
     }
   }
 
@@ -60,7 +62,7 @@ public class RangePredicateEvaluatorFactory {
    * @return Raw value based RANGE predicate evaluator
    */
   public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(RangePredicate rangePredicate,
-      FieldSpec.DataType dataType) {
+      DataType dataType) {
     switch (dataType) {
       case INT:
         return new IntRawValueBasedRangePredicateEvaluator(rangePredicate);
@@ -79,7 +81,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class OfflineDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  public static final class OfflineDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final int _startDictId;
     // Exclusive
     final int _endDictId;
@@ -129,6 +131,14 @@ public class RangePredicateEvaluatorFactory {
       }
     }
 
+    public int getStartDictId() {
+      return _startDictId;
+    }
+
+    public int getEndDictId() {
+      return _endDictId;
+    }
+
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.RANGE;
@@ -161,19 +171,59 @@ public class RangePredicateEvaluatorFactory {
   }
 
   private static final class RealtimeDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
-    final IntSet _matchingDictIdSet;
-    final int _numMatchingDictIds;
-    int[] _matchingDictIds;
+    // When the cardinality of the column is lower than this threshold, pre-calculate the matching dictionary ids;
+    // otherwise, fetch the value when evaluating each dictionary id.
+    // TODO: Tune this threshold
+    private static final int DICT_ID_SET_BASED_CARDINALITY_THRESHOLD = 1000;
 
-    RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, BaseMutableDictionary dictionary) {
-      _matchingDictIdSet = dictionary
-          .getDictIdsInRange(rangePredicate.getLowerBoundary(), rangePredicate.getUpperBoundary(),
-              rangePredicate.includeLowerBoundary(), rangePredicate.includeUpperBoundary());
-      _numMatchingDictIds = _matchingDictIdSet.size();
-      if (_numMatchingDictIds == 0) {
-        _alwaysFalse = true;
-      } else if (_numMatchingDictIds == dictionary.length()) {
-        _alwaysTrue = true;
+    final BaseMutableDictionary _dictionary;
+    final DataType _dataType;
+    final boolean _dictIdSetBased;
+    final IntSet _matchingDictIdSet;
+    final BaseRawValueBasedPredicateEvaluator _rawValueBasedEvaluator;
+
+    RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, BaseMutableDictionary dictionary,
+        DataType dataType) {
+      _dictionary = dictionary;
+      _dataType = dataType;
+      int cardinality = dictionary.length();
+      if (cardinality < DICT_ID_SET_BASED_CARDINALITY_THRESHOLD) {
+        _dictIdSetBased = true;
+        _rawValueBasedEvaluator = null;
+        _matchingDictIdSet = dictionary
+            .getDictIdsInRange(rangePredicate.getLowerBoundary(), rangePredicate.getUpperBoundary(),
+                rangePredicate.includeLowerBoundary(), rangePredicate.includeUpperBoundary());
+        int numMatchingDictIds = _matchingDictIdSet.size();
+        if (numMatchingDictIds == 0) {
+          _alwaysFalse = true;
+        } else if (numMatchingDictIds == cardinality) {
+          _alwaysTrue = true;
+        }
+      } else {
+        _dictIdSetBased = false;
+        _matchingDictIdSet = null;
+        switch (dataType) {
+          case INT:
+            _rawValueBasedEvaluator = new IntRawValueBasedRangePredicateEvaluator(rangePredicate);
+            break;
+          case LONG:
+            _rawValueBasedEvaluator = new LongRawValueBasedRangePredicateEvaluator(rangePredicate);
+            break;
+          case FLOAT:
+            _rawValueBasedEvaluator = new FloatRawValueBasedRangePredicateEvaluator(rangePredicate);
+            break;
+          case DOUBLE:
+            _rawValueBasedEvaluator = new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate);
+            break;
+          case STRING:
+            _rawValueBasedEvaluator = new StringRawValueBasedRangePredicateEvaluator(rangePredicate);
+            break;
+          case BYTES:
+            _rawValueBasedEvaluator = new BytesRawValueBasedRangePredicateEvaluator(rangePredicate);
+            break;
+          default:
+            throw new IllegalStateException();
+        }
       }
     }
 
@@ -184,20 +234,31 @@ public class RangePredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(int dictId) {
-      return _matchingDictIdSet.contains(dictId);
-    }
-
-    @Override
-    public int getNumMatchingDictIds() {
-      return _numMatchingDictIds;
+      if (_dictIdSetBased) {
+        return _matchingDictIdSet.contains(dictId);
+      } else {
+        switch (_dataType) {
+          case INT:
+            return _rawValueBasedEvaluator.applySV(_dictionary.getIntValue(dictId));
+          case LONG:
+            return _rawValueBasedEvaluator.applySV(_dictionary.getLongValue(dictId));
+          case FLOAT:
+            return _rawValueBasedEvaluator.applySV(_dictionary.getFloatValue(dictId));
+          case DOUBLE:
+            return _rawValueBasedEvaluator.applySV(_dictionary.getDoubleValue(dictId));
+          case STRING:
+            return _rawValueBasedEvaluator.applySV(_dictionary.getStringValue(dictId));
+          case BYTES:
+            return _rawValueBasedEvaluator.applySV(_dictionary.getBytesValue(dictId));
+          default:
+            throw new IllegalStateException();
+        }
+      }
     }
 
     @Override
     public int[] getMatchingDictIds() {
-      if (_matchingDictIds == null) {
-        _matchingDictIds = _matchingDictIdSet.toIntArray();
-      }
-      return _matchingDictIds;
+      throw new UnsupportedOperationException();
     }
   }
 

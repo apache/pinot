@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+
+
 /**
  * Reader interface to read from an underlying Null value vector. This is
  * primarily used to check if a particular column value corresponding to
@@ -32,4 +35,9 @@ public interface NullValueVectorReader {
    * @return true if docId is absent (null). False otherwise
    */
   boolean isNull(int docId);
+
+  /**
+   * Return the underlying null bitmap (used in query execution)
+   */
+  ImmutableRoaringBitmap getNullBitmap();
 }

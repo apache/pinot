@@ -40,19 +40,21 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -474,55 +476,13 @@ public class PinotSegmentRestletResource {
     }
   }
 
-  /**
-   * Helper method to return a list of tables that exists and matches the given table name and type, or throws
-   * {@link ControllerApplicationException} if no table found.
-   * <p>When table type is <code>null</code>, try to match both OFFLINE and REALTIME table.
-   *
-   * @param tableName Table name with or without type suffix
-   * @param tableType Table type
-   * @return List of existing table names with type suffix
-   */
   private List<String> getExistingTableNamesWithType(String tableName, @Nullable TableType tableType) {
-    List<String> tableNamesWithType = new ArrayList<>(2);
-
-    TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableTypeFromTableName != null) {
-      // Table name has type suffix
-
-      if (tableType != null && tableType != tableTypeFromTableName) {
-        throw new ControllerApplicationException(LOGGER,
-            "Table name: " + tableName + " does not match table type: " + tableType, Status.FORBIDDEN);
-      }
-
-      if (_pinotHelixResourceManager.getTableConfig(tableName) != null) {
-        tableNamesWithType.add(tableName);
-      }
-    } else {
-      // Raw table name
-
-      if (tableType == null || tableType == TableType.OFFLINE) {
-        String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-        if (_pinotHelixResourceManager.getTableConfig(offlineTableName) != null) {
-          tableNamesWithType.add(offlineTableName);
-        }
-      }
-      if (tableType == null || tableType == TableType.REALTIME) {
-        String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-        if (_pinotHelixResourceManager.getTableConfig(realtimeTableName) != null) {
-          tableNamesWithType.add(realtimeTableName);
-        }
-      }
+    try {
+      return _pinotHelixResourceManager.getExistingTableNamesWithType(tableName, tableType);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
     }
-
-    if (tableNamesWithType.isEmpty()) {
-      String errorMessage = "Failed to find table: " + tableName;
-      if (tableType != null) {
-        errorMessage += " of type: " + tableType;
-      }
-      throw new ControllerApplicationException(LOGGER, errorMessage, Status.NOT_FOUND);
-    }
-
-    return tableNamesWithType;
   }
 }

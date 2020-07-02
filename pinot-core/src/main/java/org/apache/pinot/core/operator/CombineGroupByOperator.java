@@ -37,12 +37,12 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,13 +107,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
     AtomicInteger numGroups = new AtomicInteger();
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
-    AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, null);
-    int numAggregationFunctions = aggregationFunctionContexts.length;
-    AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      aggregationFunctions[i] = aggregationFunctionContexts[i].getAggregationFunction();
-    }
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_brokerRequest);
+    int numAggregationFunctions = aggregationFunctions.length;
 
     // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
     // futures (try to interrupt the execution if it already started).
@@ -176,9 +171,11 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
                 });
               }
             }
+          } catch (EarlyTerminationException e) {
+            // Early-terminated because query times out or is already satisfied
           } catch (Exception e) {
-            LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}", index,
-                _operators.get(index).getClass().getName(), e);
+            LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}, brokerRequest {}", index,
+                _operators.get(index).getClass().getName(), _brokerRequest, e);
             mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
           } finally {
             operatorLatch.countDown();
@@ -192,7 +189,9 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
       if (!opCompleted) {
         // If this happens, the broker side should already timed out, just log the error and return
-        String errorMessage = "Timed out while combining group-by results after " + _timeOutMs + "ms";
+        String errorMessage =
+            String.format("Timed out while combining group-by results after %dms, brokerRequest = %s", _timeOutMs,
+                _brokerRequest);
         LOGGER.error(errorMessage);
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
       }
@@ -202,8 +201,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
           new AggregationGroupByTrimmingService(aggregationFunctions, (int) _brokerRequest.getGroupBy().getTopN());
       List<Map<String, Object>> trimmedResults =
           aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
-      IntermediateResultsBlock mergedBlock =
-          new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
+      IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(aggregationFunctions, trimmedResults, true);
 
       // Set the processing exceptions.
       if (!mergedProcessingExceptions.isEmpty()) {
@@ -213,17 +211,14 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       // Set the execution statistics.
       ExecutionStatistics executionStatistics = new ExecutionStatistics();
       for (Operator operator : _operators) {
-        ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
-        if (executionStatisticsToMerge != null) {
-          executionStatistics.merge(executionStatisticsToMerge);
-        }
+        executionStatistics.merge(operator.getExecutionStatistics());
       }
       mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
       mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
       mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
       mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());
       mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
-      mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+      mergedBlock.setNumTotalDocs(executionStatistics.getNumTotalDocs());
 
       // TODO: this value should be set in the inner-segment operators. Setting it here might cause false positive as we
       //       are comparing number of groups across segments with the groups limit for each segment.

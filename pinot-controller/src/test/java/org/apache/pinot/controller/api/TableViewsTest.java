@@ -22,15 +22,17 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
 import org.apache.helix.InstanceType;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -55,23 +57,21 @@ public class TableViewsTest extends ControllerTest {
 
     // Create the offline table and add one segment
     TableConfig tableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
-            .setNumReplicas(2).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(2).build();
     Assert.assertEquals(_helixManager.getInstanceType(), InstanceType.CONTROLLER);
     _helixResourceManager.addTable(tableConfig);
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME), "downloadUrl");
 
     // Create the hybrid table
-    tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME)
-        .setNumReplicas(2).build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME).setNumReplicas(2).build();
     _helixResourceManager.addTable(tableConfig);
 
     // add schema for realtime table
     addDummySchema(HYBRID_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
-    tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(HYBRID_TABLE_NAME)
-        .setNumReplicas(2).setStreamConfigs(streamConfig.getStreamConfigsMap()).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(HYBRID_TABLE_NAME).setNumReplicas(2)
+        .setStreamConfigs(streamConfig.getStreamConfigsMap()).build();
     _helixResourceManager.addTable(tableConfig);
 
     // Wait for external view get updated

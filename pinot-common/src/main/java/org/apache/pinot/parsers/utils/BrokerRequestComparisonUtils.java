@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +35,10 @@ public class BrokerRequestComparisonUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestComparisonUtils.class);
 
   public static boolean validate(BrokerRequest br1, BrokerRequest br2) {
+    return validate(br1, br2, false);
+  }
+
+  public static boolean validate(BrokerRequest br1, BrokerRequest br2, boolean ignoreOrderBy) {
     boolean result = br1.equals(br2);
     if (!result) {
       StringBuilder sb = new StringBuilder();
@@ -59,6 +64,10 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("FilterSubQueryMap did not match after conversion. {}", sb);
           return false;
         }
+      } else if (br2.getFilterQuery() != null) {
+        LOGGER.error("Filter did not match, br1.getFilterQuery() = null, br2.getFilterQuery() = {}",
+            br2.getFilterQuery());
+        return false;
       }
       if (br1.getSelections() != null) {
         if (!validateSelections(br1.getSelections(), br2.getSelections())) {
@@ -67,6 +76,10 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("Selection did not match after conversion:{}", sb);
           return false;
         }
+      } else if (br2.getSelections() != null) {
+        LOGGER.error("Selection did not match, br1.getSelections() = null, br2.getSelections() = {}",
+            br2.getSelections());
+        return false;
       }
       if (br1.getGroupBy() != null) {
         if (!validateGroupBy(br1.getGroupBy(), br2.getGroupBy())) {
@@ -75,6 +88,9 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("Group By did not match conversion:{}", sb);
           return false;
         }
+      } else if (br2.getGroupBy() != null) {
+        LOGGER.error("GroupBy did not match, br1.getGroupBy() = null, br2.getGroupBy() = {}", br2.getGroupBy());
+        return false;
       }
       if (br1.getAggregationsInfo() != null) {
         if (!validateAggregations(br1.getAggregationsInfo(), br2.getAggregationsInfo())) {
@@ -83,7 +99,60 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("Group By did not match conversion:{}", sb);
           return false;
         }
+      } else if (br2.getAggregationsInfo() != null) {
+        LOGGER.error("AggregationsInfo did not match, br1.getAggregationsInfo() = null, br2.getAggregationsInfo() = {}",
+            br2.getAggregationsInfo());
+        return false;
       }
+      if (!ignoreOrderBy) {
+        if (br1.getOrderBy() != null) {
+          if (!validateOrderBys(br1.getOrderBy(), br2.getOrderBy())) {
+            sb.append("br1.getOrderBy() = ").append(br1.getOrderBy()).append("\n").append("br2.getOrderBy() = ")
+                .append(br2.getOrderBy());
+            LOGGER.error("Order By did not match conversion:{}", sb);
+            return false;
+          }
+        } else if (br2.getOrderBy() != null) {
+          LOGGER.error("OrderBy did not match, br1.getOrderBy() = null, br2.getOrderBy() = {}", br2.getOrderBy());
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private static boolean validateOrderBys(List<SelectionSort> orderBy1, List<SelectionSort> orderBy2) {
+    if (orderBy1 == null && orderBy2 == null) {
+      return true;
+    }
+    if (orderBy1 == null || orderBy2 == null) {
+      LOGGER.error("Failed to validate OrderBys: value doesn't match.\n\t{}\n\t{}", orderBy1, orderBy2);
+      return false;
+    }
+    if (orderBy1.size() != orderBy2.size()) {
+      LOGGER.error("Failed to validate OrderBys: size doesn't match.\n\t{}\n\t{}", orderBy1, orderBy2);
+      return false;
+    }
+    for (int i = 0; i < orderBy1.size(); i++) {
+      if (!validateOrderBy(orderBy1.get(i), orderBy2.get(i))) {
+        LOGGER.error("Failed to validate OrderBys at idx {} doesn't match.\n\t{}\n\t{}", i, orderBy1.get(i),
+            orderBy2.get(i));
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean validateOrderBy(SelectionSort orderBy1, SelectionSort orderBy2) {
+    if (orderBy1.isIsAsc() != orderBy2.isIsAsc()) {
+      LOGGER.error("Failed to validate OrderBy at field: `isAsc` {} doesn't match.\n\t{}\n\t{}", orderBy1.isIsAsc(),
+          orderBy2.isIsAsc());
+      return false;
+    }
+    if (!orderBy1.getColumn().equalsIgnoreCase(orderBy2.getColumn())) {
+      LOGGER.error("Failed to validate OrderBy at field: `column` {} doesn't match.\n\t{}\n\t{}", orderBy1.getColumn(),
+          orderBy2.getColumn());
+      return false;
     }
     return true;
   }
@@ -103,26 +172,23 @@ public class BrokerRequestComparisonUtils {
   }
 
   private static boolean validateAggregation(AggregationInfo agg1, AggregationInfo agg2) {
-    if (!agg1.getAggregationType().equals(agg2.getAggregationType())) {
+    if (!agg1.getAggregationType().equalsIgnoreCase(agg2.getAggregationType())) {
       LOGGER.error("Failed to validate AggregationInfo: AggregationType doesn't match.\n\t{}\n\t{}", agg1, agg2);
       return false;
     }
-    if (agg1.getAggregationParamsSize() != agg2.getAggregationParamsSize()) {
-      LOGGER.error("Failed to validate AggregationInfo: AggregationParamsSize doesn't match.\n\t{}\n\t{}", agg1, agg2);
+    if (agg1.getExpressionsSize() != agg2.getExpressionsSize()) {
+      LOGGER.error("Failed to validate AggregationInfo: Expressions doesn't match.\n\t{}\n\t{}", agg1, agg2);
       return false;
     }
-    for (int i = 0; i < agg1.getAggregationParamsSize(); i++) {
-      for (String key : agg1.getAggregationParams().keySet()) {
-        if (!agg1.getAggregationParams().get(key).equals(agg2.getAggregationParams().get(key))) {
-          LOGGER
-              .error("Failed to validate AggregationInfo: AggregationParams at key {} doesn't match.\n\t{}\n\t{}", key,
-                  agg1.getAggregationParams().get(key), agg2.getAggregationParams().get(key));
-          return false;
-        }
+    for (int i = 0; i < agg1.getExpressionsSize(); i++) {
+      if (!agg1.getExpressions().get(i).equals(agg2.getExpressions().get(i))) {
+        LOGGER.error("Failed to validate AggregationInfo: Expressions mis-match.\n\t{}\n\t{}",
+            agg1.getExpressions().get(i), agg1.getExpressions().get(i));
+        return false;
       }
     }
     return true;
-  }
+}
 
   private static boolean validateGroupBy(GroupBy groupBy1, GroupBy groupBy2) {
     if (groupBy1.getTopN() != groupBy2.getTopN()) {

@@ -19,36 +19,32 @@
 package org.apache.pinot.core.realtime.converter.stats;
 
 import java.util.Set;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 
 import static org.apache.pinot.core.common.Constants.UNKNOWN_CARDINALITY;
 
 
 public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
+  private final DataSourceMetadata _dataSourceMetadata;
+  private final BaseSingleColumnSingleValueReaderWriter _forwardIndex;
 
-  final BlockValSet _blockValSet;
-  final int _numDocIds;
-  final String _operatorName;
-
-  public RealtimeNoDictionaryColStatistics(ColumnDataSource dataSource) {
-    _operatorName = dataSource.getOperatorName();
-    Block block = dataSource.nextBlock();
-    _numDocIds = block.getMetadata().getEndDocId() + 1;
-    _blockValSet = block.getBlockValueSet();
+  public RealtimeNoDictionaryColStatistics(DataSource dataSource) {
+    _dataSourceMetadata = dataSource.getDataSourceMetadata();
+    _forwardIndex = (BaseSingleColumnSingleValueReaderWriter) dataSource.getForwardIndex();
   }
 
   @Override
   public Object getMinValue() {
-    throw new RuntimeException("Cannot get min value for no dictionary column " + _operatorName);
+    return _dataSourceMetadata.getMinValue();
   }
 
   @Override
   public Object getMaxValue() {
-    throw new RuntimeException("Cannot get max value for no dictionary column " + _operatorName);
+    return _dataSourceMetadata.getMaxValue();
   }
 
   @Override
@@ -63,12 +59,12 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public int getLengthOfShortestElement() {
-    return lengthOfDataType(); // Only fixed length data types supported.
+    return _forwardIndex.getLengthOfShortestElement();
   }
 
   @Override
   public int getLengthOfLargestElement() {
-    return lengthOfDataType(); // Only fixed length data types supported.
+    return _forwardIndex.getLengthOfLongestElement();
   }
 
   @Override
@@ -78,12 +74,12 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public int getTotalNumberOfEntries() {
-    return _numDocIds;
+    return _dataSourceMetadata.getNumDocs();
   }
 
   @Override
   public int getMaxNumberOfMultiValues() {
-    return 1;
+    return 0;
   }
 
   @Override
@@ -93,31 +89,21 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public PartitionFunction getPartitionFunction() {
-    return null;
+    return _dataSourceMetadata.getPartitionFunction();
   }
 
   @Override
   public int getNumPartitions() {
-    return 0;
+    PartitionFunction partitionFunction = _dataSourceMetadata.getPartitionFunction();
+    if (partitionFunction != null) {
+      return partitionFunction.getNumPartitions();
+    } else {
+      return 0;
+    }
   }
 
   @Override
   public Set<Integer> getPartitions() {
-    return null;
-  }
-
-  private int lengthOfDataType() {
-    switch (_blockValSet.getValueType()) {
-      case INT:
-        return Integer.BYTES;
-      case LONG:
-        return Long.BYTES;
-      case FLOAT:
-        return Float.BYTES;
-      case DOUBLE:
-        return Double.BYTES;
-      default:
-        throw new UnsupportedOperationException();
-    }
+    return _dataSourceMetadata.getPartitions();
   }
 }

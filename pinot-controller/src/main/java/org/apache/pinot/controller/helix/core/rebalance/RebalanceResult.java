@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)

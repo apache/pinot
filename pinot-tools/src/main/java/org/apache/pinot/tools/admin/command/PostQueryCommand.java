@@ -99,14 +99,16 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     }
     LOGGER.info("Executing command: " + toString());
 
-    String request = null;
+    String request;
+    String urlString = "http://" + _brokerHost + ":" + _brokerPort + "/query";
     if (_queryType.toLowerCase().equals(Request.SQL)) {
+      urlString += "/sql";
       request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, _query));
     } else {
       request = JsonUtils.objectToString(Collections.singletonMap(Request.PQL, _query));
     }
 
-    return sendPostRequest("http://" + _brokerHost + ":" + _brokerPort + "/query", request);
+    return sendPostRequest(urlString, request);
   }
 
   @Override

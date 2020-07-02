@@ -54,6 +54,10 @@ public abstract class DetectionAlertScheme {
 
   public abstract void run() throws Exception;
 
+  public void destroy() {
+    // do nothing
+  }
+
   /**
    * Plug the appropriate template based on configuration.
    */
@@ -85,12 +89,13 @@ public abstract class DetectionAlertScheme {
    * Fail the alert task if unable to notify owner. However, in case of dimensions recipient alerter,
    * do not fail the alert if a subset of recipients are invalid.
    */
-  void handleAlertFailure(int size, IllegalArgumentException e) {
+  void handleAlertFailure(int numOfAnomalies, Exception e) throws Exception {
+    // Dimension recipients not enabled
     if (this.result.getResult().size() == 1) {
       throw e;
     } else {
       LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}." + " Exception message: ",
-          size, this.subsConfig.getId(), e);
+          numOfAnomalies, this.subsConfig.getId(), e);
     }
   }
 }

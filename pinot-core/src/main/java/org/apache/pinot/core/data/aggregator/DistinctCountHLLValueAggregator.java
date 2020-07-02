@@ -28,7 +28,24 @@ import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregat
 
 public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  private static final int DEFAULT_LOG2M_BYTE_SIZE = 180;
+  /** this value should match values LOG2M value from {@link org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction#DEFAULT_LOG2M}
+   * mapping as following:
+   *       ImmutableBiMap.<Integer, Integer>builder()
+   *           .put(5, 32)
+   *           .put(6, 52)
+   *           .put(7, 96)
+   *           .put(8, 180)
+   *           .put(9, 352)
+   *           .put(10, 692)
+   *           .put(11, 1376)
+   *           .put(12, 2740)
+   *           .put(13, 5472)
+   *           .put(14, 10932)
+   *           .put(15, 21856)
+   * see more at {@link org.apache.pinot.startree.hll.HllSizeUtils#LOG2M_TO_SIZE_IN_BYTES}
+   * TODO: make this value configurable on open source branch
+   */
+  private static final int DEFAULT_LOG2M_BYTE_SIZE = 5472;
 
   // Byte size won't change once we get the initial aggregated value
   private int _maxByteSize;

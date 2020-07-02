@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -31,8 +25,9 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.data.generator.DataGenerator;
 import org.apache.pinot.tools.data.generator.DataGeneratorSpec;
@@ -41,6 +36,14 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
 
 /**
  * Class to implement GenerateData command.
@@ -48,6 +51,9 @@ import org.slf4j.LoggerFactory;
  */
 public class GenerateDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(GenerateDataCommand.class);
+
+  private final static String FORMAT_AVRO = "avro";
+  private final static String FORMAT_CSV = "csv";
 
   @Option(name = "-numRecords", required = true, metaVar = "<int>", usage = "Number of records to generate.")
   private int _numRecords = 0;
@@ -69,6 +75,9 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
+
+  @Option(name = "-format", required = false, help = true, usage = "Output format ('avro' or 'csv').")
+  private String _format = FORMAT_AVRO;
 
   @Override
   public boolean getHelp() {
@@ -101,7 +110,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   @Override
   public String description() {
-    return "Generate random data as per the provided scema";
+    return "Generate random data as per the provided schema";
   }
 
   @Override
@@ -115,39 +124,50 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
     Schema schema = Schema.fromFile(new File(_schemaFile));
 
-    List<String> columns = new LinkedList<String>();
-    final HashMap<String, DataType> dataTypes = new HashMap<String, DataType>();
-    final HashMap<String, FieldType> fieldTypes = new HashMap<String, FieldType>();
-    final HashMap<String, TimeUnit> timeUnits = new HashMap<String, TimeUnit>();
+    List<String> columns = new LinkedList<>();
+    final HashMap<String, DataType> dataTypes = new HashMap<>();
+    final HashMap<String, FieldType> fieldTypes = new HashMap<>();
+    final HashMap<String, TimeUnit> timeUnits = new HashMap<>();
 
-    final HashMap<String, Integer> cardinality = new HashMap<String, Integer>();
-    final HashMap<String, IntRange> range = new HashMap<String, IntRange>();
+    final HashMap<String, Integer> cardinality = new HashMap<>();
+    final HashMap<String, IntRange> range = new HashMap<>();
+    final HashMap<String, Map<String, Object>> pattern = new HashMap<>();
 
-    buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range);
+    buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range, pattern);
+
     final DataGeneratorSpec spec =
-        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality, range);
+        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality, range, pattern);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
-    gen.generate(_numRecords, _numFiles);
+
+    if (FORMAT_AVRO.equals(_format)) {
+      gen.generateAvro(_numRecords, _numFiles);
+    } else if (FORMAT_CSV.equals(_format)) {
+      gen.generateCsv(_numRecords, _numFiles);
+    } else {
+      throw new IllegalArgumentException(String.format("Invalid output format '%s'", _format));
+    }
 
     return true;
   }
 
   private void buildCardinalityRangeMaps(String file, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range)
+      HashMap<String, IntRange> range, Map<String, Map<String, Object>> pattern)
       throws IOException {
     if (file == null) {
       return; // Nothing to do here.
     }
 
-    List<SchemaAnnotation> saList = JsonUtils.fileToObject(new File(file), List.class);
+    List<SchemaAnnotation> saList = JsonUtils.fileToList(new File(file), SchemaAnnotation.class);
 
     for (SchemaAnnotation sa : saList) {
       String column = sa.getColumn();
 
       if (sa.isRange()) {
         range.put(column, new IntRange(sa.getRangeStart(), sa.getRangeEnd()));
+      } else if (sa.getPattern() != null) {
+        pattern.put(column, sa.getPattern());
       } else {
         cardinality.put(column, sa.getCardinality());
       }
@@ -156,7 +176,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
       HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes, HashMap<String, TimeUnit> timeUnits,
-      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range) {
+      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range, HashMap<String, Map<String, Object>> pattern) {
     for (final FieldSpec fs : schema.getAllFieldSpecs()) {
       String col = fs.getName();
 
@@ -190,7 +210,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       }
     }
 
-    return new DataGeneratorSpec(columns, cardinality, range, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO,
+    return new DataGeneratorSpec(columns, cardinality, range, pattern, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO,
         _outDir, _overwrite);
   }
 
@@ -201,7 +221,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     schemaBuilder.addSingleValueDimension("name", DataType.STRING);
     schemaBuilder.addSingleValueDimension("age", DataType.INT);
     schemaBuilder.addMetric("percent", DataType.FLOAT);
-    schemaBuilder.addTime("days", TimeUnit.DAYS, DataType.LONG);
+    schemaBuilder.addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "days"), null);
 
     Schema schema = schemaBuilder.build();
     System.out.println(JsonUtils.objectToPrettyString(schema));

@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 .. _getting-started:
 
 Getting Started
@@ -47,11 +49,11 @@ Pinot requires JDK 8 or later and Apache Maven 3.
 
   cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh
 
-Trying out Offline quickstart demo
+Trying out Batch quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To run the demo with compiled code:
-  ``bin/quick-start-offline.sh``
+  ``bin/quick-start-batch.sh``
 
 Once the Pinot cluster is running, you can query it by going to http://localhost:9000/query/
 
@@ -79,13 +81,13 @@ Pinot uses PQL, a SQL-like query language, to query data. Here are some sample q
 
 The full reference for the PQL query language is present in the :ref:`pql` section of the Pinot documentation.
 
-Trying out Realtime quickstart demo
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Trying out Streaming quickstart demo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Pinot can ingest data from streaming sources such as Kafka.
 
 To run the demo with compiled code:
-  ``bin/quick-start-realtime.sh``
+  ``bin/quick-start-streaming.sh``
 
 Once started, the demo will start Kafka, create a Kafka topic, and create a realtime Pinot table. Once created, Pinot
 will start ingesting events from the Kafka topic into the table. The demo also starts a consumer that consumes events
@@ -200,17 +202,6 @@ In order to set up a table, we need to specify the schema of this transcript in 
     ]
   }
 
-To upload the schema, we can navigate to the directory in ``pinot-distribution`` that contains
-``pinot-admin.sh``, and use the command below:
-
-.. code-block:: none
-
-  $ VERSION=0.2.0
-  $ cd ./pinot-distribution/target/apache-pinot-incubating-$VERSION-SNAPSHOT-bin/apache-pinot-incubating-$VERSION-SNAPSHOT-bin/bin
-  $ ./pinot-admin.sh AddSchema -schemaFile $WORKING_DIR/config/transcript-schema.json -exec
-  Executing command: AddSchema -controllerHost [controller_host] -controllerPort 9000 -schemaFilePath /Users/host1/Desktop/getting-started/config/transcript-schema.json -exec
-  Sending request: http://[controller_host]:9000/schemas to controller: [controller_host], version: 0.2.0-SNAPSHOT-68092ab9eb83af173d725ec685c22ba4eb5bacf9
-
 Then, we need to specify the table config in another JSON file (also stored in ``config``), which links the schema to the table:
 
 .. code-block:: none
@@ -241,12 +232,14 @@ Then, we need to specify the table config in another JSON file (also stored in `
     "metadata": {}
   }
 
-And upload the table config to Pinot cluster:
+
+To create pinot table, we can navigate to the directory in ``pinot-distribution`` that contains
+``pinot-admin.sh``, and use the command below:
 
 .. code-block:: none
 
-  $ ./pinot-admin.sh AddTable -filePath $WORKING_DIR/config/transcript-table-config.json -exec
-  Executing command: AddTable -filePath /Users/host1/Desktop/getting-started/config/transcript-table-config.json -controllerHost [controller_host] -controllerPort 9000 -exec
+  $ ./pinot-admin.sh AddTable -schemaFile $WORKING_DIR/config/transcript-schema.json -tableConfigFile $WORKING_DIR/config/transcript-table-config.json -exec
+  Executing command: AddTable -tableConfigFile /Users/host1/Desktop/getting-started/config/transcript-table-config.json -schemaFile /Users/host1/Desktop/getting-started/config/transcript-schema.json -controllerHost [controller_host] -controllerPort 9000 -exec
   {"status":"Table transcript_OFFLINE successfully added"}
 
 At this point, the directory tree for our ``getting-started`` should look like this:
@@ -260,6 +253,7 @@ At this point, the directory tree for our ``getting-started`` should look like t
              |-- csv-record-reader-config.json
              |-- transcript-schema.json
              |-- transcript-table-config.json
+
 
 In order to upload our data to the Pinot cluster, we need to convert our CSV file into a Pinot Segment, which will be put in a new directory $WORKING_DIR/test2:
 

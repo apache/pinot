@@ -7,6 +7,8 @@ import {
   makeIterable
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import config from 'thirdeye-frontend/config/environment';
+
 import _ from 'lodash';
 
 const ROOTCAUSE_AGGREGATES_ENDPOINT = '/rootcause/metric/aggregate/chunk';
@@ -109,7 +111,7 @@ export default Service.extend({
     const fetcher = this.get('fetcher');
 
     const [ start, end ] = requestContext.anomalyRange;
-    const timezone = 'America/Los_Angeles';
+    const timezone = config.timeZone;
 
     const url = `${ROOTCAUSE_AGGREGATES_ENDPOINT}?urns=${encodeURIComponent(metricUrns)}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
     try {

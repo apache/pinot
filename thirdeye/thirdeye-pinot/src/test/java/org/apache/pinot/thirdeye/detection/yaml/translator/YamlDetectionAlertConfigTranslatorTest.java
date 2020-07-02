@@ -87,10 +87,11 @@ public class YamlDetectionAlertConfigTranslatorTest {
 
     Assert.assertEquals(alertConfig.getAlertSchemes().size(), 1);
     Assert.assertNotNull(alertConfig.getAlertSchemes().get("emailScheme"));
-    Assert.assertEquals(alertConfig.getAlertSchemes().get("emailScheme").get(PROP_CLASS_NAME), "EmailClass");
+    Assert.assertEquals(ConfigUtils.getMap(alertConfig.getAlertSchemes().get("emailScheme")).get(PROP_CLASS_NAME),
+        "EmailClass");
 
     Assert.assertEquals(alertConfig.getAlertSuppressors().size(), 1);
-    Map<String, Object> timeWindowSuppressor = alertConfig.getAlertSuppressors().get("timeWindowSuppressor");
+    Map<String, Object> timeWindowSuppressor = ConfigUtils.getMap(alertConfig.getAlertSuppressors().get("timeWindowSuppressor"));
     Assert.assertEquals(timeWindowSuppressor.get(PROP_CLASS_NAME), "TimeWindowClass");
     Map<String, Object> timeWindow = ((ArrayList<Map<String, Object>>) timeWindowSuppressor.get(PROP_TIME_WINDOWS)).get(0);
     Assert.assertEquals(timeWindow.get("windowStartTime"), 1542888000000L);

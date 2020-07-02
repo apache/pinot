@@ -19,11 +19,10 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -31,6 +30,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -38,43 +38,47 @@ import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Helper class to reduce and set Selection results into the BrokerResponseNative
  */
 public class SelectionDataTableReducer implements DataTableReducer {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionDataTableReducer.class);
 
   private final Selection _selection;
-  private boolean _preserveType;
+  private final boolean _preserveType;
+  private final boolean _responseFormatSql;
 
   SelectionDataTableReducer(BrokerRequest brokerRequest, QueryOptions queryOptions) {
     _selection = brokerRequest.getSelections();
     _preserveType = queryOptions.isPreserveType();
+    _responseFormatSql = queryOptions.isResponseFormatSQL();
   }
 
   /**
-   * Reduces data tables and sets selection results into BrokerResponseNative::SelectionResults
+   * Reduces data tables and sets selection results into
+   * 1. ResultTable if _responseFormatSql is true
+   * 2. SelectionResults by default
    */
   @Override
-  public void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
-      BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
-    Collection<DataTable> dataTables = dataTableMap.values();
-
+  public void reduceAndSetResults(String tableName, DataSchema dataSchema,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query if exists
-      if (dataSchema != null) {
-        List<String> selectionColumns =
-            SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
-        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
+      List<String> selectionColumns =
+          SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
+      if (_responseFormatSql) {
+        DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
+        brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
+      } else {
+        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, Collections.emptyList()));
       }
     } else {
-
-      assert dataSchema != null;
-
       // For data table map with more than one data tables, remove conflicting data tables
       if (dataTableMap.size() > 1) {
         List<ServerRoutingInstance> droppedServers = removeConflictingResponses(dataSchema, dataTableMap);
@@ -95,15 +99,24 @@ public class SelectionDataTableReducer implements DataTableReducer {
       if (selectionSize > 0 && _selection.isSetSelectionSortSequence()) {
         // Selection order-by
         SelectionOperatorService selectionService = new SelectionOperatorService(_selection, dataSchema);
-        selectionService.reduceWithOrdering(dataTables);
-        brokerResponseNative.setSelectionResults(selectionService.renderSelectionResultsWithOrdering(_preserveType));
+        selectionService.reduceWithOrdering(dataTableMap.values());
+        if (_responseFormatSql) {
+          brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
+        } else {
+          brokerResponseNative.setSelectionResults(selectionService.renderSelectionResultsWithOrdering(_preserveType));
+        }
       } else {
         // Selection only
         List<String> selectionColumns =
             SelectionOperatorUtils.getSelectionColumns(_selection.getSelectionColumns(), dataSchema);
-        brokerResponseNative.setSelectionResults(SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(
-            SelectionOperatorUtils.reduceWithoutOrdering(dataTables, selectionSize), dataSchema, selectionColumns,
-            _preserveType));
+        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), selectionSize);
+        if (_responseFormatSql) {
+          brokerResponseNative
+              .setResultTable(SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema));
+        } else {
+          brokerResponseNative.setSelectionResults(SelectionOperatorUtils
+              .renderSelectionResultsWithoutOrdering(reducedRows, dataSchema, selectionColumns, _preserveType));
+        }
       }
     }
   }

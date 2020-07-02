@@ -1,0 +1,46 @@
+[
+  {
+    "column": "hoursSinceEpoch",
+    "pattern": {
+      "type": "SEQUENCE",
+      "start": 420768,
+      "stepsize": 1
+    }
+  },
+  {
+    "column": "views",
+    "pattern": {
+      "type": "SEASONAL",
+      "mean": 80,
+      "sigma": 1.5,
+      "trend": 0.0005,
+      "wavelength": 24,
+      "amplitude": 65,
+      "scalingFactors": [ 0.4, 0.9, 1.0, 1.0, 1.0, 0.8, 0.4 ]
+    }
+  },
+  {
+    "column": "clicks",
+    "pattern": {
+      "type": "SEASONAL",
+      "mean": 20,
+      "sigma": 1,
+      "trend": 0.0001,
+      "wavelength": 24,
+      "amplitude": 15,
+      "scalingFactors": [ 0.4, 0.9, 1.0, 1.0, 1.0, 0.8, 0.4 ]
+    }
+  },
+  {
+    "column": "errors",
+    "pattern": {
+      "type": "SPIKE",
+      "baseline": 0,
+      "arrivalMean": 2,
+      "arrivalSigma": 1,
+      "magnitudeMean": 3,
+      "magnitudeSigma": 1,
+      "smoothing": 0.1
+    }
+  }
+]

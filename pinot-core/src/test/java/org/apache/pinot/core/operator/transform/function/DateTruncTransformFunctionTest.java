@@ -21,12 +21,15 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -38,6 +41,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
@@ -75,15 +79,16 @@ public class DateTruncTransformFunctionTest
     return formatter.parseDateTime(iso8601).getMillis();
   }
 
-  private static void testDateTruncHelper(String literalInput, String unit, String tz, long expected) throws Exception {
+  private static void testDateTruncHelper(Schema schema, String literalInput, String unit, String tz, long expected)
+      throws Exception {
     long zmillisInput = iso8601ToUtcEpochMillis(literalInput);
     GenericRow row = new GenericRow();
     row.init(ImmutableMap.of(TIME_COLUMN, zmillisInput));
     List<GenericRow> rows = ImmutableList.of(row);
-    Schema schema = new Schema();
-    schema.addField(new TimeFieldSpec(TIME_COLUMN, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     String segmentName = "testSegment";
     String indexDirPath = Paths.get(Files.createTempDirectory("pinot_date_trunc_test").toAbsolutePath().toString(), segmentName).toAbsolutePath().toString();
     try {
@@ -91,7 +96,7 @@ public class DateTruncTransformFunctionTest
       config.setOutDir(indexDirPath);
       config.setSegmentName(segmentName);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, new GenericRowRecordReader(rows, schema));
+      driver.init(config, new GenericRowRecordReader(rows));
       driver.build();
 
       IndexSegment indexSegment = ImmutableSegmentLoader.load(new File(indexDirPath, segmentName), ReadMode.heap);
@@ -116,57 +121,70 @@ public class DateTruncTransformFunctionTest
     }
   }
 
+
+
   @Test
   public void testPrestoCompatibleDateTimeConversionTransformFunction() throws Exception {
+    Schema schemaTimeFieldSpec = new Schema.SchemaBuilder()
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
+    testDateTrunc(schemaTimeFieldSpec);
+
+    Schema schemaDateTimeFieldSpec = new Schema.SchemaBuilder()
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    testDateTrunc(schemaDateTimeFieldSpec);
+  }
+
+  private void testDateTrunc(Schema schema) throws Exception {
+
     DateTime result = TIMESTAMP;
     result = result.withMillisOfSecond(0);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "second", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "second", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withSecondOfMinute(0);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "minute", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "minute", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMinuteOfHour(0);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "hour", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "hour", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withHourOfDay(0);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "day", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "day", UTC_TIME_ZONE.getID(), result.getMillis());
 
     // ISO8601 week begins on Monday. For this timestamp (2001-08-22), 20th is the Monday of that week
     result = result.withDayOfMonth(20);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "week", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "week", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withDayOfMonth(1);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "month", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "month", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMonthOfYear(7);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "quarter", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "quarter", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMonthOfYear(1);
-    testDateTruncHelper(TIMESTAMP_ISO8601_STRING, "year", UTC_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, TIMESTAMP_ISO8601_STRING, "year", UTC_TIME_ZONE.getID(), result.getMillis());
 
     result = WEIRD_TIMESTAMP;
     result = result.withMillisOfSecond(0);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "second", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "second", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withSecondOfMinute(0);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "minute", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "minute", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMinuteOfHour(0);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "hour", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "hour", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withHourOfDay(0);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "day", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "day", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withDayOfMonth(20);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "week", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "week", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withDayOfMonth(1);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "month", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "month", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMonthOfYear(7);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "quarter", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "quarter", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
 
     result = result.withMonthOfYear(1);
-    testDateTruncHelper(WEIRD_TIMESTAMP_ISO8601_STRING, "year", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
+    testDateTruncHelper(schema, WEIRD_TIMESTAMP_ISO8601_STRING, "year", WEIRD_DATE_TIME_ZONE.getID(), result.getMillis());
   }
 }

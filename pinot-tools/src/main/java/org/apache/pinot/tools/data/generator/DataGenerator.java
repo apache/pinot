@@ -18,30 +18,29 @@
  */
 package org.apache.pinot.tools.data.generator;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.spi.data.*;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.math.IntRange;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.core.data.readers.FileFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Sep 12, 2014
  */
-
+// TODO: add DATE_TIME to the data generator
 public class DataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataGenerator.class);
   private File outDir;
@@ -72,13 +71,20 @@ public class DataGenerator {
     for (final String column : genSpec.getColumns()) {
       DataType dataType = genSpec.getDataTypesMap().get(column);
 
-      if (genSpec.getCardinalityMap().containsKey(column)) {
+      if (genSpec.getPatternMap().containsKey(column)) {
+        generators.put(column,
+                GeneratorFactory.getGeneratorFor(
+                        PatternType.valueOf(genSpec.getPatternMap().get(column).get("type").toString()),
+                        genSpec.getPatternMap().get(column)));
+
+      } else if (genSpec.getCardinalityMap().containsKey(column)) {
         generators.put(column, GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column)));
+
       } else if (genSpec.getRangeMap().containsKey(column)) {
         IntRange range = genSpec.getRangeMap().get(column);
-
         generators.put(column,
-            GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger()));
+                GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger()));
+
       } else {
         LOGGER.error("cardinality for this column does not exist : " + column);
         throw new RuntimeException("cardinality for this column does not exist");
@@ -88,13 +94,30 @@ public class DataGenerator {
     }
   }
 
-  public void generate(long totalDocs, int numFiles)
+  public void generateAvro(long totalDocs, int numFiles)
       throws IOException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
       try (AvroWriter writer = new AvroWriter(outDir, i, generators, fetchSchema())) {
         for (int j = 0; j < numPerFiles; j++) {
           writer.writeNext();
+        }
+      }
+    }
+  }
+
+  public void generateCsv(long totalDocs, int numFiles)
+      throws IOException {
+    final int numPerFiles = (int) (totalDocs / numFiles);
+    for (int i = 0; i < numFiles; i++) {
+      try (FileWriter writer = new FileWriter(outDir + "/output.csv")) {
+        writer.append(StringUtils.join(genSpec.getColumns(), ",")).append('\n');
+        for (int j = 0; j < numPerFiles; j++) {
+          Object[] values = new Object[genSpec.getColumns().size()];
+          for (int k = 0; k < genSpec.getColumns().size(); k++) {
+            values[k] = generators.get(genSpec.getColumns().get(k)).next();
+          }
+          writer.append(StringUtils.join(values, ",")).append('\n');
         }
       }
     }
@@ -124,7 +147,7 @@ public class DataGenerator {
         break;
 
       case TIME:
-        spec = new TimeFieldSpec(column, dataType, genSpec.getTimeUnitMap().get(column));
+        spec = new TimeFieldSpec(new TimeGranularitySpec(dataType, genSpec.getTimeUnitMap().get(column), column));
         break;
 
       default:
@@ -141,12 +164,13 @@ public class DataGenerator {
   public static void main(String[] args)
       throws IOException {
     final String[] columns = {"column1", "column2", "column3", "column4", "column5"};
-    final Map<String, DataType> dataTypes = new HashMap<String, DataType>();
-    final Map<String, FieldType> fieldTypes = new HashMap<String, FieldType>();
-    final Map<String, TimeUnit> timeUnits = new HashMap<String, TimeUnit>();
+    final Map<String, DataType> dataTypes = new HashMap<>();
+    final Map<String, FieldType> fieldTypes = new HashMap<>();
+    final Map<String, TimeUnit> timeUnits = new HashMap<>();
 
-    final Map<String, Integer> cardinality = new HashMap<String, Integer>();
-    final Map<String, IntRange> range = new HashMap<String, IntRange>();
+    final Map<String, Integer> cardinality = new HashMap<>();
+    final Map<String, IntRange> range = new HashMap<>();
+    final Map<String, Map<String, Object>> template = new HashMap<>();
 
     for (final String col : columns) {
       dataTypes.put(col, DataType.INT);
@@ -154,11 +178,11 @@ public class DataGenerator {
       cardinality.put(col, 1000);
     }
     final DataGeneratorSpec spec =
-        new DataGeneratorSpec(Arrays.asList(columns), cardinality, range, dataTypes, fieldTypes, timeUnits,
+        new DataGeneratorSpec(Arrays.asList(columns), cardinality, range, template, dataTypes, fieldTypes, timeUnits,
             FileFormat.AVRO, "/tmp/out", true);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
-    gen.generate(1000000L, 2);
+    gen.generateAvro(1000000L, 2);
   }
 }

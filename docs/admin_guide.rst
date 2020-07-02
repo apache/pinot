@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. warning::  The documentation is not up-to-date and has moved to `Apache Pinot Docs <https://docs.pinot.apache.org/>`_.
+
 :orphan:
 
 ###########
@@ -31,6 +33,7 @@ Admin Guide
    tableconfig_schema
    schema
    in_production
+   batch_data_ingestion
    pinot_hadoop
    customizations
    tuning_pinot

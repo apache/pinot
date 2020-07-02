@@ -126,9 +126,11 @@ public class ChaosMonkeyIntegrationTest {
 
   private void createTable()
       throws InterruptedException {
+    String schemaFile = TestUtils.getFileFromResourceUrl(ChaosMonkeyIntegrationTest.class.getClassLoader().
+        getResource("chaos-monkey-schema.json"));
     String createTableFile = TestUtils.getFileFromResourceUrl(ChaosMonkeyIntegrationTest.class.getClassLoader().
         getResource("chaos-monkey-create-table.json"));
-    runAdministratorCommand(new String[]{"AddTable", "-controllerPort", "39000", "-filePath", createTableFile, "-exec"})
+    runAdministratorCommand(new String[]{"AddTable", "-controllerPort", "39000", "-schemaFile", schemaFile, "-tableConfigFile", createTableFile, "-exec"})
         .waitFor();
   }
 

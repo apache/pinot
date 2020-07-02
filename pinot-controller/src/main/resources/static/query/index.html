@@ -79,11 +79,8 @@
           <div class="small-2 columns" title="Enables tracing">
             <input type=checkbox id="trace-enabled">&nbsp;&nbsp;Tracing</input>
           </div>
-          <div class="small-3 columns" title="Sets groupByMode=sql in queryOptions (default pql)">
-            <input type=checkbox id="group-by-mode-sql">&nbsp;&nbsp;Group By Mode : SQL</input>
-          </div>
-          <div class="small-4 columns" title="Sets responseFormat=sql in queryOptions (default pql)">
-            <input type=checkbox id="response-format-sql">&nbsp;&nbsp;Query Response Format : SQL</input>
+          <div class="small-3 columns" title="Send query to /pql endpoint (default to /sql)">
+            <input type=checkbox id="pql">&nbsp;&nbsp;Query Syntax: PQL</input>
           </div>
           <div class="small-2 columns"><a href="#" id="execute-query" class="button round success small">Run Query</a>
           </div>
@@ -138,6 +135,12 @@
           <td class="{{this.fieldType}}">{{this.name}}</td>
           <td class="{{this.fieldType}}">{{this.dataType}}</td>
         </tr>
+      {{/each}}
+      {{#each dateTimeFieldSpecs}}
+      <tr>
+        <td class="{{this.fieldType}}">{{this.name}}</td>
+        <td class="{{this.fieldType}}">{{this.dataType}}</td>
+      </tr>
       {{/each}}
 
       {{#if timeFieldSpec}}

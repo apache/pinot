@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +38,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
@@ -167,8 +165,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       }
     }
 
-    List<Interval> monitoringWindows =
-        this.getMonitoringWindows().stream().filter(i -> i.getEndMillis() <= this.endTime).collect(Collectors.toList());
+    List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     TimeSeries predictedResult = TimeSeries.empty();
     int totalWindows = monitoringWindows.size();
@@ -287,9 +284,11 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         Period windowSizePeriod = DetectionUtils.periodFromTimeUnit(windowSize, windowUnit);
         List<Interval> monitoringWindows = new ArrayList<>();
         List<DateTime> monitoringWindowEndTimes = getMonitoringWindowEndTimes();
+        DateTime detectionEndTime = new DateTime(endTime, dateTimeZone).minus(windowDelayPeriod);
         for (DateTime monitoringEndTime : monitoringWindowEndTimes) {
           DateTime endTime = monitoringEndTime.minus(windowDelayPeriod);
           DateTime startTime = endTime.minus(windowSizePeriod);
+          endTime =  endTime.isAfter(detectionEndTime) ? detectionEndTime : endTime;
           monitoringWindows.add(new Interval(startTime, endTime));
         }
         for (Interval window : monitoringWindows){
@@ -300,7 +299,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         LOG.info("can't generate moving monitoring windows, calling with single detection window", e);
       }
     }
-    return Collections.singletonList(new Interval(startTime, endTime));
+    return Collections.singletonList(new Interval(startTime, endTime, DateTimeZone.forID(dataset.getTimezone())));
   }
 
   // get the list of monitoring window end times

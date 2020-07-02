@@ -28,6 +28,8 @@ import { humanizeFloat, checkStatus } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import Ember from 'ember';
+import config from 'thirdeye-frontend/config/environment';
+
 
 export default Component.extend({
   classNames: ['share-custom-template'],
@@ -79,6 +81,7 @@ export default Component.extend({
     let index = 0;
     const customHeaderMapping = get(this, 'customHeaderMapping');
     const { start, end } = getProperties(this, 'start', 'end');
+    const timeZone = config.timeZone
 
     for (const entity of entities) {
       if(!customHeaderMapping[index]) {
@@ -96,12 +99,18 @@ export default Component.extend({
           const promiseArray = [];
           if(metrics) {
             for (const metric of metrics) {
-              const offsets = yield fetch(`/rootcause/metric/aggregate/batch?urn=${metric}&start=${start}&end=${end}&offsets=${offsetsStr}&timezone=America/Los_Angeles`).then(checkStatus).then(res => res);
+              const offsets = yield fetch(`/rootcause/metric/aggregate/batch?urn=${metric}&start=${start}&end=${end}&offsets=${offsetsStr}&timezone=${timeZone}`).then(checkStatus).then(res => res);
               sumOffsets.push(offsets);
             }
-            const reducedSumOffsets = sumOffsets.reduce((arg, current) => {
-              return [arg[0] + current[0], arg[1] + current[1]];
-            });
+            // assumes maximum of two metrics and compares the two
+            let reducedSumOffsets;
+            if (Array.isArray(sumOffsets[0]) && sumOffsets.length > 1  && Array.isArray(sumOffsets[1])) {
+              reducedSumOffsets = [sumOffsets[0][0], sumOffsets[1][0]]
+            } else {
+              reducedSumOffsets = sumOffsets.reduce((arg, current) => {
+                return [arg[0] + current[0], arg[1] + current[1]];
+              });
+            }
             cell.summary = [humanizeFloat(reducedSumOffsets[0]), floatToPercent(reducedSumOffsets[0]  / reducedSumOffsets[1] - 1)];
             customHeaderMapping[index].push(cell);
           }

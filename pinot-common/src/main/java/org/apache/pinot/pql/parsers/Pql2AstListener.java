@@ -33,7 +33,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.HavingAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.InPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.IsPredicateAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IsNullPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LimitAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OptionAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OptionsAstNode;
@@ -49,6 +49,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.StarColumnListAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StarExpressionAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.TableNameAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.TextMatchPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.TopAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.WhereAstNode;
 
@@ -137,7 +138,7 @@ public class Pql2AstListener extends PQL2BaseListener {
 
   @Override
   public void enterIsPredicate(@NotNull PQL2Parser.IsPredicateContext ctx) {
-    pushNode(new IsPredicateAstNode());
+    pushNode(new IsNullPredicateAstNode(ctx.isClause().NOT() != null));
   }
 
   @Override
@@ -427,6 +428,16 @@ public class Pql2AstListener extends PQL2BaseListener {
 
   @Override
   public void exitOptions(PQL2Parser.OptionsContext ctx) {
+    popNode();
+  }
+
+  @Override
+  public void enterTextMatchPredicate(@NotNull PQL2Parser.TextMatchPredicateContext ctx) {
+    pushNode(new TextMatchPredicateAstNode());
+  }
+
+  @Override
+  public void exitTextMatchPredicate(@NotNull PQL2Parser.TextMatchPredicateContext ctx) {
     popNode();
   }
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.core.realtime.stream;
 
 import nl.jqno.equalsverifier.EqualsVerifier;
 import nl.jqno.equalsverifier.Warning;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
 

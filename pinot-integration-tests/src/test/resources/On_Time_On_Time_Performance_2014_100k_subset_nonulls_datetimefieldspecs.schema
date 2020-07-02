@@ -1,0 +1,338 @@
+{
+  "schemaName": "mytable",
+  "dimensionFieldSpecs": [
+    {
+      "name": "AirlineID",
+      "dataType": "LONG"
+    },
+    {
+      "name": "ArrTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "ArrTimeBlk",
+      "dataType": "STRING"
+    },
+    {
+      "name": "CRSArrTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "CRSDepTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "CRSElapsedTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "CancellationCode",
+      "dataType": "STRING"
+    },
+    {
+      "name": "Carrier",
+      "dataType": "STRING"
+    },
+    {
+      "name": "DayOfWeek",
+      "dataType": "INT"
+    },
+    {
+      "name": "DayofMonth",
+      "dataType": "INT"
+    },
+    {
+      "name": "DepTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "DepTimeBlk",
+      "dataType": "STRING"
+    },
+    {
+      "name": "Dest",
+      "dataType": "STRING"
+    },
+    {
+      "name": "DestAirportID",
+      "dataType": "INT"
+    },
+    {
+      "name": "DestAirportSeqID",
+      "dataType": "INT"
+    },
+    {
+      "name": "DestCityMarketID",
+      "dataType": "INT"
+    },
+    {
+      "name": "DestCityName",
+      "dataType": "STRING"
+    },
+    {
+      "name": "DestState",
+      "dataType": "STRING"
+    },
+    {
+      "name": "DestStateFips",
+      "dataType": "INT"
+    },
+    {
+      "name": "DestStateName",
+      "dataType": "STRING"
+    },
+    {
+      "name": "DestWac",
+      "dataType": "INT"
+    },
+    {
+      "name": "Distance",
+      "dataType": "INT"
+    },
+    {
+      "name": "DistanceGroup",
+      "dataType": "INT"
+    },
+    {
+      "name": "DivActualElapsedTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "DivAirportIDs",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "DivAirportLandings",
+      "dataType": "INT"
+    },
+    {
+      "name": "DivAirportSeqIDs",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "DivAirports",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "DivArrDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "DivDistance",
+      "dataType": "INT"
+    },
+    {
+      "name": "DivLongestGTimes",
+      "dataType": "FLOAT",
+      "singleValueField": false
+    },
+    {
+      "name": "DivReachedDest",
+      "dataType": "INT"
+    },
+    {
+      "name": "DivTailNums",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "DivTotalGTimes",
+      "dataType": "LONG",
+      "singleValueField": false
+    },
+    {
+      "name": "DivWheelsOffs",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "DivWheelsOns",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "Diverted",
+      "dataType": "INT"
+    },
+    {
+      "name": "FirstDepTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "FlightNum",
+      "dataType": "INT"
+    },
+    {
+      "name": "Flights",
+      "dataType": "INT"
+    },
+    {
+      "name": "LongestAddGTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "Month",
+      "dataType": "INT"
+    },
+    {
+      "name": "Origin",
+      "dataType": "STRING"
+    },
+    {
+      "name": "OriginAirportID",
+      "dataType": "INT"
+    },
+    {
+      "name": "OriginAirportSeqID",
+      "dataType": "INT"
+    },
+    {
+      "name": "OriginCityMarketID",
+      "dataType": "INT"
+    },
+    {
+      "name": "OriginCityName",
+      "dataType": "STRING"
+    },
+    {
+      "name": "OriginState",
+      "dataType": "STRING"
+    },
+    {
+      "name": "OriginStateFips",
+      "dataType": "INT"
+    },
+    {
+      "name": "OriginStateName",
+      "dataType": "STRING"
+    },
+    {
+      "name": "OriginWac",
+      "dataType": "INT"
+    },
+    {
+      "name": "Quarter",
+      "dataType": "INT"
+    },
+    {
+      "name": "RandomAirports",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "TailNum",
+      "dataType": "STRING"
+    },
+    {
+      "name": "TaxiIn",
+      "dataType": "INT"
+    },
+    {
+      "name": "TaxiOut",
+      "dataType": "INT"
+    },
+    {
+      "name": "WheelsOn",
+      "dataType": "INT"
+    },
+    {
+      "name": "WheelsOff",
+      "dataType": "INT"
+    },
+    {
+      "name": "UniqueCarrier",
+      "dataType": "STRING"
+    },
+    {
+      "name": "TotalAddGTime",
+      "dataType": "INT"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "ActualElapsedTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "AirTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "ArrDel15",
+      "dataType": "INT"
+    },
+    {
+      "name": "ArrDelay",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "ArrivalDelayGroups",
+      "dataType": "INT"
+    },
+    {
+      "name": "ArrDelayMinutes",
+      "dataType": "DOUBLE"
+    },
+    {
+      "name": "Cancelled",
+      "dataType": "INT"
+    },
+    {
+      "name": "CarrierDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "DepDel15",
+      "dataType": "INT"
+    },
+    {
+      "name": "DepDelay",
+      "dataType": "DOUBLE"
+    },
+    {
+      "name": "DepDelayMinutes",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "DepartureDelayGroups",
+      "dataType": "INT"
+    },
+    {
+      "name": "LateAircraftDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "NASDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "SecurityDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "WeatherDelay",
+      "dataType": "INT"
+    }
+  ],
+  "dateTimeFieldSpecs": [{
+    "name": "DaysSinceEpoch",
+    "dataType": "INT",
+    "format": "1:DAYS:EPOCH",
+    "granularity": "1:DAYS"
+  },
+  {
+    "name": "Year",
+    "dataType": "INT",
+    "format": "1:DAYS:SIMPLE_DATE_FORMAT:yyyy",
+    "granularity": "1:DAYS"
+  },
+  {
+    "name": "FlightDate",
+    "dataType": "STRING",
+    "format": "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd",
+    "granularity": "1:DAYS"
+  }]
+}

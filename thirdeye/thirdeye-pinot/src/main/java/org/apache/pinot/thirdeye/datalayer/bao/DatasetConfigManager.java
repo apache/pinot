@@ -31,6 +31,6 @@ public interface DatasetConfigManager extends AbstractManager<DatasetConfigDTO> 
 
   List<DatasetConfigDTO> findActiveRequiresCompletenessCheck();
 
-  void updateLastRefreshTime(String dataset, long lastRefreshTime);
+  void updateLastRefreshTime(String dataset, long lastRefreshTime, long lastEventTime);
 
 }

@@ -28,13 +28,15 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -43,6 +45,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -75,7 +78,9 @@ public class OnHeapDictionariesTest {
   public void setup()
       throws Exception {
     Schema schema = buildSchema();
-    buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, schema);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, tableConfig, schema);
 
     IndexLoadingConfig loadingConfig = new IndexLoadingConfig();
     loadingConfig.setReadMode(ReadMode.mmap);
@@ -163,10 +168,10 @@ public class OnHeapDictionariesTest {
    * @return Schema built for the segment
    * @throws Exception
    */
-  private Schema buildSegment(String segmentDirName, String segmentName, Schema schema)
+  private Schema buildSegment(String segmentDirName, String segmentName, TableConfig tableConfig, Schema schema)
       throws Exception {
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(segmentDirName);
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);
@@ -190,7 +195,7 @@ public class OnHeapDictionariesTest {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
 
     LOGGER.info("Built segment {} at {}", segmentName, segmentDirName);

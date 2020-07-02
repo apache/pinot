@@ -136,4 +136,11 @@ public class SortedIndexReaderImpl extends BaseSingleColumnSingleValueReader<Sor
     // Inclusive
     public int _endOffset = -1;
   }
+
+  @Override
+  public Pairs.IntPair getDocIds(Object value) {
+    // This should not be called from anywhere. If it happens, there is a bug
+    // and that's why we throw illegal state exception
+    throw new IllegalStateException("sorted inverted index reader supports lookup only on dictionary id");
+  }
 }

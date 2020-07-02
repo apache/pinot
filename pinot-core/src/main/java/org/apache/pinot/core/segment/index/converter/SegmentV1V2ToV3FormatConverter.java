@@ -23,8 +23,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
@@ -32,11 +30,12 @@ import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -81,6 +80,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
     createMetadataFile(v2SegmentDirectory, v3TempDirectory);
     copyCreationMetadataIfExists(v2SegmentDirectory, v3TempDirectory);
+    copyLuceneTextIndexIfExists(v2SegmentDirectory, v3TempDirectory);
     copyIndexData(v2SegmentDirectory, v2Metadata, v3TempDirectory);
 
     File newLocation = SegmentDirectoryPaths.segmentDirectoryFor(v2SegmentDirectory, SegmentVersion.v3);
@@ -89,7 +89,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     deleteV2Files(v2SegmentDirectory);
   }
 
-  private void deleteV2Files(File v2SegmentDirectory) {
+  private void deleteV2Files(File v2SegmentDirectory)
+      throws IOException {
     LOGGER.info("Deleting files in v1 segment directory: {}", v2SegmentDirectory);
     File[] files = v2SegmentDirectory.listFiles();
     if (files == null) {
@@ -100,6 +101,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     for (File file : files) {
       if (file.isFile() && file.exists()) {
         FileUtils.deleteQuietly(file);
+      }
+      if (file.isDirectory() && file.getName().endsWith(LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION)) {
+        FileUtils.deleteDirectory(file);
       }
     }
   }
@@ -152,7 +156,6 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         for (String column : allColumns) {
           copyExistingInvertedIndex(v2DataReader, v3DataWriter, column);
         }
-        copyStarTree(v2DataReader, v3DataWriter);
         v3DataWriter.saveAndClose();
       }
     }
@@ -168,18 +171,6 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       FileUtils.copyFile(new File(src, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
           new File(dest, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
     }
-  }
-
-  private void copyStarTree(SegmentDirectory.Reader v2DataReader, SegmentDirectory.Writer v3DataWriter)
-      throws IOException {
-    if (!v2DataReader.hasStarTree()) {
-      return;
-    }
-
-    InputStream v2StarTreeStream = v2DataReader.getStarTreeStream();
-    OutputStream v3StarTreeStream = v3DataWriter.starTreeOutputStream();
-
-    IOUtils.copy(v2StarTreeStream, v3StarTreeStream);
   }
 
   private void copyDictionary(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
@@ -230,6 +221,43 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     if (v2CreationFile.exists()) {
       File v3CreationFile = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
       Files.copy(v2CreationFile.toPath(), v3CreationFile.toPath());
+    }
+  }
+
+  private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir)
+      throws IOException {
+    // TODO: see if this can be done by reusing some existing methods
+    String suffix = LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(suffix);
+      }
+    });
+    for (File textIndexFile : textIndexFiles) {
+      File[] indexFiles = textIndexFile.listFiles();
+      File v3LuceneIndexDir = new File(v3Dir, textIndexFile.getName());
+      v3LuceneIndexDir.mkdir();
+      for (File indexFile : indexFiles) {
+        File v3LuceneIndexFile = new File(v3LuceneIndexDir, indexFile.getName());
+        Files.copy(indexFile.toPath(), v3LuceneIndexFile.toPath());
+      }
+    }
+    // if segment reload is issued asking for up-conversion of
+    // on-disk segment format from v1/v2 to v3, then in addition
+    // to moving the lucene text index files, we need to move the
+    // docID mapping/cache file created by us in v1/v2 during an earlier
+    // load of the segment.
+    String docIDFileSuffix = LuceneTextIndexReader.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    File[] textIndexDocIdMappingFiles = segmentDirectory.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(docIDFileSuffix);
+      }
+    });
+    for (File docIdMappingFile : textIndexDocIdMappingFiles) {
+      File v3DocIdMappingFile = new File(v3Dir, docIdMappingFile.getName());
+      Files.copy(docIdMappingFile.toPath(), v3DocIdMappingFile.toPath());
     }
   }
 

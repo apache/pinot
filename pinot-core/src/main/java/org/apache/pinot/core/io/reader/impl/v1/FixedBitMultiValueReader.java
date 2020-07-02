@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
-import java.io.IOException;
 import org.apache.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
@@ -49,7 +48,6 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueReader<FixedBitMultiValueReader.Context> {
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
-  private final PinotDataBuffer _dataBuffer;
   private final FixedByteValueReaderWriter _chunkOffsetReader;
   private final PinotDataBitSet _bitmapReader;
   private final FixedBitIntReaderWriter _rawDataReader;
@@ -58,7 +56,6 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
   private final int _numRowsPerChunk;
 
   public FixedBitMultiValueReader(PinotDataBuffer dataBuffer, int numRows, int numValues, int numBitsPerValue) {
-    _dataBuffer = dataBuffer;
     _numRows = numRows;
     _numValues = numValues;
     _numRowsPerChunk = (int) (Math.ceil((float) PREFERRED_NUM_VALUES_PER_CHUNK / (numValues / numRows)));
@@ -140,12 +137,12 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
     _chunkOffsetReader.close();
     _bitmapReader.close();
     _rawDataReader.close();
-    _dataBuffer.close();
   }
 
   public static class Context implements ReaderContext {

@@ -242,23 +242,42 @@ public class DataSchema {
     }
 
     public static ColumnDataType fromDataType(FieldSpec.DataType dataType, boolean isSingleValue) {
+      return isSingleValue ? fromDataTypeSV(dataType) : fromDataTypeMV(dataType);
+    }
+
+    public static ColumnDataType fromDataTypeSV(FieldSpec.DataType dataType) {
       switch (dataType) {
         case INT:
-          return isSingleValue ? INT : INT_ARRAY;
+          return INT;
         case LONG:
-          return isSingleValue ? LONG : LONG_ARRAY;
+          return LONG;
         case FLOAT:
-          return isSingleValue ? FLOAT : FLOAT_ARRAY;
+          return FLOAT;
         case DOUBLE:
-          return isSingleValue ? DOUBLE : DOUBLE_ARRAY;
+          return DOUBLE;
         case STRING:
-          return isSingleValue ? STRING : STRING_ARRAY;
+          return STRING;
         case BYTES:
-          if (isSingleValue) {
-            return BYTES;
-          } // else, fall down to default.
+          return BYTES;
         default:
-          throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+          throw new IllegalStateException("Unsupported data type: " + dataType);
+      }
+    }
+
+    public static ColumnDataType fromDataTypeMV(FieldSpec.DataType dataType) {
+      switch (dataType) {
+        case INT:
+          return INT_ARRAY;
+        case LONG:
+          return LONG_ARRAY;
+        case FLOAT:
+          return FLOAT_ARRAY;
+        case DOUBLE:
+          return DOUBLE_ARRAY;
+        case STRING:
+          return STRING_ARRAY;
+        default:
+          throw new IllegalStateException("Unsupported data type: " + dataType);
       }
     }
   }

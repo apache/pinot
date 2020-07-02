@@ -21,14 +21,10 @@ package org.apache.pinot.controller.validation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -36,8 +32,11 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,8 +82,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   @Override
   protected void processTable(String tableNameWithType, Context context) {
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == TableType.REALTIME) {
 
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig == null) {
@@ -96,7 +95,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         updateRealtimeDocumentCount(tableConfig);
       }
 
-      PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig);
+      PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
+          tableConfig.getIndexingConfig().getStreamConfigs());
       if (streamConfig.hasLowLevelConsumerType()) {
         _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
       }
@@ -134,14 +134,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
             groupId = segmentGroupIdName;
           }
           // Discard all segments with different groupids as they are replicas
-          if (groupId.equals(segmentGroupIdName) && realtimeSegmentZKMetadata.getTotalRawDocs() >= 0) {
-            numTotalDocs += realtimeSegmentZKMetadata.getTotalRawDocs();
+          if (groupId.equals(segmentGroupIdName) && realtimeSegmentZKMetadata.getTotalDocs() >= 0) {
+            numTotalDocs += realtimeSegmentZKMetadata.getTotalDocs();
           }
         }
       } else {
         // Low level segments
         if (!countHLCSegments) {
-          numTotalDocs += realtimeSegmentZKMetadata.getTotalRawDocs();
+          numTotalDocs += realtimeSegmentZKMetadata.getTotalDocs();
         }
       }
     }

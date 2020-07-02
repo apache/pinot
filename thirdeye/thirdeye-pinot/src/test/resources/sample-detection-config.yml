@@ -9,6 +9,9 @@ metric: cost
 # The dataset or UMP table name to which the metric belongs. Look ahead should auto populate this field.
 dataset: test-collection
 
+# The default cron schedule
+cron: 0 0 14 * * ? *
+
 rules:
   - detection:
       - name: detection_rule_1

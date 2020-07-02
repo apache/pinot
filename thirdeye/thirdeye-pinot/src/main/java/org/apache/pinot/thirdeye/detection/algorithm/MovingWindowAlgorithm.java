@@ -143,10 +143,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.sliceData = MetricSlice.from(me.getId(), dataStart.getMillis(), endTime, me.getFilters());
     this.sliceDetection = MetricSlice.from(me.getId(), detectionStart.getMillis(), endTime, me.getFilters());
 
-    this.anomalySlice = new AnomalySlice()
-        .withDetectionId(this.getConfig().getId())
-        .withStart(this.sliceData.getStart())
-        .withEnd(this.sliceData.getEnd());
+    AnomalySlice slice = new AnomalySlice().withStart(this.sliceData.getStart()).withEnd(this.sliceData.getEnd());
+    if (this.config.getId() != null) {
+      this.anomalySlice = slice.withDetectionId(this.config.getId());
+    } else {
+      this.anomalySlice = slice;
+    }
   }
 
   @Override

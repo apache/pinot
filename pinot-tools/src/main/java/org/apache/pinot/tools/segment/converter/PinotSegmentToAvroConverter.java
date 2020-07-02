@@ -24,9 +24,9 @@ import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
@@ -44,15 +44,15 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
   @Override
   public void convert()
       throws Exception {
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir))) {
-      Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(recordReader.getSchema());
+    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(new File(_segmentDir))) {
+      Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSegmentRecordReader.getSchema());
 
-      try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<Record>(avroSchema))) {
+      try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
         recordWriter.create(avroSchema, new File(_outputFile));
 
         GenericRow row = new GenericRow();
-        while (recordReader.hasNext()) {
-          row = recordReader.next(row);
+        while (pinotSegmentRecordReader.hasNext()) {
+          row = pinotSegmentRecordReader.next(row);
           Record record = new Record(avroSchema);
 
           for (String field : row.getFieldNames()) {

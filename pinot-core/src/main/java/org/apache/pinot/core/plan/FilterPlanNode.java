@@ -19,11 +19,8 @@
 package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
@@ -34,16 +31,14 @@ import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +64,7 @@ public class FilterPlanNode implements PlanNode {
    */
   private static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree, IndexSegment segment,
       @Nullable Map<String, String> debugOptions) {
-    int numDocs = segment.getSegmentMetadata().getTotalRawDocs();
+    int numDocs = segment.getSegmentMetadata().getTotalDocs();
     if (filterQueryTree == null) {
       return new MatchAllFilterOperator(numDocs);
     }
@@ -111,9 +106,17 @@ public class FilterPlanNode implements PlanNode {
       // Leaf filter operator
       Predicate predicate = Predicate.newPredicate(filterQueryTree);
 
+      // Check for null predicate
+      Predicate.Type type = predicate.getType();
+      if (type.equals(Predicate.Type.IS_NULL) || type.equals(Predicate.Type.IS_NOT_NULL)) {
+        DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
+        ImmutableRoaringBitmap nullBitmap = dataSource.getNullValueVector().getNullBitmap();
+        boolean exclusive = (type == Predicate.Type.IS_NOT_NULL);
+        return new BitmapBasedFilterOperator(new ImmutableRoaringBitmap[]{nullBitmap}, 0, numDocs - 1, exclusive);
+      }
+
       TransformExpressionTree expression = filterQueryTree.getExpression();
       if (expression.getExpressionType() == TransformExpressionTree.ExpressionType.FUNCTION) {
-
         return new ExpressionFilterOperator(segment, expression, predicate);
       } else {
         DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());

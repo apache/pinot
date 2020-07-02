@@ -18,33 +18,24 @@
  */
 package org.apache.pinot.core.segment.virtualcolumn;
 
+import org.apache.pinot.spi.data.FieldSpec;
+
+
 /**
- * Context used to pass arguments to the virtual column provider.
+ * Miscellaneous context information about the column.
+ * It will be used to build various components (dictionary, reader, etc) in the virtual column provider.
  */
 public class VirtualColumnContext {
-  private String _hostname;
-  private String _segmentName;
-  private String _columnName;
+  private FieldSpec _fieldSpec;
   private int _totalDocCount;
 
-  public VirtualColumnContext(String hostname, String segmentName, String columnName,
-      int totalDocCount) {
-    _hostname = hostname;
-    _segmentName = segmentName;
-    _columnName = columnName;
+  public VirtualColumnContext(FieldSpec fieldSpec, int totalDocCount) {
+    _fieldSpec = fieldSpec;
     _totalDocCount = totalDocCount;
   }
 
-  public String getHostname() {
-    return _hostname;
-  }
-
-  public String getSegmentName() {
-    return _segmentName;
-  }
-
-  public String getColumnName() {
-    return _columnName;
+  public FieldSpec getFieldSpec() {
+    return _fieldSpec;
   }
 
   public int getTotalDocCount() {

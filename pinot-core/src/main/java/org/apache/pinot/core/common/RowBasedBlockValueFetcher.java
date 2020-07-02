@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.common;
 
-import java.io.Serializable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class RowBasedBlockValueFetcher {
@@ -33,9 +33,9 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  public Serializable[] getRow(int docId) {
+  public Object[] getRow(int docId) {
     int numColumns = _valueFetchers.length;
-    Serializable[] row = new Serializable[numColumns];
+    Object[] row = new Object[numColumns];
     for (int i = 0; i < numColumns; i++) {
       row[i] = _valueFetchers[i].getValue(docId);
     }
@@ -80,10 +80,10 @@ public class RowBasedBlockValueFetcher {
   }
 
   private interface ValueFetcher {
-    Serializable getValue(int docId);
+    Object getValue(int docId);
   }
 
-  private class IntSingleValueFetcher implements ValueFetcher {
+  private static class IntSingleValueFetcher implements ValueFetcher {
     private final int[] _values;
 
     IntSingleValueFetcher(int[] values) {
@@ -95,7 +95,7 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class LongSingleValueFetcher implements ValueFetcher {
+  private static class LongSingleValueFetcher implements ValueFetcher {
     private final long[] _values;
 
     LongSingleValueFetcher(long[] values) {
@@ -107,7 +107,7 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class FloatSingleValueFetcher implements ValueFetcher {
+  private static class FloatSingleValueFetcher implements ValueFetcher {
     private final float[] _values;
 
     FloatSingleValueFetcher(float[] values) {
@@ -119,7 +119,7 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class DoubleSingleValueFetcher implements ValueFetcher {
+  private static class DoubleSingleValueFetcher implements ValueFetcher {
     private final double[] _values;
 
     DoubleSingleValueFetcher(double[] values) {
@@ -131,7 +131,7 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class StringSingleValueFetcher implements ValueFetcher {
+  private static class StringSingleValueFetcher implements ValueFetcher {
     private final String[] _values;
 
     StringSingleValueFetcher(String[] values) {
@@ -143,19 +143,19 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class BytesValueFetcher implements ValueFetcher {
+  private static class BytesValueFetcher implements ValueFetcher {
     private final byte[][] _values;
 
     BytesValueFetcher(byte[][] values) {
       _values = values;
     }
 
-    public byte[] getValue(int docId) {
-      return _values[docId];
+    public ByteArray getValue(int docId) {
+      return new ByteArray(_values[docId]);
     }
   }
 
-  private class IntMultiValueFetcher implements ValueFetcher {
+  private static class IntMultiValueFetcher implements ValueFetcher {
     private final int[][] _values;
 
     IntMultiValueFetcher(int[][] values) {
@@ -167,7 +167,7 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class LongMultiValueFetcher implements ValueFetcher {
+  private static class LongMultiValueFetcher implements ValueFetcher {
     private final long[][] _values;
 
     LongMultiValueFetcher(long[][] values) {
@@ -179,7 +179,7 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class FloatMultiValueFetcher implements ValueFetcher {
+  private static class FloatMultiValueFetcher implements ValueFetcher {
     private final float[][] _values;
 
     FloatMultiValueFetcher(float[][] values) {
@@ -191,7 +191,7 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class DoubleMultiValueFetcher implements ValueFetcher {
+  private static class DoubleMultiValueFetcher implements ValueFetcher {
     private final double[][] _values;
 
     DoubleMultiValueFetcher(double[][] values) {
@@ -203,7 +203,7 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
-  private class StringMultiValueFetcher implements ValueFetcher {
+  private static class StringMultiValueFetcher implements ValueFetcher {
     private final String[][] _values;
 
     StringMultiValueFetcher(String[][] values) {

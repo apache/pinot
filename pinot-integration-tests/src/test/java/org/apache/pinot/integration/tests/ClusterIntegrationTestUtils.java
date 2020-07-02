@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Lists;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
@@ -29,6 +30,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,9 +40,9 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileStream;
@@ -50,6 +52,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.broker.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;
@@ -57,18 +60,19 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
-import org.apache.pinot.core.realtime.stream.StreamDataProducer;
-import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.core.util.AvroUtils;
-import org.apache.pinot.server.util.SegmentTestUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.stream.StreamDataProducer;
+import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.testng.Assert;
 
 
@@ -88,8 +92,7 @@ public class ClusterIntegrationTestUtils {
    * @throws Exception
    */
   @SuppressWarnings("SqlNoDataSourceInspection")
-  public static void setUpH2TableWithAvro(@Nonnull List<File> avroFiles, @Nonnull String tableName,
-      @Nonnull Connection h2Connection)
+  public static void setUpH2TableWithAvro(List<File> avroFiles, String tableName, Connection h2Connection)
       throws Exception {
     int numFields;
 
@@ -192,7 +195,7 @@ public class ClusterIntegrationTestUtils {
    * @param avroFieldType Avro field type
    * @return Whether the given Avro field type is a single value type (non-NULL)
    */
-  private static boolean isSingleValueAvroFieldType(@Nonnull Schema.Type avroFieldType) {
+  private static boolean isSingleValueAvroFieldType(Schema.Type avroFieldType) {
     return (avroFieldType == Schema.Type.BOOLEAN) || (avroFieldType == Schema.Type.INT) || (avroFieldType
         == Schema.Type.LONG) || (avroFieldType == Schema.Type.FLOAT) || (avroFieldType == Schema.Type.DOUBLE) || (
         avroFieldType == Schema.Type.STRING);
@@ -206,9 +209,7 @@ public class ClusterIntegrationTestUtils {
    * @param nullable Whether the column is nullable
    * @return H2 field name and type
    */
-  @Nonnull
-  private static String buildH2FieldNameAndType(@Nonnull String fieldName, @Nonnull Schema.Type avroFieldType,
-      boolean nullable) {
+  private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable) {
     String avroFieldTypeName = avroFieldType.getName();
     String h2FieldType;
     switch (avroFieldTypeName) {
@@ -230,82 +231,68 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
-   * Builds segments from the given Avro files. Each segment will be built using a separate thread.
+   * Builds Pinot segments from the given Avro files. Each segment will be built using a separate thread.
    *
    * @param avroFiles List of Avro files
+   * @param tableConfig Pinot table config
+   * @param schema Pinot schema
    * @param baseSegmentIndex Base segment index number
    * @param segmentDir Output directory for the un-tarred segments
    * @param tarDir Output directory for the tarred segments
-   * @param tableName Table name
-   * @param createStarTreeIndex Whether to create Star-tree index
-   * @param starTreeV2BuilderConfigs List of star-tree V2 builder configs
-   * @param rawIndexColumns Columns to create raw index with
-   * @param pinotSchema Pinot schema
-   * @param executor Executor
    */
-  public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
-      String tableName, boolean createStarTreeIndex, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
-      @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.spi.data.Schema pinotSchema,
-      Executor executor) {
-    int numSegments = avroFiles.size();
-    for (int i = 0; i < numSegments; i++) {
-      final File avroFile = avroFiles.get(i);
-      final int segmentIndex = i + baseSegmentIndex;
-      executor.execute(() -> {
-        try {
-          File outputDir = new File(segmentDir, "segment-" + segmentIndex);
-          SegmentGeneratorConfig segmentGeneratorConfig =
-              SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
-
-          // Test segment with space and special character in the file name
-          segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
-
-          // Cannot build star-tree V1 and V2 at same time
-          if (starTreeV2BuilderConfigs != null) {
-            segmentGeneratorConfig.setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
-          } else {
-            if (createStarTreeIndex) {
-              segmentGeneratorConfig.enableStarTreeIndex(null);
-            }
-          }
-
-          if (rawIndexColumns != null) {
-            segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexColumns);
-          }
-
-          // Build the segment
-          SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-          driver.init(segmentGeneratorConfig);
-          driver.build();
-
-          // Tar the segment
-          File[] files = outputDir.listFiles();
-          Assert.assertNotNull(files);
-          File segmentFile = files[0];
-          String segmentName = segmentFile.getName();
-          TarGzCompressionUtils
-              .createTarGzOfDirectory(segmentFile.getAbsolutePath(), new File(tarDir, segmentName).getAbsolutePath());
-        } catch (Exception e) {
-          // Ignored
-        }
-      });
+  public static void buildSegmentsFromAvro(List<File> avroFiles, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir)
+      throws Exception {
+    int numAvroFiles = avroFiles.size();
+    if (numAvroFiles == 1) {
+      buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
+    } else {
+      ExecutorService executorService = Executors.newFixedThreadPool(numAvroFiles);
+      List<Future<Void>> futures = new ArrayList<>(numAvroFiles);
+      for (int i = 0; i < numAvroFiles; i++) {
+        File avroFile = avroFiles.get(i);
+        int segmentIndex = i + baseSegmentIndex;
+        futures.add(executorService.submit(() -> {
+          buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex, segmentDir, tarDir);
+          return null;
+        }));
+      }
+      executorService.shutdown();
+      for (Future<Void> future : futures) {
+        future.get();
+      }
     }
   }
 
   /**
-   * Builds segments from the given Avro files. Each segment will be built using a separate thread.
+   * Builds one Pinot segment from the given Avro file.
    *
-   * @param avroFiles List of Avro files
-   * @param baseSegmentIndex Base segment index number
+   * @param avroFile Avro file
+   * @param tableConfig Pinot table config
+   * @param schema Pinot schema
+   * @param segmentIndex Segment index number
    * @param segmentDir Output directory for the un-tarred segments
    * @param tarDir Output directory for the tarred segments
-   * @param tableName Table name
-   * @param executor Executor
    */
-  public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
-      String tableName, Executor executor) {
-    buildSegmentsFromAvro(avroFiles, baseSegmentIndex, segmentDir, tarDir, tableName, false, null, null, null,
-        executor);
+  public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
+      throws Exception {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
+    segmentGeneratorConfig.setOutDir(segmentDir.getPath());
+    segmentGeneratorConfig.setTableName(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
+    // Test segment with space and special character in the file name
+    segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
+
+    // Build the segment
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig);
+    driver.build();
+
+    // Tar the segment
+    String segmentName = driver.getSegmentName();
+    File indexDir = new File(segmentDir, driver.getSegmentName());
+    TarGzCompressionUtils.createTarGzOfDirectory(indexDir.getPath(), new File(tarDir, segmentName).getPath());
   }
 
   /**
@@ -319,9 +306,8 @@ public class ClusterIntegrationTestUtils {
    * @param partitionColumn Optional partition column
    * @throws Exception
    */
-  public static void pushAvroIntoKafka(@Nonnull List<File> avroFiles, @Nonnull String kafkaBroker,
-      @Nonnull String kafkaTopic, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
-      @Nullable String partitionColumn)
+  public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
+      int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn)
       throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
@@ -368,8 +354,8 @@ public class ClusterIntegrationTestUtils {
    * @throws Exception
    */
   @SuppressWarnings("unused")
-  public static void pushRandomAvroIntoKafka(@Nonnull File avroFile, @Nonnull String kafkaBroker,
-      @Nonnull String kafkaTopic, int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
+  public static void pushRandomAvroIntoKafka(File avroFile, String kafkaBroker, String kafkaTopic,
+      int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
       @Nullable String partitionColumn)
       throws Exception {
     Properties properties = new Properties();
@@ -448,8 +434,7 @@ public class ClusterIntegrationTestUtils {
    * @param fieldType Field type
    * @return Random value for the given field type
    */
-  @Nonnull
-  private static Object generateRandomValue(@Nonnull Schema.Type fieldType) {
+  private static Object generateRandomValue(Schema.Type fieldType) {
     switch (fieldType) {
       case BOOLEAN:
         return RANDOM.nextBoolean();
@@ -484,8 +469,8 @@ public class ClusterIntegrationTestUtils {
    * @param h2Connection H2 connection
    * @throws Exception
    */
-  public static void testQuery(@Nonnull String pinotQuery, @Nonnull String queryFormat, @Nonnull String brokerUrl,
-      @Nonnull org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
+  public static void testQuery(String pinotQuery, String queryFormat, String brokerUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
     // Use broker response for metadata check, connection response for value check
@@ -831,6 +816,172 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
+   * Run equivalent Pinot SQL and H2 query and compare the results.
+   *
+   * @param pinotQuery Pinot sql query
+   * @param brokerUrl Pinot broker URL
+   * @param pinotConnection Pinot connection
+   * @param sqlQueries H2 SQL query
+   * @param h2Connection H2 connection
+   * @throws Exception
+   */
+  static void testSqlQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+      @Nullable List<String> sqlQueries, @Nullable Connection h2Connection)
+      throws Exception {
+    if (pinotQuery == null || sqlQueries == null) {
+      return;
+    }
+
+    // broker response
+    JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl);
+    if (pinotResponse.get("exceptions").size() > 0) {
+      throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
+    }
+    JsonNode brokerResponseRows = pinotResponse.get("resultTable").get("rows");
+    long pinotNumRecordsSelected = pinotResponse.get("numDocsScanned").asLong();
+
+    // connection response
+    Request pinotClientRequest = new Request("sql", pinotQuery);
+    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
+    org.apache.pinot.client.ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
+    int numRows = resultTableResultSet.getRowCount();
+    int numColumns = resultTableResultSet.getColumnCount();
+
+    // h2 response
+    String sqlQuery = sqlQueries.get(0);
+    Assert.assertNotNull(h2Connection);
+    Statement h2statement = h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+    h2statement.execute(sqlQuery);
+    ResultSet h2ResultSet = h2statement.getResultSet();
+
+    // compare results
+    BrokerRequest brokerRequest =
+        PinotQueryParserFactory.get(CommonConstants.Broker.Request.SQL).compileToBrokerRequest(pinotQuery);
+    if (brokerRequest.getSelections() != null) { // selection
+      // TODO: compare results for selection queries, w/o order by
+
+      // Compare results for selection queries, with order by
+      if (brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
+        // don't compare query with multi-value column.
+        if (sqlQuery.contains("_MV")) {
+          return;
+        }
+        Set<String> orderByColumns =
+            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList());
+        Set<String> selectionColumns =
+            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getSelectList());
+        if (!selectionColumns.containsAll(orderByColumns)) {
+          // Selection columns has no overlap with order by column, don't compare.
+          return;
+        }
+        if (h2ResultSet.first()) {
+          for (int i = 0; i < brokerResponseRows.size(); i++) {
+            for (int c = 0; c < numColumns; c++) {
+              String h2Value = h2ResultSet.getString(c + 1);
+              String brokerValue = brokerResponseRows.get(i).get(c).asText();
+              String connectionValue = resultTableResultSet.getString(i, c);
+              if (orderByColumns.containsAll(CalciteSqlParser
+                  .extractIdentifiers(Arrays.asList(brokerRequest.getPinotQuery().getSelectList().get(c))))) {
+                boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
+                if (error) {
+                  String failureMessage =
+                      "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
+                          + ", got client value:" + connectionValue;
+                  failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+                }
+              }
+            }
+            if (!h2ResultSet.next()) {
+              return;
+            }
+          }
+        }
+      }
+    } else { // aggregation
+      if (!brokerRequest.isSetGroupBy()) { // aggregation only
+        // compare the single row
+        h2ResultSet.first();
+        for (int c = 0; c < numColumns; c++) {
+
+          String h2Value = h2ResultSet.getString(c + 1);
+
+          // If H2 value is null, it means no record selected in H2
+          if (h2Value == null) {
+            if (pinotNumRecordsSelected != 0) {
+              String failureMessage =
+                  "No record selected in H2 but " + pinotNumRecordsSelected + " records selected in Pinot";
+              failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+            }
+
+            // Skip further comparison
+            return;
+          }
+
+          String brokerValue = brokerResponseRows.get(0).get(c).asText();
+          String connectionValue = resultTableResultSet.getString(0, c);
+
+          // Fuzzy compare expected value and actual value
+          boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
+          if (error) {
+            String failureMessage =
+                "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
+                    + ", got client value:" + connectionValue;
+            failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+          }
+        }
+      } else { // aggregation group by
+        // TODO: compare results for aggregation group by queries w/o order by
+
+        // Compare results for aggregation group by queries with order by
+        if (brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
+          // don't compare query with multi-value column.
+          if (sqlQuery.contains("_MV")) {
+            return;
+          }
+          if (h2ResultSet.first()) {
+            for (int i = 0; i < brokerResponseRows.size(); i++) {
+              for (int c = 0; c < numColumns; c++) {
+                String h2Value = h2ResultSet.getString(c + 1);
+                String brokerValue = brokerResponseRows.get(i).get(c).asText();
+                String connectionValue = resultTableResultSet.getString(i, c);
+                boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
+                if (error) {
+                  String failureMessage =
+                      "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
+                          + ", got client value:" + connectionValue;
+                  failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+                }
+              }
+              if (!h2ResultSet.next()) {
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
+    // Fuzzy compare expected value and actual value
+    boolean error = false;
+    if (NumberUtils.isParsable(h2Value)) {
+      double expectedValue = Double.parseDouble(h2Value);
+      double actualValueBroker = Double.parseDouble(brokerValue);
+      double actualValueConnection = Double.parseDouble(connectionValue);
+      if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, 1.0) || !DoubleMath
+          .fuzzyEquals(actualValueConnection, expectedValue, 1.0)) {
+        error = true;
+      }
+    } else {
+      if (!h2Value.equals(brokerValue) || !h2Value.equals(connectionValue)) {
+        error = true;
+      }
+    }
+    return error;
+  }
+
+  /**
    * Helper method to report failures.
    *
    * @param pqlQuery Pinot PQL query
@@ -838,8 +989,8 @@ public class ClusterIntegrationTestUtils {
    * @param failureMessage Failure message
    * @param e Exception
    */
-  private static void failure(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries,
-      @Nonnull String failureMessage, @Nullable Exception e) {
+  private static void failure(String pqlQuery, @Nullable List<String> sqlQueries, String failureMessage,
+      @Nullable Exception e) {
     failureMessage += "\nPQL: " + pqlQuery;
     if (sqlQueries != null) {
       failureMessage += "\nSQL: " + sqlQueries;
@@ -858,8 +1009,7 @@ public class ClusterIntegrationTestUtils {
    * @param sqlQueries H2 SQL queries
    * @param failureMessage Failure message
    */
-  private static void failure(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries,
-      @Nonnull String failureMessage) {
+  private static void failure(String pqlQuery, @Nullable List<String> sqlQueries, String failureMessage) {
     failure(pqlQuery, sqlQueries, failureMessage, null);
   }
 
@@ -872,8 +1022,7 @@ public class ClusterIntegrationTestUtils {
    * @param value raw value.
    * @return converted value.
    */
-  @Nonnull
-  private static String convertBooleanToLowerCase(@Nonnull String value) {
+  private static String convertBooleanToLowerCase(String value) {
     if (value.equals("TRUE")) {
       return "true";
     }

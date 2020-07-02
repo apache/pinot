@@ -18,23 +18,22 @@
  */
 package org.apache.pinot.core.indexsegment.mutable;
 
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.readers.JSONRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
-import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
-import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class MutableSegmentImplNullValueVectorTest {
@@ -47,17 +46,18 @@ public class MutableSegmentImplNullValueVectorTest {
 
   @BeforeClass
   public void setup()
-      throws IOException {
+      throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(PINOT_SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_schema);
-    File avroFile = new File(dataResourceUrl.getFile());
+    File jsonFile = new File(dataResourceUrl.getFile());
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false, true);
     GenericRow reuse = new GenericRow();
-    try (RecordReader recordReader = new JSONRecordReader(avroFile, _schema)) {
+    try (RecordReader recordReader = RecordReaderFactory
+        .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {
       while (recordReader.hasNext()) {
         recordReader.next(reuse);
         GenericRow transformedRow = _recordTransformer.transform(reuse);
@@ -71,8 +71,8 @@ public class MutableSegmentImplNullValueVectorTest {
   @Test
   public void testNullValueVector()
       throws Exception {
-    ColumnDataSource cityIdDataSource = _mutableSegmentImpl.getDataSource("cityid");
-    ColumnDataSource descriptionDataSource = _mutableSegmentImpl.getDataSource("description");
+    DataSource cityIdDataSource = _mutableSegmentImpl.getDataSource("cityid");
+    DataSource descriptionDataSource = _mutableSegmentImpl.getDataSource("description");
     NullValueVectorReader cityIdNullValueVector = cityIdDataSource.getNullValueVector();
     NullValueVectorReader descNullValueVector = descriptionDataSource.getNullValueVector();
     Assert.assertFalse(cityIdNullValueVector.isNull(1));

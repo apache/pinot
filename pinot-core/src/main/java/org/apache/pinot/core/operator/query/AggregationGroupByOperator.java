@@ -18,79 +18,68 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 
 
 /**
- * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
+ * The <code>AggregationGroupByOperator</code> class provides the operator for aggregation group-by query on a single
+ * segment.
  */
 public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOperator";
 
-  private final AggregationFunctionContext[] _functionContexts;
-  private final GroupBy _groupBy;
+  private final AggregationFunction[] _aggregationFunctions;
+  private final TransformExpressionTree[] _groupByExpressions;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
-  private final long _numTotalRawDocs;
+  private final long _numTotalDocs;
   private final boolean _useStarTree;
 
-  private ExecutionStatistics _executionStatistics;
+  private int _numDocsScanned = 0;
 
-  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator,
-      long numTotalRawDocs, boolean useStarTree) {
-    _functionContexts = functionContexts;
-    _groupBy = groupBy;
+  public AggregationGroupByOperator(AggregationFunction[] aggregationFunctions,
+      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      TransformOperator transformOperator, long numTotalDocs, boolean useStarTree) {
+    _aggregationFunctions = aggregationFunctions;
+    _groupByExpressions = groupByExpressions;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
-    _numTotalRawDocs = numTotalRawDocs;
+    _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numDocsScanned = 0;
-
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
       groupByExecutor =
-          new StarTreeGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity, _numGroupsLimit,
-              _transformOperator);
+          new StarTreeGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
+              _numGroupsLimit, _transformOperator);
     } else {
       groupByExecutor =
-          new DefaultGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity, _numGroupsLimit,
-              _transformOperator);
+          new DefaultGroupByExecutor(_aggregationFunctions, _groupByExpressions, _maxInitialResultHolderCapacity,
+              _numGroupsLimit, _transformOperator);
     }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      numDocsScanned += transformBlock.getNumDocs();
+      _numDocsScanned += transformBlock.getNumDocs();
       groupByExecutor.process(transformBlock);
     }
-    AggregationGroupByResult groupByResult = groupByExecutor.getResult();
-
-    // Gather execution statistics
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
-    _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            _numTotalRawDocs);
 
     // Build intermediate result block based on aggregation group-by result from the executor
-    return new IntermediateResultsBlock(_functionContexts, groupByResult);
+    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult());
   }
 
   @Override
@@ -100,6 +89,9 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _executionStatistics;
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+        _numTotalDocs);
   }
 }

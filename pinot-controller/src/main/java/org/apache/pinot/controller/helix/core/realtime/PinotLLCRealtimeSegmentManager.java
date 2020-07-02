@@ -41,12 +41,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
-import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -60,7 +55,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -72,14 +66,21 @@ import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegment
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdateManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
-import org.apache.pinot.core.realtime.stream.OffsetCriteria;
-import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
-import org.apache.pinot.core.realtime.stream.PartitionOffsetFetcher;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.PartitionOffsetFetcher;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -206,7 +207,8 @@ public class PinotLLCRealtimeSegmentManager {
 
     _flushThresholdUpdateManager.clearFlushThresholdUpdater(realtimeTableName);
 
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig);
+    PartitionLevelStreamConfig streamConfig =
+        new PartitionLevelStreamConfig(tableConfig.getTableName(), tableConfig.getIndexingConfig().getStreamConfigs());
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     int numPartitions = getNumPartitions(streamConfig);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
@@ -432,9 +434,10 @@ public class PinotLLCRealtimeSegmentManager {
     long newSegmentCreationTimeMs = getCurrentTimeMs();
     LLCSegmentName newLLCSegmentName =
         getNextLLCSegmentName(new LLCSegmentName(committingSegmentName), newSegmentCreationTimeMs);
-    createNewSegmentZKMetadata(tableConfig, new PartitionLevelStreamConfig(tableConfig), newLLCSegmentName,
-        newSegmentCreationTimeMs, committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions,
-        numPartitions, numReplicas);
+    createNewSegmentZKMetadata(tableConfig,
+        new PartitionLevelStreamConfig(tableConfig.getTableName(), tableConfig.getIndexingConfig().getStreamConfigs()),
+        newLLCSegmentName, newSegmentCreationTimeMs, committingSegmentDescriptor, committingSegmentZKMetadata,
+        instancePartitions, numPartitions, numReplicas);
 
     // Step-3
     SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
@@ -478,7 +481,7 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(segmentMetadata != null, "Failed to find segment metadata from descriptor for segment: %s",
         segmentName);
 
-    committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
+    committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset().getOffset());
     committingSegmentZKMetadata.setStatus(Status.DONE);
     committingSegmentZKMetadata.setDownloadUrl(URIUtils
         .constructDownloadUrl(_controllerConf.generateVipUrl(), TableNameBuilder.extractRawTableName(realtimeTableName),
@@ -488,7 +491,7 @@ public class PinotLLCRealtimeSegmentManager {
     committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
     committingSegmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
     committingSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
-    committingSegmentZKMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
+    committingSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
 
     persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
     return committingSegmentZKMetadata;
@@ -503,7 +506,7 @@ public class PinotLLCRealtimeSegmentManager {
       int numPartitions, int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
-    long startOffset = committingSegmentDescriptor.getNextOffset();
+    long startOffset = committingSegmentDescriptor.getNextOffset().getOffset();
     LOGGER
         .info("Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
             segmentName, startOffset, creationTimeMs);
@@ -866,7 +869,8 @@ public class PinotLLCRealtimeSegmentManager {
             LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
             String newSegmentName = newLLCSegmentName.getSegmentName();
             CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(latestSegmentName, latestSegmentZKMetadata.getEndOffset(), 0);
+                new CommittingSegmentDescriptor(latestSegmentName,
+                    new StreamPartitionMsgOffset(latestSegmentZKMetadata.getEndOffset()), 0);
             createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
                 committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
             updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, newSegmentName,
@@ -896,7 +900,7 @@ public class PinotLLCRealtimeSegmentManager {
             }
 
             CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(latestSegmentName, startOffset, 0);
+                new CommittingSegmentDescriptor(latestSegmentName, new StreamPartitionMsgOffset(startOffset), 0);
             createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
                 committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
             String newSegmentName = newLLCSegmentName.getSegmentName();
@@ -981,7 +985,8 @@ public class PinotLLCRealtimeSegmentManager {
         new LLCSegmentName(rawTableName, partitionId, STARTING_SEQUENCE_NUMBER, creationTimeMs);
     String newSegmentName = newLLCSegmentName.getSegmentName();
     long startOffset = getPartitionOffset(streamConfig, streamConfig.getOffsetCriteria(), partitionId);
-    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null,
+        new StreamPartitionMsgOffset(startOffset), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
         committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas);
 

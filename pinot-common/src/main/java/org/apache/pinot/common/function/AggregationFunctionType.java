@@ -30,9 +30,11 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTHLL("distinctCountHLL"),
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),
   FASTHLL("fastHLL"),
+  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch"),
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),
   PERCENTILETDIGEST("percentileTDigest"),
+
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV"),
   MINMV("minMV"),
@@ -74,17 +76,17 @@ public enum AggregationFunctionType {
     String upperCaseFunctionName = functionName.toUpperCase();
     if (upperCaseFunctionName.startsWith("PERCENTILE")) {
       String remainingFunctionName = upperCaseFunctionName.substring(10);
-      if (remainingFunctionName.matches("\\d+")) {
+      if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
         return PERCENTILE;
-      } else if (remainingFunctionName.matches("EST\\d+")) {
+      } else if (remainingFunctionName.equals("EST") || remainingFunctionName.matches("EST\\d+")) {
         return PERCENTILEEST;
-      } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
+      } else if (remainingFunctionName.equals("TDIGEST") || remainingFunctionName.matches("TDIGEST\\d+")) {
         return PERCENTILETDIGEST;
-      } else if (remainingFunctionName.matches("\\d+MV")) {
+      } else if (remainingFunctionName.equals("MV") || remainingFunctionName.matches("\\d+MV")) {
         return PERCENTILEMV;
-      } else if (remainingFunctionName.matches("EST\\d+MV")) {
+      } else if (remainingFunctionName.equals("ESTMV") || remainingFunctionName.matches("EST\\d+MV")) {
         return PERCENTILEESTMV;
-      } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
+      } else if (remainingFunctionName.equals("TDIGESTMV") || remainingFunctionName.matches("TDIGEST\\d+MV")) {
         return PERCENTILETDIGESTMV;
       } else {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);

@@ -5,13 +5,15 @@
     checked=record.isSelected}}
 {{/if}}
 
-<div class="rootcause-dimensions-table__dimension-content {{if column.isFirstColumn "rootcause-dimensions-table__dimension-content--first"}}" title="{{dimensionValue}}">
+<div class="rootcause-dimensions-table__dimension-content
+  {{if column.isFirstColumn "rootcause-dimensions-table__dimension-content--first"}}
+  {{if excludedDimensions "other"}}" title="{{dimensionValue}}">
   {{#if isValueShown}}
     {{#if excludedDimensions}}
-      <a class="te-anomaly-table__link" href="#">
+      <a class="te-anomaly-table__link">
         {{dimensionValue}}
         {{#tooltip-on-element}}
-          ALL EXCEPT => {{excludedDimensions}}
+          OTHER includes => {{excludedDimensions}}
         {{/tooltip-on-element}}
       </a>
     {{else}}

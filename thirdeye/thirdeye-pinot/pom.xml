@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.apache.pinot.thirdeye</groupId>
     <artifactId>thirdeye</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>${revision}${sha1}</version>
   </parent>
   <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye-pinot</artifactId>
@@ -154,6 +154,11 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-proxy</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-util</artifactId>
       <version>${jetty.version}</version>
     </dependency>
     <dependency>

@@ -29,6 +29,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.AggregationResult;
@@ -54,6 +56,7 @@ import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDig
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -207,13 +210,15 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         .addMetric(DISTINCT_COUNT_HLL_COLUMN, DataType.BYTES).addMetric(MIN_MAX_RANGE_COLUMN, DataType.BYTES)
         .addMetric(PERCENTILE_EST_COLUMN, DataType.BYTES).addMetric(PERCENTILE_TDIGEST_COLUMN, DataType.BYTES).build();
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(RAW_TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(rows, schema)) {
+    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
@@ -284,7 +289,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentAggregation()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getAggregationQuery());
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getAggregationQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);
     assertEquals(aggregationResults.size(), 5);
@@ -450,7 +455,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentSVGroupBy()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getSVGroupByQuery());
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getSVGroupByQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);
     assertEquals(aggregationResults.size(), 5);
@@ -655,7 +660,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentMVGroupBy()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getMVGroupByQuery());
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getMVGroupByQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);
     assertEquals(aggregationResults.size(), 5);

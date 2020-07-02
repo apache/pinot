@@ -20,13 +20,14 @@ package org.apache.pinot.core.query.reduce;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -39,34 +40,38 @@ import org.apache.pinot.core.util.QueryOptions;
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
 public class AggregationDataTableReducer implements DataTableReducer {
-
   private final AggregationFunction[] _aggregationFunctions;
   private final boolean _preserveType;
+  private final boolean _responseFormatSql;
 
   AggregationDataTableReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
       QueryOptions queryOptions) {
     _aggregationFunctions = aggregationFunctions;
     _preserveType = queryOptions.isPreserveType();
+    _responseFormatSql = queryOptions.isResponseFormatSQL();
   }
 
   /**
-   * Reduces data tables and sets aggregations results into BrokerResponseNative::AggregationResults
+   * Reduces data tables and sets aggregations results into
+   * 1. ResultTable if _responseFormatSql is true
+   * 2. AggregationResults by default
    */
   @Override
-  public void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
-      BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
+  public void reduceAndSetResults(String tableName, DataSchema dataSchema,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
+      if (_responseFormatSql) {
+        DataSchema finalDataSchema = getResultTableDataSchema();
+        brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, Collections.emptyList()));
+      }
       return;
     }
 
-    assert dataSchema != null;
-
+    // Merge results from all data tables
     int numAggregationFunctions = _aggregationFunctions.length;
-    Collection<DataTable> dataTables = dataTableMap.values();
-
-    // Merge results from all data tables.
     Object[] intermediateResults = new Object[numAggregationFunctions];
-    for (DataTable dataTable : dataTables) {
+    for (DataTable dataTable : dataTableMap.values()) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediateResultToMerge;
         DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
@@ -92,7 +97,35 @@ public class AggregationDataTableReducer implements DataTableReducer {
       }
     }
 
-    // Extract final results and set them into the broker response.
+    if (_responseFormatSql) {
+      brokerResponseNative.setResultTable(reduceToResultTable(intermediateResults));
+    } else {
+      brokerResponseNative.setAggregationResults(reduceToAggregationResult(intermediateResults, dataSchema));
+    }
+  }
+
+  /**
+   * Sets aggregation results into ResultsTable
+   */
+  private ResultTable reduceToResultTable(Object[] intermediateResults) {
+    List<Object[]> rows = new ArrayList<>(1);
+    int numAggregationFunctions = _aggregationFunctions.length;
+    Object[] row = new Object[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      row[i] = _aggregationFunctions[i].extractFinalResult(intermediateResults[i]);
+    }
+    rows.add(row);
+
+    DataSchema finalDataSchema = getResultTableDataSchema();
+    return new ResultTable(finalDataSchema, rows);
+  }
+
+  /**
+   * Sets aggregation results into AggregationResults
+   */
+  private List<AggregationResult> reduceToAggregationResult(Object[] intermediateResults, DataSchema dataSchema) {
+    // Extract final results and set them into the broker response
+    int numAggregationFunctions = _aggregationFunctions.length;
     List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregationFunctions);
     for (int i = 0; i < numAggregationFunctions; i++) {
       Serializable resultValue = AggregationFunctionUtils
@@ -104,6 +137,21 @@ public class AggregationDataTableReducer implements DataTableReducer {
       }
       reducedAggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), resultValue));
     }
-    brokerResponseNative.setAggregationResults(reducedAggregationResults);
+    return reducedAggregationResults;
+  }
+
+  /**
+   * Constructs the data schema for the final results table
+   */
+  private DataSchema getResultTableDataSchema() {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    String[] finalColumnNames = new String[numAggregationFunctions];
+    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      finalColumnNames[i] = aggregationFunction.getResultColumnName();
+      finalColumnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
+    }
+    return new DataSchema(finalColumnNames, finalColumnDataTypes);
   }
 }

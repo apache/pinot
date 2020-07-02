@@ -171,6 +171,21 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     return genericPojoDao.getIdsByPredicate(predicate, beanClass);
   }
 
+  @Override
+  public List<E> list(long limit, long offset) {
+    return convertBeanListToDTOList(genericPojoDao.list(beanClass, limit, offset));
+  }
+
+  @Override
+  public List<E> findByPredicateJsonVal(Predicate predicate) {
+    return convertBeanListToDTOList(genericPojoDao.getByPredicateJsonVal(predicate, beanClass));
+  }
+
+  @Override
+  public long count() {
+    return genericPojoDao.count(beanClass);
+  }
+
   protected List<E> convertBeanListToDTOList(List<? extends AbstractBean> beans) {
     List<E> result = new ArrayList<>();
     for (AbstractBean bean : beans) {

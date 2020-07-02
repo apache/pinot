@@ -37,10 +37,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.config.Instance;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,7 +98,7 @@ public class PinotInstanceRestletResource {
     response.put("enabled", instanceConfig.getInstanceEnabled());
     response.put("port", instanceConfig.getPort());
     response.set("tags", JsonUtils.objectToJsonNode(instanceConfig.getTags()));
-    response.set("pools", JsonUtils.objectToJsonNode(instanceConfig.getRecord().getMapField(Instance.POOL_KEY)));
+    response.set("pools", JsonUtils.objectToJsonNode(instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY)));
     return response.toString();
   }
 
@@ -108,7 +109,7 @@ public class PinotInstanceRestletResource {
   @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON, notes = "Creates a new instance with given instance config")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 409, message = "Instance already exists"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse addInstance(Instance instance) {
-    LOGGER.info("Instance creation request received for instance: {}", instance.getInstanceId());
+    LOGGER.info("Instance creation request received for instance: {}", InstanceUtils.getHelixInstanceId(instance));
     if (!pinotHelixResourceManager.addInstance(instance).isSuccessful()) {
       throw new ControllerApplicationException(LOGGER, "Instance already exists", Response.Status.CONFLICT);
     }

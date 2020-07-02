@@ -24,78 +24,77 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
-import org.apache.pinot.core.realtime.stream.StreamDataProvider;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
+import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class HybridQuickstart {
-  private File _offlineQuickStartDataDir;
-  private File _realtimeQuickStartDataDir;
   private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private File _schemaFile;
+  private File _realtimeTableConfigFile;
   private File _dataFile;
-
-  private HybridQuickstart() {
-  }
+  private File _ingestionJobSpecFile;
 
   public static void main(String[] args)
       throws Exception {
+    // TODO: Explicitly call below method to load dependencies from pinot-plugins libs which are excluded from pinot-tools packaging.
+    // E.g. Kafka related libs are coming from pinot-kafka-* lib, avro libs are coming from pinot-avro lib.
+    PluginManager.get().init();
     new HybridQuickstart().execute();
   }
 
-  private QuickstartTableRequest prepareOfflineTableRequest()
+  private QuickstartTableRequest prepareOfflineTableRequest(File configDir)
       throws IOException {
-    _offlineQuickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
 
-    if (!_offlineQuickStartDataDir.exists()) {
-      Preconditions.checkState(_offlineQuickStartDataDir.mkdirs());
-    }
-
-    _schemaFile = new File(_offlineQuickStartDataDir, "airlineStats_schema.json");
-    _dataFile = new File(_offlineQuickStartDataDir, "airlineStats_data.avro");
-    File tableConfigFile = new File(_offlineQuickStartDataDir, "airlineStats_offline_table_config.json");
+    _schemaFile = new File(configDir, "airlineStats_schema.json");
+    _ingestionJobSpecFile = new File(configDir, "ingestionJobSpec.yaml");
+    File tableConfigFile = new File(configDir, "airlineStats_offline_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("sample_data/airlineStats_schema.json");
+    URL resource = classLoader.getResource("examples/batch/airlineStats/airlineStats_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, _schemaFile);
-    resource = classLoader.getResource("sample_data/airlineStats_data.avro");
+    resource = classLoader.getResource("examples/batch/airlineStats/ingestionJobSpec.yaml");
     Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, _dataFile);
-    resource = classLoader.getResource("sample_data/airlineStats_offline_table_config.json");
+    FileUtils.copyURLToFile(resource, _ingestionJobSpecFile);
+    resource = classLoader.getResource("examples/batch/airlineStats/airlineStats_offline_table_config.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    return new QuickstartTableRequest("airlineStats", _schemaFile, tableConfigFile, _offlineQuickStartDataDir,
+    return new QuickstartTableRequest("airlineStats", _schemaFile, tableConfigFile, _ingestionJobSpecFile,
         FileFormat.AVRO);
   }
 
-  private QuickstartTableRequest prepareRealtimeTableRequest()
+  private QuickstartTableRequest prepareRealtimeTableRequest(File configDir)
       throws IOException {
-    _realtimeQuickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
 
-    if (!_realtimeQuickStartDataDir.exists()) {
-      Preconditions.checkState(_realtimeQuickStartDataDir.mkdirs());
-    }
-
-    File tableConfigFile = new File(_realtimeQuickStartDataDir, "airlineStats_realtime_table_config.json");
+    _dataFile = new File(configDir, "airlineStats_data.avro");
+    _realtimeTableConfigFile = new File(configDir, "airlineStats_realtime_table_config.json");
 
     URL resource = Quickstart.class.getClassLoader().getResource(
-        "sample_data/airlineStats_realtime_table_config.json");
+        "examples/stream/airlineStats/airlineStats_realtime_table_config.json");
     Preconditions.checkNotNull(resource);
-    FileUtils.copyURLToFile(resource, tableConfigFile);
+    FileUtils.copyURLToFile(resource, _realtimeTableConfigFile);
+    resource = Quickstart.class.getClassLoader().getResource(
+        "examples/stream/airlineStats/sample_data/airlineStats_data.avro");
+    Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, _dataFile);
 
-    return new QuickstartTableRequest("airlineStats", _schemaFile, tableConfigFile);
+    return new QuickstartTableRequest("airlineStats", _schemaFile, _realtimeTableConfigFile);
   }
 
   private void startKafka() {
@@ -106,37 +105,34 @@ public class HybridQuickstart {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
     _kafkaStarter.start();
-    _kafkaStarter.createTopic("airlineStatsEvents", KafkaStarterUtils.getTopicCreationProps(10));
+    _kafkaStarter.createTopic("flights-realtime", KafkaStarterUtils.getTopicCreationProps(10));
   }
 
   public void execute()
       throws Exception {
-    QuickstartTableRequest offlineRequest = prepareOfflineTableRequest();
-    QuickstartTableRequest realtimeTableRequest = prepareRealtimeTableRequest();
 
-    File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
-    Preconditions.checkState(tempDir.mkdirs());
+    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
+    File configDir = new File(quickstartTmpDir, "configs");
+    File dataDir = new File(quickstartTmpDir, "data");
+    Preconditions.checkState(configDir.mkdirs());
+    Preconditions.checkState(dataDir.mkdirs());
+    QuickstartTableRequest offlineRequest = prepareOfflineTableRequest(configDir);
+    QuickstartTableRequest realtimeTableRequest = prepareRealtimeTableRequest(configDir);
     final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 2, 2, 1, tempDir, false);
+        new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 1, 1, 1, dataDir);
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
-    printStatus(Color.YELLOW, "***** Starting Zookeeper, 2 servers, 2 brokers and 1 controller *****");
+    printStatus(Color.YELLOW, "***** Starting Zookeeper, 1 servers, 1 brokers and 1 controller *****");
     runner.startAll();
-    printStatus(Color.YELLOW, "***** Creating a server tenant with name 'airline' *****");
-    runner.createServerTenantWith(1, 1, "airline");
-    printStatus(Color.YELLOW, "***** Creating a broker tenant with name 'airline_broker' *****");
-    runner.createBrokerTenantWith(2, "airline_broker");
-    printStatus(Color.YELLOW, "***** Adding airlineStats schema *****");
-    runner.addSchema();
     printStatus(Color.YELLOW, "***** Adding airlineStats offline and realtime table *****");
     runner.addTable();
-    printStatus(Color.YELLOW, "***** Building index segment for airlineStats *****");
-    runner.buildSegment();
-    printStatus(Color.YELLOW, "***** Pushing segment to the controller *****");
-    runner.pushSegment();
+    printStatus(Color.YELLOW, "***** Launch data ingestion job to build index segments for airlineStats and push to controller *****");
+    runner.launchDataIngestionJob();
 
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");
-    final AirlineDataStream stream = new AirlineDataStream(Schema.fromFile(_schemaFile), _dataFile);
+    Schema schema = Schema.fromFile(_schemaFile);
+    TableConfig tableConfig = JsonUtils.fileToObject(_realtimeTableConfigFile, TableConfig.class);
+    final AirlineDataStream stream = new AirlineDataStream(schema, tableConfig, _dataFile);
     stream.run();
 
     printStatus(Color.YELLOW, "***** Pinot Hybrid with hybrid table setup is complete *****");
@@ -151,7 +147,41 @@ public class HybridQuickstart {
     printStatus(Color.YELLOW, "*****    7. Built and pushed an offline segment *****");
     printStatus(Color.YELLOW,
         "*****    8. Started publishing a Kafka stream for the realtime instance to start consuming *****");
-    printStatus(Color.YELLOW, "***** go to http://localhost:9000/query to run a few queries *****");
+    printStatus(Color.YELLOW,
+        "*****    9. Sleep 5 Seconds to wait for all components brought up *****");
+    Thread.sleep(5000);
+
+    String q1 = "select count(*) from airlineStats limit 10";
+    printStatus(Color.YELLOW, "Total number of documents in the table");
+    printStatus(Color.CYAN, "Query : " + q1);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q2 = "select sum(Cancelled) from airlineStats group by AirlineID limit 5";
+    printStatus(Color.YELLOW, "Top 5 airlines in cancellation ");
+    printStatus(Color.CYAN, "Query : " + q2);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q3 = "select sum(Flights) from airlineStats where Year > 2010 group by AirlineID, Year limit 5";
+    printStatus(Color.YELLOW, "Top 5 airlines in number of flights after 2010");
+    printStatus(Color.CYAN, "Query : " + q3);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q4 = "select max(Flights) from airlineStats group by OriginCityName limit 5";
+    printStatus(Color.YELLOW, "Top 5 cities for number of flights");
+    printStatus(Color.CYAN, "Query : " + q4);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    String q5 = "select AirlineID, OriginCityName, DestCityName, Year from airlineStats order by Year limit 5";
+    printStatus(Color.YELLOW, "Print AirlineID, OriginCityName, DestCityName, Year for 5 records ordered by Year");
+    printStatus(Color.CYAN, "Query : " + q5);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    printStatus(Color.GREEN, "You can always go to http://localhost:9000/query to play around in the query console");
 
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
@@ -163,8 +193,7 @@ public class HybridQuickstart {
           runner.stop();
           _kafkaStarter.stop();
           ZkStarter.stopLocalZkServer(_zookeeperInstance);
-          FileUtils.deleteDirectory(_offlineQuickStartDataDir);
-          FileUtils.deleteDirectory(_realtimeQuickStartDataDir);
+          FileUtils.deleteDirectory(quickstartTmpDir);
         } catch (Exception e) {
           e.printStackTrace();
         }

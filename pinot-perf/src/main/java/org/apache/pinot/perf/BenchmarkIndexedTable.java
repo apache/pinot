@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.perf;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -35,14 +33,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -66,14 +65,13 @@ public class BenchmarkIndexedTable {
   private Random _random = new Random();
 
   private DataSchema _dataSchema;
-  private List<AggregationInfo> _aggregationInfos;
+  private AggregationFunction[] _aggregationFunctions;
   private List<SelectionSort> _orderBy;
 
   private List<String> _d1;
   private List<Integer> _d2;
 
   private ExecutorService _executorService;
-
 
   @Setup
   public void setup() {
@@ -93,25 +91,15 @@ public class BenchmarkIndexedTable {
     }
 
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
 
-    AggregationInfo agg1 = new AggregationInfo();
-    Map<String, String> params1 = new HashMap<>();
-    params1.put("column", "m1");
-    agg1.setAggregationParams(params1);
-    agg1.setAggregationType("sum");
-    AggregationInfo agg2 = new AggregationInfo();
-    Map<String, String> params2 = new HashMap<>();
-    params2.put("column", "m2");
-    agg2.setAggregationParams(params2);
-    agg2.setAggregationType("max");
-    _aggregationInfos = Lists.newArrayList(agg1, agg2);
+    _aggregationFunctions =
+        new AggregationFunction[]{new SumAggregationFunction("m1"), new MaxAggregationFunction("m2")};
 
-    SelectionSort orderBy = new SelectionSort();
-    orderBy.setColumn("sum(m1)");
-    orderBy.setIsAsc(true);
-    _orderBy = Lists.newArrayList(orderBy);
+    SelectionSort selectionSort = new SelectionSort();
+    selectionSort.setColumn("sum(m1)");
+    selectionSort.setIsAsc(true);
+    _orderBy = Collections.singletonList(selectionSort);
 
     _executorService = Executors.newFixedThreadPool(10);
   }
@@ -131,13 +119,14 @@ public class BenchmarkIndexedTable {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void concurrentIndexedTable() throws InterruptedException, ExecutionException, TimeoutException {
+  public void concurrentIndexedTable()
+      throws InterruptedException, ExecutionException, TimeoutException {
 
     int numSegments = 10;
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable =
-        new ConcurrentIndexedTable(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
+        new ConcurrentIndexedTable(_dataSchema, _aggregationFunctions, _orderBy, CAPACITY);
 
     // 10 parallel threads putting 10k records into the table
 
@@ -174,11 +163,11 @@ public class BenchmarkIndexedTable {
     }
   }
 
-
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void simpleIndexedTable() throws InterruptedException, TimeoutException, ExecutionException {
+  public void simpleIndexedTable()
+      throws InterruptedException, TimeoutException, ExecutionException {
 
     int numSegments = 10;
 
@@ -188,7 +177,7 @@ public class BenchmarkIndexedTable {
     for (int i = 0; i < numSegments; i++) {
 
       // make 10 indexed tables
-      IndexedTable simpleIndexedTable = new SimpleIndexedTable(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
+      IndexedTable simpleIndexedTable = new SimpleIndexedTable(_dataSchema, _aggregationFunctions, _orderBy, CAPACITY);
       simpleIndexedTables.add(simpleIndexedTable);
 
       // put 10k records in each indexed table, in parallel
@@ -219,13 +208,11 @@ public class BenchmarkIndexedTable {
     mergedTable.finish(false);
   }
 
-  public static void main(String[] args) throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkIndexedTable.class.getSimpleName())
-        .warmupTime(TimeValue.seconds(10))
-        .warmupIterations(1)
-        .measurementTime(TimeValue.seconds(30))
-        .measurementIterations(3)
-        .forks(1);
+  public static void main(String[] args)
+      throws Exception {
+    ChainedOptionsBuilder opt =
+        new OptionsBuilder().include(BenchmarkIndexedTable.class.getSimpleName()).warmupTime(TimeValue.seconds(10))
+            .warmupIterations(1).measurementTime(TimeValue.seconds(30)).measurementIterations(3).forks(1);
 
     new Runner(opt.build()).run();
   }

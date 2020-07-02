@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import org.I0Itec.zkclient.IDefaultNameSpace;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
@@ -64,13 +62,6 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
 
   @Override
   public void cleanup() {
-    if (_tmpdir != null) {
-      try {
-        FileUtils.deleteDirectory(_tmpdir);
-      } catch (IOException e) {
-        // Nothing to do right now.
-      }
-    }
   }
 
   @Override
@@ -89,7 +80,6 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   }
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
-  private File _tmpdir;
 
   public void init(int zkPort, String dataDir) {
     _zkPort = zkPort;
@@ -100,10 +90,6 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   public boolean execute()
       throws IOException {
     LOGGER.info("Executing command: " + toString());
-    _tmpdir = createAutoDeleteTempDir();
-
-    File logdir = new File(_tmpdir + File.separator + "translog");
-    File datadir = new File(_tmpdir + File.separator + "snapshot");
 
     IDefaultNameSpace _defaultNameSpace = new IDefaultNameSpace() {
       @Override
@@ -112,21 +98,12 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
       }
     };
 
-    _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, datadir.getAbsolutePath());
+    _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, _dataDir);
 
     LOGGER.info("Start zookeeper at localhost:" + _zkPort + " in thread " + Thread.currentThread().getName());
 
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".zooKeeper.pid");
     return true;
-  }
-
-  public static File createAutoDeleteTempDir() {
-    File tempdir = Files.createTempDir();
-    tempdir.delete();
-    tempdir.mkdir();
-
-    tempdir.deleteOnExit();
-    return tempdir;
   }
 
   public boolean stop() {

@@ -1,0 +1,24 @@
+Accounts, Banking, Insurance, worked in NGO, Java
+Accounts, Banking, Finance, Insurance
+Accounts, Finance, Banking, Insurance
+Java, C++, worked on open source projects, coursera machine learning
+Machine learning, Tensor flow, Java, Stanford university,
+Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine learning, spark, Kubernetes, transaction processing
+Java, Python, C++, Machine learning, building and deploying large scale production systems, concurrency, multi-threading, CPU processing
+C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large scale systems, Machine learning
+Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing
+Distributed systems, database development, columnar query engine, database kernel, storage, indexing and transaction processing, building large scale systems
+Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed storage, concurrency, multi-threading
+CUDA, GPU, Python, Machine learning, database kernel, storage, indexing and transaction processing, building large scale systems
+Distributed systems, Java, database engine, cluster management, docker image building and distribution
+Kubernetes, cluster management, operating systems, concurrency, multi-threading, apache airflow, Apache Spark,
+Apache spark, Java, C++, query processing, transaction processing, distributed storage, concurrency, multi-threading, apache airflow
+Big data stream processing, Apache Flink, Apache Beam, database kernel, distributed query engines for analytics and data warehouses
+CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high performance scalable systems
+Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java
+Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, multi-threading, C++,
+C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, distributed storage, concurrency, multi-threading, apache airflow
+Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution
+Database engine, OLAP systems, OLTP transaction processing at large scale, concurrency, multi-threading, GO, building large scale systems
+GET /administrator/ HTTP/1.1 200 4263 - Mozilla/5.0 (Windows NT 6.0; rv:34.0) Gecko/20100101 Firefox/34.0 - NullPointerException
+Foo worked in a lot of places and learned a lot of things

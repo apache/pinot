@@ -21,9 +21,6 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -53,22 +50,18 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
-    ExecutorService executor = Executors.newCachedThreadPool();
+    // Create and upload the schema and table config
+    addSchema(createSchema());
+    addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
 
-    // Push data into the Kafka topic
-    pushAvroIntoKafka(avroFiles, getKafkaTopic(), executor);
+    // Push data into Kafka
+    pushAvroIntoKafka(avroFiles);
 
-    // Load data into H2
-    setUpH2Connection(avroFiles, executor);
+    // Set up the H2 connection
+    setUpH2Connection(avroFiles);
 
-    // Initialize query generator
-    setUpQueryGenerator(avroFiles, executor);
-
-    executor.shutdown();
-    executor.awaitTermination(10, TimeUnit.MINUTES);
-
-    // Create Pinot table
-    setUpRealtimeTable(avroFiles.get(0));
+    // Initialize the query generator
+    setUpQueryGenerator(avroFiles);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
@@ -169,5 +162,12 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   public void testHardcodedSqlQueries()
       throws Exception {
     super.testHardcodedSqlQueries();
+  }
+
+  @Test
+  @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    super.testSqlQueriesFromQueryFile();
   }
 }

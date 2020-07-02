@@ -94,9 +94,18 @@ public class ServerQueryRequest {
     if (aggregationsInfo != null) {
       _aggregationExpressions = new HashSet<>();
       for (AggregationInfo aggregationInfo : aggregationsInfo) {
-        if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          _aggregationExpressions.add(
-              TransformExpressionTree.compileToExpressionTree(AggregationFunctionUtils.getColumn(aggregationInfo)));
+        String aggregationType = aggregationInfo.getAggregationType();
+
+        // TODO: Remove special casing of theta-sketch.
+        // This is needed as a work-around because only aggregation functions know how to interpret the expressions.
+        // The code below assumes that all expressions have columns in them, which may not be true. But only Aggregation
+        // functions have that knowledge, and have not been instantiated yet. A clean fix would be to instantiate
+        // aggregation functions upfront to interpret the expressions.
+        if (!aggregationType.equalsIgnoreCase(AggregationFunctionType.COUNT.getName()) && !aggregationType
+            .equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH.getName())) {
+          for (String expressions : AggregationFunctionUtils.getArguments(aggregationInfo)) {
+            _aggregationExpressions.add(TransformExpressionTree.compileToExpressionTree(expressions));
+          }
         }
       }
       _aggregationColumns = RequestUtils.extractColumnsFromExpressions(_aggregationExpressions);
@@ -130,7 +139,6 @@ public class ServerQueryRequest {
       }
       _selectionColumns = RequestUtils.extractColumnsFromExpressions(_selectionExpressions);
       _allColumns.addAll(_selectionColumns);
-
     } else {
       _selectionColumns = null;
       _selectionExpressions = null;

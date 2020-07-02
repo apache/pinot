@@ -21,22 +21,23 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.util.SchemaUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,6 +51,8 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_DOCS = 1000;
   private static final String STRING_KEY_MAP_FIELD_NAME = "stringKeyMap";
   private static final String INT_KEY_MAP_FIELD_NAME = "intKeyMap";
+  private static final String STRING_KEY_MAP_STR_FIELD_NAME = "stringKeyMapStr";
+  private static final String INT_KEY_MAP_STR_FIELD_NAME = "intKeyMapStr";
 
   @Override
   protected long getCountStarResult() {
@@ -67,23 +70,28 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    // Create the tables
-    addOfflineTable(getTableName());
+    // Create and upload the schema and table config
+    String rawTableName = getTableName();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(rawTableName)
+        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, DataType.STRING)
+        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
+        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, DataType.INT)
+        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT).build();
+    FieldSpec stringKeyMapJsonStrFieldSpec =
+        new DimensionFieldSpec(STRING_KEY_MAP_STR_FIELD_NAME, DataType.STRING, true);
+    stringKeyMapJsonStrFieldSpec.setTransformFunction("toJsonMapStr(" + STRING_KEY_MAP_FIELD_NAME + ")");
+    schema.addField(stringKeyMapJsonStrFieldSpec);
+    FieldSpec intKeyMapJsonStrFieldSpec = new DimensionFieldSpec(INT_KEY_MAP_STR_FIELD_NAME, DataType.STRING, true);
+    intKeyMapJsonStrFieldSpec.setTransformFunction("toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")");
+    schema.addField(intKeyMapJsonStrFieldSpec);
+    addSchema(schema);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
+    addTableConfig(tableConfig);
 
     // Create and upload segments
     File avroFile = createAvroFile();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(getTableName())
-        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + AvroUtils.MAP_KEY_COLUMN_SUFFIX, DataType.STRING)
-        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + AvroUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
-        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + AvroUtils.MAP_KEY_COLUMN_SUFFIX, DataType.INT)
-        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + AvroUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT).build();
-    ExecutorService executor = Executors.newCachedThreadPool();
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(Collections.singletonList(avroFile), 0, _segmentDir, _tarDir, getTableName(), false,
-            null, null, schema, executor);
-    executor.shutdown();
-    executor.awaitTermination(10, TimeUnit.MINUTES);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
+    uploadSegments(rawTableName, _tarDir);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(60_000);
@@ -118,6 +126,152 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     return avroFile;
+  }
+
+  @Test
+  public void testJsonPathQueries()
+      throws Exception {
+    // Selection only
+    String query = "SELECT stringKeyMapStr FROM " + getTableName();
+    JsonNode pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    JsonNode selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      assertEquals(selectionResults.get(i).get(0).textValue(), String.format("{\"k1\":%d,\"k2\":100%d}", i, i));
+    }
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k1', 'INT') FROM " + getTableName();
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      assertEquals(Integer.parseInt(selectionResults.get(i).get(0).textValue()), i);
+    }
+    query = "SELECT jsonExtractScalar(intKeyMapStr, '$.95', 'INT') FROM " + getTableName();
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      assertEquals(Integer.parseInt(selectionResults.get(i).get(0).textValue()), i);
+    }
+
+    // Selection order-by
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k2', 'INT') FROM " + getTableName()
+        + " ORDER BY jsonExtractScalar(stringKeyMapStr, '$.k1', 'INT')";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      assertEquals(Integer.parseInt(selectionResults.get(i).get(0).textValue()), NUM_DOCS + i);
+    }
+    query = "SELECT jsonExtractScalar(intKeyMapStr, '$.717', 'INT') FROM " + getTableName()
+        + " ORDER BY jsonExtractScalar(intKeyMapStr, '$.95', 'INT')";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      assertEquals(Integer.parseInt(selectionResults.get(i).get(0).textValue()), NUM_DOCS + i);
+    }
+
+    // Aggregation only
+    query = "SELECT MAX(jsonExtractScalar(stringKeyMapStr, '$.k1', 'INT')) FROM " + getTableName();
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    JsonNode aggregationResult = pinotResponse.get("aggregationResults").get(0).get("value");
+    assertEquals((int) Double.parseDouble(aggregationResult.textValue()), NUM_DOCS - 1);
+    query = "SELECT MAX(jsonExtractScalar(intKeyMapStr, '$.95', 'INT')) FROM " + getTableName();
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    aggregationResult = pinotResponse.get("aggregationResults").get(0).get("value");
+    assertEquals((int) Double.parseDouble(aggregationResult.textValue()), NUM_DOCS - 1);
+
+    // Aggregation group-by
+    query = "SELECT MIN(jsonExtractScalar(stringKeyMapStr, '$.k2', 'INT')) FROM " + getTableName()
+        + " GROUP BY jsonExtractScalar(stringKeyMapStr, '$.k1', 'INT')";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    JsonNode groupByResults = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
+    assertEquals(groupByResults.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode groupByResult = groupByResults.get(i);
+      assertEquals(Integer.parseInt(groupByResult.get("group").get(0).asText()), i);
+      assertEquals((int) Double.parseDouble(groupByResult.get("value").asText()), NUM_DOCS + i);
+    }
+    query = "SELECT MIN(jsonExtractScalar(intKeyMapStr, '$.717', 'INT')) FROM " + getTableName()
+        + " GROUP BY jsonExtractScalar(intKeyMapStr, '$.95', 'INT')";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    groupByResults = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
+    assertEquals(groupByResults.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode groupByResult = groupByResults.get(i);
+      assertEquals(Integer.parseInt(groupByResult.get("group").get(0).asText()), i);
+      assertEquals((int) Double.parseDouble(groupByResult.get("value").asText()), NUM_DOCS + i);
+    }
+
+    // Filter
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k2', 'INT') FROM " + getTableName()
+        + " WHERE jsonExtractScalar(stringKeyMapStr, '$.k1', 'INT') = 25";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 1);
+    assertEquals(Integer.parseInt(selectionResults.get(0).get(0).textValue()), NUM_DOCS + 25);
+    query = "SELECT jsonExtractScalar(intKeyMapStr, '$.717', 'INT') FROM " + getTableName()
+        + " WHERE jsonExtractScalar(intKeyMapStr, '$.95', 'INT') = 25";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 1);
+    assertEquals(Integer.parseInt(selectionResults.get(0).get(0).textValue()), NUM_DOCS + 25);
+
+    // Filter on non-existing key
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k2', 'INT') FROM " + getTableName()
+        + " WHERE jsonExtractScalar(stringKeyMapStr, '$.k3', 'INT_ARRAY') = 25";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 0);
+    query = "SELECT jsonExtractScalar(intKeyMapStr, '$.717', 'INT') FROM " + getTableName()
+        + " WHERE jsonExtractScalar(intKeyMapStr, '$.123', 'INT_ARRAY') = 25";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 0);
+
+    // Select non-existing key (illegal query)
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k3', 'INT') FROM " + getTableName();
+    pinotResponse = postQuery(query);
+    assertNotEquals(pinotResponse.get("exceptions").size(), 0);
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.123', 'INT') FROM " + getTableName();
+    pinotResponse = postQuery(query);
+    assertNotEquals(pinotResponse.get("exceptions").size(), 0);
+
+    // Select non-existing key with default value
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k3', 'INT', '0') FROM " + getTableName();
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.123', 'INT', '0') FROM " + getTableName();
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+
+    // Select non-existing key with proper filter
+    query = "SELECT jsonExtractScalar(intKeyMapStr, '$.123', 'INT') FROM " + getTableName()
+        + " WHERE jsonExtractKey(intKeyMapStr, '$.*') = \"$['123']\"";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 0);
+    query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k3', 'INT') FROM " + getTableName()
+        + " WHERE jsonExtractKey(stringKeyMapStr, '$.*') = \"$['k3']\"";
+    pinotResponse = postQuery(query);
+    assertEquals(pinotResponse.get("exceptions").size(), 0);
+    selectionResults = pinotResponse.get("selectionResults").get("results");
+    assertEquals(selectionResults.size(), 0);
   }
 
   @Test

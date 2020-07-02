@@ -41,12 +41,11 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String application;
   String yaml;
 
-  Map<String, Map<String, Object>> alertSchemes;
-  Map<String, Map<String, Object>> alertSuppressors;
+  Map<String, Object> alertSchemes;
+  Map<String, Object> alertSuppressors;
   AlertConfigBean.SubjectType subjectType = AlertConfigBean.SubjectType.ALERT;
 
   Map<Long, Long> vectorClocks;
-  Long highWaterMark;
 
   Map<String, Object> properties;
 
@@ -117,14 +116,6 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.application = application;
   }
 
-  public Long getHighWaterMark() {
-    return highWaterMark;
-  }
-
-  public void setHighWaterMark(Long highWaterMark) {
-    this.highWaterMark = highWaterMark;
-  }
-
   public AlertConfigBean.SubjectType getSubjectType() {
     return subjectType;
   }
@@ -133,19 +124,19 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.subjectType = subjectType;
   }
 
-  public Map<String, Map<String, Object>> getAlertSchemes() {
+  public Map<String, Object> getAlertSchemes() {
     return alertSchemes;
   }
 
-  public void setAlertSchemes(Map<String, Map<String, Object>> alertSchemes) {
+  public void setAlertSchemes(Map<String, Object> alertSchemes) {
     this.alertSchemes = alertSchemes;
   }
 
-  public Map<String, Map<String, Object>> getAlertSuppressors() {
+  public Map<String, Object> getAlertSuppressors() {
     return alertSuppressors;
   }
 
-  public void setAlertSuppressors(Map<String, Map<String, Object>> alertSuppressors) {
+  public void setAlertSuppressors(Map<String, Object> alertSuppressors) {
     this.alertSuppressors = alertSuppressors;
   }
 
@@ -176,15 +167,15 @@ public class DetectionAlertConfigBean extends AbstractBean {
     DetectionAlertConfigBean that = (DetectionAlertConfigBean) o;
     return active == that.active && Objects.equals(name, that.name) && Objects.equals(from, that.from)
         && Objects.equals(cronExpression, that.cronExpression) && Objects.equals(application, that.application)
-        && subjectType == that.subjectType && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(
-        highWaterMark, that.highWaterMark) && Objects.equals(properties, that.properties)
-        && Objects.equals(alertSchemes, that.alertSchemes) && Objects.equals(alertSuppressors, that.alertSuppressors)
-        && Objects.equals(refLinks, that.refLinks) && Objects.equals(yaml, that.yaml);
+        && subjectType == that.subjectType && Objects.equals(vectorClocks, that.vectorClocks)
+        && Objects.equals(properties, that.properties) && Objects.equals(alertSchemes, that.alertSchemes)
+        && Objects.equals(alertSuppressors, that.alertSuppressors) && Objects.equals(refLinks, that.refLinks)
+        && Objects.equals(yaml, that.yaml);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(active, name, from, cronExpression, application, subjectType, vectorClocks,
-        highWaterMark, properties, alertSchemes, alertSuppressors, refLinks, yaml);
+    return Objects.hash(active, name, from, cronExpression, application, subjectType, vectorClocks, properties,
+        alertSchemes, alertSuppressors, refLinks, yaml);
   }
 }

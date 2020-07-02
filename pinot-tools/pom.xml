@@ -24,7 +24,8 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.3.3</version>
+    <version>0.4.0</version>
+    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-tools</artifactId>
   <name>Pinot Tools</name>
@@ -55,6 +56,21 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-avro</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-csv</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-json</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-orc</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -65,12 +81,18 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-connector-kafka-base</artifactId>
+      <artifactId>pinot-thrift</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-connector-kafka-${kafka.version}</artifactId>
+      <artifactId>pinot-kafka-${kafka.version}</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-batch-ingestion-standalone</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
@@ -107,21 +129,6 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-aws</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-annotations</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -146,9 +153,7 @@
               <name>pinot-admin</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
-                <maxMemorySize>4G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-admin-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -160,7 +165,6 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>20G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -172,7 +176,6 @@
                 <initialMemorySize>10G</initialMemorySize>
                 <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -184,7 +187,6 @@
                 <initialMemorySize>10G</initialMemorySize>
                 <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -246,7 +248,7 @@
             </program>
             <program>
               <mainClass>org.apache.pinot.tools.Quickstart</mainClass>
-              <name>quick-start-offline</name>
+              <name>quick-start-batch</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
@@ -262,19 +264,29 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=6g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
               <mainClass>org.apache.pinot.tools.RealtimeQuickStart</mainClass>
-              <name>quick-start-realtime</name>
+              <name>quick-start-streaming</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand</mainClass>
+              <name>pinot-ingestion-job</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-ingestion-job-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -345,6 +357,25 @@
                 <resource>
                   <!-- source -->
                   <directory>src/main/resources/sample_data/kafka_${kafka.version}</directory>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-batch-ingestion-resources</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <!-- this is important -->
+              <overwrite>true</overwrite>
+              <!-- target -->
+              <outputDirectory>${basedir}/target/classes/examples/</outputDirectory>
+              <resources>
+                <resource>
+                  <!-- source -->
+                  <directory>src/main/resources/examples</directory>
                 </resource>
               </resources>
             </configuration>

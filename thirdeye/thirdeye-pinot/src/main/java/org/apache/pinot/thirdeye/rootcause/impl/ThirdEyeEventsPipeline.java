@@ -19,26 +19,19 @@
 
 package org.apache.pinot.thirdeye.rootcause.impl;
 
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.rootcause.Entity;
-import org.apache.pinot.thirdeye.rootcause.MaxScoreSet;
-import org.apache.pinot.thirdeye.rootcause.Pipeline;
-import org.apache.pinot.thirdeye.rootcause.PipelineContext;
-import org.apache.pinot.thirdeye.rootcause.PipelineResult;
+import org.apache.pinot.thirdeye.rootcause.*;
 import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
 import org.apache.pinot.thirdeye.rootcause.util.ScoreUtils;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections4.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -139,7 +132,7 @@ public class ThirdEyeEventsPipeline extends Pipeline {
     return this.eventDAO.findByPredicate(Predicate.AND(
         Predicate.GE("startTime", start - OVERFETCH),
         Predicate.LT("endTime", end + OVERFETCH),
-        Predicate.EQ("eventType", eventType.toUpperCase())
+        Predicate.EQ("eventType", this.eventType.toUpperCase())
     ));
   }
 
@@ -160,7 +153,7 @@ public class ThirdEyeEventsPipeline extends Pipeline {
         }
       }
 
-      ThirdEyeEventEntity entity = ThirdEyeEventEntity.fromDTO(1.0, related, dto, eventType);
+      ThirdEyeEventEntity entity = ThirdEyeEventEntity.fromDTO(1.0, related, dto, this.eventType.toLowerCase());
       entities.add(entity.withScore(strategy.score(entity) * coefficient));
     }
     return entities;

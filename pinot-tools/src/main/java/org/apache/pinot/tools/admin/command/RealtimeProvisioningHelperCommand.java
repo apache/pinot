@@ -25,9 +25,10 @@ import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.DataSize;
-import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.realtime.provisioning.MemoryEstimator;
 import org.kohsuke.args4j.Option;
@@ -152,7 +153,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     TableConfig tableConfig;
     try (FileInputStream fis = new FileInputStream(new File(_tableConfigFile))) {
       String tableConfigString = IOUtils.toString(fis);
-      tableConfig = TableConfig.fromJsonString(tableConfigString);
+      tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
     } catch (IOException e) {
       throw new RuntimeException("Exception in reading table config from file " + _tableConfigFile, e);
     }
@@ -179,10 +180,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     long sampleSegmentConsumedSeconds =
         TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(_periodSampleSegmentConsumed), TimeUnit.MILLISECONDS);
 
-    long maxUsableHostMemBytes = DataSize.toBytes(_maxUsableHostMemory);
+    long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
     MemoryEstimator memoryEstimator =
-        new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, sampleSegmentConsumedSeconds, maxUsableHostMemBytes);
+        new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, sampleSegmentConsumedSeconds,
+            maxUsableHostMemBytes);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
     memoryEstimator
         .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);

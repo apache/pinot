@@ -19,11 +19,8 @@
 package org.apache.pinot.core.io.reader.impl;
 
 import java.io.Closeable;
-import java.io.IOException;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -41,41 +38,24 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class FixedByteSingleValueMultiColReader implements Closeable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleValueMultiColReader.class);
+  private final PinotDataBuffer _dataBuffer;
+  private final int _numRows;
+  private final int[] _columnSizes;
+  private final int[] _columnOffSets;
+  private final int _rowSize;
 
-  private final int rows;
-  private final int[] colOffSets;
-  private int rowSize;
-  // To deal with a multi-threading scenario in query processing threads
-  // (which are currently non-interruptible), a segment could be dropped by
-  // the parent thread and the child query thread could still be using
-  // segment memory which may have been unmapped depending on when the
-  // drop was completed. To protect against this scenario, the data buffer
-  // is made volatile and set to null in close() operation after releasing
-  // the buffer. This ensures that concurrent thread(s) trying to invoke
-  // set**() operations on this class will hit NPE as opposed accessing
-  // illegal/invalid memory (which will crash the JVM).
-  private volatile PinotDataBuffer indexDataBuffer;
-  private final int[] columnSizes;
-
-  /**
-   *
-   * @param pinotDataBuffer
-   * @param rows
-   * @param columnSizes
-   *            in bytes
-   * @throws IOException
-   */
-  public FixedByteSingleValueMultiColReader(PinotDataBuffer pinotDataBuffer, int rows, int[] columnSizes) {
-    this.rows = rows;
-    this.columnSizes = columnSizes;
-    colOffSets = new int[columnSizes.length];
-    rowSize = 0;
-    for (int i = 0; i < columnSizes.length; i++) {
-      colOffSets[i] = rowSize;
-      rowSize += columnSizes[i];
+  public FixedByteSingleValueMultiColReader(PinotDataBuffer dataBuffer, int numRows, int[] columnSizes) {
+    _dataBuffer = dataBuffer;
+    _numRows = numRows;
+    _columnSizes = columnSizes;
+    int numColumns = _columnSizes.length;
+    _columnOffSets = new int[numColumns];
+    int offset = 0;
+    for (int i = 0; i < numColumns; i++) {
+      _columnOffSets[i] = offset;
+      offset += columnSizes[i];
     }
-    this.indexDataBuffer = pinotDataBuffer;
+    _rowSize = offset;
   }
 
   /**
@@ -86,7 +66,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
    * @return
    */
   private int computeOffset(int row, int col) {
-    final int offset = row * rowSize + colOffSets[col];
+    final int offset = row * _rowSize + _columnOffSets[col];
     return offset;
   }
 
@@ -98,7 +78,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
    */
   public char getChar(int row, int col) {
     final int offset = computeOffset(row, col);
-    return indexDataBuffer.getChar(offset);
+    return _dataBuffer.getChar(offset);
   }
 
   /**
@@ -109,7 +89,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
    */
   public short getShort(int row, int col) {
     final int offset = computeOffset(row, col);
-    return indexDataBuffer.getShort(offset);
+    return _dataBuffer.getShort(offset);
   }
 
   /**
@@ -121,7 +101,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   public int getInt(int row, int col) {
     assert getColumnSizes()[col] == 4;
     final int offset = computeOffset(row, col);
-    return indexDataBuffer.getInt(offset);
+    return _dataBuffer.getInt(offset);
   }
 
   /**
@@ -133,7 +113,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   public long getLong(int row, int col) {
     assert getColumnSizes()[col] == 8;
     final int offset = computeOffset(row, col);
-    return indexDataBuffer.getLong(offset);
+    return _dataBuffer.getLong(offset);
   }
 
   /**
@@ -145,7 +125,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   public float getFloat(int row, int col) {
     assert getColumnSizes()[col] == 4;
     final int offset = computeOffset(row, col);
-    return indexDataBuffer.getFloat(offset);
+    return _dataBuffer.getFloat(offset);
   }
 
   /**
@@ -158,7 +138,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   public double getDouble(int row, int col) {
     assert getColumnSizes()[col] == 8;
     final int offset = computeOffset(row, col);
-    return indexDataBuffer.getDouble(offset);
+    return _dataBuffer.getDouble(offset);
   }
 
   /**
@@ -184,25 +164,16 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
     final int length = getColumnSizes()[col];
     final byte[] dst = new byte[length];
     final int offset = computeOffset(row, col);
-    indexDataBuffer.copyTo(offset, dst, 0, length);
+    _dataBuffer.copyTo(offset, dst, 0, length);
     return dst;
   }
 
   public int getNumberOfRows() {
-    return rows;
+    return _numRows;
   }
 
   public int[] getColumnSizes() {
-    return columnSizes;
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    if (indexDataBuffer != null) {
-      indexDataBuffer.close();
-      indexDataBuffer = null;
-    }
+    return _columnSizes;
   }
 
   public boolean open() {
@@ -242,5 +213,11 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
     for (int iter = startPos; iter < endPos; iter++) {
       values[outStartPos++] = getString(rows[iter], col);
     }
+  }
+
+  @Override
+  public void close() {
+    // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
+    // caller is responsible of closing the PinotDataBuffer.
   }
 }

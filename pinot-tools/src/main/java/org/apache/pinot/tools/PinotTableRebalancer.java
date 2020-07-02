@@ -21,11 +21,11 @@ package org.apache.pinot.tools;
 import com.google.common.base.Preconditions;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
@@ -35,14 +35,17 @@ public class PinotTableRebalancer extends PinotZKChanger {
   private final Configuration _rebalanceConfig = new BaseConfiguration();
 
   public PinotTableRebalancer(String zkAddress, String clusterName, boolean dryRun, boolean reassignInstances,
-      boolean includeConsuming, boolean downtime, int minReplicasToKeepUpForNoDowntime) {
+      boolean includeConsuming, boolean bootstrap, boolean downtime, int minReplicasToKeepUpForNoDowntime,
+      boolean bestEffort) {
     super(zkAddress, clusterName);
     _rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
     _rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
     _rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, includeConsuming);
+    _rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, bootstrap);
     _rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
     _rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
         minReplicasToKeepUpForNoDowntime);
+    _rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEffort);
   }
 
   public RebalanceResult rebalance(String tableNameWithType) {

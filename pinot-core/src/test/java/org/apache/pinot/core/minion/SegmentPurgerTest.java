@@ -24,18 +24,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -58,6 +60,7 @@ public class SegmentPurgerTest {
   private static final String D1 = "d1";
   private static final String D2 = "d2";
 
+  private TableConfig _tableConfig;
   private File _originalIndexDir;
   private int _expectedNumRecordsPurged;
   private int _expectedNumRecordsModified;
@@ -67,9 +70,11 @@ public class SegmentPurgerTest {
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(D1, FieldSpec.DataType.INT, true));
-    schema.addField(new DimensionFieldSpec(D2, FieldSpec.DataType.INT, true));
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(Collections.singletonList(D1)).setCreateInvertedIndexDuringSegmentGeneration(true)
+        .build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(D2, FieldSpec.DataType.INT).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -81,17 +86,15 @@ public class SegmentPurgerTest {
       } else if (value2 == 0) {
         _expectedNumRecordsModified++;
       }
-      row.putField(D1, value1);
-      row.putField(D2, value2);
+      row.putValue(D1, value1);
+      row.putValue(D2, value2);
       rows.add(row);
     }
-    GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows, schema);
+    GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows);
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
-    config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setInvertedIndexCreationColumns(Collections.singletonList(D1));
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, genericRowRecordReader);
@@ -108,7 +111,7 @@ public class SegmentPurgerTest {
     // Modify records with d2 = 0 to d2 = Integer.MAX_VALUE
     SegmentPurger.RecordModifier recordModifier = row -> {
       if (row.getValue(D2).equals(0)) {
-        row.putField(D2, Integer.MAX_VALUE);
+        row.putValue(D2, Integer.MAX_VALUE);
         return true;
       } else {
         return false;
@@ -116,7 +119,7 @@ public class SegmentPurgerTest {
     };
 
     SegmentPurger segmentPurger =
-        new SegmentPurger(TABLE_NAME, _originalIndexDir, PURGED_SEGMENT_DIR, recordPurger, recordModifier);
+        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, recordPurger, recordModifier);
     File purgedIndexDir = segmentPurger.purgeSegment();
 
     // Check the purge/modify counter in segment purger

@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -47,6 +49,7 @@ import org.apache.pinot.core.operator.filter.TestFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
@@ -127,8 +130,8 @@ public class RawIndexBenchmark {
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true);
       schema.addField(dimensionFieldSpec);
     }
-
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setRawIndexCreationColumns(Collections.singletonList(_rawIndexColumn));
 
     config.setOutDir(SEGMENT_DIR_NAME);
@@ -159,7 +162,7 @@ public class RawIndexBenchmark {
 
     System.out.println("Generating segment...");
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
 
     return new File(SEGMENT_DIR_NAME, SEGMENT_NAME);

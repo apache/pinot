@@ -26,13 +26,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
-import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 
 import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
 import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
@@ -48,33 +46,18 @@ public class StarTreeIndexContainer implements Closeable {
   public StarTreeIndexContainer(File segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> indexContainerMap, ReadMode readMode)
       throws ConfigurationException, IOException {
-    List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
-    if (starTreeMetadataList != null) {
-      // Star-tree V2 exists, load it
-      File indexFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
-      if (readMode == ReadMode.heap) {
-        _dataBuffer = PinotDataBuffer
-            .loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
-      } else {
-        _dataBuffer = PinotDataBuffer
-            .mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
-      }
-      File indexMapFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
-      List<Map<IndexKey, IndexValue>> indexMapList =
-          StarTreeIndexMapUtils.loadFromFile(indexMapFile, starTreeMetadataList.size());
-      _starTrees = StarTreeLoaderUtils.loadStarTreeV2(_dataBuffer, indexMapList, segmentMetadata, indexContainerMap);
+    File indexFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
+    if (readMode == ReadMode.heap) {
+      _dataBuffer = PinotDataBuffer
+          .loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
     } else {
-      // Backward-compatible: star-tree V2 does not exist, convert star-tree V1 to star-tree V2
-      File indexFile = new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
-      if (readMode == ReadMode.heap) {
-        _dataBuffer = PinotDataBuffer
-            .loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V1 data buffer");
-      } else {
-        _dataBuffer = PinotDataBuffer
-            .mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V1 data buffer");
-      }
-      _starTrees = StarTreeLoaderUtils.convertFromStarTreeV1(_dataBuffer, segmentMetadata, indexContainerMap);
+      _dataBuffer = PinotDataBuffer
+          .mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
     }
+    File indexMapFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
+    List<Map<IndexKey, IndexValue>> indexMapList =
+        StarTreeIndexMapUtils.loadFromFile(indexMapFile, segmentMetadata.getStarTreeV2MetadataList().size());
+    _starTrees = StarTreeLoaderUtils.loadStarTreeV2(_dataBuffer, indexMapList, segmentMetadata, indexContainerMap);
   }
 
   public List<StarTreeV2> getStarTrees() {

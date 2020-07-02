@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.Selection;
@@ -45,9 +44,9 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
-  private final List<Serializable[]> _rows;
+  private final List<Object[]> _rows;
 
-  private ExecutionStatistics _executionStatistics;
+  private int _numDocsScanned = 0;
 
   public SelectionOnlyOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
@@ -73,8 +72,6 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numDocsScanned = 0;
-
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       int numExpressions = _expressions.size();
@@ -84,7 +81,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
 
       int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), transformBlock.getNumDocs());
-      numDocsScanned += numDocsToAdd;
+      _numDocsScanned += numDocsToAdd;
       for (int i = 0; i < numDocsToAdd; i++) {
         _rows.add(blockValueFetcher.getRow(i));
       }
@@ -92,14 +89,6 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
         break;
       }
     }
-
-    // Create execution statistics.
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
-    long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
-    _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            numTotalRawDocs);
 
     return new IntermediateResultsBlock(_dataSchema, _rows);
   }
@@ -111,6 +100,10 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return _executionStatistics;
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+        numTotalDocs);
   }
 }

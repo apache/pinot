@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.segment.index.creator;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,7 +29,25 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.TableDataManager;
+import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -40,12 +60,15 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.segment.index.creator.RawIndexCreatorTest.getRandomValue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -57,6 +80,7 @@ public class SegmentGenerationWithNullValueVectorTest {
   private static final String SEGMENT_DIR_NAME =
       System.getProperty("java.io.tmpdir") + File.separator + "nullValueVectorTest";
   private static final String SEGMENT_NAME = "testSegment";
+  private static final long LONG_VALUE_THRESHOLD = 100;
 
   private Random _random;
   private Schema _schema;
@@ -69,6 +93,18 @@ public class SegmentGenerationWithNullValueVectorTest {
   private static final String STRING_COLUMN = "stringColumn";
 
   Map<String, boolean[]> _actualNullVectorMap = new HashMap<>();
+
+  // Required for subsequent queries
+  private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private final List<String> _segmentNames = new ArrayList<>();
+  private InstanceDataManager _instanceDataManager;
+  private ServerMetrics _serverMetrics;
+  private QueryExecutor _queryExecutor;
+  private static final String TABLE_NAME = "testTable";
+  private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
+  private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
+  private int nullIntKeyCount = 0;
+  private int longKeyCount = 0;
 
   /**
    * Setup to build a segment with raw indexes (no-dictionary) of various data types.
@@ -86,9 +122,41 @@ public class SegmentGenerationWithNullValueVectorTest {
     _schema.addField(new DimensionFieldSpec(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE, true));
     _schema.addField(new DimensionFieldSpec(STRING_COLUMN, FieldSpec.DataType.STRING, true));
 
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     _random = new Random(System.nanoTime());
-    buildIndex(_schema);
+    buildIndex(tableConfig, _schema);
     _segment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), ReadMode.heap);
+
+    setupQueryServer();
+  }
+
+  // Registers the segment and initializes Query Executor
+  private void setupQueryServer()
+      throws ConfigurationException {
+    _segmentNames.add(_segment.getSegmentName());
+    // Mock the instance data manager
+    _serverMetrics = new ServerMetrics(new MetricsRegistry());
+    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
+    when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("OFFLINE");
+    when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
+    when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
+    @SuppressWarnings("unchecked")
+    TableDataManager tableDataManager = TableDataManagerProvider
+        .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
+            mock(ServerMetrics.class));
+    tableDataManager.start();
+    tableDataManager.addSegment(_segment);
+    _instanceDataManager = mock(InstanceDataManager.class);
+    when(_instanceDataManager.getTableDataManager(TABLE_NAME)).thenReturn(tableDataManager);
+
+    // Set up the query executor
+    URL resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
+    Assert.assertNotNull(resourceUrl);
+    PropertiesConfiguration queryExecutorConfig = new PropertiesConfiguration();
+    queryExecutorConfig.setDelimiterParsingDisabled(false);
+    queryExecutorConfig.load(new File(resourceUrl.getFile()));
+    _queryExecutor = new ServerQueryExecutorV1Impl();
+    _queryExecutor.init(queryExecutorConfig, _instanceDataManager, _serverMetrics);
   }
 
   /**
@@ -98,9 +166,9 @@ public class SegmentGenerationWithNullValueVectorTest {
    * @throws Exception
    */
 
-  private void buildIndex(Schema schema)
+  private void buildIndex(TableConfig tableConfig, Schema schema)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
 
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
@@ -137,11 +205,20 @@ public class SegmentGenerationWithNullValueVectorTest {
           _actualNullVectorMap.get(key)[rowId] = true;
         }
       }
+
+      if (_actualNullVectorMap.get(INT_COLUMN)[rowId]) {
+        nullIntKeyCount++;
+      } else if (!_actualNullVectorMap.get(LONG_COLUMN)[rowId]) {
+        if ((long)map.get(LONG_COLUMN) > LONG_VALUE_THRESHOLD) {
+          longKeyCount++;
+        }
+      }
+
       genericRow.init(map);
       rows.add(genericRow);
     }
 
-    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+    RecordReader recordReader = new GenericRowRecordReader(rows);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, recordReader);
     driver.build();
@@ -164,6 +241,37 @@ public class SegmentGenerationWithNullValueVectorTest {
         Assert.assertEquals(_actualNullVectorMap.get(colName)[i], nullValueVectorReaderMap.get(colName).isNull(i));
       }
     }
+  }
+
+  @Test
+  public void testNotNullPredicate() {
+    String query = "SELECT COUNT(*) FROM " + TABLE_NAME + " where " + INT_COLUMN + " IS NOT NULL";
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), NUM_ROWS - nullIntKeyCount);
+  }
+
+  @Test
+  public void testNullPredicate() {
+    String query = "SELECT COUNT(*) FROM " + TABLE_NAME + " where " + INT_COLUMN + " IS NULL";
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), nullIntKeyCount);
+  }
+
+  @Test
+  public void testNullWithAndPredicate() {
+    String query = "SELECT COUNT(*) FROM " + TABLE_NAME + " where " + INT_COLUMN + " IS NOT NULL and " + LONG_COLUMN + " > " + LONG_VALUE_THRESHOLD;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), longKeyCount);
+  }
+
+  private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
+    return new ServerQueryRequest(instanceRequest, _serverMetrics, System.currentTimeMillis());
   }
 
   /**

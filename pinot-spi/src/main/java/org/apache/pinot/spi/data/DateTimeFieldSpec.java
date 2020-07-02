@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
 
@@ -41,10 +42,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
   /**
-   * @param name
-   *
-   * @param dataType
-   *
+   * Constructs a DateTimeFieldSpec with basic fields name, dataType, format and granularity
    * @param format - defines how to interpret the numeric value in the date time column.
    * Format has to follow the pattern - size:timeunit:timeformat, where
    * size and timeUnit together define the granularity of the time column value.
@@ -77,6 +75,16 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
     _format = format;
     _granularity = granularity;
+  }
+
+  /**
+   * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with defaultNullValue and transformFunction
+   */
+  public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
+      @Nullable Object defaultNullValue, @Nullable String transformFunction) {
+    this(name, dataType, format, granularity);
+    setDefaultNullValue(defaultNullValue);
+    setTransformFunction(transformFunction);
   }
 
   @JsonIgnore

@@ -22,6 +22,14 @@
     }
     &--med-width {
       width: 120px;
+
+      &.baseline {
+        text-align: right;
+      }
+
+      &.current {
+        text-align: right;
+      }
     }
     &--large-width {
       width: 300px;
@@ -46,16 +54,26 @@
     }
   }
   &__dimension-content {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: inline-block;
+    word-wrap: break-word;
+    word-break: break-all;
+    white-space: normal;
     max-width: 164px;
+
+    &.other {
+      white-space: nowrap !important;
+    }
   }
   &__dimension-content--first {
-    margin-left: 10px;
-    line-height: 14px;
     display: inline-block;
-    overflow: auto !important;
-    text-overflow: initial !important;
+    word-wrap: break-word;
+    word-break: break-all;
+    white-space: normal;
+    max-width: 164px;
+
+    &.other {
+      white-space: nowrap !important;
+    }
   }
   &__header {
     border: 1px solid #ddd;

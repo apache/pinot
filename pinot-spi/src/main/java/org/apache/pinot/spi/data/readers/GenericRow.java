@@ -37,6 +37,15 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * from the {NullValueTransformer} should have {@code defaultNullValue} filled to the fields with {@code null}
  * value, so that for fields with {@code null} value, {@link #getValue(String)} will return the {@code defaultNullValue}
  * and {@link #isNullValue(String)} will return {@code true}.
+ *
+ * The fixed set of allowed data types for the fields in the GenericRow should be:
+ * Integer, Long, Float, Double, String, byte[], Object[] of the single-value types
+ * This is the fixed set of data types to be used by RecordExtractor and RecordReader to extract fields from the row,
+ * and by the ExpressionEvaluator to evaluate the result
+ * FIXME: Based on the current behavior, we support the following data types:
+ *  SV: Boolean, Byte, Character, Short, Integer, Long, Float, Double, String, byte[]
+ *  MV: Object[] or List of Byte, Character, Short, Integer, Long, Float, Double, String
+ *  We should not be using Boolean, Byte, Character and Short to keep it simple
  */
 public class GenericRow {
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();

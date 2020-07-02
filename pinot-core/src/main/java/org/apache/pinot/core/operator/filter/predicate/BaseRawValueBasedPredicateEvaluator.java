@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.commons.lang3.mutable.MutableInt;
-
 public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateEvaluator {
 
   @Override
@@ -67,24 +65,20 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
    */
   @SuppressWarnings("Duplicates")
   @Override
-  public boolean applyMV(int[] values, int length, MutableInt numEntriesScanned) {
+  public boolean applyMV(int[] values, int length) {
     if (isExclusive()) {
       for (int i = 0; i < length; i++) {
         if (!applySV(values[i])) {
-          numEntriesScanned.add(i + 1);
           return false;
         }
       }
-      numEntriesScanned.add(length);
       return true;
     } else {
       for (int i = 0; i < length; i++) {
         if (applySV(values[i])) {
-          numEntriesScanned.add(i + 1);
           return true;
         }
       }
-      numEntriesScanned.add(length);
       return false;
     }
   }

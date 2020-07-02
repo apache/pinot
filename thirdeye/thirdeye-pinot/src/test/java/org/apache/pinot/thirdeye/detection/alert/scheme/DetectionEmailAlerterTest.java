@@ -34,8 +34,9 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.detection.alert.filter.SubscriptionUtils;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
-import org.testng.annotations.AfterMethod;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -92,7 +93,8 @@ public class DetectionEmailAlerterTest {
     this.alertConfigDTO.setName(ALERT_NAME_VALUE);
     Map<Long, Long> vectorClocks = new HashMap<>();
     this.alertConfigDTO.setVectorClocks(vectorClocks);
-    this.alertConfigDAO.save(this.alertConfigDTO);
+    long id = this.alertConfigDAO.save(this.alertConfigDTO);
+    this.alertConfigDTO.setId(id);
 
     MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();
     anomalyResultDTO.setStartTime(1000L);
@@ -120,7 +122,7 @@ public class DetectionEmailAlerterTest {
     thirdEyeConfig.setAlerterConfiguration(alerterProps);
   }
 
-  @AfterMethod(alwaysRun = true)
+  @AfterClass(alwaysRun = true)
   void afterClass() {
     testDAOProvider.cleanup();
   }
@@ -134,8 +136,12 @@ public class DetectionEmailAlerterTest {
   @Test
   public void testSendEmailSuccessful() throws Exception {
     Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result = new HashMap<>();
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
+        this.alertConfigDTO,
+        ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes()),
+        new HashMap<>());
     result.put(
-        new DetectionAlertFilterNotification(ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes())),
+        new DetectionAlertFilterNotification(subsConfig),
         new HashSet<>(this.anomalyDAO.findAll()));
     DetectionAlertFilterResult notificationResults = new DetectionAlertFilterResult(result);
 

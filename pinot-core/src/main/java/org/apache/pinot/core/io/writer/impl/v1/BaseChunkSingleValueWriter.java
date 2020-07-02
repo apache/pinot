@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleValueWriter {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSingleValueWriter.class);
+  private static final int FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2 = Integer.BYTES;
+  private static final int FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V3 = Long.BYTES;
 
   protected final FileChannel _dataFile;
   protected ByteBuffer _header;
@@ -45,7 +47,9 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   protected final ChunkCompressor _chunkCompressor;
 
   protected int _chunkSize;
-  protected int _dataOffset;
+  protected long _dataOffset;
+
+  private final int _headerEntryChunkOffsetSize;
 
   /**
    * Constructor for the class.
@@ -64,11 +68,23 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
       throws FileNotFoundException {
     _chunkSize = chunkSize;
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
-
+    _headerEntryChunkOffsetSize = getHeaderEntryChunkOffsetSize(version);
     _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
     _chunkBuffer = ByteBuffer.allocateDirect(chunkSize);
     _compressedBuffer = ByteBuffer.allocateDirect(chunkSize * 2);
     _dataFile = new RandomAccessFile(file, "rw").getChannel();
+  }
+
+  public static int getHeaderEntryChunkOffsetSize(int version) {
+    switch (version) {
+      case 1:
+      case 2:
+        return FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V1V2;
+      case 3:
+        return FILE_HEADER_ENTRY_CHUNK_OFFSET_SIZE_V3;
+      default:
+        throw new IllegalStateException("Invalid version: " + version);
+    }
   }
 
   @Override
@@ -139,7 +155,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   private int writeHeader(ChunkCompressorFactory.CompressionType compressionType, int totalDocs, int numDocsPerChunk,
       int sizeOfEntry, int version) {
     int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
-    int headerSize = (numChunks + 7) * Integer.BYTES; // 7 items written before chunk indexing.
+    int headerSize = (7 * Integer.BYTES) + (numChunks * _headerEntryChunkOffsetSize);
 
     _header = ByteBuffer.allocateDirect(headerSize);
 
@@ -196,7 +212,12 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
       throw new RuntimeException(e);
     }
 
-    _header.putInt(_dataOffset);
+    if (_headerEntryChunkOffsetSize == Integer.BYTES) {
+      _header.putInt((int)_dataOffset);
+    } else if (_headerEntryChunkOffsetSize == Long.BYTES) {
+      _header.putLong(_dataOffset);
+    }
+
     _dataOffset += sizeToWrite;
 
     _chunkBuffer.clear();

@@ -24,12 +24,12 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.RoutingTable;
-import org.apache.pinot.broker.routing.TimeBoundaryService;
-import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
@@ -43,6 +43,7 @@ import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -53,10 +54,10 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryRouter _queryRouter;
 
-  public SingleConnectionBrokerRequestHandler(Configuration config, RoutingTable routingTable,
-      TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics) {
-    super(config, routingTable, timeBoundaryService, accessControlFactory, queryQuotaManager, brokerMetrics);
+  public SingleConnectionBrokerRequestHandler(Configuration config, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    super(config, routingManager, accessControlFactory, queryQuotaManager, brokerMetrics, propertyStore);
     _queryRouter = new QueryRouter(_brokerId, brokerMetrics);
   }
 

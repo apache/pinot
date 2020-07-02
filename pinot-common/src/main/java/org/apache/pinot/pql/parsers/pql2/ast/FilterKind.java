@@ -30,5 +30,18 @@ public enum FilterKind {
   BETWEEN,
   IN,
   NOT_IN,
-  REGEXP_LIKE
+  REGEXP_LIKE,
+  IS_NULL,
+  IS_NOT_NULL,
+  TEXT_MATCH;
+
+  /**
+   * Helper method that returns true if the enum maps to a Range.
+   *
+   * @return True if the enum is of Range type, false otherwise.
+   */
+  public boolean isRange() {
+    return (this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
+        || this == BETWEEN);
+  }
 }

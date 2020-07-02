@@ -25,11 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -37,6 +40,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.minion.rollup.MergeRollupSegmentConverter;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -61,6 +65,7 @@ public class MergeRollupSegmentConverterTest {
 
   private List<File> _segmentIndexDirList;
   private final long _referenceTimestamp = System.currentTimeMillis();
+  private TableConfig _tableConfig;
 
   @BeforeClass
   public void setUp()
@@ -68,12 +73,12 @@ public class MergeRollupSegmentConverterTest {
     FileUtils.deleteDirectory(WORKING_DIR);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
 
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(D1, FieldSpec.DataType.INT, true));
-    schema.addField(new DimensionFieldSpec(D2, FieldSpec.DataType.STRING, true));
-    schema.addField(new MetricFieldSpec(M1, FieldSpec.DataType.LONG));
-    schema.addField(new MetricFieldSpec(M2, FieldSpec.DataType.DOUBLE));
-    schema.addField(new TimeFieldSpec(T, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(D2, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.LONG)
+        .addMetric(M2, FieldSpec.DataType.DOUBLE)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, T), null).build();
+
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(T).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     long timestamp = _referenceTimestamp;
@@ -90,8 +95,8 @@ public class MergeRollupSegmentConverterTest {
 
     for (int i = 0; i < NUM_SEGMENTS; i++) {
       String segmentName = INPUT_SEGMENT_NAME_PREFIX + i;
-      RecordReader recordReader = new GenericRowRecordReader(rows, schema);
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+      RecordReader recordReader = new GenericRowRecordReader(rows);
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME);
       config.setSegmentName(segmentName);
@@ -108,7 +113,8 @@ public class MergeRollupSegmentConverterTest {
     // Run roll-up segment converter with "CONCATENATE" merge type
     MergeRollupSegmentConverter rollupSegmentConverter =
         new MergeRollupSegmentConverter.Builder().setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR)
-            .setTableName(TABLE_NAME).setSegmentName("TestConcatenate").setMergeType("CONCATENATE").build();
+            .setTableName(TABLE_NAME).setSegmentName("TestConcatenate").setMergeType("CONCATENATE")
+            .setTableConfig(_tableConfig).build();
     List<File> result = rollupSegmentConverter.convert();
     Assert.assertEquals(result.size(), 1);
 
@@ -148,7 +154,7 @@ public class MergeRollupSegmentConverterTest {
     MergeRollupSegmentConverter rollupSegmentConverter =
         new MergeRollupSegmentConverter.Builder().setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR)
             .setTableName(TABLE_NAME).setSegmentName("TestSimpleRollup").setMergeType("ROLLUP")
-            .setRollupPreAggregateType(preAggregateType).build();
+            .setRollupPreAggregateType(preAggregateType).setTableConfig(_tableConfig).build();
     List<File> result = rollupSegmentConverter.convert();
     Assert.assertEquals(result.size(), 1);
 

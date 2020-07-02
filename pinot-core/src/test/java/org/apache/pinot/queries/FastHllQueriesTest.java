@@ -22,12 +22,9 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -44,7 +41,12 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -70,13 +72,10 @@ import org.testng.annotations.Test;
  */
 @SuppressWarnings("ConstantConditions")
 public class FastHllQueriesTest extends BaseQueriesTest {
-  private static final String AVRO_DATA_WITHOUT_PRE_GENERATED_HLL_COLUMNS =
-      "data" + File.separator + "test_data-sv.avro";
   private static final String AVRO_DATA_WITH_PRE_GENERATED_HLL_COLUMNS =
       "data" + File.separator + "test_data-sv_hll.avro";
   private static final String SEGMENT_NAME = "testTable_126164076_167572854";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FastHllQueriesTest");
-  private static final int HLL_LOG2M = 6;
 
   private static final String BASE_QUERY = "SELECT FASTHLL(column17_HLL), FASTHLL(column18_HLL) FROM testTable";
   private static final String GROUP_BY = " group by column11";
@@ -104,57 +103,9 @@ public class FastHllQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testFastHllWithoutPreGeneratedHllColumns()
-      throws Exception {
-    buildAndLoadSegment(false);
-
-    // Test inner segment queries
-    // Test base query
-    AggregationOperator aggregationOperator = getOperatorForQuery(BASE_QUERY);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 1L, 0L, 2L, 30000L);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 21L);
-    Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
-    // Test query with filter
-    aggregationOperator = getOperatorForQueryWithFilter(BASE_QUERY);
-    resultsBlock = aggregationOperator.nextBlock();
-    executionStatistics = aggregationOperator.getExecutionStatistics();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 112479L, 12258L, 30000L);
-    aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
-    Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
-    // Test query with group-by
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(BASE_QUERY + GROUP_BY);
-    resultsBlock = aggregationGroupByOperator.nextBlock();
-    executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 4613L, 0L, 13839L, 30000L);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey._stringKey, "");
-    Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).cardinality(), 21L);
-    Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).cardinality(), 691L);
-
-    // Test inter segments base query
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(BASE_QUERY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4L, 0L, 8L, 120000L, new String[]{"21", "1762"});
-    // Test inter segments query with filter
-    brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 449916L, 49032L, 120000L,
-        new String[]{"17", "1197"});
-    // Test inter segments query with group-by
-    brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 18452L, 0L, 55356L, 120000L, new String[]{"21", "1762"});
-
-    deleteSegment();
-  }
-
-  @Test
   public void testFastHllWithPreGeneratedHllColumns()
       throws Exception {
-    buildAndLoadSegment(true);
+    buildAndLoadSegment();
 
     // Test inner segment queries
     // Test base query
@@ -185,53 +136,47 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).cardinality(), 691L);
 
     // Test inter segments base query
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(BASE_QUERY);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, new String[]{"21", "1762"});
     // Test inter segments query with filter
-    brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(BASE_QUERY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
-    brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
+    brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY + GROUP_BY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, new String[]{"21", "1762"});
 
     deleteSegment();
   }
 
-  private void buildAndLoadSegment(boolean hasPreGeneratedHllColumns)
+  private void buildAndLoadSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Get resource file path
-    URL resource;
-    if (hasPreGeneratedHllColumns) {
-      resource = getClass().getClassLoader().getResource(AVRO_DATA_WITH_PRE_GENERATED_HLL_COLUMNS);
-    } else {
-      resource = getClass().getClassLoader().getResource(AVRO_DATA_WITHOUT_PRE_GENERATED_HLL_COLUMNS);
-    }
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA_WITH_PRE_GENERATED_HLL_COLUMNS);
     Assert.assertNotNull(resource);
     String filePath = resource.getFile();
 
     // Build the segment schema
-    Schema.SchemaBuilder schemaBuilder =
-        new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
-            .addMetric("column3", FieldSpec.DataType.INT).addSingleValueDimension("column5", FieldSpec.DataType.STRING)
-            .addSingleValueDimension("column6", FieldSpec.DataType.INT)
-            .addSingleValueDimension("column7", FieldSpec.DataType.INT)
-            .addSingleValueDimension("column9", FieldSpec.DataType.INT)
-            .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
-            .addSingleValueDimension("column12", FieldSpec.DataType.STRING)
-            .addMetric("column17", FieldSpec.DataType.INT).addMetric("column18", FieldSpec.DataType.INT)
-            .addTime("daysSinceEpoch", TimeUnit.DAYS, FieldSpec.DataType.INT);
-    if (hasPreGeneratedHllColumns) {
-      schemaBuilder.addSingleValueDimension("column17_HLL", FieldSpec.DataType.STRING)
-          .addSingleValueDimension("column18_HLL", FieldSpec.DataType.STRING);
-    }
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
+        .addMetric("column3", FieldSpec.DataType.INT).addSingleValueDimension("column5", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("column6", FieldSpec.DataType.INT)
+        .addSingleValueDimension("column7", FieldSpec.DataType.INT)
+        .addSingleValueDimension("column9", FieldSpec.DataType.INT)
+        .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("column12", FieldSpec.DataType.STRING).addMetric("column17", FieldSpec.DataType.INT)
+        .addMetric("column18", FieldSpec.DataType.INT)
+        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null)
+        .addSingleValueDimension("column17_HLL", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("column18_HLL", FieldSpec.DataType.STRING).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
 
     // Create the segment generator config
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schemaBuilder.build());
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
@@ -243,14 +188,6 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setSkipTimeValueCheck(true);
     segmentGeneratorConfig
         .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
-    if (hasPreGeneratedHllColumns) {
-      segmentGeneratorConfig.setHllConfig(new HllConfig(HLL_LOG2M));
-    } else {
-      segmentGeneratorConfig.enableStarTreeIndex(null);
-      // Intentionally use the non-default suffix
-      segmentGeneratorConfig
-          .setHllConfig(new HllConfig(HLL_LOG2M, new HashSet<>(Arrays.asList("column17", "column18")), "_HLL"));
-    }
 
     // Build the index segment
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

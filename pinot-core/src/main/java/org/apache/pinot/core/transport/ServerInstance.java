@@ -21,6 +21,7 @@ package org.apache.pinot.core.transport;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.config.table.TableType;
 
 
 public class ServerInstance {
@@ -67,7 +68,7 @@ public class ServerInstance {
     return _port;
   }
 
-  public ServerRoutingInstance toServerRoutingInstance(Helix.TableType tableType) {
+  public ServerRoutingInstance toServerRoutingInstance(TableType tableType) {
     return new ServerRoutingInstance(_hostname, _port, tableType);
   }
 

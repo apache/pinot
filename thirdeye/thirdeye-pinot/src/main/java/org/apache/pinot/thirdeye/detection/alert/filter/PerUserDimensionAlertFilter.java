@@ -41,48 +41,42 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotificatio
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
+import org.springframework.util.CollectionUtils;
+
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
 
 
 /**
  * The detection alert filter that sends the anomaly email to a set of unconditional and another
  * set of conditional recipients, based on the value of a specified anomaly dimension
  *
- * However, unlike the {$link {@link DimensionDetectionAlertFilter}}, this filter consolidates
- * anomalies across dimensions and sends alert per user. This is used in scenarios where there
- * is an overlap of recipients across dimensions, to reduce the number of alerts sent out to a
- * specific user.
+ * This filter consolidates anomalies across dimensions and sends alert per user. This is used
+ * in scenarios where there is an overlap of recipients across dimensions, to reduce the number
+ * of alerts sent out to a specific user.
  */
 @AlertFilter(type = "PER_USER_DIMENSION_ALERTER_PIPELINE")
 public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
-  private static final String PROP_SEND_ONCE = "sendOnce";
 
   final String dimension;
-  final Map<String, Set<String>> recipients;
   final SetMultimap<String, String> dimensionRecipients;
   final List<Long> detectionConfigIds;
-  final boolean sendOnce;
 
   public PerUserDimensionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
     Preconditions.checkNotNull(config.getProperties().get(PROP_DIMENSION), "Dimension name not specified");
 
-    this.recipients = ConfigUtils.getMap(this.config.getProperties().get(PROP_RECIPIENTS));
     this.dimension = MapUtils.getString(this.config.getProperties(), PROP_DIMENSION);
     this.dimensionRecipients = HashMultimap.create(ConfigUtils.<String, String>getMultimap(this.config.getProperties().get(PROP_DIMENSION_RECIPIENTS)));
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
-    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
-  public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark) {
+  public DetectionAlertFilterResult run() {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-
-    final long minId = getMinId(highWaterMark);
-
-    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
+    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds));
 
     // group anomalies by dimensions value
     Multimap<String, MergedAnomalyResultDTO> grouped = Multimaps.index(anomalies, new Function<MergedAnomalyResultDTO, String>() {
@@ -105,15 +99,22 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
       }
     }
 
-    for (Map.Entry<String, List<MergedAnomalyResultDTO>> userAnomalyMapping : perUserAnomalies.entrySet()) {
-      result.addMapping(
-          new DetectionAlertFilterNotification(
-              generateNotificationSchemeProps(
-                  this.config,
-                  this.makeGroupRecipients(userAnomalyMapping.getKey()),
-                  this.recipients.get(PROP_CC),
-                  this.recipients.get(PROP_BCC))),
-          new HashSet<>(userAnomalyMapping.getValue()));
+    // Per user dimension alerter works only with email alerter
+    if (!SubscriptionUtils.isEmptyEmailRecipients(this.config)) {
+      Map<String, Object> emailProps = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
+      Map<String, Object> recipients = ConfigUtils.getMap(emailProps.get(PROP_RECIPIENTS));
+
+      for (Map.Entry<String, List<MergedAnomalyResultDTO>> userAnomalyMapping : perUserAnomalies.entrySet()) {
+        Map<String, Object> generatedAlertSchemes = generateAlertSchemeProps(this.config,
+            this.makeGroupRecipients(ConfigUtils.getList(recipients.get(PROP_TO)), userAnomalyMapping.getKey()),
+            new HashSet<>(ConfigUtils.getList(recipients.get(PROP_CC))),
+            new HashSet<>(ConfigUtils.getList(recipients.get(PROP_BCC))));
+
+        DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
+            this.config, generatedAlertSchemes, this.config.getReferenceLinks());
+
+        result.addMapping(new DetectionAlertFilterNotification(subsConfig), new HashSet<>(userAnomalyMapping.getValue()));
+      }
     }
 
     return result;
@@ -127,17 +128,13 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
     return recipients;
   }
 
-  private Set<String> makeGroupRecipients(String key) {
-    Set<String> recipients = new HashSet<>(this.recipients.get(PROP_TO));
-    recipients.add(key);
-    return recipients;
-  }
-
-  private long getMinId(long highWaterMark) {
-    if (this.sendOnce) {
-      return highWaterMark + 1;
-    } else {
-      return 0;
+  private Set<String> makeGroupRecipients(List<String> toRecipients, String newUser) {
+    Set<String> recipients = new HashSet<>();
+    if (!CollectionUtils.isEmpty(toRecipients)) {
+      recipients.addAll(toRecipients);
     }
+
+    recipients.add(newUser);
+    return recipients;
   }
 }

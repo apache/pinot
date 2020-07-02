@@ -65,20 +65,8 @@ $(document).ready(function() {
     // execute query and draw the results
     var query = EDITOR.getValue().trim();
     var traceEnabled = document.getElementById('trace-enabled').checked;
-    var groupByModeSQL = document.getElementById('group-by-mode-sql').checked;
-    var responseFormatSQL = document.getElementById('response-format-sql').checked;
-    var queryOptions = undefined;
-    if (groupByModeSQL === true) {
-      queryOptions = "groupByMode=sql";
-    }
-    if (responseFormatSQL === true) {
-      if (queryOptions === undefined) {
-        queryOptions = "responseFormat=sql";
-      } else {
-        queryOptions = queryOptions + ";responseFormat=sql";
-      }
-    }
-    HELPERS.executeQuery(query, traceEnabled, queryOptions, function(data) {
+    var querySyntaxPQL = document.getElementById('pql').checked;
+    HELPERS.executeQuery(query, querySyntaxPQL, traceEnabled, function(data) {
       RESULTS.setValue(js_beautify(data, JS_BEAUTIFY_SETTINGS));
     })
   });
@@ -135,13 +123,22 @@ var HELPERS = {
     var query = EDITOR.getValue().trim();
   },
 
-  executeQuery: function(query, traceEnabled, queryOptions, callback) {
-    var url = "/pql";
-    var params = JSON.stringify({
-      "pql": query,
-      "trace": traceEnabled,
-      "queryOptions" : queryOptions
-    });
+  executeQuery: function(query, querySyntaxPQL, traceEnabled, callback) {
+    var url = undefined;
+    var params = undefined;
+    if (querySyntaxPQL === true) {
+      url = "/pql";
+      params = JSON.stringify({
+        "pql": query,
+        "trace": traceEnabled
+      });
+    } else {
+      url = "/sql";
+      params = JSON.stringify({
+        "sql": query,
+        "trace": traceEnabled
+      });
+    }
     $.ajax({
       type: 'POST',
       url: url,

@@ -30,14 +30,14 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,11 +79,11 @@ public class TableSizeReader {
 
     boolean hasRealtimeTable = false;
     boolean hasOfflineTable = false;
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
 
     if (tableType != null) {
-      hasRealtimeTable = tableType == CommonConstants.Helix.TableType.REALTIME;
-      hasOfflineTable = tableType == CommonConstants.Helix.TableType.OFFLINE;
+      hasRealtimeTable = tableType == TableType.REALTIME;
+      hasOfflineTable = tableType == TableType.OFFLINE;
     } else {
       hasRealtimeTable = _helixResourceManager.hasRealtimeTable(tableName);
       hasOfflineTable = _helixResourceManager.hasOfflineTable(tableName);

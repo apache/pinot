@@ -32,27 +32,30 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -84,6 +87,7 @@ public class SegmentGenerationWithBytesTypeTest {
   private Random _random;
   private RecordReader _recordReader;
   private Schema _schema;
+  private TableConfig _tableConfig;
   private ImmutableSegment _segment;
 
   /**
@@ -100,6 +104,8 @@ public class SegmentGenerationWithBytesTypeTest {
     _schema.addField(new DimensionFieldSpec(FIXED_BYTES_UNSORTED_COLUMN, FieldSpec.DataType.BYTES, true));
     _schema.addField(new DimensionFieldSpec(FIXED_BYTES_NO_DICT_COLUMN, FieldSpec.DataType.BYTES, true));
     _schema.addField(new DimensionFieldSpec(VARIABLE_BYTES_COLUMN, FieldSpec.DataType.BYTES, true));
+
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
 
     _random = new Random(System.nanoTime());
     _recordReader = buildIndex(_schema);
@@ -139,7 +145,7 @@ public class SegmentGenerationWithBytesTypeTest {
     }
 
     // Ensure both record readers are exhausted, ie same number of rows.
-    Assert.assertTrue(!_recordReader.hasNext());
+    Assert.assertFalse(_recordReader.hasNext());
     pinotReader.close();
   }
 
@@ -223,7 +229,7 @@ public class SegmentGenerationWithBytesTypeTest {
 
   private RecordReader buildIndex(Schema schema)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
 
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
@@ -255,7 +261,7 @@ public class SegmentGenerationWithBytesTypeTest {
       rows.add(genericRow);
     }
 
-    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+    RecordReader recordReader = new GenericRowRecordReader(rows);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, recordReader);
     driver.build();
@@ -321,7 +327,7 @@ public class SegmentGenerationWithBytesTypeTest {
    */
   private IndexSegment buildSegmentFromAvro(Schema schema, String dirName, String avroName, String segmentName)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
     config.setInputFilePath(dirName + File.separator + avroName);
     config.setOutDir(dirName);
     config.setSegmentName(segmentName);

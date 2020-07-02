@@ -23,7 +23,7 @@ import java.io.IOException;
 
 
 /**
- * Currently only support RoaringBitmap inverted index.
+ * Support for RoaringBitmap inverted index:
  * <pre>
  * Layout for RoaringBitmap inverted index:
  * |-------------------------------------------------------------------------|
@@ -53,6 +53,8 @@ import java.io.IOException;
  *     Call seal() after all dictIds have been added
  *   </li>
  * </ul>
+ *
+ * Support for Lucene based inverted index for text
  */
 public interface InvertedIndexCreator extends Closeable {
 
@@ -71,4 +73,13 @@ public interface InvertedIndexCreator extends Closeable {
    */
   void seal()
       throws IOException;
+
+  /**
+   * Add a row (represented by an object) with a given docId
+   * @param document document/object to add
+   * @param docId object's docId
+   *
+   * Currently this is
+   */
+  void addDoc(Object document, int docId);
 }

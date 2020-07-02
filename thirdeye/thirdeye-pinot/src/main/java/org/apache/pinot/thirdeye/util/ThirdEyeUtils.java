@@ -38,6 +38,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -62,6 +63,8 @@ import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -74,6 +77,7 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Period;
 import org.slf4j.Logger;
@@ -92,11 +96,18 @@ public abstract class ThirdEyeUtils {
   private static final String TWO_DECIMALS_FORMAT = "#,###.##";
   private static final String MAX_DECIMALS_FORMAT = "#,###.#####";
   private static final String DECIMALS_FORMAT_TOKEN = "#";
+  private static final String PROP_DETECTOR_COMPONENT_NAME_DELIMETER = ",";
 
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
   private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
   private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
 
+  // How much data to prefetch to warm up the cache
+  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
+  private static final long CACHING_PERIOD_LOOKBACK_DAILY = TimeUnit.DAYS.toMillis(90);
+  private static final long CACHING_PERIOD_LOOKBACK_HOURLY = TimeUnit.DAYS.toMillis(60);
+  // disable minute level cache warm up
+  private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
 
   public static final long DETECTION_TASK_MAX_LOOKBACK_WINDOW = TimeUnit.DAYS.toMillis(7);
 
@@ -387,6 +398,26 @@ public abstract class ThirdEyeUtils {
     }
   }
 
+  /**
+   * Get the expected delay for the detection pipeline.
+   * This delay should be the longest of the expected delay of the underline datasets.
+   *
+   * @param config The detection config.
+   * @return The expected delay for this alert in milliseconds.
+   */
+  public static long getDetectionExpectedDelay(DetectionConfigDTO config) {
+    long maxExpectedDelay = 0;
+    Set<String> metricUrns = DetectionConfigFormatter
+        .extractMetricUrnsFromProperties(config.getProperties());
+    for (String urn : metricUrns) {
+      List<DatasetConfigDTO> datasets = ThirdEyeUtils.getDatasetConfigsFromMetricUrn(urn);
+      for (DatasetConfigDTO dataset : datasets) {
+        maxExpectedDelay = Math.max(dataset.getExpectedDelay().toMillis(), maxExpectedDelay);
+      }
+    }
+    return maxExpectedDelay;
+  }
+
   public static MetricConfigDTO getMetricConfigFromId(Long metricId) {
     MetricConfigDTO metricConfig = null;
     if (metricId != null) {
@@ -661,20 +692,30 @@ public abstract class ThirdEyeUtils {
     switch (granularity.getUnit()) {
       case DAYS:
         // 90 days data for daily detection
-        period = TimeUnit.DAYS.toMillis(90);
+        period = CACHING_PERIOD_LOOKBACK_DAILY;
         break;
       case HOURS:
         // 60 days data for hourly detection
-        period = TimeUnit.DAYS.toMillis(60);
+        period = CACHING_PERIOD_LOOKBACK_HOURLY;
         break;
       case MINUTES:
         // disable minute level cache warmup by default.
-        period = -1;
+        period = CACHING_PERIOD_LOOKBACK_MINUTELY;
         break;
       default:
-        period = -1;
+        period = DEFAULT_CACHING_PERIOD_LOOKBACK;
     }
     return period;
+  }
+
+  /**
+   * Check if the anomaly is detected by multiple components
+   * @param anomaly the anomaly
+   * @return if the anomaly is detected by multiple components
+   */
+  public static boolean isDetectedByMultipleComponents(MergedAnomalyResultDTO anomaly) {
+    String componentName = anomaly.getProperties().getOrDefault(PROP_DETECTOR_COMPONENT_NAME, "");
+    return componentName.contains(PROP_DETECTOR_COMPONENT_NAME_DELIMETER);
   }
 
   /**
@@ -687,13 +728,9 @@ public abstract class ThirdEyeUtils {
    */
   private static String combineComponents(String component1, String component2) {
     List<String> components = new ArrayList<>();
-    for (String component : component1.split(",")) {
-      components.add(component);
-    }
-    for (String component : component2.split(",")) {
-      components.add(component);
-    }
-    return String.join(",", components.stream().distinct().collect(Collectors.toList()));
+    components.addAll(Arrays.asList(component1.split(PROP_DETECTOR_COMPONENT_NAME_DELIMETER)));
+    components.addAll(Arrays.asList(component2.split(PROP_DETECTOR_COMPONENT_NAME_DELIMETER)));
+    return components.stream().distinct().collect(Collectors.joining(PROP_DETECTOR_COMPONENT_NAME_DELIMETER));
   }
 
   /**

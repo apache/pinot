@@ -18,15 +18,16 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.parsers.CompilerConstants;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 /**
@@ -36,9 +37,6 @@ public class FunctionCallAstNode extends BaseAstNode {
   private final String _name;
   private String _expression;
   private boolean _isInSelectList;
-
-  public static final String DISTINCT_MULTI_COLUMN_SEPARATOR = ":";
-  public static final String COLUMN_KEY_IN_AGGREGATION_INFO = "column";
 
   public FunctionCallAstNode(String name, String expression) {
     _name = name;
@@ -83,62 +81,50 @@ public class FunctionCallAstNode extends BaseAstNode {
   }
 
   AggregationInfo buildAggregationInfo() {
-    String expression;
+    List<String> functionArgs = new ArrayList<>();
     // COUNT aggregation function always works on '*'
     if (_name.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      expression = "*";
+      functionArgs.add("*");
     } else {
       List<? extends AstNode> children = getChildren();
       if (children == null || children.isEmpty()) {
         throw new Pql2CompilationException("Aggregation function expects non-null argument");
       }
-      if (!_name.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
-        if (children.size() != 1) {
-          throw new Pql2CompilationException("Aggregation function expects exactly 1 argument as column name");
-        } else {
-          expression = TransformExpressionTree.getStandardExpression(children.get(0));
+
+      // TODO: Remove all distinct special-casing.
+      // DISTINCT(*) is not supported yet. User has to specify each column that should participate in DISTINCT
+      if (_name.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName()) && children.size() == 1 && children
+          .get(0) instanceof StarExpressionAstNode) {
+        throw new Pql2CompilationException(
+            "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name as argument to DISTINCT function");
+      }
+
+      // Need to de-dup the args for Distinct.
+      if (_name.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+        Set<String> expressionsSet = new TreeSet<>();
+        for (AstNode child : children) {
+          String expression = TransformExpressionTree.getStandardExpression(child);
+
+          if (expressionsSet.add(expression)) {
+            functionArgs.add(expression);
+          }
         }
       } else {
-        // DISTINCT
-        if (!Pql2Compiler.ENABLE_DISTINCT) {
-          throw new Pql2CompilationException("Support for DISTINCT is currently disabled");
-        }
-        if (children.size() == 1) {
-          // single column DISTINCT query
-          // e.g SELECT DISTINCT(col) FROM foo
-          if (children.get(0) instanceof StarExpressionAstNode) {
-            // DISTINCT(*) is not supported yet. User has to specify each column that should participate in DISTINCT
-            throw new Pql2CompilationException(
-                "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name as argument to DISTINCT function");
-          }
-          expression = TransformExpressionTree.getStandardExpression(children.get(0));
-        } else {
-          // multi-column DISTINCT query
-          // e.g SELECT DISTINCT(col1, col2) FROM foo
-          // we will pass down the column expression to execution code
-          // as col1:col2
-          Set<String> expressions = new HashSet<>();
-          StringBuilder distinctColumnExpr = new StringBuilder();
-          int numChildren = children.size();
-          for (int i = 0; i < numChildren; ++i) {
-            expression = TransformExpressionTree.getStandardExpression(children.get(i));
-            if (expressions.add(expression)) {
-              // deduplicate the columns
-              if (i != 0) {
-                distinctColumnExpr.append(DISTINCT_MULTI_COLUMN_SEPARATOR);
-              }
-              distinctColumnExpr.append(expression);
-            }
-          }
-          expression = distinctColumnExpr.toString();
+        for (AstNode child : children) {
+          functionArgs.add(TransformExpressionTree.getStandardExpression(child));
         }
       }
     }
 
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(_name);
-    aggregationInfo.putToAggregationParams(COLUMN_KEY_IN_AGGREGATION_INFO, expression);
+    aggregationInfo.setExpressions(functionArgs);
     aggregationInfo.setIsInSelectList(_isInSelectList);
+
+    // For backward compatibility (new broker - old server), also set the old way.
+    // TODO: remove with a major version change.
+    aggregationInfo.putToAggregationParams(CompilerConstants.COLUMN_KEY_IN_AGGREGATION_INFO,
+        String.join(CompilerConstants.AGGREGATION_FUNCTION_ARG_SEPARATOR, functionArgs));
 
     return aggregationInfo;
   }

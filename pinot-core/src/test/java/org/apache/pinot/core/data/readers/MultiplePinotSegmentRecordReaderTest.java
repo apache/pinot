@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -32,6 +34,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,7 +53,8 @@ public class MultiplePinotSegmentRecordReaderTest {
   private static String D_MV_1 = "d_mv_1";
   private static String M1 = "m1";
   private static String M2 = "m2";
-  private static String TIME = "t";
+  private static String TIME_1 = "t1";
+  private static String TIME_2 = "t2";
 
   private String _segmentOutputDir;
   private List<File> _segmentIndexDirList;
@@ -60,6 +64,7 @@ public class MultiplePinotSegmentRecordReaderTest {
   public void setup()
       throws Exception {
     Schema schema = createPinotSchema();
+    TableConfig tableConfig = createTableConfig();
     _segmentOutputDir = Files.createTempDir().toString();
     _rowsList = new ArrayList<>(NUM_SEGMENTS);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
@@ -68,21 +73,27 @@ public class MultiplePinotSegmentRecordReaderTest {
       String segmentName = "multiplePinotSegmentRecordReaderTest_" + i;
       List<GenericRow> rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
       _rowsList.add(rows);
-      RecordReader recordReader = new GenericRowRecordReader(rows, schema);
-      _segmentIndexDirList.add(PinotSegmentUtil.createSegment(schema, segmentName, _segmentOutputDir, recordReader));
+      RecordReader recordReader = new GenericRowRecordReader(rows);
+      _segmentIndexDirList
+          .add(PinotSegmentUtil.createSegment(tableConfig, schema, segmentName, _segmentOutputDir, recordReader));
     }
   }
 
   private Schema createPinotSchema() {
-    Schema testSchema = new Schema();
-    testSchema.setSchemaName("schema");
-    testSchema.addField(new DimensionFieldSpec(D_SV_1, FieldSpec.DataType.STRING, true));
-    testSchema.addField(new DimensionFieldSpec(D_SV_2, FieldSpec.DataType.INT, true));
-    testSchema.addField(new DimensionFieldSpec(D_MV_1, FieldSpec.DataType.STRING, false));
-    testSchema.addField(new MetricFieldSpec(M1, FieldSpec.DataType.INT));
-    testSchema.addField(new MetricFieldSpec(M2, FieldSpec.DataType.FLOAT));
-    testSchema.addField(new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, TIME)));
-    return testSchema;
+    return new Schema.SchemaBuilder()
+        .setSchemaName("schema")
+        .addSingleValueDimension(D_SV_1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(D_SV_2, FieldSpec.DataType.INT)
+        .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING)
+        .addMetric(M1, FieldSpec.DataType.INT)
+        .addMetric(M2, FieldSpec.DataType.FLOAT)
+        .addDateTime(TIME_1, FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime(TIME_2, FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS")
+        .build();
+  }
+
+  private TableConfig createTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_1).build();
   }
 
   @Test
@@ -108,7 +119,8 @@ public class MultiplePinotSegmentRecordReaderTest {
         Assert.assertTrue(PinotSegmentUtil.compareMultiValueColumn(outputRow.getValue(D_MV_1), row.getValue(D_MV_1)));
         Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
         Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
-        Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
+        Assert.assertEquals(outputRow.getValue(TIME_1), row.getValue(TIME_1));
+        Assert.assertEquals(outputRow.getValue(TIME_2), row.getValue(TIME_2));
       }
     }
   }

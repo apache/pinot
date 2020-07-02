@@ -28,26 +28,6 @@
     <format>dir</format>
   </formats>
   <includeBaseDirectory>true</includeBaseDirectory>
-  <dependencySets>
-    <dependencySet>
-      <useProjectArtifact>false</useProjectArtifact>
-      <useTransitiveDependencies>true</useTransitiveDependencies>
-      <outputDirectory>lib</outputDirectory>
-      <unpack>false</unpack>
-      <excludes>
-        <exclude>${project.groupId}:*:*</exclude>
-      </excludes>
-    </dependencySet>
-    <dependencySet>
-      <useProjectArtifact>false</useProjectArtifact>
-      <useTransitiveDependencies>true</useTransitiveDependencies>
-      <outputDirectory>lib</outputDirectory>
-      <unpack>false</unpack>
-      <includes>
-        <include>${project.groupId}:*:*</include>
-      </includes>
-    </dependencySet>
-  </dependencySets>
 
   <files>
     <!-- Rename LICENSE-binary, NOTICE-binary to LICENSE, NOTICE and include them to a distribution tarbell -->
@@ -63,6 +43,78 @@
     <file>
       <source>${pinot.root}/DISCLAIMER</source>
     </file>
+    <!-- Include Pinot All-in-one jar -->
+    <file>
+      <source>${pinot.root}/pinot-distribution/target/pinot-distribution-${project.version}-shaded.jar</source>
+      <destName>lib/pinot-all-${project.version}-jar-with-dependencies.jar</destName>
+    </file>
+    <!-- Start Include Pinot Plugins-->
+    <!-- Start Include Pinot Stream Ingestion Plugins-->
+    <!-- Only Include Specified Kafka Version Plugin-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/target/pinot-kafka-${kafka.version}-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/pinot-kafka-${kafka.version}-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Stream Ingestion Plugins-->
+    <!-- Start Include Pinot Batch Ingestion Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/target/pinot-batch-ingestion-standalone-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-batch-ingestion/pinot-batch-ingestion-standalone/pinot-batch-ingestion-standalone-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/target/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark/target/pinot-batch-ingestion-spark-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark/pinot-batch-ingestion-spark-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Batch Ingestion Plugins-->
+    <!-- Start Include Pinot File System Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-adls/target/pinot-adls-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-file-system/pinot-adls/pinot-adls-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-gcs/target/pinot-gcs-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-file-system/pinot-gcs/pinot-gcs-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-file-system/pinot-hdfs/target/pinot-hdfs-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-file-system/pinot-hdfs/pinot-hdfs-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot File System Plugins-->
+    <!-- Start Include Pinot Input Format Plugins-->
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-avro/target/pinot-avro-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-avro/pinot-avro-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-avro/target/pinot-confluent-avro-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-confluent-avro/pinot-confluent-avro-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-csv/target/pinot-csv-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-csv/pinot-csv-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-json/target/pinot-json-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-json/pinot-json-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-orc/target/pinot-orc-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-orc/pinot-orc-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-parquet/target/pinot-parquet-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-parquet/pinot-parquet-${project.version}-shaded.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-thrift/target/pinot-thrift-${project.version}-shaded.jar</source>
+      <destName>plugins/pinot-input-format/pinot-thrift/pinot-thrift-${project.version}-shaded.jar</destName>
+    </file>
+    <!-- End Include Pinot Input Format Plugins-->
+    <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>
     <!-- Rename licenses-binary directory to licenses and include it to a distribution tarbell -->
@@ -83,18 +135,18 @@
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data/kafka_${kafka.version}</directory>
-      <outputDirectory>sample_data/</outputDirectory>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/meetupRsvp/kafka_${kafka.version}</directory>
+      <outputDirectory>examples/stream/meetupRsvp/</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data</directory>
-      <outputDirectory>sample_data/</outputDirectory>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/airlineStats/kafka_${kafka.version}</directory>
+      <outputDirectory>examples/stream/airlineStats/</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data_realtime</directory>
-      <outputDirectory>sample_data</outputDirectory>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/examples</directory>
+      <outputDirectory>examples/</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>

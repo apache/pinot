@@ -18,20 +18,20 @@
  */
 package org.apache.pinot.core.realtime.impl.fakestream;
 
+import java.util.Set;
+import org.apache.pinot.core.util.SchemaUtils;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.realtime.stream.MessageBatch;
-import org.apache.pinot.core.realtime.stream.OffsetCriteria;
-import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
-import org.apache.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
-import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
-import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
-import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
-import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamDecoderProvider;
+import org.apache.pinot.spi.stream.StreamLevelConsumer;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 
 
 /**
@@ -48,8 +48,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
   }
 
   @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
+      String groupId) {
     return new FakeStreamLevelConsumer();
   }
 
@@ -63,7 +63,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     return new FakeStreamMetadataProvider(_streamConfig);
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     String clientId = "client_id_localhost_tester";
 
     // stream config
@@ -93,7 +94,8 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
     // Message decoder
     Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();
-    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(streamConfig, pinotSchema);
+    StreamMessageDecoder streamMessageDecoder =
+        StreamDecoderProvider.create(streamConfig, SchemaUtils.extractSourceFields(pinotSchema));
     GenericRow decodedRow = new GenericRow();
     streamMessageDecoder.decode(messageBatch.getMessageAtIndex(0), decodedRow);
     System.out.println(decodedRow);

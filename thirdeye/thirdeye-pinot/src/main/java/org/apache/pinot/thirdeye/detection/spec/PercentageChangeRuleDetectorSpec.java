@@ -27,6 +27,7 @@ public class PercentageChangeRuleDetectorSpec extends AbstractSpec {
   private String offset = "wo1w";
   private String timezone = DEFAULT_TIMEZONE;
   private String pattern = "UP_OR_DOWN";
+  private String weekStart = "WEDNESDAY";
   private String monitoringGranularity = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString(); // use native granularity by default
 
   public String getMonitoringGranularity() {
@@ -67,5 +68,13 @@ public class PercentageChangeRuleDetectorSpec extends AbstractSpec {
 
   public void setPercentageChange(double percentageChange) {
     this.percentageChange = percentageChange;
+  }
+
+  public String getWeekStart() {
+    return weekStart;
+  }
+
+  public void setWeekStart(String weekStart) {
+    this.weekStart = weekStart;
   }
 }

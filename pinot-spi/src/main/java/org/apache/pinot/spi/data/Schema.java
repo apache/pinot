@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -37,7 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -77,6 +78,7 @@ public final class Schema {
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
+  private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
 
   // Json ignored fields
   private transient final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
@@ -260,6 +262,9 @@ public final class Schema {
         _dateTimeNames.add(columnName);
         _dateTimeFieldSpecs.add((DateTimeFieldSpec) fieldSpec);
         break;
+      case COMPLEX:
+        _complexFieldSpecs.add((ComplexFieldSpec) fieldSpec);
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
     }
@@ -382,6 +387,26 @@ public final class Schema {
     return null;
   }
 
+  /**
+   * Fetches the DateTimeFieldSpec for the given time column name.
+   * If the columnName is a DATE_TIME column, returns the DateTimeFieldSpec
+   * If the columnName is a TIME column, converts to DateTimeFieldSpec before returning
+   */
+  @JsonIgnore
+  @Nullable
+  public DateTimeFieldSpec getSpecForTimeColumn(String timeColumnName) {
+    FieldSpec fieldSpec = _fieldSpecMap.get(timeColumnName);
+    if (fieldSpec != null) {
+      if (fieldSpec.getFieldType() == FieldType.DATE_TIME) {
+        return (DateTimeFieldSpec) fieldSpec;
+      }
+      if (fieldSpec.getFieldType() == FieldType.TIME) {
+        return convertToDateTimeFieldSpec((TimeFieldSpec) fieldSpec);
+      }
+    }
+    return null;
+  }
+
   @JsonIgnore
   public List<String> getDimensionNames() {
     return _dimensionNames;
@@ -395,21 +420,6 @@ public final class Schema {
   @JsonIgnore
   public List<String> getDateTimeNames() {
     return _dateTimeNames;
-  }
-
-  @JsonIgnore
-  public String getTimeColumnName() {
-    return (_timeFieldSpec != null) ? _timeFieldSpec.getName() : null;
-  }
-
-  @JsonIgnore
-  public TimeUnit getIncomingTimeUnit() {
-    return (_timeFieldSpec != null) ? _timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
-  }
-
-  @JsonIgnore
-  public TimeUnit getOutgoingTimeUnit() {
-    return (_timeFieldSpec != null) ? _timeFieldSpec.getOutgoingGranularitySpec().getTimeType() : null;
   }
 
   /**
@@ -442,10 +452,12 @@ public final class Schema {
       }
       jsonObject.set("dateTimeFieldSpecs", jsonArray);
     }
-    jsonObject.put("updateSemantic", _updateSemantic);
-    if (UPSERT_TABLE_CONFIG.equalsIgnoreCase(_updateSemantic)) {
-      jsonObject.put("primaryKey", _primaryKey);
-      jsonObject.put("offsetKey", _offsetKey);
+    if (!_complexFieldSpecs.isEmpty()) {
+      ArrayNode jsonArray = JsonUtils.newArrayNode();
+      for (ComplexFieldSpec complexFieldSpec : _complexFieldSpecs) {
+        jsonArray.add(complexFieldSpec.toJsonObject());
+      }
+      jsonObject.set("complexFieldSpecs", jsonArray);
     }
     return jsonObject;
   }
@@ -514,18 +526,21 @@ public final class Schema {
             case DOUBLE:
             case BYTES:
               break;
-            case STRING:
-              MetricFieldSpec metricFieldSpec = (MetricFieldSpec) fieldSpec;
-              if (!metricFieldSpec.isDerivedMetric()) {
-                ctxLogger.info("Unsupported data type: STRING in non-derived METRIC field: {}", fieldName);
-                return false;
-              }
-              break;
             default:
               ctxLogger.info("Unsupported data type: {} in METRIC field: {}", dataType, fieldName);
               return false;
           }
           break;
+        case COMPLEX:
+          switch (dataType) {
+            case STRUCT:
+            case MAP:
+            case LIST:
+              break;
+            default:
+              ctxLogger.info("Unsupported data type: {} in COMPLEX field: {}", dataType, fieldName);
+              return false;
+          }
         default:
           ctxLogger.info("Unsupported field type: {} for field: {}", dataType, fieldName);
           return false;
@@ -547,130 +562,96 @@ public final class Schema {
       return this;
     }
 
+    /**
+     * Add single value dimensionFieldSpec
+     */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true));
       return this;
     }
 
+    /**
+     * Add single value dimensionFieldSpec with a defaultNullValue
+     */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));
       return this;
     }
 
+    /**
+     * Add multi value dimensionFieldSpec
+     */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false));
       return this;
     }
 
+    /**
+     * Add single value dimensionFieldSpec with defaultNullValue
+     */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
       return this;
     }
 
+    /**
+     * Add metricFieldSpec
+     */
     public SchemaBuilder addMetric(String metricName, DataType dataType) {
       _schema.addField(new MetricFieldSpec(metricName, dataType));
       return this;
     }
 
+    /**
+     * Add metricFieldSpec with defaultNullValue
+     */
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
       return this;
     }
 
-    public SchemaBuilder addMetric(String name, DataType dataType, int fieldSize,
-        MetricFieldSpec.DerivedMetricType derivedMetricType) {
-      _schema.addField(new MetricFieldSpec(name, dataType, fieldSize, derivedMetricType));
-      return this;
-    }
-
-    public SchemaBuilder addMetric(String name, DataType dataType, int fieldSize,
-        MetricFieldSpec.DerivedMetricType derivedMetricType, Object defaultNullValue) {
-      _schema.addField(new MetricFieldSpec(name, dataType, fieldSize, derivedMetricType, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, TimeUnit incomingTimeUnit, DataType incomingDataType) {
-      _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, TimeUnit incomingTimeUnit, DataType incomingDataType,
-        Object defaultNullValue) {
-      _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, TimeUnit incomingTimeUnit, DataType incomingDataType,
-        String outgoingName, TimeUnit outgoingTimeUnit, DataType outgoingDataType) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
-              outgoingTimeUnit));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, TimeUnit incomingTimeUnit, DataType incomingDataType,
-        String outgoingName, TimeUnit outgoingTimeUnit, DataType outgoingDataType, Object defaultNullValue) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, outgoingName, outgoingDataType,
-              outgoingTimeUnit, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType) {
-      _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType, Object defaultNullValue) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType, String outgoingName, int outgoingTimeUnitSize, TimeUnit outgoingTimeUnit,
-        DataType outgoingDataType) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
-              outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit));
-      return this;
-    }
-
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType, String outgoingName, int outgoingTimeUnitSize, TimeUnit outgoingTimeUnit,
-        DataType outgoingDataType, Object defaultNullValue) {
-      _schema.addField(
-          new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
-              outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec) {
-      _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec));
-      return this;
-    }
-
-    public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec, Object defaultNullValue) {
-      _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
-      return this;
-    }
-
+    /**
+     * @deprecated in favor of {@link SchemaBuilder#addDateTime(String, DataType, String, String)}
+     * Adds timeFieldSpec with incoming and outgoing granularity spec
+     * This will continue to exist for a while in several tests, as it helps to test backward compatibility of schemas containing TimeFieldSpec
+     */
+    @Deprecated
     public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
-        TimeGranularitySpec outgoingTimeGranularitySpec) {
-      _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
+        @Nullable TimeGranularitySpec outgoingTimeGranularitySpec) {
+      if (outgoingTimeGranularitySpec != null) {
+        _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
+      } else {
+        _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec));
+      }
       return this;
     }
 
-    public SchemaBuilder addTime(TimeGranularitySpec incomingTimeGranularitySpec,
-        TimeGranularitySpec outgoingTimeGranularitySpec, Object defaultNullValue) {
-      _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
-      return this;
-    }
-
+    /**
+     * Add dateTimeFieldSpec with basic fields
+     */
     public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity) {
       _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity));
+      return this;
+    }
+
+    /**
+     * Add dateTimeFieldSpec with basic fields plus defaultNullValue and transformFunction
+     */
+    public SchemaBuilder addDateTime(String name, DataType dataType, String format, String granularity,
+        @Nullable Object defaultNullValue, @Nullable String transformFunction) {
+      DateTimeFieldSpec dateTimeFieldSpec =
+          new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue, transformFunction);
+      _schema.addField(dateTimeFieldSpec);
+      return this;
+    }
+
+    /**
+     * Add complex field spec
+     * @param name name of complex (nested) field
+     * @param dataType root data type of complex field
+     */
+    public SchemaBuilder addComplex(String name, DataType dataType) {
+      _schema.addField(new ComplexFieldSpec(name, dataType, /* single value field */ true));
       return this;
     }
 
@@ -707,6 +688,29 @@ public final class Schema {
         .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
   }
 
+  /**
+   * Check whether the current schema is backward compatible with oldSchema.
+   * Backward compatibility requires all columns and fieldSpec in oldSchema should be retained.
+   *
+   * @param oldSchema old schema
+   */
+
+  public boolean isBackwardCompatibleWith(Schema oldSchema) {
+    Set<String> columnNames = getColumnNames();
+    for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
+      String oldSchemaColumnName = entry.getKey();
+      if (!columnNames.contains(oldSchemaColumnName)) {
+        return false;
+      }
+      FieldSpec oldSchemaFieldSpec = entry.getValue();
+      FieldSpec fieldSpec = getFieldSpecFor(oldSchemaColumnName);
+      if (!fieldSpec.equals(oldSchemaFieldSpec)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @Override
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(_schemaName);
@@ -717,49 +721,132 @@ public final class Schema {
     return result;
   }
 
-  public boolean isVirtualColumn(String columnName) {
-    return columnName.startsWith("$") || (getFieldSpecFor(columnName).getVirtualColumnProvider() != null
-        && !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
+  /**
+   * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
+   * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec
+   * 2) If timeFieldSpec contains incoming aas well as outgoing granularity spec, use the outgoing spec to construct the dateTimeFieldSpec,
+   *    and configure a transform function for the conversion from incoming
+   */
+  @VisibleForTesting
+  static DateTimeFieldSpec convertToDateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
+    DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec();
+    TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
+    TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+
+    dateTimeFieldSpec.setName(outgoingGranularitySpec.getName());
+    dateTimeFieldSpec.setDataType(outgoingGranularitySpec.getDataType());
+
+    int outgoingTimeSize = outgoingGranularitySpec.getTimeUnitSize();
+    TimeUnit outgoingTimeUnit = outgoingGranularitySpec.getTimeType();
+    String outgoingTimeFormat = outgoingGranularitySpec.getTimeFormat();
+    String[] split = outgoingTimeFormat.split(DateTimeFormatSpec.COLON_SEPARATOR);
+    DateTimeFormatSpec formatSpec;
+    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
+      formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0]);
+    } else {
+      formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0], split[1]);
+    }
+    dateTimeFieldSpec.setFormat(formatSpec.getFormat());
+    DateTimeGranularitySpec granularitySpec = new DateTimeGranularitySpec(outgoingTimeSize, outgoingTimeUnit);
+    dateTimeFieldSpec.setGranularity(granularitySpec.getGranularity());
+
+    if (timeFieldSpec.getTransformFunction() != null) {
+      dateTimeFieldSpec.setTransformFunction(timeFieldSpec.getTransformFunction());
+    } else if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
+      String incomingName = incomingGranularitySpec.getName();
+      int incomingTimeSize = incomingGranularitySpec.getTimeUnitSize();
+      TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
+      String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
+      Preconditions.checkState(incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
+              .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
+          "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
+      String transformFunction =
+          constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize, outgoingTimeUnit);
+      dateTimeFieldSpec.setTransformFunction(transformFunction);
+    }
+
+    dateTimeFieldSpec.setMaxLength(timeFieldSpec.getMaxLength());
+    dateTimeFieldSpec.setDefaultNullValue(timeFieldSpec.getDefaultNullValue());
+
+    return dateTimeFieldSpec;
   }
 
+  /**
+   * Constructs a transformFunction string for the time column, based on incoming and outgoing timeGranularitySpec
+   */
+  private static String constructTransformFunctionString(String incomingName, int incomingTimeSize, TimeUnit incomingTimeUnit,
+      int outgoingTimeSize, TimeUnit outgoingTimeUnit) {
 
-  @JsonIgnore
-  public static byte[] getByteArrayFromField(Object value, DimensionFieldSpec fieldSpec) {
-    switch (fieldSpec.getDataType()) {
-      case INT:
-        return ByteBuffer.allocate(4).putInt((int)value).array();
-      case LONG:
-        return ByteBuffer.allocate(8).putLong((long)value).array();
-      case FLOAT:
-        return ByteBuffer.allocate(4).putFloat((float)value).array();
-      case DOUBLE:
-        return ByteBuffer.allocate(8).putDouble((double)value).array();
-      case STRING:
-        return ((String) value).getBytes(StandardCharsets.UTF_8);
-      case BYTES:
-        return (byte[]) value;
-      default:
-        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
-    }
-  }
+    String innerFunction = incomingName;
+    switch (incomingTimeUnit) {
 
-  @JsonIgnore
-  public static Object getValueFromBytes(byte[] bytes, DimensionFieldSpec fieldSpec) {
-    switch (fieldSpec.getDataType()) {
-      case INT:
-        return ByteBuffer.wrap(bytes).asIntBuffer().get();
-      case LONG:
-        return ByteBuffer.wrap(bytes).asLongBuffer().get();
-      case FLOAT:
-        return ByteBuffer.wrap(bytes).asFloatBuffer().get();
-      case DOUBLE:
-        return ByteBuffer.wrap(bytes).asDoubleBuffer().get();
-      case STRING:
-        return new String(bytes, StandardCharsets.UTF_8);
-      case BYTES:
-        return bytes;
-      default:
-        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
+      case MILLISECONDS:
+        // do nothing
+        break;
+      case SECONDS:
+        if (incomingTimeSize > 1) {
+          innerFunction = String.format("fromEpochSecondsBucket(%s, %d)", incomingName, incomingTimeSize);
+        } else {
+          innerFunction = String.format("fromEpochSeconds(%s)", incomingName);
+        }
+        break;
+      case MINUTES:
+        if (incomingTimeSize > 1) {
+          innerFunction = String.format("fromEpochMinutesBucket(%s, %d)", incomingName, incomingTimeSize);
+        } else {
+          innerFunction = String.format("fromEpochMinutes(%s)", incomingName);
+        }
+        break;
+      case HOURS:
+        if (incomingTimeSize > 1) {
+          innerFunction = String.format("fromEpochHoursBucket(%s, %d)", incomingName, incomingTimeSize);
+        } else {
+          innerFunction = String.format("fromEpochHours(%s)", incomingName);
+        }
+        break;
+      case DAYS:
+        if (incomingTimeSize > 1) {
+          innerFunction = String.format("fromEpochDaysBucket(%s, %d)", incomingName, incomingTimeSize);
+        } else {
+          innerFunction = String.format("fromEpochDays(%s)", incomingName);
+        }
+        break;
     }
+
+    String outerFunction = innerFunction;
+    switch (outgoingTimeUnit) {
+
+      case MILLISECONDS:
+        break;
+      case SECONDS:
+        if (outgoingTimeSize > 1) {
+          outerFunction = String.format("toEpochSecondsBucket(%s, %d)", innerFunction, outgoingTimeSize);
+        } else {
+          outerFunction = String.format("toEpochSeconds(%s)", innerFunction);
+        }
+        break;
+      case MINUTES:
+        if (outgoingTimeSize > 1) {
+          outerFunction = String.format("toEpochMinutesBucket(%s, %d)", innerFunction, outgoingTimeSize);
+        } else {
+          outerFunction = String.format("toEpochMinutes(%s)", innerFunction);
+        }
+        break;
+      case HOURS:
+        if (outgoingTimeSize > 1) {
+          outerFunction = String.format("toEpochHoursBucket(%s, %d)", innerFunction, outgoingTimeSize);
+        } else {
+          outerFunction = String.format("toEpochHours(%s)", innerFunction);
+        }
+        break;
+      case DAYS:
+        if (outgoingTimeSize > 1) {
+          outerFunction = String.format("toEpochDaysBucket(%s, %d)", innerFunction, outgoingTimeSize);
+        } else {
+          outerFunction = String.format("toEpochDays(%s)", innerFunction);
+        }
+        break;
+    }
+    return outerFunction;
   }
 }

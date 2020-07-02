@@ -24,7 +24,8 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.3.3</version>
+    <version>0.4.0</version>
+    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-perf</artifactId>
   <name>Pinot Perf</name>
@@ -51,7 +52,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-connector-kafka-${kafka.version}</artifactId>
+      <artifactId>pinot-kafka-${kafka.version}</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
@@ -92,7 +93,6 @@
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
@@ -170,10 +170,6 @@
             <program>
               <mainClass>org.apache.pinot.perf.RawIndexBenchmark</mainClass>
               <name>pinot-RawIndexBenchmark</name>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.perf.RealtimeStressTest</mainClass>
-              <name>pinot-RealtimeStressTest</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>

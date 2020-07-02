@@ -187,6 +187,19 @@ public class UserDashboardResourceTest {
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3), this.anomalyIds.get(4)));
   }
 
+  @Test
+  public void testAnomaliesByApplicationAndMetric() throws Exception {
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "myApplicationB", null, "test_metric_2", "test_dataset", null, false, null);
+    Assert.assertEquals(anomalies.size(), 1);
+    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(4)));
+  }
+
+  @Test
+  public void testAnomaliesByApplicationAndMetricEmpty() throws Exception {
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "myApplicationA", null, "test_metric_2", "test_dataset", null, false, null);
+    Assert.assertEquals(anomalies.size(), 0);
+  }
+
   private MergedAnomalyResultDTO makeAnomaly(long start, long end, Long detectionId, String metric, String dataset) {
     MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
     anomaly.setStartTime(start);

@@ -21,7 +21,7 @@ package org.apache.pinot.minion.executor;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
 /**

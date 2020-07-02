@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.common.predicate.InPredicate;
@@ -26,17 +25,21 @@ import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
+import org.apache.pinot.core.common.predicate.TextMatchPredicate;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, Dictionary dictionary, DataType dataType) {
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, Dictionary dictionary,
+      DataType dataType) {
     try {
       if (dictionary != null) {
+        // dictionary based predicate evaluators
         switch (predicate.getType()) {
           case EQ:
             return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary);
@@ -47,14 +50,18 @@ public class PredicateEvaluatorProvider {
           case NOT_IN:
             return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary);
           case RANGE:
-            return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary);
+            return RangePredicateEvaluatorFactory
+                .newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary, dataType);
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory
                 .newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary);
+          case TEXT_MATCH:
+            throw new UnsupportedOperationException("Text match predicate not supported on dictionary encoded columns");
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
       } else {
+        // raw value based predicate evaluators
         switch (predicate.getType()) {
           case EQ:
             return EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);
@@ -69,6 +76,9 @@ public class PredicateEvaluatorProvider {
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory
                 .newRawValueBasedEvaluator((RegexpLikePredicate) predicate, dataType);
+          case TEXT_MATCH:
+            return TextMatchPredicateEvaluatorFactory
+                .newRawValueBasedEvaluator((TextMatchPredicate) predicate, dataType);
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }

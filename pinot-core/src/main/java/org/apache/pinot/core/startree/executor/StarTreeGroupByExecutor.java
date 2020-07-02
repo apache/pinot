@@ -18,17 +18,15 @@
  */
 package org.apache.pinot.core.startree.executor;
 
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.request.GroupBy;
+import java.util.Map;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
 
@@ -36,37 +34,36 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
  * The <code>StarTreeGroupByExecutor</code> class is the group-by executor for star-tree index.
  * <ul>
  *   <li>The column in function context is function-column pair</li>
- *   <li>No UDF in aggregation</li>
+ *   <li>No transform function in aggregation</li>
  *   <li>For <code>COUNT</code> aggregation function, we need to aggregate on the pre-aggregated column</li>
  * </ul>
  */
 public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
+  private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
-  public StarTreeGroupByExecutor(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
-      int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator) {
-    super(StarTreeUtils.createStarTreeFunctionContexts(functionContexts), groupBy, maxInitialResultHolderCapacity,
-        numGroupsLimit, transformOperator);
+  public StarTreeGroupByExecutor(AggregationFunction[] aggregationFunctions,
+      TransformExpressionTree[] groupByExpressions, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      TransformOperator transformOperator) {
+    super(aggregationFunctions, groupByExpressions, maxInitialResultHolderCapacity, numGroupsLimit, transformOperator);
+
+    int numAggregationFunctions = aggregationFunctions.length;
+    _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      _aggregationFunctionColumnPairs[i] =
+          AggregationFunctionUtils.getAggregationFunctionColumnPair(aggregationFunctions[i]);
+    }
   }
 
   @Override
-  protected void aggregate(@Nonnull TransformBlock transformBlock, int length, int functionIndex) {
-    AggregationFunction function = _functions[functionIndex];
-    GroupByResultHolder resultHolder = _resultHolders[functionIndex];
-
-    if (function.getType() == AggregationFunctionType.COUNT) {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(AggregationFunctionColumnPair.COUNT_STAR_COLUMN_NAME);
-      if (_hasMVGroupByExpression) {
-        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValueSet);
-      } else {
-        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValueSet);
-      }
+  protected void aggregate(TransformBlock transformBlock, int length, int functionIndex) {
+    AggregationFunction aggregationFunction = _aggregationFunctions[functionIndex];
+    GroupByResultHolder groupByResultHolder = _groupByResultHolders[functionIndex];
+    Map<TransformExpressionTree, BlockValSet> blockValSetMap =
+        AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumnPairs[functionIndex], transformBlock);
+    if (_hasMVGroupByExpression) {
+      aggregationFunction.aggregateGroupByMV(length, _mvGroupKeys, groupByResultHolder, blockValSetMap);
     } else {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_aggregationExpressions[functionIndex].getValue());
-      if (_hasMVGroupByExpression) {
-        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValueSet);
-      } else {
-        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValueSet);
-      }
+      aggregationFunction.aggregateGroupBySV(length, _svGroupKeys, groupByResultHolder, blockValSetMap);
     }
   }
 }

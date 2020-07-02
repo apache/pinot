@@ -20,10 +20,14 @@ package org.apache.pinot.core.realtime.stream;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.utils.DataSize;
-import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -234,7 +238,7 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getFlushThresholdRows(), Integer.parseInt(flushThresholdRows));
     Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(),
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
-    Assert.assertEquals(streamConfig.getFlushSegmentDesiredSizeBytes(), DataSize.toBytes(flushSegmentSize));
+    Assert.assertEquals(streamConfig.getFlushSegmentDesiredSizeBytes(), DataSizeUtils.toBytes(flushSegmentSize));
 
     // Backward compatibility check for flushThresholdTime
     flushThresholdTime = "18000000";

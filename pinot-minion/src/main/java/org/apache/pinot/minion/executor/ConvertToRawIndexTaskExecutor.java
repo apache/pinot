@@ -21,24 +21,22 @@ package org.apache.pinot.minion.executor;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.minion.RawIndexConverter;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class ConvertToRawIndexTaskExecutor extends BaseSingleSegmentConversionExecutor {
 
   @Override
-  protected SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
-      @Nonnull File workingDir)
+  protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    new RawIndexConverter(rawTableName, originalIndexDir, workingDir,
+    new RawIndexConverter(rawTableName, indexDir, workingDir,
         configs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
     return new SegmentConversionResult.Builder().setFile(workingDir)
         .setTableNameWithType(configs.get(MinionConstants.TABLE_NAME_KEY))

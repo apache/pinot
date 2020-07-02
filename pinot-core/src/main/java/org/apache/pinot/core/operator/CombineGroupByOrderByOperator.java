@@ -35,17 +35,20 @@ import java.util.function.Function;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.exception.EarlyTerminationException;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,7 +100,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
    */
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numAggregationFunctions = _brokerRequest.getAggregationsInfoSize();
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_brokerRequest);
+    int numAggregationFunctions = aggregationFunctions.length;
     int numGroupBy = _brokerRequest.getGroupBy().getExpressionsSize();
     int numColumns = numGroupBy + numAggregationFunctions;
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
@@ -136,8 +140,9 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
-                _indexedTable = new ConcurrentIndexedTable(_dataSchema, _brokerRequest.getAggregationsInfo(),
-                    _brokerRequest.getOrderBy(), _indexedTableCapacity);
+                _indexedTable =
+                    new ConcurrentIndexedTable(_dataSchema, aggregationFunctions, _brokerRequest.getOrderBy(),
+                        _indexedTableCapacity);
               }
             } finally {
               _initLock.unlock();
@@ -164,7 +169,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
                 Object[] columns = new Object[numColumns];
                 int columnIndex = 0;
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-                String[] stringKey = groupKey._stringKey.split(GroupKeyGenerator.DELIMITER);
+                String[] stringKey = groupKey.getKeys();
                 Object[] objectKey = new Object[numGroupBy];
                 for (int i = 0; i < stringKey.length; i++) {
                   Object convertedKey = converterFunctions[i].apply(stringKey[i]);
@@ -181,9 +186,11 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
                 _indexedTable.upsert(key, record);
               }
             }
+          } catch (EarlyTerminationException e) {
+            // Early-terminated because query times out or is already satisfied
           } catch (Exception e) {
-            LOGGER.error("Exception processing CombineGroupByOrderBy for index {}, operator {}", index,
-                _operators.get(index).getClass().getName(), e);
+            LOGGER.error("Exception processing CombineGroupByOrderBy for index {}, operator {}, brokerRequest {}", index,
+                _operators.get(index).getClass().getName(), _brokerRequest, e);
             mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
           } finally {
             operatorLatch.countDown();
@@ -197,7 +204,9 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
       boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
       if (!opCompleted) {
         // If this happens, the broker side should already timed out, just log the error and return
-        String errorMessage = "Timed out while combining group-by results after " + _timeOutMs + "ms";
+        String errorMessage =
+            String.format("Timed out while combining group-by results after %dms, brokerRequest = %s", _timeOutMs,
+                _brokerRequest);
         LOGGER.error(errorMessage);
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
       }
@@ -213,17 +222,14 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
       // Set the execution statistics.
       ExecutionStatistics executionStatistics = new ExecutionStatistics();
       for (Operator operator : _operators) {
-        ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
-        if (executionStatisticsToMerge != null) {
-          executionStatistics.merge(executionStatisticsToMerge);
-        }
+        executionStatistics.merge(operator.getExecutionStatistics());
       }
       mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
       mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
       mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
       mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());
       mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
-      mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+      mergedBlock.setNumTotalDocs(executionStatistics.getNumTotalDocs());
 
       if (_indexedTable.size() >= _indexedTableCapacity) {
         mergedBlock.setNumGroupsLimitReached(true);
@@ -245,30 +251,23 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   }
 
   private Function<String, Object> getConverterFunction(DataSchema.ColumnDataType columnDataType) {
-    Function<String, Object> function;
     switch (columnDataType) {
-
       case INT:
-        function = Integer::valueOf;
-        break;
+        return Integer::valueOf;
       case LONG:
-        function = Long::valueOf;
-        break;
+        return Long::valueOf;
       case FLOAT:
-        function = Float::valueOf;
-        break;
+        return Float::valueOf;
       case DOUBLE:
-        function = Double::valueOf;
-        break;
-      case BYTES:
-        function = BytesUtils::toByteArray;
-        break;
+        return Double::valueOf;
       case STRING:
+        return s -> s;
+      case BYTES:
+        return BytesUtils::toByteArray;
+      // Add other group-by column type supports here
       default:
-        function = s -> s;
-        break;
+        throw new IllegalStateException();
     }
-    return function;
   }
 
   @Override

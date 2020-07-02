@@ -54,15 +54,13 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -70,13 +68,15 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.crypt.NoOpPinotCrypter;
-import org.apache.pinot.core.crypt.PinotCrypter;
-import org.apache.pinot.core.crypt.PinotCrypterFactory;
 import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
 import org.apache.pinot.core.metadata.MetadataExtractorFactory;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.crypt.NoOpPinotCrypter;
+import org.apache.pinot.spi.crypt.PinotCrypter;
+import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -136,19 +136,13 @@ public class PinotSegmentUploadDownloadRestletResource {
           Response.Status.FORBIDDEN);
     }
 
-    FileUploadPathProvider provider;
-    try {
-      provider = new FileUploadPathProvider(_controllerConf);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
-
+    segmentName = URIUtils.decode(segmentName);
+    URI dataDirURI = ControllerFilePathProvider.getInstance().getDataDirURI();
     Response.ResponseBuilder builder = Response.ok();
     File segmentFile;
     // If the segment file is local, just use it as the return entity; otherwise copy it from remote to local first.
-    if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME.equals(provider.getBaseDataDirURI().getScheme())) {
-      segmentFile =
-          new File(provider.getBaseDataDir(), StringUtil.join(File.separator, tableName, URIUtils.decode(segmentName)));
+    if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME.equals(dataDirURI.getScheme())) {
+      segmentFile = new File(new File(dataDirURI), StringUtil.join(File.separator, tableName, segmentName));
       if (!segmentFile.exists()) {
         throw new ControllerApplicationException(LOGGER,
             "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFile.getAbsolutePath(),
@@ -156,17 +150,16 @@ public class PinotSegmentUploadDownloadRestletResource {
       }
       builder.entity(segmentFile);
     } else {
-      final URI segmentFileURI =
-          URIUtils.getUri(provider.getBaseDataDirURI().toString(), tableName, URIUtils.decode(segmentName));
-      PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
-      if (!pinotFS.exists(segmentFileURI)) {
+      URI remoteSegmentFileURI = URIUtils.getUri(dataDirURI.toString(), tableName, URIUtils.encode(segmentName));
+      PinotFS pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
+      if (!pinotFS.exists(remoteSegmentFileURI)) {
         throw new ControllerApplicationException(LOGGER,
-            "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFileURI,
+            "Segment: " + segmentName + " of table: " + tableName + " not found at: " + remoteSegmentFileURI,
             Response.Status.NOT_FOUND);
       }
-      segmentFile = new File(StringUtil.join(File.separator, _controllerConf.getLocalTempDir(), tableName,
-          StringUtil.join("_", segmentName, String.valueOf(System.nanoTime()))));
-      pinotFS.copyToLocalFile(segmentFileURI, segmentFile);
+      segmentFile = new File(ControllerFilePathProvider.getInstance().getFileDownloadTempDir(),
+          StringUtil.join(File.separator, tableName, segmentName + "-" + System.nanoTime()));
+      pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
       // Streaming in the tmp file and delete it afterward.
       builder.entity((StreamingOutput) output -> {
         try {
@@ -198,19 +191,19 @@ public class PinotSegmentUploadDownloadRestletResource {
     File tempDecryptedFile = null;
     File tempSegmentDir = null;
     try {
-      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
+      ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
       String tempFileName = TMP_DIR_PREFIX + System.nanoTime();
-      tempDecryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
-      tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
+      tempDecryptedFile = new File(provider.getFileUploadTempDir(), tempFileName);
+      tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
 
       // Set default crypter to the noop crypter when no crypter header is sent
       // In this case, the noop crypter will not do any operations, so the encrypted and decrypted file will have the same
       // file path.
       if (crypterClassName == null) {
         crypterClassName = NoOpPinotCrypter.class.getSimpleName();
-        tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
+        tempEncryptedFile = new File(provider.getFileUploadTempDir(), tempFileName);
       } else {
-        tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
+        tempEncryptedFile = new File(provider.getFileUploadTempDir(), tempFileName + ENCRYPTED_SUFFIX);
       }
 
       // TODO: Change when metadata upload added
@@ -267,12 +260,12 @@ public class PinotSegmentUploadDownloadRestletResource {
                 offlineTableName);
         zkDownloadUri = downloadUri;
       } else {
-        zkDownloadUri = getZkDownloadURIForSegmentUpload(provider, rawTableName, segmentName);
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(rawTableName, segmentName);
       }
 
       // Zk operations
-      completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, rawTableName,
-          segmentMetadata, segmentName, zkDownloadUri, moveSegmentToFinalLocation);
+      completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, rawTableName, segmentMetadata,
+          segmentName, zkDownloadUri, moveSegmentToFinalLocation);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + rawTableName);
     } catch (WebApplicationException e) {
@@ -297,14 +290,14 @@ public class PinotSegmentUploadDownloadRestletResource {
     return value;
   }
 
-  private String getZkDownloadURIForSegmentUpload(FileUploadPathProvider provider, String rawTableName,
-      String segmentName) {
-    URI baseDataDirURI = provider.getBaseDataDirURI();
-    if (baseDataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+  private String getZkDownloadURIForSegmentUpload(String rawTableName, String segmentName) {
+    ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
+    URI dataDirURI = provider.getDataDirURI();
+    if (dataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
       return URIUtils.constructDownloadUrl(provider.getVip(), rawTableName, segmentName);
     } else {
       // Receiving .tar.gz segment upload for pluggable storage. Download URI is the same as final segment location.
-      String downloadUri = URIUtils.getPath(baseDataDirURI.toString(), rawTableName, URIUtils.encode(segmentName));
+      String downloadUri = URIUtils.getPath(dataDirURI.toString(), rawTableName, URIUtils.encode(segmentName));
       LOGGER.info("Using download uri: {} for segment: {} of table {}", downloadUri, segmentName, rawTableName);
       return downloadUri;
     }
@@ -319,8 +312,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           Response.Status.BAD_REQUEST);
     }
     LOGGER.info("Downloading segment from {} to {}", currentSegmentLocationURI, tempEncryptedFile.getAbsolutePath());
-    SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
-        .fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
+    SegmentFetcherFactory.fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
     segmentMetadata = getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
         metadataProviderClass);
     return segmentMetadata;
@@ -337,11 +329,12 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempEncryptedFile,
-      FileUploadPathProvider provider, String rawTableName, SegmentMetadata segmentMetadata, String segmentName,
-      String zkDownloadURI, boolean moveSegmentToFinalLocation)
+      String rawTableName, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
+      boolean moveSegmentToFinalLocation)
       throws Exception {
-    URI finalSegmentLocationURI =
-        URIUtils.getUri(provider.getBaseDataDirURI().toString(), rawTableName, URIUtils.encode(segmentName));
+    URI finalSegmentLocationURI = URIUtils
+        .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
+            URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, tempEncryptedFile,
         enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation);
@@ -462,7 +455,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       LOGGER.warn("Incorrect number of multi-part elements: {} (segmentName {}). Picking one", map.size(), segmentName);
       isGood = false;
     }
-    List<FormDataBodyPart> bodyParts = map.get(map.keySet().iterator().next());
+    List<FormDataBodyPart> bodyParts = map.values().iterator().next();
     if (bodyParts.size() != 1) {
       LOGGER.warn("Incorrect number of elements in list in first part: {} (segmentName {}). Picking first one",
           bodyParts.size(), segmentName);

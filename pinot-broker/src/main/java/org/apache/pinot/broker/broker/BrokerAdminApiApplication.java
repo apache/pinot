@@ -24,14 +24,14 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.broker.routing.RoutingTable;
-import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.broker.routing.RoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 
 
@@ -41,18 +41,18 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   private URI _baseUri;
   private HttpServer _httpServer;
 
-  public BrokerAdminApiApplication(BrokerServerBuilder brokerServerBuilder) {
+  public BrokerAdminApiApplication(RoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
+      BrokerMetrics brokerMetrics) {
     packages(RESOURCE_PACKAGE);
     register(new AbstractBinder() {
       @Override
       protected void configure() {
-        bind(brokerServerBuilder).to(BrokerServerBuilder.class);
-        bind(brokerServerBuilder.getRoutingTable()).to(RoutingTable.class);
-        bind(brokerServerBuilder.getTimeBoundaryService()).to(TimeBoundaryService.class);
-        bind(brokerServerBuilder.getBrokerMetrics()).to(BrokerMetrics.class);
-        bind(brokerServerBuilder.getBrokerRequestHandler()).to(BrokerRequestHandler.class);
+        bind(routingManager).to(RoutingManager.class);
+        bind(brokerRequestHandler).to(BrokerRequestHandler.class);
+        bind(brokerMetrics).to(BrokerMetrics.class);
       }
     });
+    register(JacksonFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }

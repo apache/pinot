@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.transport;
 
-import com.google.common.annotations.VisibleForTesting;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -38,12 +37,14 @@ import org.apache.pinot.core.query.scheduler.QueryScheduler;
  * The {@code QueryServer} is the Netty server that runs on Pinot Server to handle the instance requests sent from Pinot
  * Brokers.
  */
-public class QueryServer implements Runnable {
+public class QueryServer {
   private final int _port;
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
 
-  private volatile Channel _channel;
+  private EventLoopGroup _bossGroup;
+  private EventLoopGroup _workerGroup;
+  private Channel _channel;
 
   public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
     _port = port;
@@ -51,13 +52,12 @@ public class QueryServer implements Runnable {
     _serverMetrics = serverMetrics;
   }
 
-  @Override
-  public void run() {
-    EventLoopGroup bossGroup = new NioEventLoopGroup();
-    EventLoopGroup workerGroup = new NioEventLoopGroup();
+  public void start() {
+    _bossGroup = new NioEventLoopGroup();
+    _workerGroup = new NioEventLoopGroup();
     try {
       ServerBootstrap serverBootstrap = new ServerBootstrap();
-      _channel = serverBootstrap.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
+      _channel = serverBootstrap.group(_bossGroup, _workerGroup).channel(NioServerSocketChannel.class)
           .option(ChannelOption.SO_BACKLOG, 128).childOption(ChannelOption.SO_KEEPALIVE, true)
           .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
@@ -68,25 +68,22 @@ public class QueryServer implements Runnable {
                       new InstanceRequestHandler(_queryScheduler, _serverMetrics));
             }
           }).bind(_port).sync().channel();
-      _channel.closeFuture().sync();
     } catch (Exception e) {
-      throw new RuntimeException(e);
-    } finally {
       // Shut down immediately
-      workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
-      bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+      _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+      _bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+      throw new RuntimeException(e);
     }
   }
 
   public void shutDown() {
-    if (_channel != null) {
-      _channel.close();
-      _channel = null;
+    try {
+      _channel.close().sync();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    } finally {
+      _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+      _bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
     }
-  }
-
-  @VisibleForTesting
-  boolean isNotReady() {
-    return _channel == null;
   }
 }

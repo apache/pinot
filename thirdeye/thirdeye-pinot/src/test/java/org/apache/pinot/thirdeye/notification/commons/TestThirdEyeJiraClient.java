@@ -27,6 +27,10 @@ public class TestThirdEyeJiraClient {
     jiraEntity.setAssignee("test_assignee");
     jiraEntity.setLabels(Arrays.asList("test_1", "test_2"));
     jiraEntity.setDescription("test_description");
+    Map<String, Object> custom = new HashMap<>();
+    custom.put("test1", "value1");
+    custom.put("test2", "value2");
+    jiraEntity.setCustomFieldsMap(custom);
 
     JiraConfiguration jiraConfig = new JiraConfiguration();
     jiraConfig.setJiraHost("host");
@@ -47,14 +51,16 @@ public class TestThirdEyeJiraClient {
     // Assert if all the parameters are set
     Assert.assertEquals(((ComplexIssueInputFieldValue) issueInput.getField("assignee").getValue())
         .getValuesMap().values().toString(), "[test_assignee]");
+    Assert.assertEquals(((ComplexIssueInputFieldValue) issueInput.getField("project").getValue())
+        .getValuesMap().values().toString(), "[test_project]");
     Assert.assertEquals(((List) issueInput.getField("labels").getValue()), Arrays.asList("test_1", "test_2"));
     Assert.assertEquals(issueInput.getField("summary").getValue(), "test_summary");
     Assert.assertEquals(issueInput.getField("description").getValue(), "test_description");
-    Assert.assertEquals(((ComplexIssueInputFieldValue) issueInput.getField("project").getValue())
-        .getValuesMap().values().toString(), "[test_project]");
+    Assert.assertEquals(issueInput.getField("test1").getValue().toString(), "ComplexIssueInputFieldValue{valuesMap={name=value1}}");
+    Assert.assertEquals(issueInput.getField("test2").getValue().toString(), "ComplexIssueInputFieldValue{valuesMap={name=value2}}");
 
     // Assert if all the required fields are sets
-    Assert.assertEquals(issueInput.getFields().size(), 7);
+    Assert.assertEquals(issueInput.getFields().size(), 9);
     Assert.assertTrue(issueInput.getFields().keySet().contains("anotherrequiredfield"));
     Assert.assertFalse(issueInput.getFields().keySet().contains("notrequiredfield"));
   }

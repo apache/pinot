@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -44,20 +45,20 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.util.ReplicationUtils;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.LoggerFactory;
 
 
@@ -109,13 +110,13 @@ public class PinotTableRestletResource {
   public SuccessResponse addTable(String tableConfigStr) {
     // TODO introduce a table config ctor with json string.
     TableConfig tableConfig;
-    String tableName;
     try {
-      tableConfig = TableConfig.fromJsonString(tableConfigStr);
-      tableName = tableConfig.getTableName();
+      tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      TableConfigUtils.validate(tableConfig);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
+    String tableName = tableConfig.getTableName();
     try {
       ensureMinReplicas(tableConfig);
       verifyTableConfigs(tableConfig);
@@ -143,15 +144,15 @@ public class PinotTableRestletResource {
   public String listTableConfigs(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
       List<String> tableNames;
-      CommonConstants.Helix.TableType tableType = null;
+      TableType tableType = null;
       if (tableTypeStr != null) {
-        tableType = CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
+        tableType = TableType.valueOf(tableTypeStr.toUpperCase());
       }
 
       if (tableType == null) {
         tableNames = _pinotHelixResourceManager.getAllRawTables();
       } else {
-        if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+        if (tableType == TableType.REALTIME) {
           tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
         } else {
           tableNames = _pinotHelixResourceManager.getAllOfflineTables();
@@ -169,18 +170,18 @@ public class PinotTableRestletResource {
     try {
       ObjectNode ret = JsonUtils.newObjectNode();
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
+      if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
-        ret.set(CommonConstants.Helix.TableType.OFFLINE.name(), tableConfig.toJsonConfig());
+        ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       }
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
+      if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
-        ret.set(CommonConstants.Helix.TableType.REALTIME.name(), tableConfig.toJsonConfig());
+        ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
       return ret.toString();
     } catch (Exception e) {
@@ -214,8 +215,8 @@ public class PinotTableRestletResource {
         ObjectNode offline = JsonUtils.newObjectNode();
         tableExists = true;
 
-        offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
-        offline.set(FileUploadPathProvider.STATE,
+        offline.put("tableName", offlineTableName);
+        offline.set("state",
             JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(offlineTableName, stateType)));
         ret.add(offline);
       }
@@ -225,8 +226,8 @@ public class PinotTableRestletResource {
         ObjectNode realtime = JsonUtils.newObjectNode();
         tableExists = true;
 
-        realtime.put(FileUploadPathProvider.TABLE_NAME, realtimeTableName);
-        realtime.set(FileUploadPathProvider.STATE,
+        realtime.put("tableName", realtimeTableName);
+        realtime.set("state",
             JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(realtimeTableName, stateType)));
         ret.add(realtime);
       }
@@ -302,13 +303,14 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      String tableConfigStr)
+      String tableConfigString)
       throws Exception {
     TableConfig tableConfig;
     try {
-      tableConfig = TableConfig.fromJsonString(tableConfigStr);
+      tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
+      TableConfigUtils.validate(tableConfig);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
     }
 
     try {
@@ -348,16 +350,17 @@ public class PinotTableRestletResource {
           + " This allows us to validate table config before apply.")
   public String checkTableConfig(String tableConfigStr) {
     try {
+      TableConfig tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      TableConfigUtils.validate(tableConfig);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
-      TableConfig tableConfig = TableConfig.fromJsonString(tableConfigStr);
-      if (tableConfig.getTableType() == CommonConstants.Helix.TableType.OFFLINE) {
-        tableConfigValidateStr.set(CommonConstants.Helix.TableType.OFFLINE.name(), tableConfig.toJsonConfig());
+      if (tableConfig.getTableType() == TableType.OFFLINE) {
+        tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       } else {
-        tableConfigValidateStr.set(CommonConstants.Helix.TableType.REALTIME.name(), tableConfig.toJsonConfig());
+        tableConfigValidateStr.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Invalid table config", Response.Status.BAD_REQUEST, e);
     }
   }
 
@@ -420,7 +423,7 @@ public class PinotTableRestletResource {
     LOGGER.info("Validating table configs for Table: {}", rawTableName);
 
     TableConfig tableConfigToCompare = null;
-    if (newTableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
+    if (newTableConfig.getTableType() == TableType.REALTIME) {
       if (_pinotHelixResourceManager.hasOfflineTable(rawTableName)) {
         tableConfigToCompare = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       }
@@ -443,7 +446,7 @@ public class PinotTableRestletResource {
 
     String newTimeColumnName = newSegmentConfig.getTimeColumnName();
     String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
-    if (!existingTimeColumnName.equals(newTimeColumnName)) {
+    if (!Objects.equal(existingTimeColumnName, newTimeColumnName)) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(String
           .format("Time column names are different! Existing time column name: %s. New time column name: %s",
               existingTimeColumnName, newTimeColumnName));
@@ -464,15 +467,17 @@ public class PinotTableRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
-  @ApiOperation(value = "Rebalances segments of a table across servers", notes = "Rebalances segments of a table across servers")
+  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)", notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
-      @ApiParam(value = "Whether to reassign instances before rebalancing the table") @DefaultValue("false") @QueryParam("reassignInstances") boolean reassignInstances,
-      @ApiParam(value = "Whether to rebalance CONSUMING segments for real-time table") @DefaultValue("false") @QueryParam("includeConsuming") boolean includeConsuming,
-      @ApiParam(value = "Whether to allow downtime (0 replicas up) for rebalance") @DefaultValue("false") @QueryParam("downtime") boolean downtime,
-      @ApiParam(value = "Minimum number of replicas to keep alive during rebalance (if downtime is false), or maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1") @QueryParam("minAvailableReplicas") int minAvailableReplicas) {
+      @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false") @QueryParam("reassignInstances") boolean reassignInstances,
+      @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false") @QueryParam("includeConsuming") boolean includeConsuming,
+      @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table)") @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
+      @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime") boolean downtime,
+      @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1") @QueryParam("minAvailableReplicas") int minAvailableReplicas,
+      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts) {
     TableType tableType;
     try {
       tableType = TableType.valueOf(tableTypeStr.toUpperCase());
@@ -486,21 +491,23 @@ public class PinotTableRestletResource {
     rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
     rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
     rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, includeConsuming);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, bootstrap);
     rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
     rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, minAvailableReplicas);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEfforts);
 
     try {
-      if (dryRun) {
+      if (dryRun || downtime) {
+        // For dry-run or rebalance with downtime, directly return the rebalance result as it should return immediately
         return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
       } else {
         // Make a dry-run first to get the target assignment
-        Configuration dryRunConfig = new BaseConfiguration();
-        dryRunConfig.addProperty(RebalanceConfigConstants.DRY_RUN, true);
-        dryRunConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
-        dryRunConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, includeConsuming);
-        RebalanceResult dryRunResult = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, dryRunConfig);
+        rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, true);
+        RebalanceResult dryRunResult = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
+
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
+          rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, false);
           _executorService.submit(() -> {
             try {
               _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
@@ -512,6 +519,7 @@ public class PinotTableRestletResource {
               "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
               dryRunResult.getSegmentAssignment());
         } else {
+          // If dry-run failed or is no-op, return the dry-run result
           return dryRunResult;
         }
       }

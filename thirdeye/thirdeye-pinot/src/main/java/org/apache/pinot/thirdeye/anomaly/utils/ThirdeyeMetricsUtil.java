@@ -68,6 +68,15 @@ public class ThirdeyeMetricsUtil {
   public static final Counter detectionTaskExceptionCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionTaskExceptionCounter");
 
+  public static final Counter dataQualityTaskCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dataQualityTaskCounter");
+
+  public static final Counter dataQualityTaskSuccessCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dataQualityTaskSuccessCounter");
+
+  public static final Counter dataQualityTaskExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dataQualityTaskExceptionCounter");
+
   public static final Counter alertTaskCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "alertTaskCounter");
 
@@ -169,6 +178,24 @@ public class ThirdeyeMetricsUtil {
 
   public static final Counter eventScheduledTaskFallbackCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "eventScheduledTaskFallbackCounter");
+
+  public static final Counter emailAlertsSucesssCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "emailAlertsSucesssCounter");
+
+  public static final Counter emailAlertsFailedCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "emailAlertsFailedCounter");
+
+  public static final Counter jiraAlertsSuccessCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "jiraAlertsSuccessCounter");
+
+  public static final Counter jiraAlertsFailedCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "jiraAlertsFailedCounter");
+
+  public static final Counter jiraAlertsNumTicketsCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "jiraAlertsNumTicketsCounter");
+
+  public static final Counter jiraAlertsNumCommentsCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "jiraAlertsNumCommentsCounter");
 
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;

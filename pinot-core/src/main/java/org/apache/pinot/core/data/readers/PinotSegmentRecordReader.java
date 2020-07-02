@@ -24,18 +24,17 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
+import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.sort.PinotSegmentSorter;
-import org.apache.pinot.core.data.readers.sort.SegmentSorter;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
@@ -48,15 +47,15 @@ public class PinotSegmentRecordReader implements RecordReader {
   private final int _numDocs;
   private final Schema _schema;
   private final Map<String, PinotSegmentColumnReader> _columnReaderMap;
+  private final int[] _docIdsInSortedColumnOrder;
 
   private int _nextDocId = 0;
-  private int[] _docIdsInSortedColumnOrder;
 
   /**
    * Read records using the segment schema
    * @param indexDir input path for the segment index
    */
-  public PinotSegmentRecordReader(@Nonnull File indexDir)
+  public PinotSegmentRecordReader(File indexDir)
       throws Exception {
     this(indexDir, null, null);
   }
@@ -69,12 +68,12 @@ public class PinotSegmentRecordReader implements RecordReader {
    * @param schema input schema that is a subset of the segment schema
    * @param sortOrder a list of column names that represent the sorting order
    */
-  public PinotSegmentRecordReader(@Nonnull File indexDir, @Nullable Schema schema, @Nullable List<String> sortOrder)
+  public PinotSegmentRecordReader(File indexDir, @Nullable Schema schema, @Nullable List<String> sortOrder)
       throws Exception {
     _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
       SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
-      _numDocs = segmentMetadata.getTotalRawDocs();
+      _numDocs = segmentMetadata.getTotalDocs();
       if (schema == null) {
         // In order not to expose virtual columns to client, schema shouldn't be fetched from segmentMetadata;
         // otherwise the original metadata will be modified. Hence, initialize a new schema.
@@ -99,25 +98,24 @@ public class PinotSegmentRecordReader implements RecordReader {
         }
       }
       // Initialize sorted doc ids
-      initializeSortedDocIds(_schema, sortOrder);
+      if (sortOrder != null && !sortOrder.isEmpty()) {
+        _docIdsInSortedColumnOrder =
+            new PinotSegmentSorter(_numDocs, _schema, _columnReaderMap).getSortedDocIds(sortOrder);
+      } else {
+        _docIdsInSortedColumnOrder = null;
+      }
     } catch (Exception e) {
       _immutableSegment.destroy();
       throw e;
     }
   }
 
-  /**
-   * Prepare sorted docIds in order of the given sort order columns
-   */
-  private void initializeSortedDocIds(Schema schema, List<String> sortOrder) {
-    if (sortOrder != null && !sortOrder.isEmpty()) {
-      SegmentSorter sorter = new PinotSegmentSorter(_numDocs, schema, _columnReaderMap);
-      _docIdsInSortedColumnOrder = sorter.getSortedDocIds(sortOrder);
-    }
+  public Schema getSchema() {
+    return _schema;
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
+  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override
@@ -159,11 +157,6 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public void rewind() {
     _nextDocId = 0;
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
   }
 
   @Override

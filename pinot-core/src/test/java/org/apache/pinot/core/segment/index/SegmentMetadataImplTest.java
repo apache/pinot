@@ -26,6 +26,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterMethod;
@@ -95,10 +97,8 @@ public class SegmentMetadataImplTest {
       ColumnMetadata columnMeta = metadata.getColumnMetadataFor(jsonColumnMeta.get("columnName").asText());
       assertNotNull(columnMeta);
       assertEquals(jsonColumnMeta.get("cardinality").asInt(), columnMeta.getCardinality());
-      assertEquals(jsonColumnMeta.get("totalRawDocs").asInt(), columnMeta.getTotalRawDocs());
       assertEquals(jsonColumnMeta.get("bitsPerElement").asInt(), columnMeta.getBitsPerElement());
       assertEquals(jsonColumnMeta.get("sorted").asBoolean(), columnMeta.isSorted());
-      assertEquals(jsonColumnMeta.get("totalAggDocs").asInt(), columnMeta.getTotalAggDocs());
       assertEquals(jsonColumnMeta.get("containsNulls").asBoolean(), columnMeta.hasNulls());
       assertEquals(jsonColumnMeta.get("hasDictionary").asBoolean(), columnMeta.hasDictionary());
     }

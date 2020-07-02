@@ -38,15 +38,17 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -230,14 +232,20 @@ public class AutoAddInvertedIndex {
       }
 
       // Skip tables without a proper time column
-      TimeFieldSpec timeFieldSpec = tableSchema.getTimeFieldSpec();
-      if (timeFieldSpec == null || timeFieldSpec.getDataType() == FieldSpec.DataType.STRING) {
+      String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+      if (timeColumnName == null) {
+        LOGGER.info(
+            "Table: {}, skip adding inverted index because it does not have a time column specified in the table config",
+            tableNameWithType);
+        continue;
+      }
+      DateTimeFieldSpec dateTimeSpec = tableSchema.getSpecForTimeColumn(timeColumnName);
+      if (dateTimeSpec == null || dateTimeSpec.getDataType() == FieldSpec.DataType.STRING) {
         LOGGER.info("Table: {}, skip adding inverted index because it does not have a numeric time column",
             tableNameWithType);
         continue;
       }
-      String timeColumnName = timeFieldSpec.getName();
-      TimeUnit timeUnit = timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
+      TimeUnit timeUnit = new DateTimeFormatSpec(dateTimeSpec.getFormat()).getColumnUnit();
       if (timeUnit != TimeUnit.DAYS) {
         LOGGER.warn("Table: {}, time column {] has non-DAYS time unit: {}", timeColumnName, timeUnit);
       }
@@ -339,7 +347,7 @@ public class AutoAddInvertedIndex {
     httpURLConnection.setRequestMethod("PUT");
 
     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(httpURLConnection.getOutputStream(), "UTF-8"));
-    writer.write(tableConfig.toJsonConfigString());
+    writer.write(tableConfig.toJsonString());
     writer.flush();
 
     BufferedReader reader = new BufferedReader(new InputStreamReader(httpURLConnection.getInputStream(), "UTF-8"));

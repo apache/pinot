@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.ByteOrder;
@@ -35,7 +36,8 @@ import java.util.TreeMap;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +82,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   public SingleFileIndexDirectory(File segmentDirectory, SegmentMetadataImpl metadata, ReadMode readMode)
       throws IOException, ConfigurationException {
     super(segmentDirectory, metadata, readMode);
+
     indexFile = new File(segmentDirectory, DEFAULT_INDEX_FILE_NAME);
     if (!indexFile.exists()) {
       indexFile.createNewFile();
@@ -90,69 +93,41 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getDictionaryBufferFor(String column)
+  public PinotDataBuffer getBuffer(String column, ColumnIndexType type)
       throws IOException {
-    return checkAndGetIndexBuffer(column, ColumnIndexType.DICTIONARY);
+    return checkAndGetIndexBuffer(column, type);
   }
 
   @Override
-  public PinotDataBuffer getForwardIndexBufferFor(String column)
+  public PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
       throws IOException {
-    return checkAndGetIndexBuffer(column, ColumnIndexType.FORWARD_INDEX);
-  }
-
-  @Override
-  public PinotDataBuffer getInvertedIndexBufferFor(String column)
-      throws IOException {
-    return checkAndGetIndexBuffer(column, ColumnIndexType.INVERTED_INDEX);
-  }
-
-  @Override
-  public PinotDataBuffer getBloomFilterBufferFor(String column)
-      throws IOException {
-    return checkAndGetIndexBuffer(column, ColumnIndexType.BLOOM_FILTER);
-  }
-
-  @Override
-  public PinotDataBuffer getNullValueVectorBufferFor(String column)
-      throws IOException {
-    return checkAndGetIndexBuffer(column, ColumnIndexType.NULLVALUE_VECTOR);
+    return allocNewBufferInternal(column, type, sizeBytes, type.name().toLowerCase() + ".create");
   }
 
   @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
+    if (type == ColumnIndexType.TEXT_INDEX) {
+      return hasTextIndex(column);
+    }
     IndexKey key = new IndexKey(column, type);
     return columnEntries.containsKey(key);
   }
 
-  @Override
-  public PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
-      throws IOException {
-    return allocNewBufferInternal(column, ColumnIndexType.DICTIONARY, sizeBytes, "dictionary.create");
-  }
-
-  @Override
-  public PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
-      throws IOException {
-    return allocNewBufferInternal(column, ColumnIndexType.FORWARD_INDEX, sizeBytes, "forward_index.create");
-  }
-
-  @Override
-  public PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
-      throws IOException {
-    return allocNewBufferInternal(column, ColumnIndexType.INVERTED_INDEX, sizeBytes, "inverted_index.create");
-  }
-
-  @Override
-  public PinotDataBuffer newBloomFilterBuffer(String column, long sizeBytes)
-      throws IOException {
-    return allocNewBufferInternal(column, ColumnIndexType.BLOOM_FILTER, sizeBytes, "bloom_filter.create");
-  }
-
-  @Override
-  public PinotDataBuffer newNullValueVectorBuffer(String column, long sizeBytes)
-      throws IOException {
-    return allocNewBufferInternal(column, ColumnIndexType.NULLVALUE_VECTOR, sizeBytes, "nullvalue_vector.create");
+  private boolean hasTextIndex(String column) {
+    String suffix = LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(suffix) && name.startsWith(column);
+      }
+    });
+    if (textIndexFiles.length > 0) {
+      Preconditions.checkState(textIndexFiles.length == 1,
+          "Illegal number of text index directories for columns " + column + " segment directory " + segmentDirectory
+              .getAbsolutePath());
+      return true;
+    }
+    return false;
   }
 
   private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {

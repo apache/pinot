@@ -25,23 +25,27 @@ import java.nio.file.attribute.FileTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -58,11 +62,19 @@ public class SegmentPreProcessorTest {
   private static final String COLUMN7_NAME = "column7";
   private static final String COLUMN13_NAME = "column13";
   private static final String NO_SUCH_COLUMN_NAME = "noSuchColumn";
+  private static final String NEW_COLUMN_INVERTED_INDEX = "newStringMVDimension";
+
+  // For create text index tests
+  private static final String EXISTING_STRING_COL_RAW = "column4";
+  private static final String EXISTING_STRING_COL_DICT = "column5";
+  private static final String NEWLY_ADDED_STRING_COL_RAW = "newTextColRaw";
+  private static final String NEWLY_ADDED_STRING_COL_DICT = "newTextColDict";
 
   // For update default value tests.
   private static final String NEW_COLUMNS_SCHEMA1 = "data/newColumnsSchema1.json";
   private static final String NEW_COLUMNS_SCHEMA2 = "data/newColumnsSchema2.json";
   private static final String NEW_COLUMNS_SCHEMA3 = "data/newColumnsSchema3.json";
+  private static final String NEW_COLUMNS_SCHEMA_WITH_TEXT = "data/newColumnsWithTextSchema.json";
   private static final String NEW_INT_METRIC_COLUMN_NAME = "newIntMetric";
   private static final String NEW_LONG_METRIC_COLUMN_NAME = "newLongMetric";
   private static final String NEW_FLOAT_METRIC_COLUMN_NAME = "newFloatMetric";
@@ -77,9 +89,11 @@ public class SegmentPreProcessorTest {
   private IndexLoadingConfig _indexLoadingConfig;
   private File _avroFile;
   private Schema _schema;
+  private TableConfig _tableConfig;
   private Schema _newColumnsSchema1;
   private Schema _newColumnsSchema2;
   private Schema _newColumnsSchema3;
+  private Schema _newColumnsSchemaWithText;
 
   @BeforeClass
   public void setUp()
@@ -102,6 +116,8 @@ public class SegmentPreProcessorTest {
     resourceUrl = classLoader.getResource(SCHEMA);
     Assert.assertNotNull(resourceUrl);
     _schema = Schema.fromFile(new File(resourceUrl.getFile()));
+    _tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA1);
     Assert.assertNotNull(resourceUrl);
     _newColumnsSchema1 = Schema.fromFile(new File(resourceUrl.getFile()));
@@ -111,6 +127,9 @@ public class SegmentPreProcessorTest {
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA3);
     Assert.assertNotNull(resourceUrl);
     _newColumnsSchema3 = Schema.fromFile(new File(resourceUrl.getFile()));
+    resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_TEXT);
+    Assert.assertNotNull(resourceUrl);
+    _newColumnsSchemaWithText = Schema.fromFile(new File(resourceUrl.getFile()));
   }
 
   private void constructV1Segment()
@@ -119,8 +138,9 @@ public class SegmentPreProcessorTest {
 
     // Create inverted index for 'column7' when constructing the segment.
     SegmentGeneratorConfig segmentGeneratorConfig =
-        SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, INDEX_DIR, "testTable", _schema);
+        SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, INDEX_DIR, "testTable", _tableConfig, _schema);
     segmentGeneratorConfig.setInvertedIndexCreationColumns(Collections.singletonList(COLUMN7_NAME));
+    segmentGeneratorConfig.setRawIndexCreationColumns(Collections.singletonList(EXISTING_STRING_COL_RAW));
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
@@ -138,6 +158,151 @@ public class SegmentPreProcessorTest {
       throws Exception {
     constructV1Segment();
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
+  }
+
+  /**
+   * Test to check for default column handling and text index creation during
+   * segment load after a new column is added to the schema with text index
+   * creation enabled
+   * @throws Exception
+   */
+  @Test
+  public void testEnableTextIndexOnNewColumn()
+      throws Exception {
+    Set<String> textIndexColumns = new HashSet<>();
+    textIndexColumns.add(NEWLY_ADDED_STRING_COL_RAW);
+    _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
+    _indexLoadingConfig.getNoDictionaryColumns().add(NEWLY_ADDED_STRING_COL_RAW);
+
+    // Create a segment in V3, add a new column with text index enabled
+    constructV3Segment();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_STRING_COL_RAW);
+    // should be null since column does not exist in the schema
+    Assert.assertNull(columnMetadata);
+    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true);
+
+    // Create a segment in V1, add a new column with text index enabled
+    constructV1Segment();
+    segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_STRING_COL_RAW);
+    // should be null since column does not exist in the schema
+    Assert.assertNull(columnMetadata);
+    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true);
+  }
+
+  /**
+   * Test to check for failure case where text index is enabled on an existing
+   * column that is dictionary encoded. This is currently not supported.
+   * @throws Exception
+   */
+  @Test
+  public void testEnableTextIndexOnNewColumnDictEncoded()
+      throws Exception {
+    constructV3Segment();
+    Set<String> textIndexColumns = new HashSet<>();
+    textIndexColumns.add(NEWLY_ADDED_STRING_COL_DICT);
+    _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_STRING_COL_DICT);
+    Assert.assertNull(columnMetadata);
+
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig,
+        _newColumnsSchemaWithText)) {
+      processor.process();
+      Assert.fail("operation should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains(
+          "Text index is currently not supported on dictionary encoded column: " + NEWLY_ADDED_STRING_COL_DICT));
+    }
+  }
+
+  /**
+   * Test to check text index creation during segment load after text index
+   * creation is enabled on an existing column
+   * @throws Exception
+   */
+  @Test
+  public void testEnableTextIndexOnExistingColumn()
+      throws Exception {
+    Set<String> textIndexColumns = new HashSet<>();
+    textIndexColumns.add(EXISTING_STRING_COL_RAW);
+    _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
+
+    // Create a segment in V3, enable text index on existing column
+    constructV3Segment();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
+    // column exists and does not have text index enabled
+    Assert.assertNotNull(columnMetadata);
+    Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
+    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, null, false);
+
+    // Create a segment in V1, add a new column with text index enabled
+    constructV1Segment();
+    segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
+    // column exists and does not have text index enabled
+    Assert.assertNotNull(columnMetadata);
+    Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
+    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, null, false);
+  }
+
+  /**
+   * Test to check for failure case where text index is enabled on an existing
+   * column that is dictionary encoded. This is currently not supported.
+   * @throws Exception
+   */
+  @Test
+  public void testEnableTextIndexOnExistingColumnDictEncoded()
+      throws Exception {
+    constructV3Segment();
+    Set<String> textIndexColumns = new HashSet<>();
+    textIndexColumns.add(EXISTING_STRING_COL_DICT);
+    _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_DICT);
+    Assert.assertNotNull(columnMetadata);
+    Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
+
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig,
+        _newColumnsSchemaWithText)) {
+      processor.process();
+      Assert.fail("operation should have failed");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage()
+          .contains("Text index is currently not supported on dictionary encoded column: " + EXISTING_STRING_COL_DICT));
+    }
+  }
+
+  private void checkTextIndexCreation(String column, int cardinality, int bits, Schema schema, boolean isAutoGenerated)
+      throws Exception {
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, schema)) {
+      processor.process();
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
+
+      Assert.assertEquals(columnMetadata.getCardinality(), cardinality);
+      Assert.assertEquals(columnMetadata.getTotalDocs(), 100000);
+      Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.STRING);
+      Assert.assertEquals(columnMetadata.getBitsPerElement(), bits);
+      Assert.assertEquals(columnMetadata.getColumnMaxLength(), 0);
+      Assert.assertEquals(columnMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
+      Assert.assertFalse(columnMetadata.isSorted());
+      Assert.assertFalse(columnMetadata.hasNulls());
+      Assert.assertFalse(columnMetadata.hasDictionary());
+      Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.LUCENE);
+      Assert.assertTrue(columnMetadata.isSingleValue());
+      Assert.assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 0);
+      Assert.assertEquals(columnMetadata.getTotalNumberOfEntries(), 100000);
+      Assert.assertEquals(columnMetadata.isAutoGenerated(), isAutoGenerated);
+      Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "null");
+
+      try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap);
+          SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+        Assert.assertTrue(reader.hasIndexFor(column, ColumnIndexType.TEXT_INDEX));
+      }
+    }
   }
 
   @Test
@@ -213,12 +378,8 @@ public class SegmentPreProcessorTest {
     try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentDirectoryPath, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       // 8 bytes overhead is for checking integrity of the segment.
-      try (PinotDataBuffer col1Buffer = reader.getIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX)) {
-        addedLength += col1Buffer.size() + 8;
-      }
-      try (PinotDataBuffer col13Buffer = reader.getIndexFor(COLUMN13_NAME, ColumnIndexType.INVERTED_INDEX)) {
-        addedLength += col13Buffer.size() + 8;
-      }
+      addedLength += reader.getIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX).size() + 8;
+      addedLength += reader.getIndexFor(COLUMN13_NAME, ColumnIndexType.INVERTED_INDEX).size() + 8;
     }
     FileTime newLastModifiedTime = Files.getLastModifiedTime(singleFileIndex.toPath());
     Assert.assertTrue(newLastModifiedTime.compareTo(lastModifiedTime) > 0);
@@ -268,7 +429,10 @@ public class SegmentPreProcessorTest {
   public void testV1UpdateDefaultColumns()
       throws Exception {
     constructV1Segment();
-    checkUpdateDefaultColumns();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(
+        Arrays.asList(COLUMN1_NAME, COLUMN7_NAME, COLUMN13_NAME, NO_SUCH_COLUMN_NAME, NEW_COLUMN_INVERTED_INDEX)));
+    checkUpdateDefaultColumns(indexLoadingConfig);
 
     // Try to use the third schema and update default value again.
     // For the third schema, we changed the default value for column 'newStringMVDimension' to 'notSameLength', which
@@ -289,10 +453,10 @@ public class SegmentPreProcessorTest {
         "0000000141ba085ee15d2f3241ba085ee15d2f324059000000000000000000013ff000000000000041ba085ee15d2f32");
   }
 
-  private void checkUpdateDefaultColumns()
+  private void checkUpdateDefaultColumns(IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     // Update default value.
-    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, _newColumnsSchema1)) {
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, indexLoadingConfig, _newColumnsSchema1)) {
       processor.process();
     }
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -302,8 +466,6 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
     Assert.assertEquals(columnMetadata.getCardinality(), 1);
     Assert.assertEquals(columnMetadata.getTotalDocs(), 100000);
-    Assert.assertEquals(columnMetadata.getTotalRawDocs(), 100000);
-    Assert.assertEquals(columnMetadata.getTotalAggDocs(), 0);
     Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.INT);
     Assert.assertEquals(columnMetadata.getBitsPerElement(), 1);
     Assert.assertEquals(columnMetadata.getColumnMaxLength(), 0);

@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -26,14 +28,13 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
-  @Override
-  public AggregationFunctionType getType() {
-    return AggregationFunctionType.MAXMV;
+  public MaxMVAggregationFunction(String column) {
+    super(column);
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.MAXMV.getName() + "_" + column;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.MAXMV;
   }
 
   @Override
@@ -42,8 +43,9 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     double max = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
       for (double value : valuesArray[i]) {
@@ -57,8 +59,8 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       double max = groupByResultHolder.getDoubleResult(groupKey);
@@ -73,8 +75,8 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+      Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {

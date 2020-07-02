@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -31,11 +33,11 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -45,10 +47,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -56,12 +55,18 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,105 +97,85 @@ public class HelixServerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
 
   private final String _helixClusterName;
+  private final String _zkAddress;
   private final Configuration _serverConf;
   private final String _instanceId;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final ServerInstance _serverInstance;
   private final AdminApiApplication _adminApiApplication;
-  private final String _zkServers;
+  private final RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
 
-  public HelixServerStarter(String helixClusterName, String zkServer, Configuration serverConf)
+  public HelixServerStarter(String helixClusterName, String zkAddress, Configuration serverConf)
       throws Exception {
     LOGGER.info("Starting Pinot server");
     long startTimeMs = System.currentTimeMillis();
-    _helixClusterName = helixClusterName;
 
+    _helixClusterName = helixClusterName;
+    _zkAddress = zkAddress;
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = ConfigurationUtils.cloneConfiguration(serverConf);
 
-    // Log warnings for usage of deprecated config keys
-    Map<String, String> deprecatedConfigKeyWarnings = new HashMap<String, String>() {{
-      //noinspection deprecation
-      put(CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK, String.format(
-          "use %s instead, which will check the service status instead of comparing currentState/externalView with idealState (enabled by default)",
-          CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK));
-      //noinspection deprecation
-      put(CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS, String
-          .format("use %s instead, which is the timeout for the whole startup process (10 minutes by default)",
-              CONFIG_OF_STARTUP_TIMEOUT_MS));
-      //noinspection deprecation
-      put(CONFIG_OF_ENABLE_SHUTDOWN_DELAY, String.format(
-          "use %s instead, which will drain the queries (no incoming queries and all existing queries finished) (enabled by default)",
-          CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK));
-      //noinspection deprecation
-      put(CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME, String
-          .format("use %s instead, which is the timeout for the whole shutdown process (10 minutes by default)",
-              CONFIG_OF_SHUTDOWN_TIMEOUT_MS));
-      //noinspection deprecation
-      put(CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME, String
-          .format("use %s instead, which is the interval for the resource check (10 seconds by default)",
-              CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS));
-    }};
-    for (Map.Entry<String, String> entry : deprecatedConfigKeyWarnings.entrySet()) {
-      String deprecatedConfigKey = entry.getKey();
-      if (_serverConf.containsKey(deprecatedConfigKey)) {
-        LOGGER.warn("Found usage of deprecated config key: {}, {}", deprecatedConfigKey, entry.getValue());
-      }
-    }
-
+    String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
+        _serverConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
+            .getHostnameOrAddress() : NetUtil.getHostAddress());
+    int port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
     if (_serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       _instanceId = _serverConf.getString(CONFIG_OF_INSTANCE_ID);
     } else {
-      String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
-          _serverConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
-              .getHostnameOrAddress() : NetUtil.getHostAddress());
-
-      int port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
       _instanceId = PREFIX_OF_SERVER_INSTANCE + host + "_" + port;
       _serverConf.addProperty(CONFIG_OF_INSTANCE_ID, _instanceId);
     }
 
-    LOGGER.info("Connecting Helix components");
+    LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
+        _helixClusterName, _instanceId);
     setupHelixSystemProperties();
-    // Replace all white-spaces from list of zkServers.
-    _zkServers = zkServer.replaceAll("\\s+", "");
     _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkServers);
-    _helixManager.connect();
-    _helixAdmin = _helixManager.getClusterManagmentTool();
-    addInstanceTagIfNeeded(helixClusterName, _instanceId);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
+        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
-    LOGGER.info("Starting server instance");
+    LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
-    ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
-    // Need to do this before we start receiving state transitions.
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
-    _serverInstance = new ServerInstance();
-    _serverInstance.init(serverInstanceConfig, propertyStore);
-    _serverInstance.start();
-
-    // Register state model factory
-    SegmentFetcherAndLoader fetcherAndLoader =
-        new SegmentFetcherAndLoader(_serverConf, _serverInstance.getInstanceDataManager(), propertyStore);
+    ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
+    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverConf, instanceDataManager);
     StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, _serverInstance.getInstanceDataManager(),
-            fetcherAndLoader, propertyStore);
+        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, fetcherAndLoader);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
+    // Start the server instance as a pre-connect callback so that it starts after connecting to the ZK in order to
+    // access the property store, but before receiving state transitions
+    _helixManager.addPreConnectCallback(_serverInstance::start);
+
+    LOGGER.info("Connecting Helix manager");
+    _helixManager.connect();
+    _helixAdmin = _helixManager.getClusterManagmentTool();
+    updateInstanceConfigIfNeeded(host, port);
 
     // Start restlet server for admin API endpoint
+    String accessControlFactoryClass =
+        _serverConf.getString(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+    LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
+    final AccessControlFactory accessControlFactory;
+    try {
+      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
+              + "'", e);
+    }
+
     int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
-    _adminApiApplication = new AdminApiApplication(_serverInstance);
+    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory);
     _adminApiApplication.start(adminApiPort);
     setAdminApiPort(adminApiPort);
 
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(fetcherAndLoader, _serverInstance.getInstanceDataManager(), serverMetrics);
+        new SegmentMessageHandlerFactory(fetcherAndLoader, instanceDataManager, serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
@@ -217,6 +202,9 @@ public class HelixServerStarter {
     serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
     serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
+
+    _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
+    _realtimeLuceneIndexRefreshState.start();
   }
 
   /**
@@ -299,17 +287,48 @@ public class HelixServerStarter {
     _helixAdmin.setConfig(scope, props);
   }
 
-  private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
-    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
+  private void updateInstanceConfigIfNeeded(String host, int port) {
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
+    boolean needToUpdateInstanceConfig = false;
+
+    // Add default instance tags if not exist
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.size() == 0) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getOfflineTagForTenant(null));
-        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getRealtimeTagForTenant(null));
+        instanceConfig.addTag(TagNameUtils.getOfflineTagForTenant(null));
+        instanceConfig.addTag(TagNameUtils.getRealtimeTagForTenant(null));
       } else {
-        _helixAdmin.addInstanceTag(clusterName, instanceName, UNTAGGED_SERVER_INSTANCE);
+        instanceConfig.addTag(UNTAGGED_SERVER_INSTANCE);
       }
+      needToUpdateInstanceConfig = true;
     }
+
+    // Update host and port if needed
+    if (!host.equals(instanceConfig.getHostName())) {
+      instanceConfig.setHostName(host);
+      needToUpdateInstanceConfig = true;
+    }
+    String portStr = Integer.toString(port);
+    if (!portStr.equals(instanceConfig.getPort())) {
+      instanceConfig.setPort(portStr);
+      needToUpdateInstanceConfig = true;
+    }
+
+    if (needToUpdateInstanceConfig) {
+      LOGGER.info("Updating instance config for instance: {} with instance tags: {}, host: {}, port: {}", _instanceId,
+          instanceTags, host, port);
+    } else {
+      LOGGER.info("Instance config for instance: {} has instance tags: {}, host: {}, port: {}, no need to update",
+          _instanceId, instanceTags, host, port);
+      return;
+    }
+
+    // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
+    // forbids instance host/port modification
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    Preconditions.checkState(
+        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(_instanceId), instanceConfig),
+        "Failed to update instance config");
   }
 
   private void setupHelixSystemProperties() {
@@ -380,6 +399,7 @@ public class HelixServerStarter {
     if (_serverConf.getBoolean(CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK, DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
+    _realtimeLuceneIndexRefreshState.stop();
   }
 
   /**
@@ -453,7 +473,7 @@ public class HelixServerStarter {
 
     HelixAdmin helixAdmin = null;
     try {
-      helixAdmin = new ZKHelixAdmin(_zkServers);
+      helixAdmin = new ZKHelixAdmin(_zkAddress);
 
       // Monitor all enabled table resources that the server serves
       Set<String> resourcesToMonitor = new HashSet<>();
@@ -540,6 +560,11 @@ public class HelixServerStarter {
       }
     }
     return true;
+  }
+
+  @VisibleForTesting
+  public String getInstanceId() {
+    return _instanceId;
   }
 
   /**

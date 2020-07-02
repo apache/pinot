@@ -26,7 +26,7 @@ import java.util.Map;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.query.utils.Pair;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -49,9 +49,7 @@ public class Aggregation {
     _addCountStar = false;
 
     for (AggregationInfo aggregationInfo : _aggregationsInfo) {
-      Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
-      for (Map.Entry<String, String> entry : aggregationParams.entrySet()) {
-        String column = entry.getValue();
+      for (String column : aggregationInfo.getExpressions()) {
         // Apparently in case of multiple group by's '*' is replaced by empty/null in brokerRequest.
         if (column == null || column.isEmpty() || column.equals("*")) {
           _addCountStar = true;

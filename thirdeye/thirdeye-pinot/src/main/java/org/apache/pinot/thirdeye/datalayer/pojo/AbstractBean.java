@@ -21,9 +21,10 @@ package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.io.Serializable;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
-public abstract class AbstractBean extends AbstractDTO {
+public abstract class AbstractBean extends AbstractDTO implements Serializable {
 
 }

@@ -267,7 +267,6 @@ ALTER TABLE `classification_config_index` ADD UNIQUE `classification_config_uniq
 create index classification_config_name_index on classification_config_index(name);
 create index classification_config_base_id_idx ON classification_config_index(base_id);
 
-
 create table if not exists entity_to_entity_mapping_index (
     from_urn varchar(500) not null,
     to_urn varchar(500) not null,
@@ -325,10 +324,13 @@ create index config_name_idx on config_index(name);
 create index config_base_id_idx ON config_index(base_id);
 
 create table application_index (
+  base_id bigint(20) not null,
+  create_time timestamp,
+  update_time timestamp default current_timestamp,
   application VARCHAR (200) not null,
-  recipients VARCHAR(1000) NOT NULL,
-  base_id bigint(20) not null
+  recipients VARCHAR(1000) NOT NULL
 );
+create index application_application_idx on application_index(application);
 
 create table if not exists alert_snapshot_index (
     base_id bigint(20) not null,
@@ -378,6 +380,8 @@ create index session_principal_type_idx ON session_index(principal_type);
 create table if not exists detection_config_index (
     base_id bigint(20) not null,
     `name` VARCHAR(256) not null,
+    active BOOLEAN,
+    created_by VARCHAR(256),
     create_time timestamp,
     update_time timestamp default current_timestamp,
     version int(10)
@@ -385,6 +389,8 @@ create table if not exists detection_config_index (
 ALTER TABLE `detection_config_index` ADD UNIQUE `detection_config_unique_index`(`name`);
 create index detection_config_base_id_idx ON detection_config_index(base_id);
 create index detection_config_name_idx ON detection_config_index(`name`);
+create index detection_config_active_idx ON detection_config_index(active);
+create index detection_config_created_by_index ON detection_config_index(created_by);
 
 create table if not exists detection_alert_config_index (
     base_id bigint(20) not null,

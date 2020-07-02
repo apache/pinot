@@ -99,6 +99,15 @@ public class TransformExpressionTreeTest {
     Assert.assertTrue(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
   }
 
+  @Test
+  public void testNoArgFunction() {
+    String expression = "now()";
+    TransformExpressionTree expressionTree = TransformExpressionTree.compileToExpressionTree(expression);
+    Assert.assertEquals(expressionTree.isFunction(), true);
+    Assert.assertEquals(expressionTree.getValue(), "now");
+    Assert.assertEquals(expressionTree.getChildren().size(), 0);
+  }
+
   private static boolean equalsWithStandardExpressionTree(TransformExpressionTree expressionTree) {
     return expressionTree.hashCode() == STANDARD_EXPRESSION_TREE.hashCode() && expressionTree
         .equals(STANDARD_EXPRESSION_TREE) && expressionTree.toString().equals(STANDARD_EXPRESSION);
