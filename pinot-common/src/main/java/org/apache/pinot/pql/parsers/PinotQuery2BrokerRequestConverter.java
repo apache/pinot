@@ -247,11 +247,10 @@ public class PinotQuery2BrokerRequestConverter {
       case IDENTIFIER:
         break;
       case FUNCTION:
-        Function functionCall = filterExpression.getFunctionCall();
-        String operator = functionCall.getOperator();
-        FilterKind filterKind = FilterKind.valueOf(operator);
+        FilterKind filterKind = ParserUtils.getFilterKind(filterExpression);
         FilterOperator filterOperator = ParserUtils.filterKindToOperator(filterKind);
         filterQuery.setOperator(filterOperator);
+        Function functionCall = filterExpression.getFunctionCall();
         List<Expression> operands = functionCall.getOperands();
         switch (filterOperator) {
           case AND:
@@ -272,7 +271,11 @@ public class PinotQuery2BrokerRequestConverter {
             filterQuery.setColumn(ParserUtils.standardizeExpression(operands.get(0), false));
             filterQuery.setValue(ParserUtils.getFilterValues(filterKind, operands));
             break;
-
+          case IS_NULL:
+          case IS_NOT_NULL:
+            //first operand is the always the column
+            filterQuery.setColumn(ParserUtils.standardizeExpression(operands.get(0), false));
+            break;
           default:
             throw new UnsupportedOperationException("Filter UDF not supported");
         }
