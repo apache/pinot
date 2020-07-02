@@ -116,15 +116,14 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, InvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, InvertedIndexReader> _rangeIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
+  private final Map<String, Comparable> _minValueMap = new HashMap<>();
+  private final Map<String, Comparable> _maxValueMap = new HashMap<>();
+
   private final Map<String, RealtimeNullValueVectorReaderWriter> _nullValueVectorMap = new HashMap<>();
   private final IdMap<FixedIntArray> _recordIdMap;
   private boolean _aggregateMetrics;
 
   private volatile int _numDocsIndexed = 0;
-
-  // to compute the rolling interval
-  private volatile long _minTime = Long.MAX_VALUE;
-  private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
 
   // Cache the physical (non-virtual) field specs
@@ -182,6 +181,10 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
         physicalFieldSpecs.add(fieldSpec);
+
+        // Init min/max value map to avoid potential thread safety issue (expanding hashMap while reading).
+        _minValueMap.put(fieldSpec.getName(), null);
+        _maxValueMap.put(fieldSpec.getName(), null);
 
         FieldSpec.FieldType fieldType = fieldSpec.getFieldType();
         if (fieldType == FieldSpec.FieldType.DIMENSION) {
@@ -367,11 +370,33 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   public long getMinTime() {
-    return _minTime;
+    Long minTime = extractTimeValue(_minValueMap.get(_timeColumnName));
+    if (minTime != null) {
+      return minTime;
+    }
+    return Long.MAX_VALUE;
   }
 
   public long getMaxTime() {
-    return _maxTime;
+    Long maxTime = extractTimeValue(_maxValueMap.get(_timeColumnName));
+    if (maxTime != null) {
+      return maxTime;
+    }
+    return Long.MIN_VALUE;
+  }
+
+  private Long extractTimeValue(Comparable time) {
+    if (time != null) {
+      if (time instanceof Number) {
+        return ((Number) time).longValue();
+      } else {
+        String stringValue = time.toString();
+        if (StringUtils.isNumeric(stringValue)) {
+          return Long.parseLong(stringValue);
+        }
+      }
+    }
+    return null;
   }
 
   public void addExtraColumns(Schema newSchema) {
@@ -443,23 +468,6 @@ public class MutableSegmentImpl implements MutableSegment {
           continue;
         }
       }
-
-      // Update min/max value for time column
-      if (column.equals(_timeColumnName)) {
-        long timeValue;
-        if (value instanceof Number) {
-          timeValue = ((Number) value).longValue();
-          _minTime = Math.min(_minTime, timeValue);
-          _maxTime = Math.max(_maxTime, timeValue);
-        } else {
-          String stringValue = value.toString();
-          if (StringUtils.isNumeric(stringValue)) {
-            timeValue = Long.parseLong(stringValue);
-            _minTime = Math.min(_minTime, timeValue);
-            _maxTime = Math.max(_maxTime, timeValue);
-          }
-        }
-      }
     }
     return dictIdMap;
   }
@@ -513,6 +521,30 @@ public class MutableSegmentImpl implements MutableSegment {
         ((FixedByteSingleColumnMultiValueReaderWriter) _indexReaderWriterMap.get(column)).setIntArray(docId, dictIds);
 
         numValuesInfo.updateMVEntry(dictIds.length);
+      }
+
+      // Update min/max value for columns
+      BaseMutableDictionary dictionary = _dictionaryMap.get(column);
+      if (dictionary != null) {
+        _minValueMap.put(column, dictionary.getMinVal());
+        _maxValueMap.put(column, dictionary.getMaxVal());
+        continue;
+      }
+      if (!(value instanceof Comparable)) {
+        continue;
+      }
+      Comparable comparableValue = (Comparable) value;
+      Comparable currentMinValue = _minValueMap.get(column);
+      if (currentMinValue == null) {
+        _minValueMap.put(column, comparableValue);
+        _maxValueMap.put(column, comparableValue);
+        continue;
+      }
+      if (comparableValue.compareTo(currentMinValue) < 0) {
+        _minValueMap.put(column, comparableValue);
+      }
+      if (comparableValue.compareTo(_maxValueMap.get(column)) > 0) {
+        _maxValueMap.put(column, comparableValue);
       }
     }
   }
@@ -647,10 +679,12 @@ public class MutableSegmentImpl implements MutableSegment {
       InvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
       InvertedIndexReader rangeIndex = _rangeIndexMap.get(column);
       BloomFilterReader bloomFilter = _bloomFilterMap.get(column);
+      Comparable minValue =_minValueMap.get(column);
+      Comparable maxValue =_maxValueMap.get(column);
       RealtimeNullValueVectorReaderWriter nullValueVector = _nullValueVectorMap.get(column);
       return new MutableDataSource(fieldSpec, _numDocsIndexed, numValuesInfo.getNumValues(),
-          numValuesInfo.getMaxNumValuesPerMVEntry(), partitionFunction, partitionId, forwardIndex, dictionary,
-          invertedIndex, rangeIndex, bloomFilter, nullValueVector);
+          numValuesInfo.getMaxNumValuesPerMVEntry(), partitionFunction, partitionId, minValue, maxValue,
+          forwardIndex, dictionary, invertedIndex, rangeIndex, bloomFilter, nullValueVector);
     }
   }
 
