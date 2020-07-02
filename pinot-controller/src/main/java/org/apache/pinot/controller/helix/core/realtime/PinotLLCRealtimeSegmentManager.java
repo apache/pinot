@@ -49,6 +49,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -357,7 +358,6 @@ public class PinotLLCRealtimeSegmentManager {
    * and we need to move the segment file to its permanent location before committing the segment metadata.
    * Modifies the segment location in committingSegmentDescriptor to the uri which the segment is moved to
    * unless committingSegmentDescriptor has a peer download uri scheme in segment location.
-   * moving.
    */
   public void commitSegmentFile(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor)
       throws Exception {
@@ -498,10 +498,10 @@ public class PinotLLCRealtimeSegmentManager {
     // TODO Issue 5953 remove the long parsing once metadata is set correctly.
     committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
     committingSegmentZKMetadata.setStatus(Status.DONE);
-    // If the download url set by the server is a peer download url format with peer scheme, put an empty string in zk
-    // otherwise just use the location in the descriptor.
-    committingSegmentZKMetadata.setDownloadUrl(isPeerURL(committingSegmentDescriptor.getSegmentLocation()) ? ""
-        : committingSegmentDescriptor.getSegmentLocation());
+    // If the download url set by the server is a peer download url format with peer scheme, put
+    // METADATA_URI_FOR_PEER_DOWNLOAD in zk; otherwise just use the location in the descriptor.
+    committingSegmentZKMetadata.setDownloadUrl(isPeerURL(committingSegmentDescriptor.getSegmentLocation())
+        ? CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD : committingSegmentDescriptor.getSegmentLocation());
     committingSegmentZKMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     committingSegmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     committingSegmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());

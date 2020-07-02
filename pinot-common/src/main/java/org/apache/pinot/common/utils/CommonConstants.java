@@ -350,6 +350,7 @@ public class CommonConstants {
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
 
     public static final String LOCAL_SEGMENT_SCHEME = "file";
+    public static final String METADATA_URI_FOR_PEER_DOWNLOAD = "";
 
     public enum SegmentType {
       OFFLINE, REALTIME
