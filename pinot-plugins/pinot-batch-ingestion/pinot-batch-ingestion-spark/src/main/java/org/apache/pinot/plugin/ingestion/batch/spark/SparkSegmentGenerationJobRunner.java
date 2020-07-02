@@ -28,6 +28,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -247,7 +248,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         }
 
         //create localTempDir for input and output
-        File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + System.currentTimeMillis());
+        File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
         File localInputTempDir = new File(localTempDir, "input");
         FileUtils.forceMkdir(localInputTempDir);
         File localOutputTempDir = new File(localTempDir, "output");

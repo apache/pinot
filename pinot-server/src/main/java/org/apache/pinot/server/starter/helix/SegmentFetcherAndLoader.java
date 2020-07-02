@@ -20,6 +20,7 @@ package org.apache.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -181,7 +182,7 @@ public class SegmentFetcherAndLoader {
   private String downloadSegmentToLocal(String uri, PinotCrypter crypter, String tableName, String segmentName)
       throws Exception {
     File tempDir = new File(new File(_instanceDataManager.getSegmentFileDirectory(), tableName),
-        "tmp_" + segmentName + "_" + System.nanoTime());
+        "tmp-" + segmentName + "-" + UUID.randomUUID());
     FileUtils.forceMkdir(tempDir);
     File tempDownloadFile = new File(tempDir, segmentName + ENCODED_SUFFIX);
     File tempTarFile = new File(tempDir, segmentName + TAR_GZ_SUFFIX);
