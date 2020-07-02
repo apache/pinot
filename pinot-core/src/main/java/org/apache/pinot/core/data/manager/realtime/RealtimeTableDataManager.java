@@ -66,7 +66,6 @@ import static org.apache.pinot.common.utils.CommonConstants.Segment.METADATA_URI
 
 @ThreadSafe
 public class RealtimeTableDataManager extends BaseTableDataManager {
-  private static final String EMPTY_URL = "";
   private final ExecutorService _segmentAsyncExecutorService =
       Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
