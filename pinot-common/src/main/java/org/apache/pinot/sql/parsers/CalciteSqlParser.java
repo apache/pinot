@@ -662,7 +662,7 @@ public class CalciteSqlParser {
   private static String extractFunctionName(SqlBasicCall funcSqlNode) {
     String funcName = funcSqlNode.getOperator().getKind().name();
     if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
-      // in-built functions like REGEXP_LIKE, TEXT_MATCH that are not natively
+      // in-built functions like REGEXP_LIKE, TEXT_MATCH, timeConvert etc that are not natively
       // supported by Calcite grammar
       funcName = funcSqlNode.getOperator().getName().toUpperCase();
     }
