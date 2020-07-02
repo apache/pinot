@@ -96,9 +96,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // the minimum interval between updates to RealtimeSegmentStatsHistory as 30 minutes. This way it is
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
-  private static final int RETRY_COUNT = 3;
-  private static final long RETRY_WAIT_MS = 100;
-  private static final double RETRY_DELAY_SCALE_FACTOR = 2.0;
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
   }
