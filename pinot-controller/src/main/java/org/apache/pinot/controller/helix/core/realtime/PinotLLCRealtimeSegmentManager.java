@@ -356,7 +356,7 @@ public class PinotLLCRealtimeSegmentManager {
    * When splitCommit is enabled, segment file is uploaded to the segmentLocation in the committingSegmentDescriptor,
    * and we need to move the segment file to its permanent location before committing the segment metadata.
    * Modifies the segment location in committingSegmentDescriptor to the uri which the segment is moved to
-   * Exception: for committingSegmentDescriptor with peer download scheme in its segment location, there is no need for
+   * unless committingSegmentDescriptor has a peer download uri scheme in segment location.
    * moving.
    */
   public void commitSegmentFile(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor)
