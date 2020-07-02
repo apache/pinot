@@ -41,6 +41,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -62,6 +63,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -688,6 +690,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
         PARTITION_OFFSET.toString(), 0, segmentLocation);
     segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    Assert.assertEquals(committingSegmentDescriptor.getSegmentLocation(),
+        URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
     assertFalse(segmentFile.exists());
   }
 
@@ -713,6 +717,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(segmentName,
         PARTITION_OFFSET.toString(), 0, segmentLocation);
     segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+    Assert.assertEquals(committingSegmentDescriptor.getSegmentLocation(),
+        URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
     assertFalse(segmentFile.exists());
     assertFalse(extraSegmentFile.exists());
     assertTrue(otherSegmentFile.exists());
@@ -767,6 +773,36 @@ public class PinotLLCRealtimeSegmentManagerTest {
     } catch (IllegalStateException e) {
       // Expected
     }
+  }
+
+  @Test
+  public void testCommitSegmentMetadata() {
+    // Set up a new table with 2 replicas, 5 instances, 4 partition
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    setUpNewTable(segmentManager, 2, 5, 4);
+
+    // Test case 1: segment location with vip format.
+    // Commit a segment for partition 0
+    String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String segmentLocationVIP = "http://control_vip/segments/segment1";
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L, segmentLocationVIP);
+    committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+
+    LLCRealtimeSegmentZKMetadata metadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
+    Assert.assertEquals(metadata.getDownloadUrl(), segmentLocationVIP);
+
+    // Test case 2: segment location with peer format: peer://segment1, verify that an empty string is stored in zk.
+    committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+    String peerSegmentLocation = "peer:///segment1";
+    committingSegmentDescriptor = new CommittingSegmentDescriptor(committingSegment,
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L, peerSegmentLocation);
+    committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+
+    metadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
+    Assert.assertEquals(metadata.getDownloadUrl(), "");
   }
 
   //////////////////////////////////////////////////////////////////////////////////
