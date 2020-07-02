@@ -56,8 +56,6 @@ import static org.apache.pinot.core.geospatial.GeometryUtils.GEOMETRY_FACTORY;
 public class GeometrySerde extends Serializer {
     private static final Logger LOGGER = LoggerFactory.getLogger(GeometrySerde.class);
 
-
-
     @Override
     public void write(Kryo kryo, Output output, Object object) {
         if (!(object instanceof Geometry)) {
@@ -92,8 +90,6 @@ public class GeometrySerde extends Serializer {
                 return readPolygon(input, true, factory);
             case GEOMETRY_COLLECTION:
                 return readGeometryCollection(input, factory);
-            //            case ENVELOPE:
-            //                return readEnvelope(input);
             default:
                 throw new UnsupportedOperationException("Unexpected type: " + type);
         }
@@ -438,20 +434,5 @@ public class GeometrySerde extends Serializer {
             Geometry geometry = collection.getGeometryN(geometryIndex);
             writeGeometry(output, geometry);
         }
-    }
-
-    private void writeEnvelope(Output output, Geometry geometry) {
-        if (geometry.isEmpty()) {
-            for (int i = 0; i < 4; i++) {
-                output.writeDouble(NaN);
-            }
-            return;
-        }
-
-        Envelope envelope = geometry.getEnvelopeInternal();
-        output.writeDouble(envelope.getMinX());
-        output.writeDouble(envelope.getMinY());
-        output.writeDouble(envelope.getMaxX());
-        output.writeDouble(envelope.getMaxY());
     }
 }
