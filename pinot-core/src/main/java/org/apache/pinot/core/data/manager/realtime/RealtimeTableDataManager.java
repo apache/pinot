@@ -60,7 +60,8 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
+
+import static org.apache.pinot.common.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 
 
 @ThreadSafe
@@ -278,7 +279,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   public void downloadAndReplaceSegment(String segmentName, LLCRealtimeSegmentZKMetadata llcSegmentMetadata,
       IndexLoadingConfig indexLoadingConfig, TableConfig tableConfig) {
     final String uri = llcSegmentMetadata.getDownloadUrl();
-    if (uri != null && !uri.isEmpty()) {
+    if (!METADATA_URI_FOR_PEER_DOWNLOAD.equals(uri)) {
       try {
         downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, uri);
       } catch (Exception e) {
