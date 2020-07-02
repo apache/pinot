@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.ingestion.batch.hadoop;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URI;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -65,7 +66,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     String segmentGenerationJobSpecStr = _jobConf.get(SEGMENT_GENERATION_JOB_SPEC);
     _spec = yaml.loadAs(segmentGenerationJobSpecStr, SegmentGenerationJobSpec.class);
     LOGGER.info("Segment generation job spec : {}", segmentGenerationJobSpecStr);
-    _localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + System.currentTimeMillis());
+    _localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
 
     // Load Pinot Plugins copied from Distributed cache.
     File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);

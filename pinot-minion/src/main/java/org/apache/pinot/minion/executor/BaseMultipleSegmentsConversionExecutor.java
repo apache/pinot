@@ -24,8 +24,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
@@ -60,12 +60,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
    * @return a list of segment conversion result
    * @throws Exception
    */
-  protected abstract List<SegmentConversionResult> convert(@Nonnull PinotTaskConfig pinotTaskConfig,
-      @Nonnull List<File> originalIndexDir, @Nonnull File workingDir)
+  protected abstract List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> originalIndexDir,
+      File workingDir)
       throws Exception;
 
   @Override
-  public List<SegmentConversionResult> executeTask(@Nonnull PinotTaskConfig pinotTaskConfig)
+  public List<SegmentConversionResult> executeTask(PinotTaskConfig pinotTaskConfig)
       throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -78,7 +78,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     LOGGER.info("Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}", taskType,
         tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
 
-    File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + System.nanoTime());
+    File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
 
     try {

@@ -32,6 +32,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -159,8 +160,8 @@ public class PinotSegmentUploadDownloadRestletResource {
             "Segment: " + segmentName + " of table: " + tableName + " not found at: " + remoteSegmentFileURI,
             Response.Status.NOT_FOUND);
       }
-      segmentFile = new File(ControllerFilePathProvider.getInstance().getFileDownloadTempDir(),
-          StringUtil.join(File.separator, tableName, segmentName + "-" + System.nanoTime()));
+      segmentFile = new File(new File(ControllerFilePathProvider.getInstance().getFileDownloadTempDir(), tableName),
+          segmentName + "-" + UUID.randomUUID());
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
       // Streaming in the tmp file and delete it afterward.
       builder.entity((StreamingOutput) output -> {
@@ -194,7 +195,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     File tempSegmentDir = null;
     try {
       ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
-      String tempFileName = TMP_DIR_PREFIX + System.nanoTime();
+      String tempFileName = TMP_DIR_PREFIX + UUID.randomUUID();
       tempDecryptedFile = new File(provider.getFileUploadTempDir(), tempFileName);
       tempEncryptedFile = new File(provider.getFileUploadTempDir(), tempFileName + ENCRYPTED_SUFFIX);
       tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
