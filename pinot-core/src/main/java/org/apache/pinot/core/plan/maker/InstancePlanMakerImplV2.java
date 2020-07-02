@@ -164,7 +164,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (ExpressionContext expression : selectExpressions) {
       FunctionContext function = expression.getFunction();
       String functionName = function.getFunctionName();
-      if (!functionName.equals("min") && !functionName.equals("max") && !functionName.equals("minmaxrange")) {
+      if (!functionName.equals("min") && !functionName.equals("max") && !functionName.equals("minmaxrange")
+          && !functionName.equals("distinctcount")) {
         return false;
       }
       ExpressionContext argument = function.getArguments().get(0);

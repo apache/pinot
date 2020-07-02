@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +73,13 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
         case MINMAXRANGE:
           aggregationResults.add(
               new MinMaxRangePair(dictionary.getDoubleValue(0), dictionary.getDoubleValue(dictionary.length() - 1)));
+          break;
+        case DISTINCTCOUNT:
+          IntOpenHashSet set = new IntOpenHashSet(128);
+          for (int dictId = 0; dictId < dictionary.length(); dictId++) {
+            set.add(dictionary.get(dictId).hashCode());
+          }
+          aggregationResults.add(set);
           break;
         default:
           throw new IllegalStateException(
