@@ -126,40 +126,40 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
     // gender = female
     String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'gender'\", \"dimValue = 'Female'\", \"dimName = 'gender' AND dimValue = 'Female'\") from "
+        + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''gender'' AND dimValue = ''Female''') from "
         + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND dimValue = 'Female'";
     runAndAssert(query, 50 + 60 + 70 + 110 + 120 + 130);
 
     // gender = male
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'gender'\", \"dimValue='Male'\", \"dimName = 'gender' AND dimValue = 'Male'\") from "
+        + "'dimName = ''gender''', 'dimValue = ''Male''', 'dimName = ''gender'' AND dimValue = ''Male''') from "
         + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND dimValue = 'Male'";
     runAndAssert(query, 80 + 90 + 100 + 140 + 150 + 160);
 
     // course = math
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'course'\", \"dimValue = 'Math'\", \"dimName = 'course' AND dimValue = 'Math'\") from "
+        + "'dimName = ''course''', 'dimValue = ''Math''', 'dimName = ''course'' AND dimValue = ''Math''') from "
         + DEFAULT_TABLE_NAME + " where dimName = 'course' AND dimValue = 'Math'";
     runAndAssert(query, 50 + 80 + 110 + 140);
 
     // gender = female AND course = math
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'gender'\", \"dimValue = 'Female'\", \"dimName = 'course'\", \"dimValue = 'Math'\", "
-        + "\"(dimName = 'gender' AND dimValue = 'Female') AND (dimName = 'course' AND dimValue = 'Math')\") from "
+        + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''Math''', "
+        + "'(dimName = ''gender'' AND dimValue = ''Female'') AND (dimName = ''course'' AND dimValue = ''Math'')') from "
         + DEFAULT_TABLE_NAME
         + " where (dimName = 'gender' AND dimValue = 'Female') OR (dimName = 'course' AND dimValue = 'Math')";
     runAndAssert(query, 50 + 110);
 
     // gender = male OR course = biology
     query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-        + "\"dimName = 'gender'\", \"dimValue='Male'\", \"dimName = 'course'\", \"dimValue='Biology'\", "
-        + "\"(dimName = 'gender' AND dimValue = 'Male') OR (dimName = 'course' AND dimValue = 'Biology')\") from "
+        + "'dimName = ''gender''', 'dimValue = ''Male''', 'dimName = ''course''', 'dimValue = ''Biology''', "
+        + "'(dimName = ''gender'' AND dimValue = ''Male'') OR (dimName = ''course'' AND dimValue = ''Biology'')') from "
         + DEFAULT_TABLE_NAME
         + " where (dimName = 'gender' AND dimValue = 'Male') OR (dimName = 'course' AND dimValue = 'Biology')";
     runAndAssert(query, 70 + 80 + 90 + 100 + 130 + 140 + 150 + 160);
 
     // group by gender
-    query = "select dimValue, distinctCountThetaSketch(thetaSketchCol, '', \"dimName = 'gender'\", \"dimName = 'gender'\") from "
+    query = "select dimValue, distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender''', 'dimName = ''gender''') from "
         + DEFAULT_TABLE_NAME + " where dimName = 'gender' AND (dimValue = 'Female' OR dimValue = 'Male') "
         + "group by dimValue";
     runAndAssert(query,
