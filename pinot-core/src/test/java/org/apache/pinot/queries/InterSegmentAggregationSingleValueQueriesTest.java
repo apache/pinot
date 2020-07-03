@@ -174,7 +174,8 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT DISTINCTCOUNT(column1), DISTINCTCOUNT(column3) FROM testTable";
 
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
+    //without filter, we should be using dictionary for distinctcount
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
         new String[]{"6582", "21910"});
 
     brokerResponse = getBrokerResponseForPqlQueryWithFilter(query);
