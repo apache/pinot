@@ -230,7 +230,6 @@ public class PinotControllerModeTest extends ControllerTest {
         "Failed to start the first Pinot-only controller");
     // The first Pinot-only controller should be the MASTER for all partitions
     checkInstanceState(helixAdmin);
-    checkHelixConstraints(helixAdmin);
 
     // Start the second Pinot-only controller
     properties = getDefaultControllerConfiguration();

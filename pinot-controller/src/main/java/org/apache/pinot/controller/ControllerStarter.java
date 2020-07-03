@@ -218,8 +218,9 @@ public class ControllerStarter implements ServiceStartable {
         .put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE, Message.MessageType.STATE_TRANSITION.name());
     ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxMessageLimit);
 
-    getHelixAdmin().setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
-        MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
+    _helixControllerManager.getClusterManagmentTool()
+        .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
+            MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -301,11 +302,6 @@ public class ControllerStarter implements ServiceStartable {
         .setServiceStatusCallback(_helixParticipantInstanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
   }
 
-  private HelixAdmin getHelixAdmin() {
-    return _controllerMode == ControllerConf.ControllerMode.PINOT_ONLY ? _helixResourceManager.getHelixAdmin()
-        : _helixControllerManager.getClusterManagmentTool();
-  }
-
   private void setUpHelixController() {
     // Register and connect instance as Helix controller.
     LOGGER.info("Starting Helix controller");
@@ -377,9 +373,6 @@ public class ControllerStarter implements ServiceStartable {
       LOGGER.info("Realtime tables with High Level consumers will NOT be supported");
       _realtimeSegmentsManager = null;
     }
-
-    // setup constraints
-    setupHelixClusterConstraints();
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
