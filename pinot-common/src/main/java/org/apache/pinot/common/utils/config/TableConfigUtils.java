@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
@@ -228,10 +229,8 @@ public class TableConfigUtils {
       }
       String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
       if (peerSegmentDownloadScheme != null) {
-        if (!"http".equalsIgnoreCase(peerSegmentDownloadScheme) && !"https"
-            .equalsIgnoreCase(peerSegmentDownloadScheme)) {
-          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
-              + "' for peerSegmentDownloadScheme. Must be one of http nor https");
+        if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme) && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
+          throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme + "' for peerSegmentDownloadScheme. Must be one of http nor https" );
         }
       }
     }

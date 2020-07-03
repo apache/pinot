@@ -52,6 +52,8 @@ import org.apache.pinot.spi.services.ServiceStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
+
 
 /**
  * The class <code>MinionStarter</code> provides methods to start and stop the Pinot Minion.
@@ -60,7 +62,6 @@ import org.slf4j.LoggerFactory;
 public class MinionStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionStarter.class);
 
-  private static final String HTTPS_PROTOCOL = "https";
   private static final String HTTPS_ENABLED = "enabled";
 
   private final Configuration _config;

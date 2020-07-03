@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IngestionConfig;
@@ -247,11 +248,9 @@ public class TableConfigSerDeTest {
     }
     {
       // with SegmentsValidationAndRetentionConfig
-      TableConfig tableConfig = tableConfigBuilder.setPeerSegmentDownloadScheme("http").build();
-      checkSegmentsValidationAndRetentionConfig(
-          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkSegmentsValidationAndRetentionConfig(
-          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+      TableConfig tableConfig = tableConfigBuilder.setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL).build();
+      checkSegmentsValidationAndRetentionConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkSegmentsValidationAndRetentionConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
     {
       // With ingestion config
@@ -273,7 +272,7 @@ public class TableConfigSerDeTest {
 
   private void checkSegmentsValidationAndRetentionConfig(TableConfig tableConfig) {
     // TODO validate other fields of SegmentsValidationAndRetentionConfig.
-    assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), "http");
+    assertEquals(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(), CommonConstants.HTTP_PROTOCOL);
   }
 
   private void checkDefaultTableConfig(TableConfig tableConfig) {

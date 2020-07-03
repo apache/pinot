@@ -657,7 +657,7 @@ public class ControllerStarter implements ServiceStartable {
     }
 
     conf.setControllerVipHost("localhost");
-    conf.setControllerVipProtocol("http");
+    conf.setControllerVipProtocol(CommonConstants.HTTP_PROTOCOL);
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setOfflineSegmentIntervalCheckerFrequencyInSeconds(3600);
     conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);

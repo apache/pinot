@@ -21,16 +21,18 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.List;
+import javax.ws.rs.NotSupportedException;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.utils.CommonConstants.HTTPS_PROTOCOL;
+import static org.apache.pinot.common.utils.CommonConstants.HTTP_PROTOCOL;
 import static org.testng.Assert.assertEquals;
 
 
 public class SegmentFetcherFactoryTest {
-  private static final String HTTP_PROTOCOL = "http";
-  private static final String HTTPS_PROTOCOL = "https";
   private static final String FILE_PROTOCOL = "file";
   private static final String TEST_PROTOCOL = "test";
   private static final String TEST_URI = "test://foo/bar";
@@ -87,6 +89,12 @@ public class SegmentFetcherFactoryTest {
         throws Exception {
       assertEquals(uri, new URI(TEST_URI));
       _fetchFileToLocalCalled++;
+    }
+
+    @Override
+    public void fetchSegmentToLocal(List<URI> uri, File dest)
+        throws Exception {
+      throw new UnsupportedOperationException();
     }
   }
 }

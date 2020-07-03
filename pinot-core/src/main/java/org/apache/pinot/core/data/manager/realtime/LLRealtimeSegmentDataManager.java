@@ -1019,7 +1019,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
     closeKafkaConsumers();
-    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
+    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig, _tableConfig);
   }
 
   protected long now() {

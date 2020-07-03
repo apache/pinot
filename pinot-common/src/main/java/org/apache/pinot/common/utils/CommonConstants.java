@@ -24,6 +24,8 @@ import java.io.File;
 public class CommonConstants {
 
   public static final String PREFIX_OF_SSL_SUBSET = "ssl";
+  public static final String HTTP_PROTOCOL = "http";
+  public static final String HTTPS_PROTOCOL = "https";
 
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";

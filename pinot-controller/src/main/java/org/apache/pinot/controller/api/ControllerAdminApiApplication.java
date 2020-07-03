@@ -31,6 +31,7 @@ import javax.ws.rs.container.ContainerResponseFilter;
 
 import org.apache.pinot.controller.api.listeners.ListenerConfig;
 import org.apache.pinot.controller.api.listeners.TlsConfiguration;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.NetworkListener;
@@ -56,10 +57,10 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
   private HttpServer _httpServer;
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.controller.api.resources";
-  
+
   public ControllerAdminApiApplication() {
     super();
-    
+
     packages(RESOURCE_PACKAGE);
     // TODO See ControllerResponseFilter
 //    register(new LoggingFeature());
@@ -87,7 +88,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   public void registerBinder(AbstractBinder binder) {
     register(binder);
   }
-  
+
   private void configureListener(ListenerConfig listenerConfig, HttpServer httpServer) {
     final NetworkListener listener = new NetworkListener(listenerConfig.getName() + "-" + listenerConfig.getPort(),
         listenerConfig.getHost(), listenerConfig.getPort());
@@ -106,21 +107,21 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   public void start(List<ListenerConfig> listenerConfigs, boolean advertiseHttps) {
     // ideally greater than reserved port but then port 80 is also valid
     Preconditions.checkNotNull(listenerConfigs);
-    
+
     // The URI is irrelevant since the default listener will be manually rewritten.
     _httpServer = GrizzlyHttpServerFactory.createHttpServer(URI.create("http://0.0.0.0/"), this, false);
-    
+
     // Listeners cannot be configured with the factory. Manual overrides is required as instructed by Javadoc.
     _httpServer.removeListener("grizzly");
 
     listenerConfigs.forEach(listenerConfig->configureListener(listenerConfig, _httpServer));
-    
+
     try {
       _httpServer.start();
     } catch (IOException e) {
       throw new RuntimeException("Failed to start Http Server", e);
     }
-    
+
     setupSwagger(_httpServer, advertiseHttps);
 
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
@@ -149,9 +150,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
     if (advertiseHttps) {
-      beanConfig.setSchemes(new String[]{"https"});
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
     } else {
-      beanConfig.setSchemes(new String[]{"http"});
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL});
     }
     beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
@@ -174,7 +175,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     }
     _httpServer.shutdownNow();
   }
-  
+
   private class CorsFilter implements ContainerResponseFilter {
     @Override
     public void filter(ContainerRequestContext containerRequestContext,

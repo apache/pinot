@@ -26,6 +26,7 @@ import java.net.URLClassLoader;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.server.api.access.AccessControlFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
@@ -97,7 +98,7 @@ public class AdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot server information");
     beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[]{"http"});
+    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL});
     beanConfig.setBasePath(baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);

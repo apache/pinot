@@ -209,7 +209,7 @@ public class PerfBenchmarkDriver {
     conf.setDataDir(_controllerDataDir);
     conf.setTenantIsolationEnabled(false);
     conf.setControllerVipHost("localhost");
-    conf.setControllerVipProtocol("http");
+    conf.setControllerVipProtocol(CommonConstants.HTTP_PROTOCOL);
     return conf;
   }
 

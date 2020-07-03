@@ -139,7 +139,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableNameWithType);
     tableDataManagerConfig.overrideConfigs(tableConfig);
     TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore, _serverMetrics);
+        .getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore, _serverMetrics, _helixManager);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;

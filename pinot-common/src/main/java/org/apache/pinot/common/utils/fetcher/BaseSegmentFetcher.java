@@ -20,6 +20,8 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
+import java.util.List;
+import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
@@ -64,6 +66,26 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   public void fetchSegmentToLocal(URI uri, File dest)
       throws Exception {
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+      try {
+        fetchSegmentToLocalWithoutRetry(uri, dest);
+        _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
+        return true;
+      } catch (Exception e) {
+        _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
+        return false;
+      }
+    });
+  }
+
+  @Override
+  public void fetchSegmentToLocal(List<URI> uris, File dest)
+      throws Exception {
+    if (uris == null) {
+      throw new IllegalArgumentException("The input uri list is empty");
+    }
+    Random r = new Random();
+    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+      URI uri = uris.get(r.nextInt(uris.size()));
       try {
         fetchSegmentToLocalWithoutRetry(uri, dest);
         _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
