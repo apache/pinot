@@ -116,6 +116,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, InvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, InvertedIndexReader> _rangeIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
+  // Only store min/max for non-dictionary fields
   private final Map<String, Comparable> _minValueMap = new HashMap<>();
   private final Map<String, Comparable> _maxValueMap = new HashMap<>();
 
@@ -181,11 +182,6 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
         physicalFieldSpecs.add(fieldSpec);
-
-        // Init min/max value map to avoid potential thread safety issue (expanding hashMap while reading).
-        _minValueMap.put(fieldSpec.getName(), null);
-        _maxValueMap.put(fieldSpec.getName(), null);
-
         FieldSpec.FieldType fieldType = fieldSpec.getFieldType();
         if (fieldType == FieldSpec.FieldType.DIMENSION) {
           physicalDimensionFieldSpecs.add((DimensionFieldSpec) fieldSpec);
@@ -230,6 +226,9 @@ public class MutableSegmentImpl implements MutableSegment {
         if (isFixedWidthColumn) {
           forwardIndexColumnSize = dataType.size();
         }
+        // Init min/max value map to avoid potential thread safety issue (expanding hashMap while reading).
+        _minValueMap.put(fieldSpec.getName(), null);
+        _maxValueMap.put(fieldSpec.getName(), null);
       } else {
         // dictionary encoded index
         // each forward index entry will contain a 4 byte dictionary ID
@@ -369,16 +368,24 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
+  /**
+   * Get min time from the segment, based on the time column, only used by Kafka HLC.
+   */
+  @Deprecated
   public long getMinTime() {
-    Long minTime = extractTimeValue(_minValueMap.get(_timeColumnName));
+    Long minTime = extractTimeValue(getMinVal(_timeColumnName));
     if (minTime != null) {
       return minTime;
     }
     return Long.MAX_VALUE;
   }
 
+  /**
+   * Get max time from the segment, based on the time column, only used by Kafka HLC.
+   */
+  @Deprecated
   public long getMaxTime() {
-    Long maxTime = extractTimeValue(_maxValueMap.get(_timeColumnName));
+    Long maxTime = extractTimeValue(getMaxVal(_timeColumnName));
     if (maxTime != null) {
       return maxTime;
     }
@@ -397,6 +404,32 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
     return null;
+  }
+
+  /**
+   * Get min value of a column in the segment.
+   * @param column
+   * @return min value
+   */
+  public Comparable getMinVal(String column) {
+    BaseMutableDictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      return dictionary.getMinVal();
+    }
+    return _minValueMap.get(column);
+  }
+
+  /**
+   * Get max value of a column in the segment.
+   * @param column
+   * @return max value
+   */
+  public Comparable getMaxVal(String column) {
+    BaseMutableDictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      return dictionary.getMaxVal();
+    }
+    return _maxValueMap.get(column);
   }
 
   public void addExtraColumns(Schema newSchema) {
@@ -523,14 +556,8 @@ public class MutableSegmentImpl implements MutableSegment {
         numValuesInfo.updateMVEntry(dictIds.length);
       }
 
-      // Update min/max value for columns
-      BaseMutableDictionary dictionary = _dictionaryMap.get(column);
-      if (dictionary != null) {
-        _minValueMap.put(column, dictionary.getMinVal());
-        _maxValueMap.put(column, dictionary.getMaxVal());
-        continue;
-      }
-      if (!(value instanceof Comparable)) {
+      // Update min/max value for no dictionary columns
+      if ((_dictionaryMap.get(column) != null) || !(value instanceof Comparable)) {
         continue;
       }
       Comparable comparableValue = (Comparable) value;
@@ -679,8 +706,8 @@ public class MutableSegmentImpl implements MutableSegment {
       InvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
       InvertedIndexReader rangeIndex = _rangeIndexMap.get(column);
       BloomFilterReader bloomFilter = _bloomFilterMap.get(column);
-      Comparable minValue =_minValueMap.get(column);
-      Comparable maxValue =_maxValueMap.get(column);
+      Comparable minValue = getMinVal(column);
+      Comparable maxValue = getMaxVal(column);
       RealtimeNullValueVectorReaderWriter nullValueVector = _nullValueVectorMap.get(column);
       return new MutableDataSource(fieldSpec, _numDocsIndexed, numValuesInfo.getNumValues(),
           numValuesInfo.getMaxNumValuesPerMVEntry(), partitionFunction, partitionId, minValue, maxValue,
