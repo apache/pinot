@@ -16,38 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl.constant;
+package org.apache.pinot.core.segment.index.readers.constant;
 
-import java.io.IOException;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * Forward index reader for multi-value column with constant values.
+ * Inverted index reader for multi-value column with constant values.
  */
-public class ConstantMVForwardIndexReader implements ForwardIndexReader<ReaderContext> {
+public final class ConstantMVInvertedIndexReader implements InvertedIndexReader<MutableRoaringBitmap> {
+  private final MutableRoaringBitmap _bitmap;
 
-  @Override
-  public DataType getValueType() {
-    // NOTE: Dictionary id is handled as INT type.
-    return DataType.INT;
+  public ConstantMVInvertedIndexReader(int numDocs) {
+    _bitmap = new MutableRoaringBitmap();
+    _bitmap.add(0L, numDocs);
   }
 
   @Override
-  public boolean isSingleValue() {
-    return false;
+  public MutableRoaringBitmap getDocIds(int dictId) {
+    return _bitmap;
   }
 
   @Override
-  public int getIntArray(int docId, int[] intArray) {
-    intArray[0] = 0;
-    return 1;
-  }
-
-  @Override
-  public void close()
-      throws IOException {
+  public void close() {
   }
 }

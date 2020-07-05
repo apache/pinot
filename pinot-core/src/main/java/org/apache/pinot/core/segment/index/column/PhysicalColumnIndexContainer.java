@@ -21,13 +21,6 @@ package org.apache.pinot.core.segment.index.column;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
-import org.apache.pinot.core.io.reader.SortedIndexReader;
-import org.apache.pinot.core.io.reader.impl.FixedBitMVForwardIndexReader;
-import org.apache.pinot.core.io.reader.impl.FixedBitSVForwardIndexReader;
-import org.apache.pinot.core.io.reader.impl.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.core.io.reader.impl.SortedIndexReaderImpl;
-import org.apache.pinot.core.io.reader.impl.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
@@ -36,6 +29,7 @@ import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.BytesDictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
@@ -46,7 +40,13 @@ import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
 import org.apache.pinot.core.segment.index.readers.RangeIndexReader;
+import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
@@ -59,9 +59,9 @@ import org.slf4j.LoggerFactory;
 public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
-  private final ForwardIndexReader _forwardIndex;
-  private final InvertedIndexReader _invertedIndex;
-  private final InvertedIndexReader _rangeIndex;
+  private final ForwardIndexReader<?> _forwardIndex;
+  private final InvertedIndexReader<?> _invertedIndex;
+  private final InvertedIndexReader<?> _rangeIndex;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
   private final NullValueVectorReaderImpl _nullValueVectorReader;
@@ -107,7 +107,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         // Single-value
         if (metadata.isSorted()) {
           // Sorted
-          SortedIndexReader sortedIndexReader = new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
+          SortedIndexReader<?> sortedIndexReader = new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
           _rangeIndex = null;
@@ -151,17 +151,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public ForwardIndexReader getForwardIndex() {
+  public ForwardIndexReader<?> getForwardIndex() {
     return _forwardIndex;
   }
 
   @Override
-  public InvertedIndexReader getInvertedIndex() {
+  public InvertedIndexReader<?> getInvertedIndex() {
     return _invertedIndex;
   }
 
   @Override
-  public InvertedIndexReader getRangeIndex() {
+  public InvertedIndexReader<?> getRangeIndex() {
     return _rangeIndex;
   }
 
@@ -222,7 +222,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     }
   }
 
-  private static ForwardIndexReader loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
+  private static ForwardIndexReader<?> loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
       FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:

@@ -42,12 +42,12 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -158,15 +158,13 @@ public class TextIndexHandler {
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
     // further need to move around the lucene index directory since it is created with correct directory structure
     // based on segmentVersion.
-    try (LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true)) {
-      try (VarByteChunkSVForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata)) {
-        ChunkReaderContext readerContext = forwardIndexReader.createContext();
-        for (int docID = 0; docID < numDocs; docID++) {
-          Object docToAdd = forwardIndexReader.getString(docID, readerContext);
-          textIndexCreator.addDoc(docToAdd, docID);
-        }
-        textIndexCreator.seal();
+    try (LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true);
+        VarByteChunkSVForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata);
+        ChunkReaderContext readerContext = forwardIndexReader.createContext()) {
+      for (int docId = 0; docId < numDocs; docId++) {
+        textIndexCreator.addDoc(forwardIndexReader.getString(docId, readerContext), docId);
       }
+      textIndexCreator.seal();
     }
     LOGGER.info("Created text index for column: {} in segment: {}", column, _segmentName);
     PropertiesConfiguration properties = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);

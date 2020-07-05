@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.readerwriter.impl;
+package org.apache.pinot.core.realtime.impl.forward;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import org.apache.pinot.core.io.readerwriter.ForwardIndexReaderWriter;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
@@ -87,9 +87,10 @@ import org.slf4j.LoggerFactory;
  * </code>
  *
  */
-// TODO: Check thread-safety
-public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWriter {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteMVForwardIndexReaderWriter.class);
+// TODO: Fix thread-safety issue for ArrayList
+// TODO: Optimize it
+public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteMVMutableForwardIndex.class);
 
   /**
    * number of columns is 1, column size is variable but less than _maxNumberOfMultiValuesPerRow
@@ -119,8 +120,8 @@ public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWr
   private int _prevRowStartIndex = 0;  // Offset in the data-buffer for the last row added.
   private int _prevRowLength = 0;  // Number of values in the column for the last row added.
 
-  public FixedByteMVForwardIndexReaderWriter(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount,
-      int rowCountPerChunk, int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context) {
+  public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
+      int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context) {
     _memoryManager = memoryManager;
     _context = context;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
@@ -170,23 +171,6 @@ public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWr
     }
   }
 
-  @Override
-  public void close()
-      throws IOException {
-    for (FixedByteSingleValueMultiColWriter writer : _headerWriters) {
-      writer.close();
-    }
-    for (FixedByteSingleValueMultiColReader reader : _headerReaders) {
-      reader.close();
-    }
-    for (FixedByteSingleValueMultiColWriter writer : _dataWriters) {
-      writer.close();
-    }
-    for (FixedByteSingleValueMultiColReader reader : _dataReaders) {
-      reader.close();
-    }
-  }
-
   private void writeIntoHeader(int row, int dataWriterIndex, int startIndex, int length) {
     if (row >= _headerWriters.size() * _rowCountPerChunk) {
       addHeaderBuffer();
@@ -221,16 +205,22 @@ public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWr
     return newStartIndex;
   }
 
+  /**
+   * TODO: Currently we only support dictionary-encoded forward index on multi-value columns.
+   */
   @Override
-  public DataType getValueType() {
-    // NOTE: Dictionary id is handled as INT type.
-    // TODO: Currently we only support dictionary-encoded forward index on multi-value columns.
-    return DataType.INT;
+  public boolean isDictionaryEncoded() {
+    return true;
   }
 
   @Override
   public boolean isSingleValue() {
     return false;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.INT;
   }
 
   @Override
@@ -244,39 +234,7 @@ public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWr
   }
 
   @Override
-  public void setIntArray(int docId, int[] intArray) {
-    int newStartIndex = updateHeader(docId, intArray.length);
-    for (int i = 0; i < intArray.length; i++) {
-      _currentDataWriter.setInt(newStartIndex + i, 0, intArray[i]);
-    }
-  }
-
-  @Override
-  public void setLongArray(int docId, long[] longArray) {
-    int newStartIndex = updateHeader(docId, longArray.length);
-    for (int i = 0; i < longArray.length; i++) {
-      _currentDataWriter.setLong(newStartIndex + i, 0, longArray[i]);
-    }
-  }
-
-  @Override
-  public void setFloatArray(int docId, float[] floatArray) {
-    int newStartIndex = updateHeader(docId, floatArray.length);
-    for (int i = 0; i < floatArray.length; i++) {
-      _currentDataWriter.setFloat(newStartIndex + i, 0, floatArray[i]);
-    }
-  }
-
-  @Override
-  public void setDoubleArray(int docId, double[] doubleArray) {
-    int newStartIndex = updateHeader(docId, doubleArray.length);
-    for (int i = 0; i < doubleArray.length; i++) {
-      _currentDataWriter.setDouble(newStartIndex + i, 0, doubleArray[i]);
-    }
-  }
-
-  @Override
-  public int getIntArray(int docId, int[] intArray) {
+  public int getDictIdMV(int docId, int[] dictIdBuffer) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
     int rowInCurrentHeader = getRowInCurrentHeader(docId);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
@@ -284,13 +242,18 @@ public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWr
     int length = headerReader.getInt(rowInCurrentHeader, 2);
     FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
-      intArray[i] = dataReader.getInt(startIndex + i, 0);
+      dictIdBuffer[i] = dataReader.getInt(startIndex + i, 0);
     }
     return length;
   }
 
   @Override
-  public int getLongArray(int docId, long[] longArray) {
+  public int getIntMV(int docId, int[] valueBuffer) {
+    return getDictIdMV(docId, valueBuffer);
+  }
+
+  @Override
+  public int getLongMV(int docId, long[] valueBuffer) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
     int rowInCurrentHeader = getRowInCurrentHeader(docId);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
@@ -298,13 +261,13 @@ public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWr
     int length = headerReader.getInt(rowInCurrentHeader, 2);
     FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
-      longArray[i] = dataReader.getLong(startIndex + i, 0);
+      valueBuffer[i] = dataReader.getLong(startIndex + i, 0);
     }
     return length;
   }
 
   @Override
-  public int getFloatArray(int docId, float[] floatArray) {
+  public int getFloatMV(int docId, float[] valueBuffer) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
     int rowInCurrentHeader = getRowInCurrentHeader(docId);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
@@ -312,13 +275,13 @@ public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWr
     int length = headerReader.getInt(rowInCurrentHeader, 2);
     FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
-      floatArray[i] = dataReader.getFloat(startIndex + i, 0);
+      valueBuffer[i] = dataReader.getFloat(startIndex + i, 0);
     }
     return length;
   }
 
   @Override
-  public int getDoubleArray(int docId, double[] doubleArray) {
+  public int getDoubleMV(int docId, double[] valueBuffer) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
     int rowInCurrentHeader = getRowInCurrentHeader(docId);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
@@ -326,8 +289,62 @@ public class FixedByteMVForwardIndexReaderWriter implements ForwardIndexReaderWr
     int length = headerReader.getInt(rowInCurrentHeader, 2);
     FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
-      doubleArray[i] = dataReader.getDouble(startIndex + i, 0);
+      valueBuffer[i] = dataReader.getDouble(startIndex + i, 0);
     }
     return length;
+  }
+
+  @Override
+  public void setDictIdMV(int docId, int[] dictIds) {
+    int newStartIndex = updateHeader(docId, dictIds.length);
+    for (int i = 0; i < dictIds.length; i++) {
+      _currentDataWriter.setInt(newStartIndex + i, 0, dictIds[i]);
+    }
+  }
+
+  @Override
+  public void setIntMV(int docId, int[] values) {
+    setDictIdMV(docId, values);
+  }
+
+  @Override
+  public void setLongMV(int docId, long[] values) {
+    int newStartIndex = updateHeader(docId, values.length);
+    for (int i = 0; i < values.length; i++) {
+      _currentDataWriter.setLong(newStartIndex + i, 0, values[i]);
+    }
+  }
+
+  @Override
+  public void setFloatMV(int docId, float[] values) {
+    int newStartIndex = updateHeader(docId, values.length);
+    for (int i = 0; i < values.length; i++) {
+      _currentDataWriter.setFloat(newStartIndex + i, 0, values[i]);
+    }
+  }
+
+  @Override
+  public void setDoubleMV(int docId, double[] values) {
+    int newStartIndex = updateHeader(docId, values.length);
+    for (int i = 0; i < values.length; i++) {
+      _currentDataWriter.setDouble(newStartIndex + i, 0, values[i]);
+    }
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for (FixedByteSingleValueMultiColWriter writer : _headerWriters) {
+      writer.close();
+    }
+    for (FixedByteSingleValueMultiColReader reader : _headerReaders) {
+      reader.close();
+    }
+    for (FixedByteSingleValueMultiColWriter writer : _dataWriters) {
+      writer.close();
+    }
+    for (FixedByteSingleValueMultiColReader reader : _dataReaders) {
+      reader.close();
+    }
   }
 }

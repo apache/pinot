@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.index.readerwriter;
+package org.apache.pinot.index.forward.mutable;
 
 import java.io.IOException;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.VarByteSVForwardIndexReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.realtime.impl.forward.VarByteSVMutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -32,12 +32,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class VarByteSVForwardIndexReaderWriterTest {
+public class VarByteSVMutableForwardIndexTest {
   private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(VarByteSVForwardIndexReaderWriterTest.class.getName());
+    _memoryManager = new DirectMemoryManager(VarByteSVMutableForwardIndexTest.class.getName());
   }
 
   @AfterClass
@@ -53,8 +53,8 @@ public class VarByteSVForwardIndexReaderWriterTest {
     // we will test with complete randomness
     int initialCapacity = 5;
     int estimatedAvgStringLength = 30;
-    try (VarByteSVForwardIndexReaderWriter readerWriter = new VarByteSVForwardIndexReaderWriter(DataType.STRING,
-        _memoryManager, "StringColumn", initialCapacity, estimatedAvgStringLength)) {
+    try (VarByteSVMutableForwardIndex readerWriter = new VarByteSVMutableForwardIndex(DataType.STRING, _memoryManager,
+        "StringColumn", initialCapacity, estimatedAvgStringLength)) {
       int rows = 1000;
       Random random = new Random();
       String[] data = new String[rows];
@@ -77,8 +77,8 @@ public class VarByteSVForwardIndexReaderWriterTest {
       throws IOException {
     int initialCapacity = 5;
     int estimatedAvgStringLength = 30;
-    try (VarByteSVForwardIndexReaderWriter readerWriter = new VarByteSVForwardIndexReaderWriter(DataType.STRING,
-        _memoryManager, "StringColumn", initialCapacity, estimatedAvgStringLength)) {
+    try (VarByteSVMutableForwardIndex readerWriter = new VarByteSVMutableForwardIndex(DataType.STRING, _memoryManager,
+        "StringColumn", initialCapacity, estimatedAvgStringLength)) {
       int rows = 1000;
       Random random = new Random();
       String[] data = new String[rows];

@@ -86,8 +86,8 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
   @Override
@@ -96,22 +96,18 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   }
 
   @Override
-  public void index(String value) {
+  public DataType getValueType() {
+    return _valueType;
+  }
+
+  @Override
+  public void putString(String value) {
     _indexWriter.putString(value);
   }
 
   @Override
-  public void index(byte[] value) {
+  public void putBytes(byte[] value) {
     _indexWriter.putBytes(value);
-  }
-
-  @Override
-  public void index(Object value) {
-    if (_valueType == DataType.STRING) {
-      index((String) value);
-    } else {
-      index((byte[]) value);
-    }
   }
 
   @Override

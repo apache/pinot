@@ -21,7 +21,6 @@ package org.apache.pinot.core.segment.creator.impl.fwd;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
-import org.apache.pinot.core.io.writer.ForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.FixedBitSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -32,7 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Forward index creator for dictionary-encoded unsorted single-value column.
  */
 public class SingleValueUnsortedForwardIndexCreator implements ForwardIndexCreator {
-  private final ForwardIndexWriter _writer;
+  private final FixedBitSVForwardIndexWriter _writer;
 
   public SingleValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs)
       throws Exception {
@@ -41,9 +40,8 @@ public class SingleValueUnsortedForwardIndexCreator implements ForwardIndexCreat
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
-    // NOTE: Dictionary id is handled as INT type.
-    return FieldSpec.DataType.INT;
+  public boolean isDictionaryEncoded() {
+    return true;
   }
 
   @Override
@@ -52,8 +50,13 @@ public class SingleValueUnsortedForwardIndexCreator implements ForwardIndexCreat
   }
 
   @Override
-  public void index(int dictId) {
-    _writer.putInt(dictId);
+  public FieldSpec.DataType getValueType() {
+    return FieldSpec.DataType.INT;
+  }
+
+  @Override
+  public void putDictId(int dictId) {
+    _writer.putDictId(dictId);
   }
 
   @Override

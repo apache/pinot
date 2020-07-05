@@ -357,9 +357,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     checkUnsupportedOperationsForTextIndex(column, indexLoadingConfig, fieldSpec);
 
     int totalDocs = _segmentMetadata.getTotalDocs();
-    Object defaultValue = fieldSpec.getDefaultNullValue();
-    String stringDefaultValue = (String) defaultValue;
-    int lengthOfLongestEntry = StringUtil.encodeUtf8(stringDefaultValue).length;
+    String defaultValue = (String) fieldSpec.getDefaultNullValue();
+    int lengthOfLongestEntry = StringUtil.encodeUtf8(defaultValue).length;
     int dictionaryElementSize = 0;
 
     boolean deriveNumDocsPerChunk =
@@ -370,14 +369,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         ChunkCompressorFactory.CompressionType.SNAPPY, column, totalDocs, DataType.STRING, lengthOfLongestEntry,
         deriveNumDocsPerChunk, writerVersion)) {
       for (int docId = 0; docId < totalDocs; docId++) {
-        rawIndexCreator.index(defaultValue);
+        rawIndexCreator.putString(defaultValue);
       }
     }
 
     // even though the column is sorted, we should pass it as false so that during
     // TEXT_MATCH query time, when index reader is created, we create TextIndexReader
     // and not SortedIndexReader.
-    Object sortedArray = new String[]{(String) defaultValue};
+    Object sortedArray = new String[]{defaultValue};
     DefaultColumnStatistics columnStatistics =
         new DefaultColumnStatistics(defaultValue /* min */, defaultValue /* max */, sortedArray, false, totalDocs, 0);
 
@@ -464,7 +463,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       try (SingleValueSortedForwardIndexCreator svFwdIndexCreator = new SingleValueSortedForwardIndexCreator(_indexDir,
           fieldSpec.getName(), 1/*cardinality*/)) {
         for (int docId = 0; docId < totalDocs; docId++) {
-          svFwdIndexCreator.index(0/*dictionaryId*/);
+          svFwdIndexCreator.putDictId(0);
         }
       }
     } else {
@@ -475,7 +474,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               fieldSpec.getName(), 1/*cardinality*/, totalDocs/*numDocs*/, totalDocs/*totalNumberOfValues*/)) {
         int[] dictIds = {0};
         for (int docId = 0; docId < totalDocs; docId++) {
-          mvFwdIndexCreator.index(dictIds);
+          mvFwdIndexCreator.putDictIdMV(dictIds);
         }
       }
     }

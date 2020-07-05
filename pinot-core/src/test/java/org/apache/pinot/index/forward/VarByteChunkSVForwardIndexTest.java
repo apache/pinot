@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.index.readerwriter;
+package org.apache.pinot.index.forward;
 
 import java.io.File;
 import java.net.URL;
@@ -26,11 +26,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.memory.PinotNativeOrderLBuffer;
 import org.apache.pinot.core.segment.memory.PinotNonNativeOrderLBuffer;
@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 /**
  * Unit test for {@link VarByteChunkSVForwardIndexReader} and {@link VarByteChunkSVForwardIndexWriter} classes.
  */
-public class VarByteChunkSVForwardIndexReaderWriteTest {
+public class VarByteChunkSVForwardIndexTest {
   private static final int NUM_ENTRIES = 5003;
   private static final int NUM_DOCS_PER_CHUNK = 1009;
   private static final int MAX_STRING_LENGTH = 101;
@@ -103,15 +103,13 @@ public class VarByteChunkSVForwardIndexReaderWriteTest {
 
     try (VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.STRING);
+        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
         VarByteChunkSVForwardIndexReader eightByteOffsetReader = new VarByteChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.STRING)) {
-
-      ChunkReaderContext context1 = fourByteOffsetReader.createContext();
-      ChunkReaderContext context2 = eightByteOffsetReader.createContext();
-
+            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.STRING);
+        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_ENTRIES; i++) {
-        Assert.assertEquals(fourByteOffsetReader.getString(i, context1), expected[i]);
-        Assert.assertEquals(eightByteOffsetReader.getString(i, context2), expected[i]);
+        Assert.assertEquals(fourByteOffsetReader.getString(i, fourByteOffsetReaderContext), expected[i]);
+        Assert.assertEquals(eightByteOffsetReader.getString(i, eightByteOffsetReaderContext), expected[i]);
       }
     }
 
@@ -149,10 +147,10 @@ public class VarByteChunkSVForwardIndexReaderWriteTest {
     }
     File file = new File(resource.getFile());
     try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.STRING)) {
-      ChunkReaderContext context = reader.createContext();
+        PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.STRING);
+        ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
-        String actual = reader.getString(i, context);
+        String actual = reader.getString(i, readerContext);
         Assert.assertEquals(actual, data[i % data.length]);
       }
     }
@@ -208,10 +206,10 @@ public class VarByteChunkSVForwardIndexReaderWriteTest {
     }
 
     PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(outFile);
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING)) {
-      ChunkReaderContext context = reader.createContext();
+    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+        ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
-        Assert.assertEquals(reader.getString(i, context), expected[i]);
+        Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
       }
     }
 
@@ -228,10 +226,10 @@ public class VarByteChunkSVForwardIndexReaderWriteTest {
       buffer = PinotNonNativeOrderLBuffer.mapFile(outFile, true, 0, outFile.length());
     }
 
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING)) {
-      ChunkReaderContext context = reader.createContext();
+    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+        ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
-        Assert.assertEquals(reader.getString(i, context), expected[i]);
+        Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
       }
     }
 

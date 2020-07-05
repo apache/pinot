@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl;
+package org.apache.pinot.core.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
 import org.apache.pinot.common.utils.StringUtil;
@@ -26,47 +26,31 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
- * Reader class for data written out by {@link VarByteChunkSVForwardIndexWriter}.
- * For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
+ * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of  of variable length data
+ * type (STRING, BYTES).
+ * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
-public class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIndexReader {
-  private final DataType _valueType;
+public final class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIndexReader {
   private final int _maxChunkSize;
 
   // Thread local (reusable) byte[] to read bytes from data file.
   private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[_lengthOfLongestEntry]);
 
-  /**
-   * Constructor for the class.
-   *
-   * @param pinotDataBuffer Data buffer to read from
-   */
-  public VarByteChunkSVForwardIndexReader(PinotDataBuffer pinotDataBuffer, DataType valueType) {
-    super(pinotDataBuffer);
-    _valueType = valueType;
+  public VarByteChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
+    super(dataBuffer, valueType);
     _maxChunkSize = _numDocsPerChunk * (VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE
         + _lengthOfLongestEntry);
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
-  }
-
-  @Override
-  public boolean isSingleValue() {
-    return true;
-  }
-
-  @Override
-  public String getString(int docId) {
-    return getString(docId, createContext());
+  public ChunkReaderContext createContext() {
+    return new ChunkReaderContext(_maxChunkSize);
   }
 
   @Override
   public String getString(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
-    ByteBuffer chunkBuffer = getChunkForRow(docId, context);
+    ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
 
     int rowOffset =
         chunkBuffer.getInt(chunkRowId * VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE);
@@ -82,14 +66,9 @@ public class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIndexRea
   }
 
   @Override
-  public byte[] getBytes(int docId) {
-    return getBytes(docId, createContext());
-  }
-
-  @Override
   public byte[] getBytes(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
-    ByteBuffer chunkBuffer = getChunkForRow(docId, context);
+    ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
 
     int rowOffset =
         chunkBuffer.getInt(chunkRowId * VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE);
@@ -101,11 +80,6 @@ public class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIndexRea
     chunkBuffer.position(rowOffset);
     chunkBuffer.get(bytes, 0, length);
     return bytes;
-  }
-
-  @Override
-  public ChunkReaderContext createContext() {
-    return new ChunkReaderContext(_maxChunkSize);
   }
 
   /**

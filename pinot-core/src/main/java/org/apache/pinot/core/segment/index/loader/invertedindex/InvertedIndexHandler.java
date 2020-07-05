@@ -24,15 +24,16 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
-import org.apache.pinot.core.io.reader.impl.FixedBitMVForwardIndexReader;
-import org.apache.pinot.core.io.reader.impl.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -40,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class InvertedIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(InvertedIndexHandler.class);
 
@@ -105,17 +107,18 @@ public class InvertedIndexHandler {
     try (OffHeapBitmapInvertedIndexCreator creator = new OffHeapBitmapInvertedIndexCreator(_indexDir,
         columnMetadata.getFieldSpec(), columnMetadata.getCardinality(), numDocs,
         columnMetadata.getTotalNumberOfEntries())) {
-      try (ForwardIndexReader<?> forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter)) {
+      try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata, _segmentWriter);
+          ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
         if (columnMetadata.isSingleValue()) {
           // Single-value column.
           for (int i = 0; i < numDocs; i++) {
-            creator.add(forwardIndexReader.getInt(i));
+            creator.add(forwardIndexReader.getDictId(i, readerContext));
           }
         } else {
           // Multi-value column.
           int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
           for (int i = 0; i < numDocs; i++) {
-            int length = forwardIndexReader.getIntArray(i, dictIds);
+            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
             creator.add(dictIds, length);
           }
         }

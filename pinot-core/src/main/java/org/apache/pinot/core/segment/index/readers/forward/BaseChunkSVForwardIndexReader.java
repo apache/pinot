@@ -16,39 +16,45 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl;
+package org.apache.pinot.core.segment.index.readers.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.compression.ChunkDecompressor;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
 import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.util.CleanerUtil;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Base implementation for chunk based single-value forward index reader.
+ * Base implementation for chunk-based single-value raw (non-dictionary-encoded) forward index reader.
  */
-public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReader<ChunkReaderContext> {
+public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReader<BaseChunkSVForwardIndexReader.ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSVForwardIndexReader.class);
 
   protected final int _chunkSize;
   protected final int _numDocsPerChunk;
   protected final int _numChunks;
   protected final int _lengthOfLongestEntry;
+  protected final boolean _isCompressed;
+  protected final PinotDataBuffer _rawData;
 
   private final PinotDataBuffer _dataBuffer;
+  private final DataType _valueType;
   private final PinotDataBuffer _dataHeader;
-  private final PinotDataBuffer _rawData;
-  private final boolean _isCompressed;
   private final ChunkDecompressor _chunkDecompressor;
   private final int _headerEntryChunkOffsetSize;
 
-  public BaseChunkSVForwardIndexReader(PinotDataBuffer dataBuffer) {
+  public BaseChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
     _dataBuffer = dataBuffer;
+    _valueType = valueType;
 
     int headerOffset = 0;
     int version = _dataBuffer.getInt(headerOffset);
@@ -61,6 +67,9 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
     headerOffset += Integer.BYTES;
 
     _lengthOfLongestEntry = _dataBuffer.getInt(headerOffset);
+    if (valueType.isFixedWidth()) {
+      Preconditions.checkState(_lengthOfLongestEntry == valueType.size());
+    }
     headerOffset += Integer.BYTES;
 
     int dataHeaderStart = headerOffset;
@@ -93,17 +102,17 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
   }
 
   /**
-   * Helper method to get the chunk for a given row.
+   * Helper method to return the chunk buffer that contains the value at the given document id.
    * <ul>
    *   <li> If the chunk already exists in the reader context, returns the same. </li>
    *   <li> Otherwise, loads the chunk for the row, and sets it in the reader context. </li>
    * </ul>
-   * @param row Row for which to get the chunk
+   * @param docId Document id
    * @param context Reader context
    * @return Chunk for the row
    */
-  protected ByteBuffer getChunkForRow(int row, ChunkReaderContext context) {
-    int chunkId = row / _numDocsPerChunk;
+  protected ByteBuffer getChunkBuffer(int docId, ChunkReaderContext context) {
+    int chunkId = docId / _numDocsPerChunk;
     if (context.getChunkId() == chunkId) {
       return context.getChunkBuffer();
     }
@@ -137,7 +146,7 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
    * @param chunkId Id of the chunk for which to return the position.
    * @return Position (offset) of the chunk in the data.
    */
-  protected long getChunkPosition(int chunkId) {
+  private long getChunkPosition(int chunkId) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
     } else {
@@ -145,27 +154,65 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
     }
   }
 
-  /**
-   * Method to determine if the data is compressed or not.
-   *
-   * @return True if data is compressed, false otherwise.
-   */
-  protected boolean isCompressed() {
-    return _isCompressed;
+  @Override
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
-  /**
-   * Returns a PinotDataBuffer containing the raw data.
-   *
-   * @return PinotDataBuffer containing raw data.
-   */
-  protected PinotDataBuffer getRawData() {
-    return _rawData;
+  @Override
+  public boolean isSingleValue() {
+    return true;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return _valueType;
   }
 
   @Override
   public void close() {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
+  }
+
+  /**
+   * Context for the chunk-based forward index readers.
+   * <p>Information saved in the context can be used by subsequent reads as cache:
+   * <ul>
+   *   <li>
+   *     Chunk Buffer from the previous read. Useful if the subsequent read is from the same buffer, as it avoids extra
+   *     chunk decompression.
+   *   </li>
+   *   <li>Id for the chunk</li>
+   * </ul>
+   */
+  public static class ChunkReaderContext implements ForwardIndexReaderContext {
+    private final ByteBuffer _chunkBuffer;
+    private int _chunkId;
+
+    public ChunkReaderContext(int maxChunkSize) {
+      _chunkBuffer = ByteBuffer.allocateDirect(maxChunkSize);
+      _chunkId = -1;
+    }
+
+    public ByteBuffer getChunkBuffer() {
+      return _chunkBuffer;
+    }
+
+    public int getChunkId() {
+      return _chunkId;
+    }
+
+    public void setChunkId(int chunkId) {
+      _chunkId = chunkId;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      if (CleanerUtil.UNMAP_SUPPORTED) {
+        CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
+      }
+    }
   }
 }

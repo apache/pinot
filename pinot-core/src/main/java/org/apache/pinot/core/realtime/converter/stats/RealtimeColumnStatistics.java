@@ -22,9 +22,9 @@ import java.util.Set;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -123,22 +123,22 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
     }
 
     // Iterate over all data to figure out whether or not it's in sorted order
-    ForwardIndexReader<?> forwardIndex = _dataSource.getForwardIndex();
+    MutableForwardIndex mutableForwardIndex = (MutableForwardIndex) _dataSource.getForwardIndex();
     int numDocs = dataSourceMetadata.getNumDocs();
     // Iterate with the sorted order if provided
     if (_sortedDocIdIterationOrder != null) {
-      int previousDictId = forwardIndex.getInt(_sortedDocIdIterationOrder[0]);
+      int previousDictId = mutableForwardIndex.getDictId(_sortedDocIdIterationOrder[0]);
       for (int i = 1; i < numDocs; i++) {
-        int currentDictId = forwardIndex.getInt(_sortedDocIdIterationOrder[i]);
+        int currentDictId = mutableForwardIndex.getDictId(_sortedDocIdIterationOrder[i]);
         if (_mutableDictionary.compare(previousDictId, currentDictId) > 0) {
           return false;
         }
         previousDictId = currentDictId;
       }
     } else {
-      int previousDictId = forwardIndex.getInt(0);
+      int previousDictId = mutableForwardIndex.getDictId(0);
       for (int i = 1; i < numDocs; i++) {
-        int currentDictId = forwardIndex.getInt(i);
+        int currentDictId = mutableForwardIndex.getDictId(i);
         if (_mutableDictionary.compare(previousDictId, currentDictId) > 0) {
           return false;
         }

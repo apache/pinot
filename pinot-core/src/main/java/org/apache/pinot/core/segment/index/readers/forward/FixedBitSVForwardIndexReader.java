@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl;
+package org.apache.pinot.core.segment.index.readers.forward;
 
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
-import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -29,7 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Bit-compressed dictionary-encoded forward index reader for single-value columns. The values returned are dictionary
  * ids.
  */
-public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<ReaderContext> {
+public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
   private final FixedBitIntReaderWriter _reader;
 
   public FixedBitSVForwardIndexReader(PinotDataBuffer dataBuffer, int numDocs, int numBitsPerValue) {
@@ -37,9 +37,8 @@ public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<Re
   }
 
   @Override
-  public DataType getValueType() {
-    // NOTE: Dictionary id is handled as INT type.
-    return DataType.INT;
+  public boolean isDictionaryEncoded() {
+    return true;
   }
 
   @Override
@@ -48,8 +47,20 @@ public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<Re
   }
 
   @Override
-  public int getInt(int docId) {
+  public DataType getValueType() {
+    return DataType.INT;
+  }
+
+  @Override
+  public int getDictId(int docId, ForwardIndexReaderContext context) {
     return _reader.readInt(docId);
+  }
+
+  @Override
+  public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
+    for (int i = 0; i < length; i++) {
+      dictIdBuffer[i] = _reader.readInt(docIds[i]);
+    }
   }
 
   @Override

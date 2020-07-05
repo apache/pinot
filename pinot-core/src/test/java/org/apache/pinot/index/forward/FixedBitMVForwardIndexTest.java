@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.index.reader;
+package org.apache.pinot.index.forward;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.io.reader.impl.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.io.writer.impl.FixedBitMVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -69,28 +69,17 @@ public class FixedBitMVForwardIndexTest {
       try (FixedBitMVForwardIndexWriter writer = new FixedBitMVForwardIndexWriter(INDEX_FILE, NUM_DOCS, totalNumValues,
           numBitsPerValue)) {
         for (int[] values : valuesArray) {
-          writer.putIntArray(values);
+          writer.putDictIds(values);
         }
       }
 
       // Read the forward index
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
           FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues,
-              numBitsPerValue)) {
+              numBitsPerValue); FixedBitMVForwardIndexReader.Context readerContext = reader.createContext()) {
         int[] valueBuffer = new int[MAX_NUM_VALUES_PER_MV_ENTRY];
-
-        // Read without context
         for (int i = 0; i < NUM_DOCS; i++) {
-          int numValues = reader.getIntArray(i, valueBuffer);
-          for (int j = 0; j < numValues; j++) {
-            assertEquals(valueBuffer[j], valuesArray[i][j]);
-          }
-        }
-
-        // Read with context
-        FixedBitMVForwardIndexReader.Context context = reader.createContext();
-        for (int i = 0; i < NUM_DOCS; i++) {
-          int numValues = reader.getIntArray(i, valueBuffer, context);
+          int numValues = reader.getDictIdMV(i, valueBuffer, readerContext);
           for (int j = 0; j < numValues; j++) {
             assertEquals(valueBuffer[j], valuesArray[i][j]);
           }

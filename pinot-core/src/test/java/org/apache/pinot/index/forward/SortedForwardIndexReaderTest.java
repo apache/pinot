@@ -16,14 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.index.reader;
+package org.apache.pinot.index.forward;
 
 import java.io.File;
 import java.util.Random;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.SortedIndexReader;
-import org.apache.pinot.core.io.reader.impl.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -60,18 +58,11 @@ public class SortedForwardIndexReaderTest {
     }
     writer.close();
 
-    try (SortedIndexReader reader = new SortedIndexReaderImpl(PinotDataBuffer.loadBigEndianFile(file), cardinality)) {
-      // without using context
+    try (SortedIndexReaderImpl reader = new SortedIndexReaderImpl(PinotDataBuffer.loadBigEndianFile(file), cardinality);
+        SortedIndexReaderImpl.Context readerContext = reader.createContext()) {
       for (int i = 0; i < cardinality; i++) {
         for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {
-          Assert.assertEquals(reader.getInt(docId), i);
-        }
-      }
-      // with context
-      ReaderContext context = reader.createContext();
-      for (int i = 0; i < cardinality; i++) {
-        for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {
-          Assert.assertEquals(reader.getInt(docId, context), i);
+          Assert.assertEquals(reader.getDictId(docId, readerContext), i);
         }
       }
     }

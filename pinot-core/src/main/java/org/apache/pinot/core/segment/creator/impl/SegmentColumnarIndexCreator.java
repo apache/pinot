@@ -324,7 +324,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           // get dictID from dictionary
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
           // store the docID -> dictID mapping in forward index
-          forwardIndexCreator.index(dictId);
+          forwardIndexCreator.putDictId(dictId);
           InvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
           if (invertedIndexCreator != null) {
             // if inverted index enabled during segment creation,
@@ -334,7 +334,28 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         } else {
           // non-dictionary encoded SV column
           // store the docId -> raw value mapping in forward index
-          forwardIndexCreator.index(columnValueToIndex);
+          switch (forwardIndexCreator.getValueType()) {
+            case INT:
+              forwardIndexCreator.putInt((int) columnValueToIndex);
+              break;
+            case LONG:
+              forwardIndexCreator.putLong((long) columnValueToIndex);
+              break;
+            case FLOAT:
+              forwardIndexCreator.putFloat((float) columnValueToIndex);
+              break;
+            case DOUBLE:
+              forwardIndexCreator.putDouble((double) columnValueToIndex);
+              break;
+            case STRING:
+              forwardIndexCreator.putString((String) columnValueToIndex);
+              break;
+            case BYTES:
+              forwardIndexCreator.putBytes((byte[]) columnValueToIndex);
+              break;
+            default:
+              throw new IllegalStateException();
+          }
           // text-search enabled column
           if (_textIndexColumns.contains(columnName)) {
             InvertedIndexCreator textInvertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
@@ -345,7 +366,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       } else {
         // MV column (always dictionary encoded)
         int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
-        forwardIndexCreator.index(dictIds);
+        forwardIndexCreator.putDictIdMV(dictIds);
         InvertedIndexCreator invertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
         if (invertedIndexCreator != null) {
           invertedIndexCreator.add(dictIds, dictIds.length);

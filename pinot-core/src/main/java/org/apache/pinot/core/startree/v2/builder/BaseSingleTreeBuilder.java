@@ -45,7 +45,6 @@ import org.apache.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
 import org.apache.pinot.core.startree.StarTreeNode;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +78,6 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   final ValueAggregator[] _valueAggregators;
   // Readers and data types for column in function-column pair
   final PinotSegmentColumnReader[] _metricReaders;
-  final DataType[] _metricDataTypes;
 
   final int _maxLeafRecords;
 
@@ -138,9 +136,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metrics = new String[_numMetrics];
     _functionColumnPairs = new AggregationFunctionColumnPair[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
-    _metricDataTypes = new DataType[_numMetrics];
     _metricReaders = new PinotSegmentColumnReader[_numMetrics];
-    Schema schema = segment.getSegmentMetadata().getSchema();
 
     int index = 0;
     for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
@@ -151,7 +147,6 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();
-        _metricDataTypes[index] = schema.getFieldSpecFor(column).getDataType();
         _metricReaders[index] = new PinotSegmentColumnReader(segment, column);
       }
 
@@ -226,7 +221,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   int[] getSegmentRecordDimensions(int docId) {
     int[] dimensions = new int[_numDimensions];
     for (int i = 0; i < _numDimensions; i++) {
-      dimensions[i] = _dimensionReaders[i].getDictionaryId(docId);
+      dimensions[i] = _dimensionReaders[i].getDictId(docId);
     }
     return dimensions;
   }
@@ -243,7 +238,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     for (int i = 0; i < _numMetrics; i++) {
       // Ignore the column for COUNT aggregation function
       if (_metricReaders[i] != null) {
-        metrics[i] = _metricReaders[i].readSV(docId, _metricDataTypes[i]);
+        metrics[i] = _metricReaders[i].getValue(docId);
       }
     }
     return new Record(dimensions, metrics);
@@ -486,15 +481,29 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       for (int docId = 0; docId < _numDocs; docId++) {
         Record record = getStarTreeRecord(docId);
         for (int i = 0; i < _numDimensions; i++) {
-          dimensionIndexCreators[i].index(record._dimensions[i]);
+          dimensionIndexCreators[i].putDictId(record._dimensions[i]);
         }
         for (int i = 0; i < _numMetrics; i++) {
           ValueAggregator valueAggregator = _valueAggregators[i];
-          if (valueAggregator.getAggregatedValueType() == DataType.BYTES) {
-            //noinspection unchecked
-            metricIndexCreators[i].index(valueAggregator.serializeAggregatedValue(record._metrics[i]));
-          } else {
-            metricIndexCreators[i].index(record._metrics[i]);
+          ForwardIndexCreator metricIndexCreator = metricIndexCreators[i];
+          switch (valueAggregator.getAggregatedValueType()) {
+            case INT:
+              metricIndexCreator.putInt((int) record._metrics[i]);
+              break;
+            case LONG:
+              metricIndexCreator.putLong((long) record._metrics[i]);
+              break;
+            case FLOAT:
+              metricIndexCreator.putFloat((float) record._metrics[i]);
+              break;
+            case DOUBLE:
+              metricIndexCreator.putDouble((double) record._metrics[i]);
+              break;
+            case BYTES:
+              metricIndexCreator.putBytes(valueAggregator.serializeAggregatedValue(record._metrics[i]));
+              break;
+            default:
+              throw new IllegalStateException();
           }
         }
       }
@@ -515,5 +524,18 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
     _metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         _builderConfig.getSkipStarNodeCreationForDimensions());
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for (PinotSegmentColumnReader dimensionReader : _dimensionReaders) {
+      dimensionReader.close();
+    }
+    for (PinotSegmentColumnReader metricReader : _metricReaders) {
+      if (metricReader != null) {
+        metricReader.close();
+      }
+    }
   }
 }

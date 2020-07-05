@@ -30,10 +30,10 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.core.io.reader.impl.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
+import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -155,16 +155,13 @@ public class RawIndexCreatorTest {
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-    VarByteChunkSVForwardIndexReader rawIndexReader =
-        new VarByteChunkSVForwardIndexReader(indexBuffer, DataType.STRING);
-
-    _recordReader.rewind();
-    ChunkReaderContext context = rawIndexReader.createContext();
-    for (int row = 0; row < NUM_ROWS; row++) {
-      GenericRow expectedRow = _recordReader.next();
-      Object expected = expectedRow.getValue(STRING_COLUMN);
-      Object actual = rawIndexReader.getString(row, context);
-      Assert.assertEquals(actual, expected);
+    try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(indexBuffer,
+        DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+      _recordReader.rewind();
+      for (int row = 0; row < NUM_ROWS; row++) {
+        GenericRow expectedRow = _recordReader.next();
+        Assert.assertEquals(rawIndexReader.getString(row, readerContext), expectedRow.getValue(STRING_COLUMN));
+      }
     }
   }
 
@@ -178,16 +175,13 @@ public class RawIndexCreatorTest {
   private void testFixedLengthRawIndexCreator(String column, DataType dataType)
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
-    FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(indexBuffer, dataType);
-
-    _recordReader.rewind();
-    for (int row = 0; row < NUM_ROWS; row++) {
-      GenericRow expectedRow = _recordReader.next();
-      Object expected = expectedRow.getValue(column);
-
-      Object actual;
-      actual = readValueFromIndex(rawIndexReader, dataType, row);
-      Assert.assertEquals(actual, expected);
+    try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(indexBuffer,
+        dataType); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+      _recordReader.rewind();
+      for (int row = 0; row < NUM_ROWS; row++) {
+        GenericRow expectedRow = _recordReader.next();
+        Assert.assertEquals(readValueFromIndex(rawIndexReader, readerContext, row), expectedRow.getValue(column));
+      }
     }
   }
 
@@ -270,33 +264,24 @@ public class RawIndexCreatorTest {
    * Helper method to reader value for the given row.
    *
    * @param rawIndexReader Index reader
-   * @param dataType Data type of value to be read
-   * @param row Row to read
+   * @param readerContext Reader context
+   * @param docId Document id
    * @return Value read from index
    */
-  private Object readValueFromIndex(FixedByteChunkSVForwardIndexReader rawIndexReader, DataType dataType, int row) {
-    Object actual;
-    ChunkReaderContext context = rawIndexReader.createContext();
-    switch (dataType) {
+  private Object readValueFromIndex(FixedByteChunkSVForwardIndexReader rawIndexReader, ChunkReaderContext readerContext,
+      int docId) {
+    switch (rawIndexReader.getValueType()) {
       case INT:
-        actual = rawIndexReader.getInt(row, context);
-        break;
-
+        return rawIndexReader.getInt(docId, readerContext);
       case LONG:
-        actual = rawIndexReader.getLong(row, context);
-        break;
-
+        return rawIndexReader.getLong(docId, readerContext);
       case FLOAT:
-        actual = rawIndexReader.getFloat(row, context);
-        break;
-
+        return rawIndexReader.getFloat(docId, readerContext);
       case DOUBLE:
-        actual = rawIndexReader.getDouble(row, context);
-        break;
-
+        return rawIndexReader.getDouble(docId, readerContext);
       default:
-        throw new IllegalArgumentException("Illegal data type for fixed width raw index reader: " + dataType);
+        throw new IllegalArgumentException(
+            "Illegal data type for fixed width raw index reader: " + rawIndexReader.getValueType());
     }
-    return actual;
   }
 }

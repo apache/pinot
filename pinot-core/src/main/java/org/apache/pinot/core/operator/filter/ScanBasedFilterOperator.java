@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import org.apache.pinot.core.common.ColumnValueReader;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MVScanDocIdSet;
 import org.apache.pinot.core.operator.docidsets.SVScanDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -44,16 +42,12 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   @Override
   protected FilterBlock getNextBlock() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
-    ColumnValueReader valueReader = _dataSource.getValueReader();
-
-    FilterBlockDocIdSet docIdSet;
     if (dataSourceMetadata.isSingleValue()) {
-      docIdSet = new SVScanDocIdSet(_predicateEvaluator, valueReader, _numDocs);
+      return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource.getForwardIndex(), _numDocs));
     } else {
-      docIdSet = new MVScanDocIdSet(_predicateEvaluator, valueReader, _numDocs,
-          dataSourceMetadata.getMaxNumValuesPerMVEntry());
+      return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource.getForwardIndex(), _numDocs,
+          dataSourceMetadata.getMaxNumValuesPerMVEntry()));
     }
-    return new FilterBlock(docIdSet);
   }
 
   @Override

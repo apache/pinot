@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
-import org.apache.pinot.core.io.reader.impl.constant.ConstantMVForwardIndexReader;
-import org.apache.pinot.core.io.reader.impl.constant.ConstantMVInvertedIndexReader;
-import org.apache.pinot.core.io.reader.impl.constant.ConstantSortedIndexReader;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.ConstantValueBytesDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueDoubleDictionary;
@@ -30,7 +26,11 @@ import org.apache.pinot.core.segment.index.readers.ConstantValueIntDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueLongDictionary;
 import org.apache.pinot.core.segment.index.readers.ConstantValueStringDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.constant.ConstantMVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.constant.ConstantMVInvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.constant.ConstantSortedIndexReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -41,7 +41,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProvider {
 
   @Override
-  public ForwardIndexReader buildForwardIndex(VirtualColumnContext context) {
+  public ForwardIndexReader<?> buildForwardIndex(VirtualColumnContext context) {
     if (context.getFieldSpec().isSingleValueField()) {
       return new ConstantSortedIndexReader(context.getTotalDocCount());
     } else {
@@ -71,7 +71,7 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
   }
 
   @Override
-  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
+  public InvertedIndexReader<?> buildInvertedIndex(VirtualColumnContext context) {
     if (context.getFieldSpec().isSingleValueField()) {
       return new ConstantSortedIndexReader(context.getTotalDocCount());
     } else {

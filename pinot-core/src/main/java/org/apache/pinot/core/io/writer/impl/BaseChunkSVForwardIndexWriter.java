@@ -19,6 +19,7 @@
 package org.apache.pinot.core.io.writer.impl;
 
 import com.google.common.base.Preconditions;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -27,15 +28,14 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import org.apache.pinot.core.io.compression.ChunkCompressor;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.writer.ForwardIndexWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Base implementation for chunk based single-value forward index writer.
+ * Base implementation for chunk-based single-value raw (non-dictionary-encoded) forward index writer.
  */
-public abstract class BaseChunkSVForwardIndexWriter implements ForwardIndexWriter {
+public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
   // TODO: Remove this before release 0.5.0
   public static final int DEFAULT_VERSION = 2;
   public static final int CURRENT_VERSION = 3;

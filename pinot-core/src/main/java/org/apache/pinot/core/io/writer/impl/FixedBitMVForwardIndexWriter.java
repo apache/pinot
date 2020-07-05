@@ -19,13 +19,13 @@
 package org.apache.pinot.core.io.writer.impl;
 
 import com.google.common.base.Preconditions;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
-import org.apache.pinot.core.io.writer.ForwardIndexWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -50,7 +50,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the
  * bitmap to find the right offset in the raw data section
  */
-public class FixedBitMVForwardIndexWriter implements ForwardIndexWriter {
+public class FixedBitMVForwardIndexWriter implements Closeable {
   private static final int SIZE_OF_INT = 4;
   private static final int NUM_COLS_IN_HEADER = 1;
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
@@ -152,8 +152,7 @@ public class FixedBitMVForwardIndexWriter implements ForwardIndexWriter {
     return newStartIndex;
   }
 
-  @Override
-  public void putIntArray(int[] intArray) {
-    rawDataWriter.writeInt(updateHeader(intArray.length), intArray.length, intArray);
+  public void putDictIds(int[] dictIds) {
+    rawDataWriter.writeInt(updateHeader(dictIds.length), dictIds.length, dictIds);
   }
 }

@@ -26,11 +26,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.io.reader.impl.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriterV2;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.util.PinotDataBitSetV2;
 import org.apache.pinot.core.io.writer.impl.FixedBitSVForwardIndexWriter;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -203,7 +203,7 @@ public class BenchmarkPinotDataBitSet {
     FixedBitSVForwardIndexWriter forwardIndexWriter = new FixedBitSVForwardIndexWriter(encodedFile, ROWS, numBits);
     String line;
     while ((line = bfr.readLine()) != null) {
-      forwardIndexWriter.putInt(Integer.parseInt(line));
+      forwardIndexWriter.putDictId(Integer.parseInt(line));
     }
     forwardIndexWriter.close();
   }
@@ -256,7 +256,7 @@ public class BenchmarkPinotDataBitSet {
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void twoBitBulkWithGaps() {
-    _bit2Reader.readValues(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps);
+    _bit2Reader.readDictIds(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, null);
   }
 
   // 2-bit: test multi integer decode for a set of monotonically
@@ -339,7 +339,7 @@ public class BenchmarkPinotDataBitSet {
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void fourBitBulkWithGaps() {
-    _bit4Reader.readValues(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps);
+    _bit4Reader.readDictIds(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, null);
   }
 
   // 4-bit: test multi integer decode for a set of monotonically
@@ -422,7 +422,7 @@ public class BenchmarkPinotDataBitSet {
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void eightBitBulkWithGaps() {
-    _bit8Reader.readValues(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps);
+    _bit8Reader.readDictIds(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, null);
   }
 
   // 8-bit: test multi integer decode for a set of monotonically
@@ -505,7 +505,7 @@ public class BenchmarkPinotDataBitSet {
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void sixteenBitBulkWithGaps() {
-    _bit16Reader.readValues(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps);
+    _bit16Reader.readDictIds(docIdsWithGaps, NUM_DOCIDS_WITH_GAPS, unpackedWithGaps, null);
   }
 
   // 16-bit: test multi integer decode for a set of monotonically

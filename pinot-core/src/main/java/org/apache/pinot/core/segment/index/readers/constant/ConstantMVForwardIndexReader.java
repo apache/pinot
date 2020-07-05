@@ -16,43 +16,40 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl.constant;
+package org.apache.pinot.core.segment.index.readers.constant;
 
-import java.io.IOException;
-import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.SortedIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
- * Sorted index reader for single-value column with constant values.
+ * Dictionary-encoded forward index reader for multi-value column with constant values.
  */
-public class ConstantSortedIndexReader implements SortedIndexReader<ReaderContext> {
-  private final int _numDocs;
+public final class ConstantMVForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
 
-  public ConstantSortedIndexReader(int numDocs) {
-    _numDocs = numDocs;
+  @Override
+  public boolean isDictionaryEncoded() {
+    return true;
   }
 
   @Override
-  public int getInt(int docId) {
-    return 0;
+  public boolean isSingleValue() {
+    return false;
   }
 
   @Override
-  public void readValues(int[] docIds, int length, int[] values) {
-    for (int i = 0; i < length; i++) {
-      values[i] = 0;
-    }
+  public DataType getValueType() {
+    return DataType.INT;
   }
 
   @Override
-  public Pairs.IntPair getDocIds(int dictId) {
-    return new Pairs.IntPair(0, _numDocs - 1);
+  public int getDictIdMV(int docId, int[] dictIdBuffer, ForwardIndexReaderContext context) {
+    dictIdBuffer[0] = 0;
+    return 1;
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() {
   }
 }

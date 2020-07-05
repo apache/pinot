@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.index.readerwriter;
+package org.apache.pinot.index.forward.mutable;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.FixedByteMVForwardIndexReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.realtime.impl.forward.FixedByteMVMutableForwardIndex;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class FixedByteMVForwardIndexReaderWriterTest {
+public class FixedByteMVMutableForwardIndexTest {
   private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(FixedByteMVForwardIndexReaderWriterTest.class.getName());
+    _memoryManager = new DirectMemoryManager(FixedByteMVMutableForwardIndexTest.class.getName());
   }
 
   @AfterClass
@@ -68,13 +68,13 @@ public class FixedByteMVForwardIndexReaderWriterTest {
 
   public void testIntArray(final long seed)
       throws IOException {
-    FixedByteMVForwardIndexReaderWriter readerWriter;
+    FixedByteMVMutableForwardIndex readerWriter;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
     int maxNumberOfMultiValuesPerRow = 2000;
     readerWriter =
-        new FixedByteMVForwardIndexReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes,
-            _memoryManager, "IntArray");
+        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes, _memoryManager,
+            "IntArray");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -83,11 +83,11 @@ public class FixedByteMVForwardIndexReaderWriterTest {
       for (int j = 0; j < data[i].length; j++) {
         data[i][j] = r.nextInt();
       }
-      readerWriter.setIntArray(i, data[i]);
+      readerWriter.setIntMV(i, data[i]);
     }
     int[] ret = new int[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
-      int length = readerWriter.getIntArray(i, ret);
+      int length = readerWriter.getIntMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
@@ -96,14 +96,13 @@ public class FixedByteMVForwardIndexReaderWriterTest {
 
   public void testIntArrayFixedSize(int multiValuesPerRow, long seed)
       throws IOException {
-    FixedByteMVForwardIndexReaderWriter readerWriter;
+    FixedByteMVMutableForwardIndex readerWriter;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
     // Keep the rowsPerChunk as a multiple of multiValuesPerRow to check the cases when both data and header buffers
     // transition to new ones
-    readerWriter =
-        new FixedByteMVForwardIndexReaderWriter(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2,
-            columnSizeInBytes, _memoryManager, "IntArrayFixedSize");
+    readerWriter = new FixedByteMVMutableForwardIndex(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2,
+        columnSizeInBytes, _memoryManager, "IntArrayFixedSize");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -112,11 +111,11 @@ public class FixedByteMVForwardIndexReaderWriterTest {
       for (int j = 0; j < data[i].length; j++) {
         data[i][j] = r.nextInt();
       }
-      readerWriter.setIntArray(i, data[i]);
+      readerWriter.setIntMV(i, data[i]);
     }
     int[] ret = new int[multiValuesPerRow];
     for (int i = 0; i < rows; i++) {
-      int length = readerWriter.getIntArray(i, ret);
+      int length = readerWriter.getIntMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
@@ -125,13 +124,14 @@ public class FixedByteMVForwardIndexReaderWriterTest {
 
   public void testWithZeroSize(long seed)
       throws IOException {
-    FixedByteMVForwardIndexReaderWriter readerWriter;
+    FixedByteMVMutableForwardIndex readerWriter;
     final int maxNumberOfMultiValuesPerRow = 5;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
     Random r = new Random(seed);
-    readerWriter = new FixedByteMVForwardIndexReaderWriter(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1,
-        columnSizeInBytes, _memoryManager, "ZeroSize");
+    readerWriter =
+        new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
+            _memoryManager, "ZeroSize");
 
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
@@ -140,28 +140,28 @@ public class FixedByteMVForwardIndexReaderWriterTest {
         for (int j = 0; j < data[i].length; j++) {
           data[i][j] = r.nextInt();
         }
-        readerWriter.setIntArray(i, data[i]);
+        readerWriter.setIntMV(i, data[i]);
       } else {
         data[i] = new int[0];
-        readerWriter.setIntArray(i, data[i]);
+        readerWriter.setIntMV(i, data[i]);
       }
     }
     int[] ret = new int[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
-      int length = readerWriter.getIntArray(i, ret);
+      int length = readerWriter.getIntMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
     readerWriter.close();
   }
 
-  private FixedByteMVForwardIndexReaderWriter createReaderWriter(FieldSpec.DataType dataType, Random r,
-      int rows, int maxNumberOfMultiValuesPerRow) {
+  private FixedByteMVMutableForwardIndex createReaderWriter(FieldSpec.DataType dataType, Random r, int rows,
+      int maxNumberOfMultiValuesPerRow) {
     final int avgMultiValueCount = r.nextInt(maxNumberOfMultiValuesPerRow) + 1;
     final int rowCountPerChunk = r.nextInt(rows) + 1;
 
-    return new FixedByteMVForwardIndexReaderWriter(maxNumberOfMultiValuesPerRow, avgMultiValueCount,
-        rowCountPerChunk, dataType.size(), _memoryManager, "ReaderWriter");
+    return new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, avgMultiValueCount, rowCountPerChunk,
+        dataType.size(), _memoryManager, "ReaderWriter");
   }
 
   private long generateSeed() {
@@ -176,7 +176,7 @@ public class FixedByteMVForwardIndexReaderWriterTest {
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
-    FixedByteMVForwardIndexReaderWriter readerWriter =
+    FixedByteMVMutableForwardIndex readerWriter =
         createReaderWriter(FieldSpec.DataType.LONG, r, rows, maxNumberOfMultiValuesPerRow);
 
     long[][] data = new long[rows][];
@@ -186,15 +186,15 @@ public class FixedByteMVForwardIndexReaderWriterTest {
         for (int j = 0; j < data[i].length; j++) {
           data[i][j] = r.nextLong();
         }
-        readerWriter.setLongArray(i, data[i]);
+        readerWriter.setLongMV(i, data[i]);
       } else {
         data[i] = new long[0];
-        readerWriter.setLongArray(i, data[i]);
+        readerWriter.setLongMV(i, data[i]);
       }
     }
     long[] ret = new long[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
-      int length = readerWriter.getLongArray(i, ret);
+      int length = readerWriter.getLongMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
@@ -208,7 +208,7 @@ public class FixedByteMVForwardIndexReaderWriterTest {
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
-    FixedByteMVForwardIndexReaderWriter readerWriter =
+    FixedByteMVMutableForwardIndex readerWriter =
         createReaderWriter(FieldSpec.DataType.FLOAT, r, rows, maxNumberOfMultiValuesPerRow);
 
     float[][] data = new float[rows][];
@@ -218,15 +218,15 @@ public class FixedByteMVForwardIndexReaderWriterTest {
         for (int j = 0; j < data[i].length; j++) {
           data[i][j] = r.nextFloat();
         }
-        readerWriter.setFloatArray(i, data[i]);
+        readerWriter.setFloatMV(i, data[i]);
       } else {
         data[i] = new float[0];
-        readerWriter.setFloatArray(i, data[i]);
+        readerWriter.setFloatMV(i, data[i]);
       }
     }
     float[] ret = new float[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
-      int length = readerWriter.getFloatArray(i, ret);
+      int length = readerWriter.getFloatMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
@@ -240,7 +240,7 @@ public class FixedByteMVForwardIndexReaderWriterTest {
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
-    FixedByteMVForwardIndexReaderWriter readerWriter =
+    FixedByteMVMutableForwardIndex readerWriter =
         createReaderWriter(FieldSpec.DataType.DOUBLE, r, rows, maxNumberOfMultiValuesPerRow);
 
     double[][] data = new double[rows][];
@@ -250,15 +250,15 @@ public class FixedByteMVForwardIndexReaderWriterTest {
         for (int j = 0; j < data[i].length; j++) {
           data[i][j] = r.nextDouble();
         }
-        readerWriter.setDoubleArray(i, data[i]);
+        readerWriter.setDoubleMV(i, data[i]);
       } else {
         data[i] = new double[0];
-        readerWriter.setDoubleArray(i, data[i]);
+        readerWriter.setDoubleMV(i, data[i]);
       }
     }
     double[] ret = new double[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
-      int length = readerWriter.getDoubleArray(i, ret);
+      int length = readerWriter.getDoubleMV(i, ret);
       Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }

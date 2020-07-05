@@ -16,31 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl.constant;
+package org.apache.pinot.core.segment.index.readers;
 
-import java.io.IOException;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
- * Inverted index reader for multi-value column with constant values.
+ * Interface for sorted index reader which can be used as both forward index and inverted index.
  */
-public class ConstantMVInvertedIndexReader implements InvertedIndexReader<MutableRoaringBitmap> {
-  private final MutableRoaringBitmap _bitmap;
+public interface SortedIndexReader<T extends ForwardIndexReaderContext> extends ForwardIndexReader<T>, InvertedIndexReader<Pairs.IntPair> {
 
-  public ConstantMVInvertedIndexReader(int numDocs) {
-    _bitmap = new MutableRoaringBitmap();
-    _bitmap.add(0L, numDocs);
+  /**
+   * NOTE: Sorted index is always dictionary-encoded.
+   */
+  @Override
+  default boolean isDictionaryEncoded() {
+    return true;
+  }
+
+  /**
+   * NOTE: Sorted index can only apply to single-value column.
+   */
+  @Override
+  default boolean isSingleValue() {
+    return true;
   }
 
   @Override
-  public MutableRoaringBitmap getDocIds(int dictId) {
-    return _bitmap;
-  }
-
-  @Override
-  public void close()
-      throws IOException {
+  default DataType getValueType() {
+    return DataType.INT;
   }
 }

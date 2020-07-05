@@ -24,14 +24,14 @@ import it.unimi.dsi.fastutil.ints.IntSets;
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.FixedByteSVForwardIndexReaderWriter;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 @SuppressWarnings("Duplicates")
 public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
-  private final FixedByteSVForwardIndexReaderWriter _dictIdToValue;
+  private final FixedByteSVMutableForwardIndex _dictIdToValue;
 
   private volatile float _min = Float.MAX_VALUE;
   private volatile float _max = Float.MIN_VALUE;
@@ -41,7 +41,7 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
     super(estimatedCardinality, maxOverflowSize, memoryManager, allocationContext);
     int initialEntryCount = nearestPowerOf2(estimatedCardinality);
     _dictIdToValue =
-        new FixedByteSVForwardIndexReaderWriter(DataType.FLOAT, initialEntryCount, memoryManager, allocationContext);
+        new FixedByteSVMutableForwardIndex(false, DataType.FLOAT, initialEntryCount, memoryManager, allocationContext);
   }
 
   @Override

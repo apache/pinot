@@ -74,28 +74,24 @@ public class FixedByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexW
     _chunkDataOffset = 0;
   }
 
-  @Override
   public void putInt(int value) {
     _chunkBuffer.putInt(value);
     _chunkDataOffset += Integer.BYTES;
     flushChunkIfNeeded();
   }
 
-  @Override
   public void putLong(long value) {
     _chunkBuffer.putLong(value);
     _chunkDataOffset += Long.BYTES;
     flushChunkIfNeeded();
   }
 
-  @Override
   public void putFloat(float value) {
     _chunkBuffer.putFloat(value);
     _chunkDataOffset += Float.BYTES;
     flushChunkIfNeeded();
   }
 
-  @Override
   public void putDouble(double value) {
     _chunkBuffer.putDouble(value);
     _chunkDataOffset += Double.BYTES;

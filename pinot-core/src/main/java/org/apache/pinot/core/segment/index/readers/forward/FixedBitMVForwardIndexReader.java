@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl;
+package org.apache.pinot.core.segment.index.readers.forward;
 
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
-import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -74,9 +74,8 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public DataType getValueType() {
-    // NOTE: Dictionary id is handled as INT type.
-    return DataType.INT;
+  public boolean isDictionaryEncoded() {
+    return true;
   }
 
   @Override
@@ -85,29 +84,17 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public int getIntArray(int docId, int[] intArray) {
-    int chunkId = docId / _numDocsPerChunk;
-    int chunkOffset = _chunkOffsetReader.getInt(chunkId);
-    int indexInChunk = docId % _numDocsPerChunk;
-    int startIndex;
-    if (indexInChunk == 0) {
-      startIndex = chunkOffset;
-    } else {
-      startIndex = _bitmapReader.getNextNthSetBitOffset(chunkOffset + 1, indexInChunk);
-    }
-    int endIndex;
-    if (docId == _numDocs - 1) {
-      endIndex = _numValues;
-    } else {
-      endIndex = _bitmapReader.getNextSetBitOffset(startIndex + 1);
-    }
-    int numValues = endIndex - startIndex;
-    _rawDataReader.readInt(startIndex, numValues, intArray);
-    return numValues;
+  public DataType getValueType() {
+    return DataType.INT;
   }
 
   @Override
-  public int getIntArray(int docId, int[] intArray, Context context) {
+  public Context createContext() {
+    return new Context();
+  }
+
+  @Override
+  public int getDictIdMV(int docId, int[] dictIdBuffer, Context context) {
     int contextDocId = context._docId;
     int contextEndOffset = context._endOffset;
     int startIndex;
@@ -136,18 +123,13 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
       endIndex = _bitmapReader.getNextSetBitOffset(startIndex + 1);
     }
     int numValues = endIndex - startIndex;
-    _rawDataReader.readInt(startIndex, numValues, intArray);
+    _rawDataReader.readInt(startIndex, numValues, dictIdBuffer);
 
     // Update context
     context._docId = docId;
     context._endOffset = endIndex;
 
     return numValues;
-  }
-
-  @Override
-  public Context createContext() {
-    return new Context();
   }
 
   @Override
@@ -159,9 +141,13 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     _rawDataReader.close();
   }
 
-  public static class Context implements ReaderContext {
-    public int _docId = -1;
+  public static class Context implements ForwardIndexReaderContext {
+    private int _docId = -1;
     // Exclusive
-    public int _endOffset = 0;
+    private int _endOffset = 0;
+
+    @Override
+    public void close() {
+    }
   }
 }

@@ -16,26 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.readerwriter.impl;
+package org.apache.pinot.core.realtime.impl.forward;
 
 import java.io.IOException;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.io.readerwriter.ForwardIndexReaderWriter;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
+import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * Single-value forward index reader-writer for variable length values (STRING and BYTES).
  */
-public class VarByteSVForwardIndexReaderWriter implements ForwardIndexReaderWriter {
+public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   private final DataType _valueType;
   private final MutableOffHeapByteArrayStore _byteArrayStore;
   private int _lengthOfShortestElement;
   private int _lengthOfLongestElement;
 
-  public VarByteSVForwardIndexReaderWriter(DataType valueType, PinotDataBufferMemoryManager memoryManager,
+  public VarByteSVMutableForwardIndex(DataType valueType, PinotDataBufferMemoryManager memoryManager,
       String allocationContext, int estimatedMaxNumberOfValues, int estimatedAverageStringLength) {
     _valueType = valueType;
     _byteArrayStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedMaxNumberOfValues,
@@ -45,13 +45,18 @@ public class VarByteSVForwardIndexReaderWriter implements ForwardIndexReaderWrit
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
   @Override
   public boolean isSingleValue() {
     return true;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return _valueType;
   }
 
   @Override
@@ -65,6 +70,16 @@ public class VarByteSVForwardIndexReaderWriter implements ForwardIndexReaderWrit
   }
 
   @Override
+  public String getString(int docId) {
+    return StringUtil.decodeUtf8(_byteArrayStore.get(docId));
+  }
+
+  @Override
+  public byte[] getBytes(int docId) {
+    return _byteArrayStore.get(docId);
+  }
+
+  @Override
   public void setString(int docId, String value) {
     setBytes(docId, StringUtil.encodeUtf8(value));
   }
@@ -74,16 +89,6 @@ public class VarByteSVForwardIndexReaderWriter implements ForwardIndexReaderWrit
     _byteArrayStore.add(value);
     _lengthOfLongestElement = Math.max(_lengthOfLongestElement, value.length);
     _lengthOfShortestElement = Math.min(_lengthOfShortestElement, value.length);
-  }
-
-  @Override
-  public String getString(int docId) {
-    return StringUtil.decodeUtf8(getBytes(docId));
-  }
-
-  @Override
-  public byte[] getBytes(int docId) {
-    return _byteArrayStore.get(docId);
   }
 
   @Override

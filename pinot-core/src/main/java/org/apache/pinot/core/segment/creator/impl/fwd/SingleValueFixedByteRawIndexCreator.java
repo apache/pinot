@@ -76,8 +76,8 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
   @Override
@@ -86,43 +86,28 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   }
 
   @Override
-  public void index(int value) {
+  public DataType getValueType() {
+    return _valueType;
+  }
+
+  @Override
+  public void putInt(int value) {
     _indexWriter.putInt(value);
   }
 
   @Override
-  public void index(long value) {
+  public void putLong(long value) {
     _indexWriter.putLong(value);
   }
 
   @Override
-  public void index(float value) {
+  public void putFloat(float value) {
     _indexWriter.putFloat(value);
   }
 
   @Override
-  public void index(double value) {
+  public void putDouble(double value) {
     _indexWriter.putDouble(value);
-  }
-
-  @Override
-  public void index(Object value) {
-    switch (_valueType) {
-      case INT:
-        index((int) value);
-        break;
-      case LONG:
-        index((long) value);
-        break;
-      case FLOAT:
-        index((float) value);
-        break;
-      case DOUBLE:
-        index((double) value);
-        break;
-      default:
-        throw new IllegalStateException();
-    }
   }
 
   @Override

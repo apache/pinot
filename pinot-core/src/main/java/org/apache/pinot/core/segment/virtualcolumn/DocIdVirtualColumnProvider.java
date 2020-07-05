@@ -20,14 +20,14 @@ package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.SortedIndexReader;
 import org.apache.pinot.core.segment.index.column.BaseVirtualColumnProvider;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.DocIdDictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 
 
 /**
@@ -59,16 +59,16 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     return DOC_ID_SORTED_INDEX_READER;
   }
 
-  private static class DocIdSortedIndexReader implements SortedIndexReader<ReaderContext> {
+  private static class DocIdSortedIndexReader implements SortedIndexReader<ForwardIndexReaderContext> {
 
     @Override
-    public int getInt(int docId) {
+    public int getDictId(int docId, ForwardIndexReaderContext context) {
       return docId;
     }
 
     @Override
-    public void readValues(int[] docIds, int length, int[] values) {
-      System.arraycopy(docIds, 0, values, 0, length);
+    public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
+      System.arraycopy(docIds, 0, dictIdBuffer, 0, length);
     }
 
     @Override

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.creator;
 
 import java.io.Closeable;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -28,96 +28,149 @@ import org.apache.pinot.spi.data.FieldSpec;
 public interface ForwardIndexCreator extends Closeable {
 
   /**
-   * Returns the data type of the values in the forward index.
-   * <p>NOTE: Dictionary id is handled as INT type.
+   * Returns {@code true} if the forward index is dictionary-encoded, {@code false} if it is raw.
    */
-  FieldSpec.DataType getValueType();
+  boolean isDictionaryEncoded();
 
   /**
-   * Returns {@code true} if the forward index is for a single-value column, {@code false} otherwise.
+   * Returns {@code true} if the forward index is for a single-value column, {@code false} if it is for a multi-value
+   * column.
    */
   boolean isSingleValue();
 
   /**
-   * SINGLE-VALUE COLUMN APIs
+   * Returns the data type of the values in the forward index. Returns {@link DataType#INT} for dictionary-encoded
+   * forward index.
+   */
+  DataType getValueType();
+
+  /**
+   * DICTIONARY-ENCODED INDEX APIs
    */
 
   /**
-   * Indexes the next INT type single-value into the forward index.
-   * <p>NOTE: Dictionary id is handled as INT type.
+   * Writes the dictionary id for the next single-value into the forward index.
    *
-   * @param value Value to index
+   * @param dictId Document id to write
    */
-  default void index(int value) {
+  default void putDictId(int dictId) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Indexes the next LONG type single-value into the forward index.
+   * Writes the dictionary ids for the next multi-value into the forward index.
    *
-   * @param value Value to index
+   * @param dictIds Document ids to write
    */
-  default void index(long value) {
+  default void putDictIdMV(int[] dictIds) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Indexes the next FLOAT type single-value into the forward index.
-   *
-   * @param value Value to index
+   * SINGLE-VALUE COLUMN RAW INDEX APIs
    */
-  default void index(float value) {
+
+  /**
+   * Writes the next INT type single-value into the forward index.
+   *
+   * @param value Value to write
+   */
+  default void putInt(int value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Indexes the next DOUBLE type single-value into the forward index.
+   * Writes the next LONG type single-value into the forward index.
    *
-   * @param value Value to index
+   * @param value Value to write
    */
-  default void index(double value) {
+  default void putLong(long value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Indexes the next STRING type single-value into the forward index.
+   * Writes the next FLOAT type single-value into the forward index.
    *
-   * @param value Value to index
+   * @param value Value to write
    */
-  default void index(String value) {
+  default void putFloat(float value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Indexes the next BYTES type single-value into the forward index.
+   * Writes the next DOUBLE type single-value into the forward index.
    *
-   * @param value Value to index
+   * @param value Value to write
    */
-  default void index(byte[] value) {
+  default void putDouble(double value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Indexes the next raw single-value (not dictionary id) into the forward index. The given value should be of the
-   * forward index value type.
+   * Writes the next STRING type single-value into the forward index.
    *
-   * @param value Value to index
+   * @param value Value to write
    */
-  default void index(Object value) {
+  default void putString(String value) {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * MULTI-VALUE COLUMN APIs
+   * Writes the next BYTES type single-value into the forward index.
+   *
+   * @param value Value to write
+   */
+  default void putBytes(byte[] value) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * MULTI-VALUE COLUMN RAW INDEX APIs
+   * TODO: Not supported yet
    */
 
   /**
-   * Indexes the next INT type multi-value from the given int array into the forward index.
-   * <p>NOTE: Dictionary id is handled as INT type.
+   * Writes the next INT type multi-value into the forward index.
    *
-   * @param intArray Array containing the values to index
+   * @param values Values to write
    */
-  default void index(int[] intArray) {
+  default void putIntMV(int[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the next LONG type multi-value into the forward index.
+   *
+   * @param values Values to write
+   */
+  default void putLongMV(long[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the next FLOAT type multi-value into the forward index.
+   *
+   * @param values Values to write
+   */
+  default void putFloatMV(float[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the next DOUBLE type multi-value into the forward index.
+   *
+   * @param values Values to write
+   */
+  default void putDoubleMV(double[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the next STRING type multi-value into the forward index.
+   *
+   * @param values Values to write
+   */
+  default void putStringMV(String[] values) {
     throw new UnsupportedOperationException();
   }
 }

@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.readerwriter.impl;
+package org.apache.pinot.core.realtime.impl.forward;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import org.apache.pinot.core.io.readerwriter.ForwardIndexReaderWriter;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import org.apache.pinot.core.segment.index.readers.MutableForwardIndex;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
@@ -41,13 +41,15 @@ import org.slf4j.LoggerFactory;
  *   are not guaranteed to have a deterministic value. </li>
  * </ul>
  */
-// TODO: Check thread-safety
-public class FixedByteSVForwardIndexReaderWriter implements ForwardIndexReaderWriter {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSVForwardIndexReaderWriter.class);
+// TODO: Fix thread-safety issue for ArrayList
+// TODO: Optimize it
+public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSVMutableForwardIndex.class);
 
   private final List<WriterWithOffset> _writers = new ArrayList<>();
   private final List<ReaderWithOffset> _readers = new ArrayList<>();
 
+  private final boolean _dictionaryEncoded;
   private final DataType _valueType;
   private final int _valueSizeInBytes;
   private final int _numRowsPerChunk;
@@ -63,8 +65,9 @@ public class FixedByteSVForwardIndexReaderWriter implements ForwardIndexReaderWr
    * @param memoryManager Memory manager to be used for allocating memory.
    * @param allocationContext Allocation allocationContext.
    */
-  public FixedByteSVForwardIndexReaderWriter(DataType valueType, int numRowsPerChunk,
+  public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType valueType, int numRowsPerChunk,
       PinotDataBufferMemoryManager memoryManager, String allocationContext) {
+    _dictionaryEncoded = dictionaryEncoded;
     _valueType = valueType;
     _valueSizeInBytes = valueType.size();
     _numRowsPerChunk = numRowsPerChunk;
@@ -75,13 +78,18 @@ public class FixedByteSVForwardIndexReaderWriter implements ForwardIndexReaderWr
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public boolean isDictionaryEncoded() {
+    return _dictionaryEncoded;
   }
 
   @Override
   public boolean isSingleValue() {
     return true;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return _valueType;
   }
 
   @Override
@@ -95,14 +103,64 @@ public class FixedByteSVForwardIndexReaderWriter implements ForwardIndexReaderWr
   }
 
   @Override
-  public void close()
-      throws IOException {
-    for (WriterWithOffset writer : _writers) {
-      writer.close();
+  public int getDictId(int docId) {
+    int bufferId = getBufferId(docId);
+    return _readers.get(bufferId).getInt(docId);
+  }
+
+  @Override
+  public void readDictIds(int[] docIds, int length, int[] dictIdBuffer) {
+    /*
+     * TODO
+     * If we assume that the document ids are sorted, then we can write logic to move values from one reader
+     * at a time, identifying the rows in sequence that belong to the same block. This logic is more complex, but may
+     * perform better in the sorted case.
+     *
+     * An alternative is to not have multiple _dataBuffers, but just copy the values from one buffer to next as we
+     * increase the number of rows.
+     */
+    if (_readers.size() == 1) {
+      _readers.get(0).getReader().readIntValues(docIds, 0, 0, length, dictIdBuffer, 0);
+    } else {
+      for (int i = 0; i < length; i++) {
+        int docId = docIds[i];
+        dictIdBuffer[i] = _readers.get(getBufferId(docId)).getInt(docId);
+      }
     }
-    for (ReaderWithOffset reader : _readers) {
-      reader.close();
-    }
+  }
+
+  @Override
+  public int getInt(int docId) {
+    int bufferId = getBufferId(docId);
+    return _readers.get(bufferId).getInt(docId);
+  }
+
+  @Override
+  public long getLong(int docId) {
+    int bufferId = getBufferId(docId);
+    return _readers.get(bufferId).getLong(docId);
+  }
+
+  @Override
+  public float getFloat(int docId) {
+    int bufferId = getBufferId(docId);
+    return _readers.get(bufferId).getFloat(docId);
+  }
+
+  @Override
+  public double getDouble(int docId) {
+    int bufferId = getBufferId(docId);
+    return _readers.get(bufferId).getDouble(docId);
+  }
+
+  private int getBufferId(int row) {
+    return row / _numRowsPerChunk;
+  }
+
+  @Override
+  public void setDictId(int docId, int dictId) {
+    addBufferIfNeeded(docId);
+    getWriterForRow(docId).setInt(docId, dictId);
   }
 
   @Override
@@ -134,52 +192,14 @@ public class FixedByteSVForwardIndexReaderWriter implements ForwardIndexReaderWr
   }
 
   @Override
-  public int getInt(int docId) {
-    int bufferId = getBufferId(docId);
-    return _readers.get(bufferId).getInt(docId);
-  }
-
-  @Override
-  public long getLong(int docId) {
-    int bufferId = getBufferId(docId);
-    return _readers.get(bufferId).getLong(docId);
-  }
-
-  @Override
-  public float getFloat(int docId) {
-    int bufferId = getBufferId(docId);
-    return _readers.get(bufferId).getFloat(docId);
-  }
-
-  @Override
-  public double getDouble(int docId) {
-    int bufferId = getBufferId(docId);
-    return _readers.get(bufferId).getDouble(docId);
-  }
-
-  @Override
-  public void readValues(int[] docIds, int length, int[] values) {
-    /*
-     * TODO
-     * If we assume that the row IDs in 'rows' is sorted, then we can write logic to move values from one reader
-     * at a time, identifying the rows in sequence that belong to the same block. This logic is more complex, but may
-     * perform better in the sorted case.
-     *
-     * An alternative is to not have multiple _dataBuffers, but just copy the values from one buffer to next as we
-     * increase the number of rows.
-     */
-    if (_readers.size() == 1) {
-      _readers.get(0).getReader().readIntValues(docIds, 0, 0, length, values, 0);
-    } else {
-      for (int i = 0; i < length; i++) {
-        int docId = docIds[i];
-        values[i] = _readers.get(getBufferId(docId)).getInt(docId);
-      }
+  public void close()
+      throws IOException {
+    for (WriterWithOffset writer : _writers) {
+      writer.close();
     }
-  }
-
-  private int getBufferId(int row) {
-    return row / _numRowsPerChunk;
+    for (ReaderWithOffset reader : _readers) {
+      reader.close();
+    }
   }
 
   private void addBuffer() {

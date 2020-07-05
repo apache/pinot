@@ -21,18 +21,17 @@ package org.apache.pinot.core.segment.creator.impl.fwd;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
-import org.apache.pinot.core.io.writer.ForwardIndexWriter;
 import org.apache.pinot.core.io.writer.impl.FixedBitMVForwardIndexWriter;
 import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * Forward index creator for dictionary-encoded multi-value column.
  */
 public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreator {
-  private final ForwardIndexWriter _writer;
+  private final FixedBitMVForwardIndexWriter _writer;
 
   public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs,
       int totalNumValues)
@@ -43,9 +42,8 @@ public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreato
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
-    // NOTE: Dictionary id is handled as INT type.
-    return FieldSpec.DataType.INT;
+  public boolean isDictionaryEncoded() {
+    return true;
   }
 
   @Override
@@ -54,8 +52,13 @@ public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreato
   }
 
   @Override
-  public void index(int[] dictIds) {
-    _writer.putIntArray(dictIds);
+  public DataType getValueType() {
+    return DataType.INT;
+  }
+
+  @Override
+  public void putDictIdMV(int[] dictIds) {
+    _writer.putDictIds(dictIds);
   }
 
   @Override

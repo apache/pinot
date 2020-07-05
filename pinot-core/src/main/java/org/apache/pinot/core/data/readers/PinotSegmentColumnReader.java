@@ -18,110 +18,82 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.core.common.ColumnValueReader;
+import java.io.Closeable;
+import java.io.IOException;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 
 
-public class PinotSegmentColumnReader {
-  private final ColumnValueReader _valueReader;
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class PinotSegmentColumnReader implements Closeable {
+  private final ForwardIndexReader _reader;
+  private final ForwardIndexReaderContext _readerContext;
   private final Dictionary _dictionary;
-  private final int[] _mvBuffer;
+  private final int[] _dictIdBuffer;
 
   public PinotSegmentColumnReader(ImmutableSegment immutableSegment, String column) {
     DataSource dataSource = immutableSegment.getDataSource(column);
-    _valueReader = dataSource.getValueReader();
+    _reader = dataSource.getForwardIndex();
+    _readerContext = _reader.createContext();
     _dictionary = dataSource.getDictionary();
-    if (_valueReader.isSingleValue()) {
-      _mvBuffer = null;
+    if (_reader.isSingleValue()) {
+      _dictIdBuffer = null;
     } else {
-      _mvBuffer = new int[dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry()];
+      _dictIdBuffer = new int[dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry()];
     }
-  }
-
-  public Object readInt(int docId) {
-    if (_dictionary != null) {
-      return _dictionary.get(_valueReader.getIntValue(docId));
-    } else {
-      return _valueReader.getIntValue(docId);
-    }
-  }
-
-  public Object readLong(int docId) {
-    if (_dictionary != null) {
-      return _dictionary.get(_valueReader.getIntValue(docId));
-    } else {
-      return _valueReader.getLongValue(docId);
-    }
-  }
-
-  public Object readFloat(int docId) {
-    if (_dictionary != null) {
-      return _dictionary.get(_valueReader.getIntValue(docId));
-    } else {
-      return _valueReader.getFloatValue(docId);
-    }
-  }
-
-  public Object readDouble(int docId) {
-    if (_dictionary != null) {
-      return _dictionary.get(_valueReader.getIntValue(docId));
-    } else {
-      return _valueReader.getDoubleValue(docId);
-    }
-  }
-
-  public Object readString(int docId) {
-    if (_dictionary != null) {
-      return _dictionary.get(_valueReader.getIntValue(docId));
-    } else {
-      return _valueReader.getStringValue(docId);
-    }
-  }
-
-  public Object readBytes(int docId) {
-    if (_dictionary != null) {
-      return _dictionary.get(_valueReader.getIntValue(docId));
-    } else {
-      return _valueReader.getBytesValue(docId);
-    }
-  }
-
-  public Object readSV(int docId, DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return readInt(docId);
-      case LONG:
-        return readLong(docId);
-      case FLOAT:
-        return readFloat(docId);
-      case DOUBLE:
-        return readDouble(docId);
-      case STRING:
-        return readString(docId);
-      case BYTES:
-        return readBytes(docId);
-      default:
-        throw new IllegalStateException("Unsupported data type: " + dataType);
-    }
-  }
-
-  public Object[] readMV(int docId) {
-    int numValues = _valueReader.getIntValues(docId, _mvBuffer);
-    Object[] values = new Object[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = _dictionary.get(_mvBuffer[i]);
-    }
-    return values;
-  }
-
-  public int getDictionaryId(int docId) {
-    return _valueReader.getIntValue(docId);
   }
 
   public boolean hasDictionary() {
     return _dictionary != null;
+  }
+
+  public int getDictId(int docId) {
+    return _reader.getDictId(docId, _readerContext);
+  }
+
+  public Object getValue(int docId) {
+    if (_dictionary != null) {
+      if (_reader.isSingleValue()) {
+        return _dictionary.get(_reader.getDictId(docId, _readerContext));
+      } else {
+        int numValues = _reader.getDictIdMV(docId, _dictIdBuffer, _readerContext);
+        Object[] values = new Object[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = _dictionary.get(_dictIdBuffer[i]);
+        }
+        return values;
+      }
+    } else {
+      // NOTE: Only support single-value raw index
+      assert _reader.isSingleValue();
+
+      switch (_reader.getValueType()) {
+        case INT:
+          return _reader.getInt(docId, _readerContext);
+        case LONG:
+          return _reader.getLong(docId, _readerContext);
+        case FLOAT:
+          return _reader.getFloat(docId, _readerContext);
+        case DOUBLE:
+          return _reader.getDouble(docId, _readerContext);
+        case STRING:
+          return _reader.getString(docId, _readerContext);
+        case BYTES:
+          return _reader.getBytes(docId, _readerContext);
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    if (_readerContext != null) {
+      _readerContext.close();
+    }
   }
 }

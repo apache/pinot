@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.index.readerwriter;
+package org.apache.pinot.index.forward.mutable;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.FixedByteSVForwardIndexReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -31,12 +31,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class FixedByteSVForwardIndexReaderWriterTest {
+public class FixedByteSVMutableForwardIndexTest {
   private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(FixedByteSVForwardIndexReaderWriterTest.class.getName());
+    _memoryManager = new DirectMemoryManager(FixedByteSVMutableForwardIndexTest.class.getName());
   }
 
   @AfterClass
@@ -46,7 +46,7 @@ public class FixedByteSVForwardIndexReaderWriterTest {
   }
 
   @Test
-  public void testInt()
+  public void testDictId()
       throws IOException {
     Random r = new Random();
     final long seed = r.nextLong();
@@ -54,7 +54,7 @@ public class FixedByteSVForwardIndexReaderWriterTest {
     int rows = 10;
     for (int div = 1; div <= rows / 2; div++) {
       try {
-        testInt(r, rows, div);
+        testDictId(r, rows, div);
       } catch (Throwable t) {
         t.printStackTrace();
         Assert.fail("Failed with seed " + seed);
@@ -62,24 +62,24 @@ public class FixedByteSVForwardIndexReaderWriterTest {
     }
   }
 
-  private void testInt(final Random random, final int rows, final int div)
+  private void testDictId(final Random random, final int rows, final int div)
       throws IOException {
-    FixedByteSVForwardIndexReaderWriter readerWriter;
-    readerWriter = new FixedByteSVForwardIndexReaderWriter(DataType.INT, rows / div, _memoryManager, "Int");
+    FixedByteSVMutableForwardIndex readerWriter;
+    readerWriter = new FixedByteSVMutableForwardIndex(true, DataType.INT, rows / div, _memoryManager, "Int");
     int[] data = new int[rows];
     for (int i = 0; i < rows; i++) {
       data[i] = random.nextInt();
-      readerWriter.setInt(i, data[i]);
+      readerWriter.setDictId(i, data[i]);
     }
 
     for (int i = 0; i < rows; i++) {
-      Assert.assertEquals(readerWriter.getInt(i), data[i]);
+      Assert.assertEquals(readerWriter.getDictId(i), data[i]);
     }
 
     // Test mutability by over-writing all rows.
     for (int i = 0; i < rows; i++) {
       data[i] = random.nextInt();
-      readerWriter.setInt(i, data[i]);
+      readerWriter.setDictId(i, data[i]);
     }
 
     int[] rowIds = new int[rows];
@@ -89,7 +89,7 @@ public class FixedByteSVForwardIndexReaderWriterTest {
     int[] values = new int[rows];
     Arrays.fill(values, 0);
 
-    readerWriter.readValues(rowIds, rows, values);
+    readerWriter.readDictIds(rowIds, rows, values);
     for (int i = 0; i < rows; i++) {
       Assert.assertEquals(values[i], data[i]);
     }
@@ -98,17 +98,17 @@ public class FixedByteSVForwardIndexReaderWriterTest {
     int start = rows * 4;
     for (int i = 0; i < rows; i++) {
       data[i] = random.nextInt();
-      readerWriter.setInt(start + i, data[i]);
+      readerWriter.setDictId(start + i, data[i]);
     }
 
     for (int i = 0; i < rows; i++) {
-      Assert.assertEquals(readerWriter.getInt(start + i), data[i]);
+      Assert.assertEquals(readerWriter.getDictId(start + i), data[i]);
     }
 
     // Ensure that rows not written default to zero.
     start = rows * 2;
     for (int i = 0; i < 2 * rows; i++) {
-      Assert.assertEquals(readerWriter.getInt(start + i), 0);
+      Assert.assertEquals(readerWriter.getDictId(start + i), 0);
     }
     readerWriter.close();
   }
@@ -127,8 +127,8 @@ public class FixedByteSVForwardIndexReaderWriterTest {
 
   private void testLong(final Random random, final int rows, final int div)
       throws IOException {
-    FixedByteSVForwardIndexReaderWriter readerWriter;
-    readerWriter = new FixedByteSVForwardIndexReaderWriter(DataType.LONG, rows / div, _memoryManager, "Long");
+    FixedByteSVMutableForwardIndex readerWriter;
+    readerWriter = new FixedByteSVMutableForwardIndex(false, DataType.LONG, rows / div, _memoryManager, "Long");
     long[] data = new long[rows];
 
     for (int i = 0; i < rows; i++) {

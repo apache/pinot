@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.io.writer.impl;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
-import org.apache.pinot.core.io.writer.ForwardIndexWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -30,7 +30,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  * Bit-compressed dictionary-encoded forward index writer for single-value columns. The values written are dictionary
  * ids.
  */
-public class FixedBitSVForwardIndexWriter implements ForwardIndexWriter {
+public class FixedBitSVForwardIndexWriter implements Closeable {
   private final PinotDataBuffer _dataBuffer;
   private final FixedBitIntReaderWriter _intReaderWriter;
 
@@ -45,9 +45,8 @@ public class FixedBitSVForwardIndexWriter implements ForwardIndexWriter {
     _intReaderWriter = new FixedBitIntReaderWriter(_dataBuffer, numDocs, numBitsPerValue);
   }
 
-  @Override
-  public void putInt(int value) {
-    _intReaderWriter.writeInt(_nextDocId++, value);
+  public void putDictId(int dictId) {
+    _intReaderWriter.writeInt(_nextDocId++, dictId);
   }
 
   @Override

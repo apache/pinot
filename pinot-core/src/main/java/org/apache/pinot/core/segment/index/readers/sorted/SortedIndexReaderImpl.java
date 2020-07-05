@@ -16,20 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl;
+package org.apache.pinot.core.segment.index.readers.sorted;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.SortedIndexReader;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
+import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
  * Implementation of sorted index reader.
- * <p>NOTE: Sorted index is always dictionary-encoded.
  */
 public class SortedIndexReaderImpl implements SortedIndexReader<SortedIndexReaderImpl.Context> {
   private final FixedByteValueReaderWriter _reader;
@@ -43,17 +42,12 @@ public class SortedIndexReaderImpl implements SortedIndexReader<SortedIndexReade
   }
 
   @Override
-  public int getInt(int docId) {
-    // Only one value in dictionary
-    if (_cardinality == 1) {
-      return 0;
-    }
-
-    return binarySearch(docId, 0, _cardinality - 1);
+  public Context createContext() {
+    return new Context();
   }
 
   @Override
-  public int getInt(int docId, Context context) {
+  public int getDictId(int docId, Context context) {
     // Only one value in dictionary
     if (_cardinality == 1) {
       return 0;
@@ -104,35 +98,16 @@ public class SortedIndexReaderImpl implements SortedIndexReader<SortedIndexReade
   }
 
   @Override
-  public void readValues(int[] docIds, int length, int[] values) {
+  public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, Context context) {
     if (_cardinality == 1) {
       for (int i = 0; i < length; i++) {
-        values[i] = 0;
-      }
-    } else {
-      Context context = new Context();
-      for (int i = 0; i < length; i++) {
-        values[i] = getInt(docIds[i], context);
-      }
-    }
-  }
-
-  @Override
-  public void readValues(int[] docIds, int length, int[] values, Context context) {
-    if (_cardinality == 1) {
-      for (int i = 0; i < length; i++) {
-        values[i] = 0;
+        dictIdBuffer[i] = 0;
       }
     } else {
       for (int i = 0; i < length; i++) {
-        values[i] = getInt(docIds[i], context);
+        dictIdBuffer[i] = getDictId(docIds[i], context);
       }
     }
-  }
-
-  @Override
-  public Context createContext() {
-    return new Context();
   }
 
   @Override
@@ -146,10 +121,14 @@ public class SortedIndexReaderImpl implements SortedIndexReader<SortedIndexReade
     _reader.close();
   }
 
-  public static class Context implements ReaderContext {
-    public int _dictId = -1;
-    public int _startOffset = -1;
+  public static class Context implements ForwardIndexReaderContext {
+    private int _dictId = -1;
+    private int _startOffset = -1;
     // Inclusive
-    public int _endOffset = -1;
+    private int _endOffset = -1;
+
+    @Override
+    public void close() {
+    }
   }
 }

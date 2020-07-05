@@ -16,12 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader;
+package org.apache.pinot.core.segment.index.readers;
+
+import java.io.Closeable;
+
 
 /**
- * Marker interface for the context of a reader. The reader itself is always stateless because it needs to be accessed
- * by multiple threads. The context can be passed when reading the values from the reader so that reader can store some
- * states inside the context in order to accelerate the following reads.
+ * Interface for the context of the forward index reader.
+ * <p>The forward index reader itself is always stateless because it needs to be accessed by multiple threads. The
+ * context can be passed when reading the values from the forward index reader so that reader can store some states
+ * inside the context in order to accelerate the following reads.
  */
-public interface ReaderContext {
+public interface ForwardIndexReaderContext extends Closeable {
 }

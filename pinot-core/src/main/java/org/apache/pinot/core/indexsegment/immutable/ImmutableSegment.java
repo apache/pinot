@@ -19,7 +19,7 @@
 package org.apache.pinot.core.indexsegment.immutable;
 
 import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 

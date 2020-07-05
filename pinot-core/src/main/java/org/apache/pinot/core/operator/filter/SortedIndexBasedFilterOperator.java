@@ -25,7 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.io.reader.SortedIndexReader;
+import org.apache.pinot.core.segment.index.readers.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;

@@ -82,12 +82,10 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
     _chunkDataOffSet = _chunkHeaderSize;
   }
 
-  @Override
   public void putString(String value) {
     putBytes(StringUtil.encodeUtf8(value));
   }
 
-  @Override
   public void putBytes(byte[] value) {
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;

@@ -19,9 +19,9 @@
 package org.apache.pinot.core.common;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.core.io.reader.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 
@@ -35,14 +35,6 @@ public interface DataSource {
    * Returns the metadata for the column.
    */
   DataSourceMetadata getDataSourceMetadata();
-
-  /**
-   * Returns the value reader for the column. The value reader is a wrapper on the forward index to help read values
-   * from it.
-   */
-  default ColumnValueReader getValueReader() {
-    return new ColumnValueReader(getForwardIndex());
-  }
 
   /**
    * Returns the forward index for the column. The forward index can be either dictionary-encoded or raw.

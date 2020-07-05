@@ -50,9 +50,8 @@ public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
-    // NOTE: Dictionary id is handled as INT type.
-    return FieldSpec.DataType.INT;
+  public boolean isDictionaryEncoded() {
+    return true;
   }
 
   @Override
@@ -61,7 +60,12 @@ public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator
   }
 
   @Override
-  public void index(int dictId) {
+  public FieldSpec.DataType getValueType() {
+    return FieldSpec.DataType.INT;
+  }
+
+  @Override
+  public void putDictId(int dictId) {
     int docId = _nextDocId++;
     if (_minDocIds[dictId] > docId) {
       _minDocIds[dictId] = docId;
