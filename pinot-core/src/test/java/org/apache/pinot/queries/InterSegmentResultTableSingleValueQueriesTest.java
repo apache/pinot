@@ -347,8 +347,9 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     rows = new ArrayList<>();
     rows.add(new Object[]{6582, 21910});
     expectedResultsSize = 1;
+    //without filter, distinctCount must be solved using dictionary. expectedNumEntriesScannedPostFilter is 0L
     QueriesTestUtils
-        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
+        .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
     brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
