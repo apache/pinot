@@ -35,6 +35,7 @@ import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
@@ -156,7 +157,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   /**
    * Returns {@code true} if the given aggregation-only without filter QueryContext can be solved with dictionary,
    * {@code false} otherwise.
-   * <p>Aggregations supported: MIN, MAX, MINMAXRANGE
+   * <p>Aggregations supported: MIN, MAX, MINMAXRANGE, DISTINCTCOUNT
    */
   @VisibleForTesting
   static boolean isFitForDictionaryBasedPlan(QueryContext queryContext, IndexSegment indexSegment) {
@@ -164,10 +165,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (ExpressionContext expression : selectExpressions) {
       FunctionContext function = expression.getFunction();
       String functionName = function.getFunctionName();
-      if (!functionName.equals("min") && !functionName.equals("max") && !functionName.equals("minmaxrange")
-          && !functionName.equals("distinctcount")) {
+      if(!AggregationFunctionUtils.isFitForDictionaryBasedComputation(functionName)) {
         return false;
       }
+
       ExpressionContext argument = function.getArguments().get(0);
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return false;
