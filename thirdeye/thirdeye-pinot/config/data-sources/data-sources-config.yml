@@ -231,3 +231,8 @@ dataSourceConfigs:
             utk_test: jdbc:postgresql://localhost:25432/utk_test
           user: root
           password: root
+      Druid:
+        - db:
+            druid_test: jdbc:avatica:remote:url=http://localhost:8082/druid/v2/sql/avatica/
+          user: ""
+          password: ""

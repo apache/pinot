@@ -89,6 +89,7 @@ public class SqlUtils {
   private static final String H2 = "H2";
   private static final String VERTICA = "Vertica";
   private static final String POSTGRESQL = "PostgreSQL";
+  private static final String DRUID = "Druid";
 
   /**
    * Insert a table to SQL database, currently only used by H2, that can be read by ThirdEye
@@ -594,6 +595,16 @@ public class SqlUtils {
     }
   }
 
+  /**
+   * Convert java SimpleDateFormat to Druid's format
+   *
+   * @param timeFormat
+   * @return MySQL's time format
+   */
+  private static String timeFormatToDruidFormat(String timeFormat) {
+    return "EPOCH";
+  }
+
   private static String timeFormatToVerticaFormat(String timeFormat) {
     if (timeFormat.contains("mm")) {
       return timeFormat.replaceAll("(?i):mm", ":mi");
@@ -617,6 +628,8 @@ public class SqlUtils {
       return "UNIX_TIMESTAMP(STR_TO_DATE(CAST(" + timeColumn + " AS CHAR), '" + timeFormatToMySQLFormat(timeFormat) + "'))";
     } else if (sourceName.equals(POSTGRESQL)) {
       return "EXTRACT(EPOCH FROM to_timestamp(" + timeColumn + ", '" + timeFormatToPostgreSQLFormat(timeFormat) + "'))";
+    } else if (sourceName.equals(DRUID)) {
+      return "TIME_EXTRACT(" + timeColumn + ", '" + timeFormatToDruidFormat(timeFormat) + "') ";
     } else if (sourceName.equals(H2)){
       return "TO_UNIXTIME(PARSEDATETIME(CAST(" + timeColumn + " AS VARCHAR), '" + timeFormat + "'))";
     } else if (sourceName.equals(VERTICA)) {
