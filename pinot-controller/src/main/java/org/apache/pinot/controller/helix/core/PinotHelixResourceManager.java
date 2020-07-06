@@ -2063,10 +2063,6 @@ public class PinotHelixResourceManager {
     return getHelixInstanceConfig(instanceName) != null;
   }
 
-  public boolean isSingleTenantCluster() {
-    return _isSingleTenantCluster;
-  }
-
   /**
    * Computes the broker nodes that are untagged and free to be used.
    * @return List of online untagged broker instances.
