@@ -39,11 +39,12 @@ public class MutableDataSource extends BaseDataSource {
   private static final String OPERATOR_NAME_PREFIX = "MutableDataSource:";
 
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
-      @Nullable PartitionFunction partitionFunction, int partitionId, DataFileReader forwardIndex,
-      @Nullable Dictionary dictionary, @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
+      @Nullable PartitionFunction partitionFunction, int partitionId, @Nullable Comparable minValue,
+      @Nullable Comparable maxValue, DataFileReader forwardIndex, @Nullable Dictionary dictionary,
+      @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
       @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitionId), forwardIndex, dictionary, invertedIndex, rangeIndex, bloomFilter, nullValueVector,
+            partitionId, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, bloomFilter, nullValueVector,
         OPERATOR_NAME_PREFIX + fieldSpec.getName());
   }
 
@@ -54,9 +55,12 @@ public class MutableDataSource extends BaseDataSource {
     final int _maxNumValuesPerMVEntry;
     final PartitionFunction _partitionFunction;
     final Set<Integer> _partitions;
+    final Comparable _minValue;
+    final Comparable _maxValue;
 
     MutableDataSourceMetadata(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
-        @Nullable PartitionFunction partitionFunction, int partitionId) {
+        @Nullable PartitionFunction partitionFunction, int partitionId, @Nullable Comparable minValue,
+        @Nullable Comparable maxValue) {
       _fieldSpec = fieldSpec;
       _numDocs = numDocs;
       _numValues = numValues;
@@ -68,6 +72,8 @@ public class MutableDataSource extends BaseDataSource {
         _partitionFunction = null;
         _partitions = null;
       }
+      _minValue = minValue;
+      _maxValue = maxValue;
     }
 
     @Override
@@ -99,13 +105,13 @@ public class MutableDataSource extends BaseDataSource {
     @Nullable
     @Override
     public Comparable getMinValue() {
-      return null;
+      return _minValue;
     }
 
     @Nullable
     @Override
     public Comparable getMaxValue() {
-      return null;
+      return _maxValue;
     }
 
     @Nullable

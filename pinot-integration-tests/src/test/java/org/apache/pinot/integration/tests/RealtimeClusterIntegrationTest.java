@@ -19,8 +19,10 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -65,6 +67,16 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  @Override
+  protected List<String> getNoDictionaryColumns() {
+    // Randomly set time column as no dictionary column.
+    if (new Random().nextInt(2) == 0) {
+      return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "DaysSinceEpoch");
+    } else {
+      return super.getNoDictionaryColumns();
+    }
   }
 
   @Test
