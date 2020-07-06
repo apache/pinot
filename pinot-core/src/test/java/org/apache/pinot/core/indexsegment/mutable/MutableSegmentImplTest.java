@@ -19,6 +19,7 @@
 package org.apache.pinot.core.indexsegment.mutable;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.Collections;
 import org.apache.commons.io.FileUtils;
@@ -29,12 +30,12 @@ import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -52,6 +53,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class MutableSegmentImplTest {
   private static final String AVRO_FILE = "data/test_data-mv.avro";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplTest");
@@ -126,7 +128,8 @@ public class MutableSegmentImplTest {
   }
 
   @Test
-  public void testDataSourceForSVColumns() {
+  public void testDataSourceForSVColumns()
+      throws IOException {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
@@ -146,19 +149,23 @@ public class MutableSegmentImplTest {
           continue;
         }
 
-        SingleValueSet actualValueSet = (SingleValueSet) actualDataSource.nextBlock().getBlockValueSet();
-        SingleValueSet expectedValueSet = (SingleValueSet) expectedDataSource.nextBlock().getBlockValueSet();
-        for (int docId = 0; docId < expectedNumDocs; docId++) {
-          int actualDictId = actualValueSet.getIntValue(docId);
-          int expectedDictId = expectedValueSet.getIntValue(docId);
-          assertEquals(actualDictionary.get(actualDictId), expectedDictionary.get(expectedDictId));
+        ForwardIndexReader actualReader = actualDataSource.getForwardIndex();
+        ForwardIndexReader expectedReader = expectedDataSource.getForwardIndex();
+        try (ForwardIndexReaderContext actualReaderContext = actualReader.createContext();
+            ForwardIndexReaderContext expectedReaderContext = expectedReader.createContext()) {
+          for (int docId = 0; docId < expectedNumDocs; docId++) {
+            int actualDictId = actualReader.getDictId(docId, actualReaderContext);
+            int expectedDictId = expectedReader.getDictId(docId, expectedReaderContext);
+            assertEquals(actualDictionary.get(actualDictId), expectedDictionary.get(expectedDictId));
+          }
         }
       }
     }
   }
 
   @Test
-  public void testDataSourceForMVColumns() {
+  public void testDataSourceForMVColumns()
+      throws IOException {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
@@ -177,15 +184,18 @@ public class MutableSegmentImplTest {
         int[] actualDictIds = new int[maxNumValuesPerMVEntry];
         int[] expectedDictIds = new int[maxNumValuesPerMVEntry];
 
-        MultiValueSet actualValueSet = (MultiValueSet) actualDataSource.nextBlock().getBlockValueSet();
-        MultiValueSet expectedValueSet = (MultiValueSet) expectedDataSource.nextBlock().getBlockValueSet();
-        for (int docId = 0; docId < expectedNumDocs; docId++) {
-          int actualLength = actualValueSet.getIntValues(docId, actualDictIds);
-          int expectedLength = expectedValueSet.getIntValues(docId, expectedDictIds);
-          assertEquals(actualLength, expectedLength);
+        ForwardIndexReader actualReader = actualDataSource.getForwardIndex();
+        ForwardIndexReader expectedReader = expectedDataSource.getForwardIndex();
+        try (ForwardIndexReaderContext actualReaderContext = actualReader.createContext();
+            ForwardIndexReaderContext expectedReaderContext = expectedReader.createContext()) {
+          for (int docId = 0; docId < expectedNumDocs; docId++) {
+            int actualLength = actualReader.getDictIdMV(docId, actualDictIds, actualReaderContext);
+            int expectedLength = expectedReader.getDictIdMV(docId, expectedDictIds, expectedReaderContext);
+            assertEquals(actualLength, expectedLength);
 
-          for (int i = 0; i < expectedLength; i++) {
-            assertEquals(actualDictionary.get(actualDictIds[i]), expectedDictionary.get(expectedDictIds[i]));
+            for (int i = 0; i < expectedLength; i++) {
+              assertEquals(actualDictionary.get(actualDictIds[i]), expectedDictionary.get(expectedDictIds[i]));
+            }
           }
         }
       }

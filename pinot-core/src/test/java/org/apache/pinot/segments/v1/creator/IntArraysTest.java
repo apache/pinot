@@ -29,21 +29,22 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
-import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 
+
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class IntArraysTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "IntArraysTest");
@@ -95,24 +96,33 @@ public class IntArraysTest {
         ((SegmentMetadataImpl) heapSegment.getSegmentMetadata()).getColumnMetadataMap();
 
     for (String column : metadataMap.keySet()) {
-      DataFileReader heapArray = heapSegment.getForwardIndex(column);
-      DataFileReader mmapArray = mmapSegment.getForwardIndex(column);
-
-      if (metadataMap.get(column).isSingleValue()) {
-        final SingleColumnSingleValueReader svHeapReader = (SingleColumnSingleValueReader) heapArray;
-        final SingleColumnSingleValueReader mvMmapReader = (SingleColumnSingleValueReader) mmapArray;
-        for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
-          Assert.assertEquals(mvMmapReader.getInt(i), svHeapReader.getInt(i));
-        }
-      } else {
-        final SingleColumnMultiValueReader svHeapReader = (SingleColumnMultiValueReader) heapArray;
-        final SingleColumnMultiValueReader mvMmapReader = (SingleColumnMultiValueReader) mmapArray;
-        for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
-          final int[] i_1 = new int[1000];
-          final int[] j_i = new int[1000];
-          Assert.assertEquals(mvMmapReader.getIntArray(i, j_i), svHeapReader.getIntArray(i, i_1));
+      ForwardIndexReader heapForwardIndex = heapSegment.getForwardIndex(column);
+      ForwardIndexReader mmapForwardIndex = mmapSegment.getForwardIndex(column);
+      try (ForwardIndexReaderContext heapReaderContext = heapForwardIndex.createContext();
+          ForwardIndexReaderContext mmapReaderContext = mmapForwardIndex.createContext()) {
+        int numDocs = metadataMap.get(column).getTotalDocs();
+        if (metadataMap.get(column).isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            assertEquals(heapForwardIndex.getDictId(i, heapReaderContext),
+                mmapForwardIndex.getDictId(i, mmapReaderContext));
+          }
+        } else {
+          int maxNumValuesPerMVEntry = metadataMap.get(column).getMaxNumberOfMultiValues();
+          int[] heapDictIdBuffer = new int[maxNumValuesPerMVEntry];
+          int[] mmapDictIdBuffer = new int[maxNumValuesPerMVEntry];
+          for (int i = 0; i < numDocs; i++) {
+            int heapNumValues = heapForwardIndex.getDictIdMV(i, heapDictIdBuffer, heapReaderContext);
+            int mmapNumValues = mmapForwardIndex.getDictIdMV(i, mmapDictIdBuffer, mmapReaderContext);
+            assertEquals(heapNumValues, mmapNumValues);
+            for (int j = 0; j < heapNumValues; j++) {
+              assertEquals(heapDictIdBuffer[j], mmapDictIdBuffer[j]);
+            }
+          }
         }
       }
     }
+
+    heapSegment.destroy();
+    mmapSegment.destroy();
   }
 }

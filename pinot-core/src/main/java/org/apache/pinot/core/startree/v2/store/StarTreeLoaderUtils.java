@@ -26,10 +26,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.data.aggregator.ValueAggregatorFactory;
-import org.apache.pinot.core.io.reader.impl.v1.BaseChunkSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -40,6 +40,7 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 
 import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
@@ -82,8 +83,8 @@ public class StarTreeLoaderUtils {
         end = start + indexValue._size;
         PinotDataBuffer forwardIndexDataBuffer = dataBuffer.view(start, end, ByteOrder.BIG_ENDIAN);
         ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(dimension);
-        FixedBitSingleValueReader forwardIndex =
-            new FixedBitSingleValueReader(forwardIndexDataBuffer, numDocs, columnMetadata.getBitsPerElement());
+        FixedBitSVForwardIndexReader forwardIndex =
+            new FixedBitSVForwardIndexReader(forwardIndexDataBuffer, numDocs, columnMetadata.getBitsPerElement());
         dataSourceMap.put(dimension, new StarTreeDataSource(columnMetadata.getFieldSpec(), numDocs, forwardIndex,
             indexContainerMap.get(dimension).getDictionary()));
       }
@@ -95,14 +96,13 @@ public class StarTreeLoaderUtils {
         start = indexValue._offset;
         end = start + indexValue._size;
         PinotDataBuffer forwardIndexDataBuffer = dataBuffer.view(start, end, ByteOrder.BIG_ENDIAN);
-        FieldSpec.DataType dataType =
-            ValueAggregatorFactory.getAggregatedValueType(functionColumnPair.getFunctionType());
+        DataType dataType = ValueAggregatorFactory.getAggregatedValueType(functionColumnPair.getFunctionType());
         FieldSpec fieldSpec = new MetricFieldSpec(metric, dataType);
-        BaseChunkSingleValueReader forwardIndex;
-        if (dataType == FieldSpec.DataType.BYTES) {
-          forwardIndex = new VarByteChunkSingleValueReader(forwardIndexDataBuffer);
+        BaseChunkSVForwardIndexReader forwardIndex;
+        if (dataType == DataType.BYTES) {
+          forwardIndex = new VarByteChunkSVForwardIndexReader(forwardIndexDataBuffer, DataType.BYTES);
         } else {
-          forwardIndex = new FixedByteChunkSingleValueReader(forwardIndexDataBuffer);
+          forwardIndex = new FixedByteChunkSVForwardIndexReader(forwardIndexDataBuffer, dataType);
         }
         dataSourceMap.put(metric, new StarTreeDataSource(fieldSpec, numDocs, forwardIndex, null));
       }

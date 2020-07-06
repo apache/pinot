@@ -19,10 +19,10 @@
 package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
-import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 
@@ -31,11 +31,11 @@ import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
  * Column index container for virtual columns.
  */
 public class VirtualColumnIndexContainer implements ColumnIndexContainer {
-  private DataFileReader _forwardIndex;
-  private InvertedIndexReader _invertedIndex;
-  private Dictionary _dictionary;
+  private final ForwardIndexReader<?> _forwardIndex;
+  private final InvertedIndexReader<?> _invertedIndex;
+  private final Dictionary _dictionary;
 
-  public VirtualColumnIndexContainer(DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
+  public VirtualColumnIndexContainer(ForwardIndexReader<?> forwardIndex, InvertedIndexReader<?> invertedIndex,
       Dictionary dictionary) {
     _forwardIndex = forwardIndex;
     _invertedIndex = invertedIndex;
@@ -43,17 +43,17 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
-  public DataFileReader getForwardIndex() {
+  public ForwardIndexReader<?> getForwardIndex() {
     return _forwardIndex;
   }
 
   @Override
-  public InvertedIndexReader getInvertedIndex() {
+  public InvertedIndexReader<?> getInvertedIndex() {
     return _invertedIndex;
   }
 
   @Override
-  public InvertedIndexReader getRangeIndex() {
+  public InvertedIndexReader<?> getRangeIndex() {
     return null;
   }
 

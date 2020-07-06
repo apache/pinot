@@ -23,7 +23,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
@@ -34,18 +34,16 @@ import org.apache.pinot.spi.data.FieldSpec;
 /**
  * The {@code MutableDataSource} class is the data source for a column in the mutable segment.
  */
-// TODO: Support min/max value for mutable segment
 public class MutableDataSource extends BaseDataSource {
-  private static final String OPERATOR_NAME_PREFIX = "MutableDataSource:";
 
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
       @Nullable PartitionFunction partitionFunction, int partitionId, @Nullable Comparable minValue,
-      @Nullable Comparable maxValue, DataFileReader forwardIndex, @Nullable Dictionary dictionary,
+      @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
       @Nullable InvertedIndexReader invertedIndex, @Nullable InvertedIndexReader rangeIndex,
       @Nullable BloomFilterReader bloomFilter, @Nullable NullValueVectorReader nullValueVector) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitionId, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, bloomFilter, nullValueVector,
-        OPERATOR_NAME_PREFIX + fieldSpec.getName());
+            partitionId, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, bloomFilter,
+        nullValueVector);
   }
 
   private static class MutableDataSourceMetadata implements DataSourceMetadata {

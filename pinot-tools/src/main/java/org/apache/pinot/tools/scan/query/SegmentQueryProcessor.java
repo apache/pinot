@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.scan.query;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,16 +36,17 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 class SegmentQueryProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentQueryProcessor.class);
 
@@ -267,45 +269,47 @@ class SegmentQueryProcessor {
   private List<Integer> evaluatePredicate(List<Integer> inputDocIds, String column, PredicateFilter predicateFilter) {
     List<Integer> result = new ArrayList<>();
     DataSource dataSource = _immutableSegment.getDataSource(column);
-    if (!_mvColumns.contains(column)) {
-      SingleValueSet valueSet = (SingleValueSet) dataSource.nextBlock().getBlockValueSet();
-
-      if (inputDocIds != null) {
-        for (int docId : inputDocIds) {
-          if (predicateFilter.apply(valueSet.getIntValue(docId))) {
-            result.add(docId);
+    ForwardIndexReader reader = dataSource.getForwardIndex();
+    try (ForwardIndexReaderContext readerContext = reader.createContext()) {
+      if (!_mvColumns.contains(column)) {
+        if (inputDocIds != null) {
+          for (int docId : inputDocIds) {
+            if (predicateFilter.apply(reader.getDictId(docId, readerContext))) {
+              result.add(docId);
+            }
+          }
+        } else {
+          int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
+          for (int docId = 0; docId < numDocs; docId++) {
+            if (predicateFilter.apply(reader.getDictId(docId, readerContext))) {
+              result.add(docId);
+            }
           }
         }
       } else {
-        int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
-        for (int docId = 0; docId < numDocs; docId++) {
-          if (predicateFilter.apply(valueSet.getIntValue(docId))) {
-            result.add(docId);
-          }
-        }
-      }
-    } else {
-      MultiValueSet valueSet = (MultiValueSet) dataSource.nextBlock().getBlockValueSet();
-      int[] dictIds = _mvColumnArrayMap.get(column);
+        int[] dictIdBuffer = _mvColumnArrayMap.get(column);
 
-      if (inputDocIds != null) {
-        for (int docId : inputDocIds) {
-          int length = valueSet.getIntValues(docId, dictIds);
-          if (predicateFilter.apply(dictIds, length)) {
-            result.add(docId);
+        if (inputDocIds != null) {
+          for (int docId : inputDocIds) {
+            int length = reader.getDictIdMV(docId, dictIdBuffer, readerContext);
+            if (predicateFilter.apply(dictIdBuffer, length)) {
+              result.add(docId);
+            }
           }
-        }
-      } else {
-        int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
-        for (int docId = 0; docId < numDocs; docId++) {
-          int length = valueSet.getIntValues(docId, dictIds);
-          if (predicateFilter.apply(dictIds, length)) {
-            result.add(docId);
+        } else {
+          int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
+          for (int docId = 0; docId < numDocs; docId++) {
+            int length = reader.getDictIdMV(docId, dictIdBuffer, readerContext);
+            if (predicateFilter.apply(dictIdBuffer, length)) {
+              result.add(docId);
+            }
           }
         }
       }
+      return result;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
-    return result;
   }
 
   public String getSegmentName() {

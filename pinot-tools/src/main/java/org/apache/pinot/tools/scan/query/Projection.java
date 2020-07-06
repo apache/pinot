@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.scan.query;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -25,16 +26,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class Projection {
   private final ImmutableSegment _immutableSegment;
   private final SegmentMetadataImpl _metadata;
@@ -78,25 +79,24 @@ public class Projection {
 
     for (Pair pair : _columnList) {
       String column = (String) pair.getFirst();
-      if (!_mvColumns.contains(column)) {
-        SingleValueSet valueSet =
-            (SingleValueSet) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet();
-
-        int rowId = 0;
-        for (Integer docId : _filteredDocIds) {
-          resultTable.add(rowId++, valueSet.getIntValue(docId));
+      ForwardIndexReader reader = _immutableSegment.getDataSource(column).getForwardIndex();
+      try (ForwardIndexReaderContext readerContext = reader.createContext()) {
+        if (!_mvColumns.contains(column)) {
+          int rowId = 0;
+          for (int docId : _filteredDocIds) {
+            resultTable.add(rowId++, reader.getDictId(docId, readerContext));
+          }
+        } else {
+          int rowId = 0;
+          for (int docId : _filteredDocIds) {
+            int[] dictIdBuffer = _mvColumnArrayMap.get(column);
+            int numMVValues = reader.getDictIdMV(docId, dictIdBuffer, readerContext);
+            int[] dictIds = Arrays.copyOf(dictIdBuffer, numMVValues);
+            resultTable.add(rowId++, dictIds);
+          }
         }
-      } else {
-        MultiValueSet valueSet = (MultiValueSet) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet();
-
-        int rowId = 0;
-        for (int docId : _filteredDocIds) {
-          int[] dictIds = _mvColumnArrayMap.get(column);
-          int numMVValues = valueSet.getIntValues(docId, dictIds);
-
-          dictIds = Arrays.copyOf(dictIds, numMVValues);
-          resultTable.add(rowId++, ArrayUtils.toObject(dictIds));
-        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
     }
 
@@ -113,15 +113,13 @@ public class Projection {
         String column = (String) columnList.get(colId).getFirst();
         Dictionary dictionary = dictionaryMap.get(column);
 
-        if (object instanceof Object[]) {
-          Object[] objArray = (Object[]) object;
-          Object[] valArray = new Object[objArray.length];
-
-          for (int i = 0; i < objArray.length; ++i) {
-            int dictId = (int) objArray[i];
-            valArray[i] = dictionary.get(dictId);
+        if (object instanceof int[]) {
+          int[] dictIds = (int[]) object;
+          Object[] values = new Object[dictIds.length];
+          for (int i = 0; i < dictIds.length; ++i) {
+            values[i] = dictionary.get(dictIds[i]);
           }
-          row.set(colId, valArray);
+          row.set(colId, values);
         } else {
           int dictId = (int) object;
           row.set(colId, dictionary.get(dictId));

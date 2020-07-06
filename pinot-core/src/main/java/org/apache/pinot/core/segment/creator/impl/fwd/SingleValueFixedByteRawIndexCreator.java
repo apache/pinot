@@ -21,24 +21,22 @@ package org.apache.pinot.core.segment.creator.impl.fwd;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
-import org.apache.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
-import org.apache.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
+import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
+import org.apache.pinot.core.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
- * Implementation of {@link org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator}
- * <ul>
- *   <li> Uses {@link FixedByteSingleValueMultiColWriter} as the underlying writer. </li>
- *   <li> Should be used for writing fixed byte data (int, long, float & double). </li>
- * </ul>
+ * Forward index creator for raw (non-dictionary-encoded) single-value column of fixed length data type (INT, LONG,
+ * FLOAT, DOUBLE).
  */
-public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndexCreator {
+public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
 
-  final FixedByteChunkSingleValueWriter _indexWriter;
+  private final FixedByteChunkSVForwardIndexWriter _indexWriter;
+  private final DataType _valueType;
 
   /**
    * Constructor for the class
@@ -47,13 +45,13 @@ public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndex
    * @param compressionType Type of compression to use
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
-   * @param sizeOfEntry Size of entry (in bytes)
+   * @param valueType Type of the values
    * @throws IOException
    */
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
-      String column, int totalDocs, int sizeOfEntry)
+      String column, int totalDocs, DataType valueType)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, sizeOfEntry, BaseChunkSingleValueWriter.DEFAULT_VERSION);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
   }
 
   /**
@@ -63,52 +61,53 @@ public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndex
    * @param compressionType Type of compression to use
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
-   * @param sizeOfEntry Size of entry (in bytes)
+   * @param valueType Type of the values
    * @param writerVersion writer format version
    * @throws IOException
    */
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
-      String column, int totalDocs, int sizeOfEntry, int writerVersion)
+      String column, int totalDocs, DataType valueType, int writerVersion)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     _indexWriter =
-        new FixedByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, sizeOfEntry, writerVersion);
+        new FixedByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, valueType.size(),
+            writerVersion);
+    _valueType = valueType;
   }
 
   @Override
-  public void index(int docId, int valueToIndex) {
-    _indexWriter.setInt(docId, valueToIndex);
+  public boolean isDictionaryEncoded() {
+    return false;
   }
 
   @Override
-  public void index(int docId, long valueToIndex) {
-    _indexWriter.setLong(docId, valueToIndex);
+  public boolean isSingleValue() {
+    return true;
   }
 
   @Override
-  public void index(int docId, float valueToIndex) {
-    _indexWriter.setFloat(docId, valueToIndex);
+  public DataType getValueType() {
+    return _valueType;
   }
 
   @Override
-  public void index(int docId, double valueToIndex) {
-    _indexWriter.setDouble(docId, valueToIndex);
+  public void putInt(int value) {
+    _indexWriter.putInt(value);
   }
 
   @Override
-  public void index(int docId, Object valueToIndex) {
-    if (valueToIndex instanceof Integer) {
-      index(docId, ((Integer) valueToIndex).intValue());
-    } else if (valueToIndex instanceof Long) {
-      index(docId, ((Long) valueToIndex).longValue());
-    } else if (valueToIndex instanceof Float) {
-      index(docId, ((Float) valueToIndex).floatValue());
-    } else if (valueToIndex instanceof Double) {
-      index(docId, ((Double) valueToIndex).doubleValue());
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal argument type for fixed length raw indexing: " + valueToIndex.getClass().getName());
-    }
+  public void putLong(long value) {
+    _indexWriter.putLong(value);
+  }
+
+  @Override
+  public void putFloat(float value) {
+    _indexWriter.putFloat(value);
+  }
+
+  @Override
+  public void putDouble(double value) {
+    _indexWriter.putDouble(value);
   }
 
   @Override

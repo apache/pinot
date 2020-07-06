@@ -20,8 +20,8 @@ package org.apache.pinot.core.realtime.impl.dictionary;
 
 import java.util.Random;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -50,8 +50,8 @@ public class MultiValueDictionaryTest {
   public void testMultiValueIndexing() {
     long seed = System.nanoTime();
     try (LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
-        FixedByteSingleColumnMultiValueReaderWriter indexer = new FixedByteSingleColumnMultiValueReaderWriter(
-            MAX_N_VALUES, MAX_N_VALUES / 2, NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer")) {
+        FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer")) {
       // Insert rows into the indexer and dictionary
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {
@@ -62,14 +62,14 @@ public class MultiValueDictionaryTest {
         }
         int[] dictIds = dict.index(values);
         assertEquals(dictIds.length, numValues);
-        indexer.setIntArray(row, dictIds);
+        indexer.setDictIdMV(row, dictIds);
       }
 
       // Read back rows and make sure that the values are good.
       random = new Random(seed);
       int[] dictIds = new int[MAX_N_VALUES];
       for (int row = 0; row < NROWS; row++) {
-        int numValues = indexer.getIntArray(row, dictIds);
+        int numValues = indexer.getDictIdMV(row, dictIds);
         assertEquals(numValues, Math.abs(random.nextInt()) % MAX_N_VALUES);
 
         for (int i = 0; i < numValues; i++) {

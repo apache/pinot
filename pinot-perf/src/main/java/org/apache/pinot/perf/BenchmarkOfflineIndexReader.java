@@ -27,19 +27,19 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.integration.tests.ClusterTest;
@@ -84,9 +84,9 @@ public class BenchmarkOfflineIndexReader {
 
   // Forward index
   private int _numDocs;
-  private FixedBitSingleValueReader _fixedBitSingleValueReader;
+  private FixedBitSVForwardIndexReader _fixedBitSingleValueReader;
   private SortedIndexReaderImpl _sortedForwardIndexReader;
-  private FixedBitMultiValueReader _fixedBitMultiValueReader;
+  private FixedBitMVForwardIndexReader _fixedBitMultiValueReader;
   private int[] _buffer;
 
   // Dictionary
@@ -118,16 +118,16 @@ public class BenchmarkOfflineIndexReader {
 
     // Forward index
     _numDocs = segmentMetadata.getTotalDocs();
-    _fixedBitSingleValueReader =
-        new FixedBitSingleValueReader(segmentReader.getIndexFor(SV_UNSORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
-            _numDocs, segmentMetadata.getColumnMetadataFor(SV_UNSORTED_COLUMN_NAME).getBitsPerElement());
+    _fixedBitSingleValueReader = new FixedBitSVForwardIndexReader(
+        segmentReader.getIndexFor(SV_UNSORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX), _numDocs,
+        segmentMetadata.getColumnMetadataFor(SV_UNSORTED_COLUMN_NAME).getBitsPerElement());
     _sortedForwardIndexReader =
         new SortedIndexReaderImpl(segmentReader.getIndexFor(SV_SORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
             segmentMetadata.getColumnMetadataFor(SV_SORTED_COLUMN_NAME).getCardinality());
     ColumnMetadata mvColumnMetadata = segmentMetadata.getColumnMetadataFor(MV_COLUMN_NAME);
     _fixedBitMultiValueReader =
-        new FixedBitMultiValueReader(segmentReader.getIndexFor(MV_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX), _numDocs,
-            mvColumnMetadata.getTotalNumberOfEntries(), mvColumnMetadata.getBitsPerElement());
+        new FixedBitMVForwardIndexReader(segmentReader.getIndexFor(MV_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
+            _numDocs, mvColumnMetadata.getTotalNumberOfEntries(), mvColumnMetadata.getBitsPerElement());
     _buffer = new int[mvColumnMetadata.getMaxNumberOfMultiValues()];
 
     // Dictionary
@@ -147,61 +147,67 @@ public class BenchmarkOfflineIndexReader {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public int fixedBitSingleValueReader() {
-    ReaderContext context = _fixedBitSingleValueReader.createContext();
-    int ret = 0;
-    for (int i = 0; i < _numDocs; i++) {
-      ret += _fixedBitSingleValueReader.getInt(i, context);
+  public int fixedBitSingleValueReader()
+      throws IOException {
+    try (ForwardIndexReaderContext readerContext = _fixedBitSingleValueReader.createContext()) {
+      int ret = 0;
+      for (int i = 0; i < _numDocs; i++) {
+        ret += _fixedBitSingleValueReader.getDictId(i, readerContext);
+      }
+      return ret;
     }
-    return ret;
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int sortedForwardIndexReaderSequential() {
-    SortedIndexReaderImpl.Context context = _sortedForwardIndexReader.createContext();
-    int ret = 0;
-    for (int i = 0; i < _numDocs; i++) {
-      ret += _sortedForwardIndexReader.getInt(i, context);
+    try (SortedIndexReaderImpl.Context readerContext = _sortedForwardIndexReader.createContext()) {
+      int ret = 0;
+      for (int i = 0; i < _numDocs; i++) {
+        ret += _sortedForwardIndexReader.getDictId(i, readerContext);
+      }
+      return ret;
     }
-    return ret;
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int sortedForwardIndexReaderRandom() {
-    SortedIndexReaderImpl.Context context = _sortedForwardIndexReader.createContext();
-    int ret = 0;
-    for (int i = 0; i < _numDocs; i++) {
-      ret += _sortedForwardIndexReader.getInt(RANDOM.nextInt(_numDocs), context);
+    try (SortedIndexReaderImpl.Context readerContext = _sortedForwardIndexReader.createContext()) {
+      int ret = 0;
+      for (int i = 0; i < _numDocs; i++) {
+        ret += _sortedForwardIndexReader.getDictId(RANDOM.nextInt(_numDocs), readerContext);
+      }
+      return ret;
     }
-    return ret;
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int fixedBitMultiValueReaderSequential() {
-    FixedBitMultiValueReader.Context context = _fixedBitMultiValueReader.createContext();
-    int ret = 0;
-    for (int i = 0; i < _numDocs; i++) {
-      ret += _fixedBitMultiValueReader.getIntArray(i, _buffer, context);
+    try (FixedBitMVForwardIndexReader.Context readerContext = _fixedBitMultiValueReader.createContext()) {
+      int ret = 0;
+      for (int i = 0; i < _numDocs; i++) {
+        ret += _fixedBitMultiValueReader.getDictIdMV(i, _buffer, readerContext);
+      }
+      return ret;
     }
-    return ret;
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int fixedBitMultiValueReaderRandom() {
-    FixedBitMultiValueReader.Context context = _fixedBitMultiValueReader.createContext();
-    int ret = 0;
-    for (int i = 0; i < _numDocs; i++) {
-      ret += _fixedBitMultiValueReader.getIntArray(RANDOM.nextInt(_numDocs), _buffer, context);
+    try (FixedBitMVForwardIndexReader.Context readerContext = _fixedBitMultiValueReader.createContext()) {
+      int ret = 0;
+      for (int i = 0; i < _numDocs; i++) {
+        ret += _fixedBitMultiValueReader.getDictIdMV(RANDOM.nextInt(_numDocs), _buffer, readerContext);
+      }
+      return ret;
     }
-    return ret;
   }
 
   @Benchmark

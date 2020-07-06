@@ -21,24 +21,42 @@ package org.apache.pinot.core.segment.creator.impl.fwd;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
-import org.apache.pinot.core.io.writer.SingleColumnSingleValueWriter;
-import org.apache.pinot.core.io.writer.impl.v1.FixedBitSingleValueWriter;
-import org.apache.pinot.core.segment.creator.SingleValueForwardIndexCreator;
+import org.apache.pinot.core.io.writer.impl.FixedBitSVForwardIndexWriter;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class SingleValueUnsortedForwardIndexCreator implements SingleValueForwardIndexCreator {
-  private final SingleColumnSingleValueWriter _writer;
+/**
+ * Forward index creator for dictionary-encoded unsorted single-value column.
+ */
+public class SingleValueUnsortedForwardIndexCreator implements ForwardIndexCreator {
+  private final FixedBitSVForwardIndexWriter _writer;
 
   public SingleValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs)
       throws Exception {
     File indexFile = new File(outputDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-    _writer = new FixedBitSingleValueWriter(indexFile, numDocs, PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
+    _writer = new FixedBitSVForwardIndexWriter(indexFile, numDocs, PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
   }
 
   @Override
-  public void index(int docId, int dictId) {
-    _writer.setInt(docId, dictId);
+  public boolean isDictionaryEncoded() {
+    return true;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return true;
+  }
+
+  @Override
+  public FieldSpec.DataType getValueType() {
+    return FieldSpec.DataType.INT;
+  }
+
+  @Override
+  public void putDictId(int dictId) {
+    _writer.putDictId(dictId);
   }
 
   @Override

@@ -29,7 +29,6 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.text.LuceneDocIdCollector;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -90,14 +89,8 @@ public class RealtimeLuceneTextIndexReader implements InvertedIndexReader<Mutabl
     throw new UnsupportedOperationException("Using dictionary ID is not supported on Lucene inverted index");
   }
 
-  /**
-   * Get docIds from the text inverted index for a given raw value
-   * @param value value to look for in the inverted index
-   * @return docIDs in bitmap
-   */
   @Override
-  public MutableRoaringBitmap getDocIds(Object value) {
-    String searchQuery = (String) value;
+  public MutableRoaringBitmap getDocIds(String searchQuery) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     Collector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
     IndexSearcher indexSearcher = null;

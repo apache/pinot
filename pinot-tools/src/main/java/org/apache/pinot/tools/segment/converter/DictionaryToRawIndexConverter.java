@@ -35,12 +35,13 @@ import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.writer.impl.v1.BaseChunkSingleValueWriter;
-import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
-import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.io.writer.impl.BaseChunkSVForwardIndexWriter;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -51,7 +52,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to convert segment with dictionary encoded column to raw index (without dictionary).
  */
-@SuppressWarnings({"FieldCanBeLocal", "unused"})
+@SuppressWarnings({"FieldCanBeLocal", "unused", "rawtypes", "unchecked"})
 public class DictionaryToRawIndexConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryToRawIndexConverter.class);
 
@@ -285,6 +286,7 @@ public class DictionaryToRawIndexConverter {
   private void convertOneColumn(IndexSegment segment, String column, File newSegment)
       throws IOException {
     DataSource dataSource = segment.getDataSource(column);
+    ForwardIndexReader reader = dataSource.getForwardIndex();
     Dictionary dictionary = dataSource.getDictionary();
 
     if (dictionary == null) {
@@ -301,21 +303,46 @@ public class DictionaryToRawIndexConverter {
     ChunkCompressorFactory.CompressionType compressionType =
         ChunkCompressorFactory.CompressionType.valueOf(_compressionType);
     FieldSpec.DataType dataType = dataSourceMetadata.getDataType();
-    int totalDocs = segment.getSegmentMetadata().getTotalDocs();
+    int numDocs = segment.getSegmentMetadata().getTotalDocs();
     int lengthOfLongestEntry = (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
-    SingleValueSet valueSet = (SingleValueSet) dataSource.nextBlock().getBlockValueSet();
 
-    try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
-        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, totalDocs, lengthOfLongestEntry,
-            false, BaseChunkSingleValueWriter.DEFAULT_VERSION)) {
-      for (int docId = 0; docId < totalDocs; docId++) {
-        int dictId = valueSet.getIntValue(docId);
-        Object value = dictionary.get(dictId);
-        rawIndexCreator.index(docId++, value);
-
-        if (docId % 1000000 == 0) {
-          LOGGER.info("Converted {} records.", docId);
-        }
+    try (ForwardIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
+        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, numDocs, lengthOfLongestEntry,
+            false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+        ForwardIndexReaderContext readerContext = reader.createContext()) {
+      switch (dataType) {
+        case INT:
+          for (int docId = 0; docId < numDocs; docId++) {
+            rawIndexCreator.putInt(dictionary.getIntValue(reader.getDictId(docId, readerContext)));
+          }
+          break;
+        case LONG:
+          for (int docId = 0; docId < numDocs; docId++) {
+            rawIndexCreator.putLong(dictionary.getLongValue(reader.getDictId(docId, readerContext)));
+          }
+          break;
+        case FLOAT:
+          for (int docId = 0; docId < numDocs; docId++) {
+            rawIndexCreator.putFloat(dictionary.getFloatValue(reader.getDictId(docId, readerContext)));
+          }
+          break;
+        case DOUBLE:
+          for (int docId = 0; docId < numDocs; docId++) {
+            rawIndexCreator.putDouble(dictionary.getDoubleValue(reader.getDictId(docId, readerContext)));
+          }
+          break;
+        case STRING:
+          for (int docId = 0; docId < numDocs; docId++) {
+            rawIndexCreator.putString(dictionary.getStringValue(reader.getDictId(docId, readerContext)));
+          }
+          break;
+        case BYTES:
+          for (int docId = 0; docId < numDocs; docId++) {
+            rawIndexCreator.putBytes(dictionary.getBytesValue(reader.getDictId(docId, readerContext)));
+          }
+          break;
+        default:
+          throw new IllegalStateException();
       }
     }
 

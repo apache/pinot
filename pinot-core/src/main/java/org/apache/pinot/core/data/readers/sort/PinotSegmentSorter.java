@@ -103,7 +103,7 @@ public class PinotSegmentSorter implements SegmentSorter {
         }
 
         // Compute the order
-        compare = columnReader.getDictionaryId(docId1) - columnReader.getDictionaryId(docId2);
+        compare = columnReader.getDictId(docId1) - columnReader.getDictId(docId2);
 
         if (compare != 0) {
           return compare;

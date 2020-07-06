@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.readers;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -187,7 +188,8 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() {
+  public void close()
+      throws IOException {
     for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
       recordReader.close();
     }

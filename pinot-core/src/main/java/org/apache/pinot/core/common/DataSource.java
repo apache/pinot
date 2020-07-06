@@ -19,56 +19,56 @@
 package org.apache.pinot.core.common;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 
 
 /**
- * The {@code DataSource} class contains all the data and metadata for a column for query execution purpose.
+ * The {@code DataSource} contains all the indexes and metadata for a column for query execution purpose.
  */
-public abstract class DataSource extends BaseOperator {
+public interface DataSource {
 
   /**
    * Returns the metadata for the column.
    */
-  public abstract DataSourceMetadata getDataSourceMetadata();
+  DataSourceMetadata getDataSourceMetadata();
 
   /**
    * Returns the forward index for the column. The forward index can be either dictionary-encoded or raw.
    */
-  public abstract DataFileReader getForwardIndex();
+  ForwardIndexReader<?> getForwardIndex();
 
   /**
    * Returns the dictionary for the column if it is dictionary-encoded, or {@code null} if not.
    */
   @Nullable
-  public abstract Dictionary getDictionary();
+  Dictionary getDictionary();
 
   /**
    * Returns the inverted index for the column if exists, or {@code null} if not.
    */
   @Nullable
-  public abstract InvertedIndexReader getInvertedIndex();
+  InvertedIndexReader<?> getInvertedIndex();
 
   /**
-   * Returns the inverted index for the column if exists, or {@code null} if not.
+   * Returns the range index for the column if exists, or {@code null} if not.
+   * <p>TODO: Have a separate interface for range index.
    */
   @Nullable
-  public abstract InvertedIndexReader getRangeIndex();
+  InvertedIndexReader<?> getRangeIndex();
 
   /**
    * Returns the bloom filter for the column if exists, or {@code null} if not.
    */
   @Nullable
-  public abstract BloomFilterReader getBloomFilter();
+  BloomFilterReader getBloomFilter();
 
   /**
    * Returns null value vector for the column if exists, or {@code null} if not.
    */
   @Nullable
-  public abstract NullValueVectorReader getNullValueVector();
+  NullValueVectorReader getNullValueVector();
 }
