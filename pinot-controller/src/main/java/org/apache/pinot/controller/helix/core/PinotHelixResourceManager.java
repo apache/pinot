@@ -1043,12 +1043,13 @@ public class PinotHelixResourceManager {
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
-    if (isSingleTenantCluster()) {
-      TenantConfig tenantConfig = tableConfig.getTenantConfig();
-      String brokerTag = tenantConfig.getBroker() == null ? TagNameUtils.DEFAULT_TENANT_NAME : tenantConfig.getBroker();
-      String serverTag = tenantConfig.getServer() == null ? TagNameUtils.DEFAULT_TENANT_NAME : tenantConfig.getServer();
-      tableConfig
-          .setTenantConfig(new TenantConfig(brokerTag, serverTag, tenantConfig.getTagOverrideConfig()));
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
+    String brokerTag = tenantConfig.getBroker();
+    String serverTag = tenantConfig.getServer();
+    if (brokerTag == null || serverTag == null) {
+      String newBrokerTag = brokerTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : brokerTag;
+      String newServerTag = serverTag == null ? TagNameUtils.DEFAULT_TENANT_NAME : serverTag;
+      tableConfig.setTenantConfig(new TenantConfig(newBrokerTag, newServerTag, tenantConfig.getTagOverrideConfig()));
     }
     validateTableTenantConfig(tableConfig);
 
@@ -1127,8 +1128,8 @@ public class PinotHelixResourceManager {
     }
 
     LOGGER.info("Updating BrokerResource IdealState for table: {}", tableNameWithType);
-    String brokerTag = TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig());
-    List<String> brokers = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag);
+    List<String> brokers =
+        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
     HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
       assert idealState != null;
       idealState.getRecord().getMapFields()
