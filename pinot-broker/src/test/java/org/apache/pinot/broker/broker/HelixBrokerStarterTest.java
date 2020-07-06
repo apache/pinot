@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -163,6 +165,16 @@ public class HelixBrokerStarterTest extends ControllerTest {
     String newOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(newRawTableName);
     TableConfig newTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(newRawTableName).setBrokerTenant("testBroker").build();
+    try {
+      _helixResourceManager.addTable(newTableConfig);
+      Assert.fail("Table creation should fail as testBroker does not exist");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    // Add a new table with same broker tenant
+    newTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(newRawTableName)
+        .setServerTenant(TagNameUtils.DEFAULT_TENANT_NAME).build();
     _helixResourceManager.addTable(newTableConfig);
 
     // Broker tenant should be overridden to DefaultTenant
