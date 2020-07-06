@@ -227,8 +227,8 @@ public class MutableSegmentImpl implements MutableSegment {
           forwardIndexColumnSize = dataType.size();
         }
         // Init min/max value map to avoid potential thread safety issue (expanding hashMap while reading).
-        _minValueMap.put(fieldSpec.getName(), null);
-        _maxValueMap.put(fieldSpec.getName(), null);
+        _minValueMap.put(column, null);
+        _maxValueMap.put(column, null);
       } else {
         // dictionary encoded index
         // each forward index entry will contain a 4 byte dictionary ID
