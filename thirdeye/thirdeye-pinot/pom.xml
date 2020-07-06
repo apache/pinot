@@ -225,6 +225,11 @@
       <version>42.2.14</version>
     </dependency>
     <dependency>
+      <groupId>org.apache.calcite.avatica</groupId>
+      <artifactId>avatica-core</artifactId>
+      <version>1.17.0</version>
+    </dependency>
+
 
     <!-- TODO: restructure this -->
     <dependency>

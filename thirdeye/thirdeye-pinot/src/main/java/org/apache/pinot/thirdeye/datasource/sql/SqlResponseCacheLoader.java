@@ -59,6 +59,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private static final String PRESTO = "Presto";
   private static final String MYSQL = "MySQL";
   private static final String VERTICA = "Vertica";
+  private static final String DRUID = "Druid";
   private static final String POSTGRESQL = "PostgreSQL";
 
   public static final int INIT_CONNECTIONS = 20;
@@ -74,11 +75,13 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private Map<String, DataSource> prestoDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> mysqlDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> verticaDBNameToDataSourceMap = new HashMap<>();
+  private Map<String, DataSource> druidDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> postgresqlDBNameToDataSourceMap = new HashMap<>();
 
   private static Map<String, String> prestoDBNameToURLMap = new HashMap<>();
   private static Map<String, String> mysqlDBNameToURLMap = new HashMap<>();
   private static Map<String, String> verticaDBNameToURLMap = new HashMap<>();
+  private static Map<String, String> druidDBNameToURLMap = new HashMap<>();
   private static Map<String, String> postgresqlDBNameToURLMap = new HashMap<>();
 
   private static String h2Url;
@@ -160,6 +163,32 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
 
           postgresqlDBNameToDataSourceMap.put(entry.getKey(), dataSource);
           postgresqlDBNameToURLMap.putAll(dbNameToURLMap);
+        }
+      }
+    }
+
+    // Init Druid datasources
+    if (properties.containsKey(POSTGRESQL)) {
+      List<Map<String, Object>> mysqlMapList = ConfigUtils.getList(properties.get(DRUID));
+      for (Map<String, Object> objMap: mysqlMapList) {
+        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
+        String druidUser = (String)objMap.get(USER);
+        String druidPassword = getPassword(objMap);
+
+        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
+          DataSource dataSource = new DataSource();
+          dataSource.setInitialSize(INIT_CONNECTIONS);
+          dataSource.setMaxActive(MAX_CONNECTIONS);
+          dataSource.setUsername(druidUser);
+          dataSource.setPassword(druidPassword);
+          dataSource.setUrl(entry.getValue());
+
+          // Timeout before an abandoned(in use) connection can be removed.
+          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
+          dataSource.setRemoveAbandoned(true);
+
+          druidDBNameToDataSourceMap.put(entry.getKey(), dataSource);
+          druidDBNameToURLMap.putAll(dbNameToURLMap);
         }
       }
     }
@@ -341,6 +370,8 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       dataSource = mysqlDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(POSTGRESQL)) {
       dataSource = postgresqlDBNameToDataSourceMap.get(SQLQuery.getDbName());
+    } else if (sourceName.equals(DRUID)) {
+      dataSource = druidDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(VERTICA)) {
       dataSource = verticaDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else {
@@ -375,6 +406,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
     dbNameToURLMap.put(MYSQL, mysqlDBNameToURLMap);
     dbNameToURLMap.put(VERTICA, verticaDBNameToURLMap);
     dbNameToURLMap.put(POSTGRESQL, postgresqlDBNameToURLMap);
+    dbNameToURLMap.put(DRUID, druidDBNameToURLMap);
 
     Map<String, String> h2ToURLMap = new HashMap<>();
     h2ToURLMap.put(H2, h2Url);
@@ -402,6 +434,8 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       return mysqlDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(POSTGRESQL)) {
       return postgresqlDBNameToDataSourceMap.get(dbName);
+    } else if (sourceName.equals(DRUID)) {
+      return druidDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(VERTICA)) {
       return verticaDBNameToDataSourceMap.get(dbName);
     } else {
