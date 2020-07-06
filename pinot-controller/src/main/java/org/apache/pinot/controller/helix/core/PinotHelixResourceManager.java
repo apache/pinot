@@ -1043,10 +1043,6 @@ public class PinotHelixResourceManager {
    */
   public void addTable(TableConfig tableConfig)
       throws IOException {
-    if (isSingleTenantCluster() && tableConfig.getTenantConfig() == null) {
-      tableConfig
-          .setTenantConfig(new TenantConfig(TagNameUtils.DEFAULT_TENANT_NAME, TagNameUtils.DEFAULT_TENANT_NAME, null));
-    }
     validateTableTenantConfig(tableConfig);
 
     String tableNameWithType = tableConfig.getTableName();
