@@ -112,7 +112,7 @@ public class SchemaUtils {
    */
   private static boolean isValidFieldName(FieldSpec fieldSpec) {
     String columnName = fieldSpec.getName();
-    if (SQL_PARSER_METADATA.isReservedWord(columnName.toUpperCase(Locale.ROOT))) {
+    if (SQL_PARSER_METADATA.isReservedWord(columnName.toUpperCase())) {
       LOGGER.error("Cannot use SQL reserved word {} as field name in the schema", columnName);
       return false;
     }
@@ -126,15 +126,19 @@ public class SchemaUtils {
     String column = fieldSpec.getName();
     String transformFunction = fieldSpec.getTransformFunction();
     if (transformFunction != null) {
-      FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-      if (functionEvaluator != null) {
-        List<String> arguments = functionEvaluator.getArguments();
+      try {
+        List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments();
         // output column used as input
         if (arguments.contains(column)) {
           LOGGER.error("The arguments of transform function: {}, should not contain the destination column: {}",
               transformFunction, column);
           return false;
         }
+      } catch (Exception e) {
+        LOGGER
+            .error("Exception in getting arguments for transform function {} for column {}", transformFunction, column,
+                e);
+        return false;
       }
     }
     return true;
