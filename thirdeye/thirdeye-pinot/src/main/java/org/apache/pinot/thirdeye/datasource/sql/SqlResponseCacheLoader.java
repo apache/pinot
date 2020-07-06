@@ -59,6 +59,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private static final String PRESTO = "Presto";
   private static final String MYSQL = "MySQL";
   private static final String VERTICA = "Vertica";
+  private static final String POSTGRESQL = "PostgreSQL";
 
   public static final int INIT_CONNECTIONS = 20;
   public static int MAX_CONNECTIONS = 50;
@@ -73,10 +74,12 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private Map<String, DataSource> prestoDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> mysqlDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> verticaDBNameToDataSourceMap = new HashMap<>();
+  private Map<String, DataSource> postgresqlDBNameToDataSourceMap = new HashMap<>();
 
   private static Map<String, String> prestoDBNameToURLMap = new HashMap<>();
   private static Map<String, String> mysqlDBNameToURLMap = new HashMap<>();
   private static Map<String, String> verticaDBNameToURLMap = new HashMap<>();
+  private static Map<String, String> postgresqlDBNameToURLMap = new HashMap<>();
 
   private static String h2Url;
   DataSource h2DataSource;
@@ -131,6 +134,32 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
 
           mysqlDBNameToDataSourceMap.put(entry.getKey(), dataSource);
           mysqlDBNameToURLMap.putAll(dbNameToURLMap);
+        }
+      }
+    }
+
+    // Init PostgreSQL datasources
+    if (properties.containsKey(POSTGRESQL)) {
+      List<Map<String, Object>> mysqlMapList = ConfigUtils.getList(properties.get(POSTGRESQL));
+      for (Map<String, Object> objMap: mysqlMapList) {
+        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
+        String postgresqlUser = (String)objMap.get(USER);
+        String postgresqlPassword = getPassword(objMap);
+
+        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
+          DataSource dataSource = new DataSource();
+          dataSource.setInitialSize(INIT_CONNECTIONS);
+          dataSource.setMaxActive(MAX_CONNECTIONS);
+          dataSource.setUsername(postgresqlUser);
+          dataSource.setPassword(postgresqlPassword);
+          dataSource.setUrl(entry.getValue());
+
+          // Timeout before an abandoned(in use) connection can be removed.
+          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
+          dataSource.setRemoveAbandoned(true);
+
+          postgresqlDBNameToDataSourceMap.put(entry.getKey(), dataSource);
+          postgresqlDBNameToURLMap.putAll(dbNameToURLMap);
         }
       }
     }
@@ -310,6 +339,8 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       dataSource = prestoDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(MYSQL)) {
       dataSource = mysqlDBNameToDataSourceMap.get(SQLQuery.getDbName());
+    } else if (sourceName.equals(POSTGRESQL)) {
+      dataSource = postgresqlDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(VERTICA)) {
       dataSource = verticaDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else {
@@ -343,6 +374,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
     dbNameToURLMap.put(PRESTO, prestoDBNameToURLMap);
     dbNameToURLMap.put(MYSQL, mysqlDBNameToURLMap);
     dbNameToURLMap.put(VERTICA, verticaDBNameToURLMap);
+    dbNameToURLMap.put(POSTGRESQL, postgresqlDBNameToURLMap);
 
     Map<String, String> h2ToURLMap = new HashMap<>();
     h2ToURLMap.put(H2, h2Url);
@@ -368,6 +400,8 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       return prestoDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(MYSQL)) {
       return mysqlDBNameToDataSourceMap.get(dbName);
+    } else if (sourceName.equals(POSTGRESQL)) {
+      return postgresqlDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(VERTICA)) {
       return verticaDBNameToDataSourceMap.get(dbName);
     } else {

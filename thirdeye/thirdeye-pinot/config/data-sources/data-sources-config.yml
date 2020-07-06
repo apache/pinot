@@ -226,3 +226,8 @@ dataSourceConfigs:
             metrics:
               value: "SUM"
             dataFile: "hourly.csv"
+      PostgreSQL:
+        - db:
+            utk_test: jdbc:postgresql://localhost:25432/utk_test
+          user: root
+          password: root
