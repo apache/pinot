@@ -252,8 +252,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setZkStr(String zkStr) {
-    throw new UnsupportedOperationException("Fix me!");
-    //    setProperty(ZK_STR, zkStr);
+    setProperty(ZK_STR, zkStr);
   }
 
   // A boolean to decide whether Jersey API should be the primary one. For now, we set this to be false,
