@@ -200,7 +200,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 400000L);
+    // 100000 * (2 order-by columns + 1 docId column) + 10 * (2 non-order-by columns)
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 300020L);
     Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
@@ -225,7 +226,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 275416L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 62480L);
+    // 15620 * (2 order-by columns + 1 docId column) + 10 * (2 non-order-by columns)
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 46880L);
     Assert.assertEquals(executionStatistics.getNumTotalDocs(), 100000L);
     selectionDataSchema = resultsBlock.getDataSchema();
     columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);

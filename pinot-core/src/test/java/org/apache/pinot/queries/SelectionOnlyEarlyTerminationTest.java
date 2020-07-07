@@ -97,7 +97,6 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
   public void testSelectWithOrderByQuery() {
     int numSegmentsPerServer = getNumSegments();
     String query = "SELECT column11, column18, column1 FROM testTable ORDER BY column11";
-    int numColumnsInSelection = 3;
     BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     assertNotNull(brokerResponse.getSelectionResults());
     assertNull(brokerResponse.getResultTable());
@@ -105,8 +104,9 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
     assertEquals(brokerResponse.getNumSegmentsMatched(), numSegmentsPerServer * NUM_SERVERS);
     assertEquals(brokerResponse.getNumDocsScanned(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    // numDocsScanned * (1 order-by columns + 1 docId column) + 10 * (2 non-order-by columns) per segment
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-        brokerResponse.getNumDocsScanned() * numColumnsInSelection);
+        brokerResponse.getNumDocsScanned() * 2 + 20 * numSegmentsPerServer * NUM_SERVERS);
     assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
 
     brokerResponse = getBrokerResponseForSqlQuery(query);
@@ -116,8 +116,9 @@ public class SelectionOnlyEarlyTerminationTest extends BaseSingleValueQueriesTes
     assertEquals(brokerResponse.getNumSegmentsMatched(), numSegmentsPerServer * NUM_SERVERS);
     assertEquals(brokerResponse.getNumDocsScanned(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    // numDocsScanned * (1 order-by columns + 1 docId column) + 10 * (2 non-order-by columns) per segment
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(),
-        brokerResponse.getNumDocsScanned() * numColumnsInSelection);
+        brokerResponse.getNumDocsScanned() * 2 + 20 * numSegmentsPerServer * NUM_SERVERS);
     assertEquals(brokerResponse.getTotalDocs(), numSegmentsPerServer * NUM_SERVERS * NUM_DOCS_PER_SEGMENT);
   }
 }

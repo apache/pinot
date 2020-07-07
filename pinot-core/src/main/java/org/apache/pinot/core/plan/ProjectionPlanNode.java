@@ -21,6 +21,7 @@ package org.apache.pinot.core.plan;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -36,7 +37,7 @@ public class ProjectionPlanNode implements PlanNode {
   private final DocIdSetPlanNode _docIdSetPlanNode;
 
   public ProjectionPlanNode(IndexSegment indexSegment, Set<String> projectionColumns,
-      DocIdSetPlanNode docIdSetPlanNode) {
+      @Nullable DocIdSetPlanNode docIdSetPlanNode) {
     _indexSegment = indexSegment;
     _projectionColumns = projectionColumns;
     _docIdSetPlanNode = docIdSetPlanNode;
@@ -48,6 +49,6 @@ public class ProjectionPlanNode implements PlanNode {
     for (String column : _projectionColumns) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
-    return new ProjectionOperator(dataSourceMap, _docIdSetPlanNode.run());
+    return new ProjectionOperator(dataSourceMap, _docIdSetPlanNode != null ? _docIdSetPlanNode.run() : null);
   }
 }
