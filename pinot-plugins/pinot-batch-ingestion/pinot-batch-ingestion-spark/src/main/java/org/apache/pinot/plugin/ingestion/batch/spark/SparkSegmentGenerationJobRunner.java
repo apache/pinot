@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.getFileName;
+import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
+import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -29,12 +35,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.MapConfiguration;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
@@ -50,12 +56,6 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
-import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
-import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.getFileName;
-import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
-import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
 
 
 public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Serializable {
@@ -120,8 +120,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     //init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      Configuration config = new MapConfiguration(pinotFSSpec.getConfigs());
-      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), config);
+      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
 
     //Get pinotFS for input
@@ -212,8 +211,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       final URI finalOutputDirURI = (stagingDirURI == null) ? outputDirURI : stagingDirURI;
       pathRDD.foreach(pathAndIdx -> {
         for (PinotFSSpec pinotFSSpec : _spec.getPinotFSSpecs()) {
-          Configuration config = new MapConfiguration(pinotFSSpec.getConfigs());
-          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), config);
+          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
         }
         PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());
         String[] splits = pathAndIdx.split(" ");

@@ -18,12 +18,19 @@
  */
 package org.apache.pinot.server.realtime;
 
+import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_CONTROLLER_HTTPS_ENABLED;
+import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_CONTROLLER_HTTPS_PORT;
+import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS;
+import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_OTHER_REQUESTS_TIMEOUT;
+import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS;
+
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
+
 import javax.net.ssl.SSLContext;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
@@ -32,11 +39,10 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
 
 
 /**
@@ -57,14 +63,14 @@ public class ServerSegmentCompletionProtocolHandler {
   private final ServerMetrics _serverMetrics;
   private final String _rawTableName;
 
-  public static void init(Configuration uploaderConfig) {
-    Configuration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
-    if (httpsConfig.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
+  public static void init(PinotConfiguration uploaderConfig) {
+    PinotConfiguration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
+    if (httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
-      _controllerHttpsPort = httpsConfig.getInt(CONFIG_OF_CONTROLLER_HTTPS_PORT);
+      _controllerHttpsPort = httpsConfig.getProperty(CONFIG_OF_CONTROLLER_HTTPS_PORT, Integer.class);
     }
     _segmentUploadRequestTimeoutMs =
-        uploaderConfig.getInt(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS, DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
+        uploaderConfig.getProperty(CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS, DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
   }
 
   public ServerSegmentCompletionProtocolHandler(ServerMetrics serverMetrics, String tableNameWithType) {

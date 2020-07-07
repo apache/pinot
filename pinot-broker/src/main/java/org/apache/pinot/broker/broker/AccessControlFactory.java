@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.broker.broker;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,13 +28,13 @@ public abstract class AccessControlFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(AccessControlFactory.class);
   public static final String ACCESS_CONTROL_CLASS_CONFIG = "class";
 
-  public abstract void init(Configuration confguration);
+  public abstract void init(PinotConfiguration confguration);
 
   public abstract AccessControl create();
 
-  public static AccessControlFactory loadFactory(Configuration configuration) {
+  public static AccessControlFactory loadFactory(PinotConfiguration configuration) {
     AccessControlFactory accessControlFactory;
-    String accessControlFactoryClassName = configuration.getString(ACCESS_CONTROL_CLASS_CONFIG);
+    String accessControlFactoryClassName = configuration.getProperty(ACCESS_CONTROL_CLASS_CONFIG);
     if (accessControlFactoryClassName == null) {
       accessControlFactoryClassName = AllowAllAccessControlFactory.class.getName();
     }

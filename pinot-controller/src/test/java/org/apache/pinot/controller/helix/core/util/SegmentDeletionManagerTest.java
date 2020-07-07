@@ -18,7 +18,12 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
-import com.google.common.io.Files;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,8 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import junit.framework.Assert;
-import org.apache.commons.configuration.PropertiesConfiguration;
+
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -36,6 +40,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.joda.time.DateTime;
@@ -43,11 +48,9 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyList;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import com.google.common.io.Files;
+
+import junit.framework.Assert;
 
 
 public class SegmentDeletionManagerTest {
@@ -199,10 +202,10 @@ public class SegmentDeletionManagerTest {
   @Test
   public void testRemoveDeletedSegments()
       throws Exception {
-    PropertiesConfiguration pinotFSConfig = new PropertiesConfiguration();
-    pinotFSConfig.addProperty(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
         LocalPinotFS.class.getName());
-    PinotFSFactory.init(pinotFSConfig);
+    PinotFSFactory.init(new PinotConfiguration(properties));
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();

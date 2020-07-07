@@ -19,8 +19,10 @@
 package org.apache.pinot.core.query.config;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import org.apache.commons.configuration.Configuration;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -31,11 +33,11 @@ public class SegmentPrunerConfig {
 
   private final int _numSegmentPruners;
   private final List<String> _segmentPrunerNames;
-  private final List<Configuration> _segmentPrunerConfigs;
+  private final List<PinotConfiguration> _segmentPrunerConfigs;
 
-  public SegmentPrunerConfig(Configuration segmentPrunerConfig) {
-    String[] segmentPrunerNames = segmentPrunerConfig.getStringArray(SEGMENT_PRUNER_NAMES_KEY);
-    _numSegmentPruners = segmentPrunerNames.length;
+  public SegmentPrunerConfig(PinotConfiguration segmentPrunerConfig) {
+    List<String> segmentPrunerNames = segmentPrunerConfig.getProperty(SEGMENT_PRUNER_NAMES_KEY, Arrays.asList());
+    _numSegmentPruners = segmentPrunerNames.size();
     _segmentPrunerNames = new ArrayList<>(_numSegmentPruners);
     _segmentPrunerConfigs = new ArrayList<>(_numSegmentPruners);
     for (String segmentPrunerName : segmentPrunerNames) {
@@ -52,7 +54,7 @@ public class SegmentPrunerConfig {
     return _segmentPrunerNames.get(index);
   }
 
-  public Configuration getSegmentPrunerConfig(int index) {
+  public PinotConfiguration getSegmentPrunerConfig(int index) {
     return _segmentPrunerConfigs.get(index);
   }
 }

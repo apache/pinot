@@ -18,25 +18,25 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import org.testng.annotations.Test;
-
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.testng.annotations.Test;
+
 
 public class UnboundedResourceManagerTest {
 
   @Test
   public void testDefault() {
-    Configuration config = new PropertiesConfiguration();
-
-    UnboundedResourceManager rm = new UnboundedResourceManager(config);
+    UnboundedResourceManager rm = new UnboundedResourceManager(new PinotConfiguration());
     assertTrue(rm.getNumQueryRunnerThreads() > 1);
     assertTrue(rm.getNumQueryWorkerThreads() >= 1);
     assertEquals(rm.getTableThreadsHardLimit(), rm.getNumQueryRunnerThreads() + rm.getNumQueryWorkerThreads());
@@ -45,14 +45,14 @@ public class UnboundedResourceManagerTest {
 
   @Test
   public void testWithConfig() {
-    Configuration config = new PropertiesConfiguration();
+    Map<String, Object> properties = new HashMap<>();
     final int workers = 5;
     final int runners = 2;
 
-    config.setProperty(ResourceManager.QUERY_RUNNER_CONFIG_KEY, runners);
-    config.setProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, workers);
+    properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, runners);
+    properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, workers);
 
-    UnboundedResourceManager rm = new UnboundedResourceManager(config);
+    UnboundedResourceManager rm = new UnboundedResourceManager(new PinotConfiguration(properties));
     assertEquals(rm.getNumQueryWorkerThreads(), workers);
     assertEquals(rm.getNumQueryRunnerThreads(), runners);
     assertEquals(rm.getTableThreadsHardLimit(), runners + workers);

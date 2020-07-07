@@ -18,19 +18,21 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Random;
-import org.apache.commons.configuration.PropertiesConfiguration;
+
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class LiteralOnlyBrokerRequestTest {
@@ -90,7 +92,7 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandler()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PropertiesConfiguration(), null, null, null,
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null,
             new BrokerMetrics("", new MetricsRegistry(), false), null);
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
@@ -117,7 +119,7 @@ public class LiteralOnlyBrokerRequestTest {
   public void testBrokerRequestHandlerWithAsFunction()
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PropertiesConfiguration(), null, null, null,
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), null, null, null,
             new BrokerMetrics("", new MetricsRegistry(), false), null);
     long currentTsMin = System.currentTimeMillis();
     JsonNode request = new ObjectMapper().readTree(

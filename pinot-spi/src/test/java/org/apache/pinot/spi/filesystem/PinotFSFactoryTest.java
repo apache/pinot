@@ -22,8 +22,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,16 +34,16 @@ public class PinotFSFactoryTest {
 
   @Test
   public void testDefaultPinotFSFactory() {
-    PinotFSFactory.init(new BaseConfiguration());
+    PinotFSFactory.init(new PinotConfiguration());
     Assert.assertTrue(PinotFSFactory.create("file") instanceof LocalPinotFS);
   }
 
   @Test
   public void testCustomizedSegmentFetcherFactory() {
-    Configuration config = new BaseConfiguration();
-    config.addProperty("class.file", LocalPinotFS.class.getName());
-    config.addProperty("class.test", TestPinotFS.class.getName());
-    PinotFSFactory.init(config);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("class.file", LocalPinotFS.class.getName());
+    properties.put("class.test", TestPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
 
     PinotFS testPinotFS = PinotFSFactory.create("test");
     Assert.assertTrue(testPinotFS instanceof TestPinotFS);
@@ -58,7 +60,7 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public void init(Configuration configuration) {
+    public void init(PinotConfiguration configuration) {
       initCalled++;
     }
 

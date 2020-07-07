@@ -18,16 +18,18 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import org.testng.annotations.Test;
-
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.testng.annotations.Test;
 
 
 public class ResourceManagerTest {
@@ -71,10 +73,10 @@ public class ResourceManagerTest {
     };
   }
 
-  private Configuration getConfig(int runners, int workers) {
-    Configuration config = new PropertiesConfiguration();
-    config.setProperty(ResourceManager.QUERY_RUNNER_CONFIG_KEY, runners);
-    config.setProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, workers);
-    return config;
+  private PinotConfiguration getConfig(int runners, int workers) {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, runners);
+    properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, workers);
+    return new PinotConfiguration(properties);
   }
 }

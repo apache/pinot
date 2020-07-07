@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.config;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -38,18 +38,17 @@ public class QueryExecutorConfig {
 
   private static final String[] REQUIRED_KEYS = {};
 
-  private Configuration _queryExecutorConfig = null;
+  private PinotConfiguration _queryExecutorConfig = null;
   private SegmentPrunerConfig _segmentPrunerConfig;
   private QueryPlannerConfig _queryPlannerConfig;
   private final long _timeOutMs;
 
-  public QueryExecutorConfig(Configuration config)
-      throws ConfigurationException {
+  public QueryExecutorConfig(PinotConfiguration config) throws ConfigurationException {
     _queryExecutorConfig = config;
     checkRequiredKeys();
     _segmentPrunerConfig = new SegmentPrunerConfig(_queryExecutorConfig.subset(QUERY_PRUNER));
     _queryPlannerConfig = new QueryPlannerConfig(_queryExecutorConfig.subset(QUERY_PLANNER));
-    _timeOutMs = _queryExecutorConfig.getLong(TIME_OUT, -1);
+    _timeOutMs = _queryExecutorConfig.getProperty(TIME_OUT, -1);
   }
 
   private void checkRequiredKeys()
@@ -61,7 +60,7 @@ public class QueryExecutorConfig {
     }
   }
 
-  public Configuration getConfig() {
+  public PinotConfiguration getConfig() {
     return _queryExecutorConfig;
   }
 

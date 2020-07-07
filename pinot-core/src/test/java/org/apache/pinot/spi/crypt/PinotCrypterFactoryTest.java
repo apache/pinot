@@ -19,8 +19,10 @@
 package org.apache.pinot.spi.crypt;
 
 import java.io.File;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,17 +33,17 @@ public class PinotCrypterFactoryTest {
 
   @Test
   public void testDefaultPinotCrypter() {
-    PinotCrypterFactory.init(new PropertiesConfiguration());
+    PinotCrypterFactory.init(new PinotConfiguration());
     Assert.assertTrue(PinotCrypterFactory.create("NoOpPinotCrypter") instanceof NoOpPinotCrypter);
     Assert.assertTrue(PinotCrypterFactory.create("nooppinotcrypter") instanceof NoOpPinotCrypter);
   }
 
   @Test
   public void testConfiguredPinotCrypter() {
-    PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-    propertiesConfiguration.addProperty("class.testpinotcrypter", TestPinotCrypter.class.getName());
-    propertiesConfiguration.addProperty("testpinotcrypter" + "." + CONFIG_SUBSET_KEY, SAMPLE_KEYMAP_VAL);
-    PinotCrypterFactory.init(propertiesConfiguration);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("class.testpinotcrypter", TestPinotCrypter.class.getName());
+    properties.put("testpinotcrypter" + "." + CONFIG_SUBSET_KEY, SAMPLE_KEYMAP_VAL);
+    PinotCrypterFactory.init(new PinotConfiguration(properties));
     Assert.assertTrue(PinotCrypterFactory.create(NoOpPinotCrypter.class.getSimpleName()) instanceof NoOpPinotCrypter);
     PinotCrypter testPinotCrypter = PinotCrypterFactory.create(TestPinotCrypter.class.getSimpleName());
     Assert.assertTrue(testPinotCrypter instanceof TestPinotCrypter);
@@ -50,9 +52,9 @@ public class PinotCrypterFactoryTest {
 
   public static final class TestPinotCrypter implements PinotCrypter {
     @Override
-    public void init(Configuration config) {
+    public void init(PinotConfiguration config) {
       Assert.assertTrue(config.containsKey(CONFIG_SUBSET_KEY));
-      Assert.assertTrue(config.getString(CONFIG_SUBSET_KEY).equalsIgnoreCase(SAMPLE_KEYMAP_VAL));
+      Assert.assertTrue(config.getProperty(CONFIG_SUBSET_KEY).equalsIgnoreCase(SAMPLE_KEYMAP_VAL));
     }
 
     @Override

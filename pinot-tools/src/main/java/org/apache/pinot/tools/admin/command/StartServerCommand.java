@@ -21,7 +21,8 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import org.apache.commons.configuration.Configuration;
+import java.util.Map;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -145,7 +146,7 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   }
 
 
-  private Configuration getServerConf()
+  private Map<String, Object> getServerConf()
       throws ConfigurationException, SocketException, UnknownHostException {
     if (_configFileName != null) {
       return PinotConfigUtils.readConfigFromFile(_configFileName);

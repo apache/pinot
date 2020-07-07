@@ -30,11 +30,13 @@ import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Stoppable;
 import com.yammer.metrics.core.Timer;
 import java.lang.reflect.Constructor;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,13 +54,10 @@ public class MetricsHelper {
    *
    * @param configuration The subset of the configuration containing the metrics-related keys
    */
-  public static void initializeMetrics(Configuration configuration) {
+  public static void initializeMetrics(PinotConfiguration configuration) {
     synchronized (MetricsHelper.class) {
-      String[] listenerClassNames = configuration.getStringArray("metricsRegistryRegistrationListeners");
-
-      if (listenerClassNames.length < 1) {
-        listenerClassNames = new String[]{JmxReporterMetricsRegistryRegistrationListener.class.getName()};
-      }
+      List<String> listenerClassNames = configuration.getProperty("metricsRegistryRegistrationListeners",
+          Arrays.asList(JmxReporterMetricsRegistryRegistrationListener.class.getName()));
 
       // Build each listener using their default constructor and add them
       for (String listenerClassName : listenerClassNames) {

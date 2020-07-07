@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.integration.tests;
 
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -35,6 +40,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentSta
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -47,10 +53,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-
 
 /**
  * Integration test for all {@link org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask}s.
@@ -61,54 +63,6 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   private static final int PERIODIC_TASK_INITIAL_DELAY_SECONDS = 30;
   private static final int PERIODIC_TASK_FREQUENCY_SECONDS = 5;
   private static final String PERIODIC_TASK_FREQUENCY = "5s";
-
-  // Set initial delay of 30 seconds for periodic tasks, to allow time for tables setup.
-  // Run at 5 seconds frequency in order to keep them running, in case first run happens before table setup.
-  private static class TestControllerConf extends ControllerConf {
-    private TestControllerConf(ControllerConf controllerConf) {
-      copy(controllerConf);
-    }
-
-    @Override
-    public long getStatusCheckerInitialDelayInSeconds() {
-      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
-    }
-
-    @Override
-    public int getStatusCheckerFrequencyInSeconds() {
-      return PERIODIC_TASK_FREQUENCY_SECONDS;
-    }
-
-    @Override
-    public long getRealtimeSegmentRelocationInitialDelayInSeconds() {
-      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
-    }
-
-    @Override
-    public String getRealtimeSegmentRelocatorFrequency() {
-      return PERIODIC_TASK_FREQUENCY;
-    }
-
-    @Override
-    public long getBrokerResourceValidationInitialDelayInSeconds() {
-      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
-    }
-
-    @Override
-    public int getBrokerResourceValidationFrequencyInSeconds() {
-      return PERIODIC_TASK_FREQUENCY_SECONDS;
-    }
-
-    @Override
-    public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
-      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
-    }
-
-    @Override
-    public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
-      return PERIODIC_TASK_FREQUENCY_SECONDS;
-    }
-  }
 
   private static final int NUM_REPLICAS = 2;
   private static final String TENANT_NAME = "TestTenant";
@@ -153,9 +107,18 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     startZk();
     startKafka();
 
-    TestControllerConf controllerConf = new TestControllerConf(getDefaultControllerConfiguration());
-    controllerConf.setTenantIsolationEnabled(false);
-    startController(controllerConf);
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+    properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATOR_FREQUENCY, PERIODIC_TASK_FREQUENCY);
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS, PERIODIC_TASK_INITIAL_DELAY_SECONDS);
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS, PERIODIC_TASK_FREQUENCY_SECONDS);
+    
+    startController(properties);
     startBrokers(NUM_BROKERS);
     startServers(NUM_OFFLINE_SERVERS + NUM_REALTIME_SERVERS);
 

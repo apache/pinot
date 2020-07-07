@@ -20,8 +20,9 @@ package org.apache.pinot.spi.crypt;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.configuration.Configuration;
+
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,7 @@ public class NoOpPinotCrypter implements PinotCrypter {
   public static final Logger LOGGER = LoggerFactory.getLogger(NoOpPinotCrypter.class);
 
   @Override
-  public void init(Configuration config) {
+  public void init(PinotConfiguration config) {
 
   }
 

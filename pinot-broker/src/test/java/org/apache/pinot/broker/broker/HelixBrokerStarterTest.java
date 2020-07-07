@@ -21,8 +21,6 @@ package org.apache.pinot.broker.broker;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
@@ -45,7 +43,7 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -77,9 +75,11 @@ public class HelixBrokerStarterTest extends ControllerTest {
     startZk();
     startController();
 
-    Configuration brokerConf = new BaseConfiguration();
-    brokerConf.addProperty(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
-    _brokerStarter = new HelixBrokerStarter(brokerConf, getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
+    
+    _brokerStarter =
+        new HelixBrokerStarter(new PinotConfiguration(properties), getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
     _brokerStarter.start();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);

@@ -30,7 +30,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
@@ -77,6 +76,7 @@ import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
@@ -174,7 +174,7 @@ public class ControllerStarter implements ServiceStartable {
 
   private void inferHostnameIfNeeded(ControllerConf config) {
     if (config.getControllerHost() == null) {
-      if (config.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
+      if (config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
         final String inferredHostname = NetUtil.getHostnameOrAddress();
         if (inferredHostname != null) {
           config.setControllerHost(inferredHostname);
@@ -198,7 +198,7 @@ public class ControllerStarter implements ServiceStartable {
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
-        .getString(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
+        .getProperty(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
@@ -248,7 +248,7 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   @Override
-  public Configuration getConfig() {
+  public PinotConfiguration getConfig() {
     return _config;
   }
 
@@ -454,9 +454,9 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void initPinotFSFactory() {
-    Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     LOGGER.info("Initializing PinotFSFactory");
-    PinotFSFactory.init(pinotFSConfig);
+    
+    PinotFSFactory.init(_config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
   }
 
   private void initControllerFilePathProvider() {
@@ -469,7 +469,7 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void initSegmentFetcherFactory() {
-    Configuration segmentFetcherFactoryConfig =
+    PinotConfiguration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
@@ -480,7 +480,7 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void initPinotCrypterFactory() {
-    Configuration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    PinotConfiguration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     LOGGER.info("Initializing PinotCrypterFactory");
     try {
       PinotCrypterFactory.init(pinotCrypterConfig);

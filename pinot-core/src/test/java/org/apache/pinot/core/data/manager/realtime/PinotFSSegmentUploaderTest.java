@@ -23,13 +23,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.testng.Assert;
@@ -44,11 +46,11 @@ public class PinotFSSegmentUploaderTest {
   @BeforeClass
   public void setUp()
       throws URISyntaxException, IOException, HttpErrorStatusException {
-    Configuration fsConfig = new PropertiesConfiguration();
-    fsConfig.setProperty("class.hdfs", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysSucceedPinotFS");
-    fsConfig.setProperty("class.timeout", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
-    fsConfig.setProperty("class.existing", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
-    PinotFSFactory.init(fsConfig);
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("class.hdfs", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysSucceedPinotFS");
+    properties.put("class.timeout", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysTimeoutPinotFS");
+    properties.put("class.existing", "org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploaderTest$AlwaysExistPinotFS");
+    PinotFSFactory.init(new PinotConfiguration(properties));
     _file = FileUtils.getFile(FileUtils.getTempDirectory(), UUID.randomUUID().toString());
     _file.deleteOnExit();
     _llcSegmentName = new LLCSegmentName("test_REALTIME", 1, 0, System.currentTimeMillis());
@@ -85,7 +87,7 @@ public class PinotFSSegmentUploaderTest {
   public static class AlwaysSucceedPinotFS extends PinotFS {
 
     @Override
-    public void init(Configuration config) {
+    public void init(PinotConfiguration config) {
 
     }
 
