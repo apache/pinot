@@ -43,7 +43,8 @@ public class GeoInputOutputTest extends GeoFunctionTest {
     assertAsTextAndBinary("POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))");
     assertAsTextAndBinary("POLYGON ((0 0, 0 3, 3 3, 3 0, 0 0), (1 1, 2 1, 2 2, 1 2, 1 1))");
     assertAsTextAndBinary("MULTIPOLYGON (((1 1, 1 3, 3 3, 3 1, 1 1)), ((2 4, 2 6, 6 6, 6 4, 2 4)))");
-    assertAsTextAndBinary("GEOMETRYCOLLECTION (POINT (1 2), LINESTRING (0 0, 1 2, 3 4), POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0)))");
+    assertAsTextAndBinary(
+        "GEOMETRYCOLLECTION (POINT (1 2), LINESTRING (0 0, 1 2, 3 4), POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0)))");
 
     assertAsTextAndBinary("MULTIPOINT ((0 0), (0 1), (1 1), (0 1))");
     assertAsTextAndBinary("LINESTRING (0 0, 0 1, 0 1, 1 1, 1 0, 0 0)");
@@ -52,12 +53,10 @@ public class GeoInputOutputTest extends GeoFunctionTest {
   private void assertAsTextAndBinary(String wkt)
       throws Exception {
     // assert geometry
-    assertStringFunction(
-        String.format("ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText(%s))))", STRING_SV_COLUMN),
+    assertStringFunction(String.format("ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText(%s))))", STRING_SV_COLUMN),
         new String[]{wkt}, Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));
     // assert geography
-    assertStringFunction(
-        String.format("ST_AsText(ST_GeogFromWKB(ST_AsBinary(ST_GeogFromText(%s))))", STRING_SV_COLUMN),
+    assertStringFunction(String.format("ST_AsText(ST_GeogFromWKB(ST_AsBinary(ST_GeogFromText(%s))))", STRING_SV_COLUMN),
         new String[]{wkt}, Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));
   }
 }

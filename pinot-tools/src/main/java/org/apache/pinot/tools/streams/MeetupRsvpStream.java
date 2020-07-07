@@ -34,7 +34,6 @@ import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.glassfish.tyrus.client.ClientManager;
-import org.locationtech.jts.io.WKBWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +60,6 @@ public class MeetupRsvpStream {
 
   public void run() {
     try {
-      final WKBWriter wkbWriter= new WKBWriter();
       ClientEndpointConfig cec = ClientEndpointConfig.Builder.create().build();
       client = ClientManager.createClient();
       client.connectToServer(new Endpoint() {
@@ -90,7 +88,6 @@ public class MeetupRsvpStream {
                   }
 
                   JsonNode group = messageJSON.get("group");
-                  System.out.println(String.format("reading group %s", group.get("group_id")));
                   if (group != null) {
                     extracted.set("group_city", group.get("group_city"));
                     extracted.set("group_country", group.get("group_country"));
@@ -118,7 +115,7 @@ public class MeetupRsvpStream {
         }
       }, cec, new URI("ws://stream.meetup.com/2/rsvps"));
     } catch (Exception e) {
-      e.printStackTrace();
+      LOGGER.error("encountered an error running the meetupRSVPEvents stream", e);
     }
   }
 }

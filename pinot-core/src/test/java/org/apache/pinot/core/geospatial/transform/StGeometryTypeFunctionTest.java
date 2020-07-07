@@ -31,13 +31,9 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
     assertType("LINESTRING (1 1, 2 2)", "LineString");
     assertType("POLYGON ((1 1, 1 4, 4 4, 4 1, 1 1))'))", "Polygon");
     assertType("MULTIPOINT (1 1, 2 2)'))", "MultiPoint");
-    assertType("MULTILINESTRING ((1 1, 2 2), (3 3, 4 4))",
-        "MultiLineString");
-    assertType(
-        "MULTIPOLYGON (((1 1, 1 4, 4 4, 4 1, 1 1)), ((1 1, 1 4, 4 4, 4 1, 1 1)))",
-        "MultiPolygon");
-    assertType("GEOMETRYCOLLECTION(POINT(4 6),LINESTRING(4 6, 7 10))",
-        "GeometryCollection");
+    assertType("MULTILINESTRING ((1 1, 2 2), (3 3, 4 4))", "MultiLineString");
+    assertType("MULTIPOLYGON (((1 1, 1 4, 4 4, 4 1, 1 1)), ((1 1, 1 4, 4 4, 4 1, 1 1)))", "MultiPolygon");
+    assertType("GEOMETRYCOLLECTION(POINT(4 6),LINESTRING(4 6, 7 10))", "GeometryCollection");
   }
 
   private void assertType(String wkt, String type)

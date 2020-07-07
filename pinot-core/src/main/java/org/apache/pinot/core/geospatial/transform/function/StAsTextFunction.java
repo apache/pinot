@@ -35,52 +35,55 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 
+
+/**
+ * Returns the text representation of the geometry object.
+ */
 public class StAsTextFunction extends BaseTransformFunction {
-    private static final Logger LOGGER = LoggerFactory.getLogger(StAsTextFunction.class);
-    private TransformFunction _transformFunction;
-    private static WKTWriter _writer;
-    public static final String FUNCTION_NAME = "ST_AsText";
-    private String[] _results;
+  private static final Logger LOGGER = LoggerFactory.getLogger(StAsTextFunction.class);
+  private TransformFunction _transformFunction;
+  private static WKTWriter _writer;
+  public static final String FUNCTION_NAME = "ST_AsText";
+  private String[] _results;
 
-    @Override
-    public String getName() {
-        return FUNCTION_NAME;
-    }
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
+  }
 
-    @Override
-    public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-        Preconditions
-                .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
-                        getName());
-        TransformFunction transformFunction = arguments.get(0);
-        Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-                "Argument must be single-valued for transform function: %s", getName());
-        _transformFunction = transformFunction;
-        _writer = new WKTWriter();
-    }
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+    Preconditions
+        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    TransformFunction transformFunction = arguments.get(0);
+    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+        "Argument must be single-valued for transform function: %s", getName());
+    _transformFunction = transformFunction;
+    _writer = new WKTWriter();
+  }
 
-    @Override
-    public TransformResultMetadata getResultMetadata() {
-        return STRING_SV_NO_DICTIONARY_METADATA;
-    }
+  @Override
+  public TransformResultMetadata getResultMetadata() {
+    return STRING_SV_NO_DICTIONARY_METADATA;
+  }
 
-    @Override
-    public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-        if (_results == null) {
-            _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        }
-        byte[][] values = _transformFunction.transformToBytesValuesSV(projectionBlock);
-        Geometry geometry;
-        for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-                geometry = GeometrySerializer.deserialize(values[i]);
-            _results[i] = _writer.write(geometry);
-        }
-        return _results;
+  @Override
+  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+    if (_results == null) {
+      _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
+    byte[][] values = _transformFunction.transformToBytesValuesSV(projectionBlock);
+    Geometry geometry;
+    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+      geometry = GeometrySerializer.deserialize(values[i]);
+      _results[i] = _writer.write(geometry);
+    }
+    return _results;
+  }
 
-    @ScalarFunction
-    public static String stAsText(byte[] bytes) {
-        WKTWriter writer = new WKTWriter();
-        return writer.write(GeometrySerializer.deserialize(bytes));
-    }
+  @ScalarFunction
+  public static String stAsText(byte[] bytes) {
+    WKTWriter writer = new WKTWriter();
+    return writer.write(GeometrySerializer.deserialize(bytes));
+  }
 }

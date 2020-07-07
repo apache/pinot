@@ -27,7 +27,8 @@ import static java.lang.String.format;
 
 public class StAreaFunctionTest extends GeoFunctionTest {
   @Test
-  public void testStAreaGeom() throws Exception {
+  public void testStAreaGeom()
+      throws Exception {
     assertArea("POLYGON ((2 2, 2 6, 6 6, 6 2, 2 2))", 16.0, true);
     assertArea("POLYGON EMPTY", 0.0, true);
     assertArea("LINESTRING (1 4, 2 5)", 0.0, true);
@@ -70,7 +71,8 @@ public class StAreaFunctionTest extends GeoFunctionTest {
     assertArea("POLYGON((90 0, 0 0, 0 90, 90 0), (89 1, 1 1, 1 89, 89 1))", 3.480423348045961E12, false);
   }
 
-  private void assertArea(String wkt, double area, boolean geom) throws Exception {
+  private void assertArea(String wkt, double area, boolean geom)
+      throws Exception {
     assertDoubleFunction(
         String.format("ST_Area(%s(%s))", geom ? "ST_GeomFromText" : "ST_GeogFromText", STRING_SV_COLUMN),
         new double[]{area}, Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));

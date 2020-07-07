@@ -34,44 +34,47 @@ import org.locationtech.jts.io.WKBReader;
 import java.util.List;
 import java.util.Map;
 
-public abstract class ConstructFromWKBFunction extends BaseTransformFunction {
-    private TransformFunction _transformFunction;
-    private byte[][] _results;
-    private WKBReader _reader;
 
-    @Override
-    public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-        Preconditions
-                .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
-                        getName());
-        TransformFunction transformFunction = arguments.get(0);
-        Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-                "The argument must be single-valued for transform function: %s", getName());
-        _transformFunction = transformFunction;
-        _reader = new WKBReader(getGeometryFactory());
+/**
+ * An abstract class for implementing the geo constructor functions from well-known binary (WKB) format.
+ */
+abstract class ConstructFromWKBFunction extends BaseTransformFunction {
+  private TransformFunction _transformFunction;
+  private byte[][] _results;
+  private WKBReader _reader;
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+    Preconditions
+        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    TransformFunction transformFunction = arguments.get(0);
+    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+        "The argument must be single-valued for transform function: %s", getName());
+    _transformFunction = transformFunction;
+    _reader = new WKBReader(getGeometryFactory());
+  }
+
+  abstract protected GeometryFactory getGeometryFactory();
+
+  @Override
+  public TransformResultMetadata getResultMetadata() {
+    return BYTES_SV_NO_DICTIONARY_METADATA;
+  }
+
+  @Override
+  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+    if (_results == null) {
+      _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
     }
-
-    abstract protected GeometryFactory getGeometryFactory();
-
-    @Override
-    public TransformResultMetadata getResultMetadata() {
-        return BYTES_SV_NO_DICTIONARY_METADATA;
+    byte[][] argumentValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
+    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+      try {
+        Geometry geometry = _reader.read(argumentValues[i]);
+        _results[i] = GeometrySerializer.serialize(geometry);
+      } catch (ParseException e) {
+        throw new RuntimeException(String.format("Failed to parse geometry from bytes %s", argumentValues[i]));
+      }
     }
-
-    @Override
-    public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-        if (_results == null) {
-            _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        }
-        byte[][] argumentValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
-        for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-            try {
-                Geometry geometry = _reader.read(argumentValues[i]);
-                _results[i] = GeometrySerializer.serialize(geometry);
-            } catch (ParseException e) {
-                throw new RuntimeException(String.format("Failed to parse geometry from bytes %s", argumentValues[i]));
-            }
-        }
-        return _results;
-    }
+    return _results;
+  }
 }

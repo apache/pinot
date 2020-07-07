@@ -18,29 +18,32 @@
  */
 package org.apache.pinot.core.geospatial;
 
+/**
+ * The geometry type.
+ */
 public enum GeometryType {
 
-    POINT(false, "ST_Point"),
-    MULTI_POINT(true, "ST_MultiPoint"),
-    LINE_STRING(false, "ST_LineString"),
-    MULTI_LINE_STRING(true, "ST_MultiLineString"),
-    POLYGON(false, "ST_Polygon"),
-    MULTI_POLYGON(true, "ST_MultiPolygon"),
-    GEOMETRY_COLLECTION(true, "ST_GeomCollection");
+  POINT(false, "ST_Point"),
+  MULTI_POINT(true, "ST_MultiPoint"),
+  LINE_STRING(false, "ST_LineString"),
+  MULTI_LINE_STRING(true, "ST_MultiLineString"),
+  POLYGON(false, "ST_Polygon"),
+  MULTI_POLYGON(true, "ST_MultiPolygon"),
+  GEOMETRY_COLLECTION(true, "ST_GeomCollection");
 
-    private final boolean multitype;
-    private final String name;
+  private final boolean multitype;
+  private final String name;
 
-    GeometryType(boolean multitype, String name) {
-        this.multitype = multitype;
-        this.name = name;
-    }
+  GeometryType(boolean multitype, String name) {
+    this.multitype = multitype;
+    this.name = name;
+  }
 
-    public boolean isMultitype() {
-        return multitype;
-    }
+  public boolean isMultitype() {
+    return multitype;
+  }
 
-    public String getName() {
-        return name;
-    }
+  public String getName() {
+    return name;
+  }
 }

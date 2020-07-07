@@ -31,43 +31,46 @@ import org.locationtech.jts.geom.Geometry;
 import java.util.List;
 import java.util.Map;
 
+
+/**
+ * Function that returns the type of the geometry as a string.
+ */
 public class StGeometryTypeFunction extends BaseTransformFunction {
-    private TransformFunction _transformFunction;
-    private String[] _results;
-    public static final String FUNCTION_NAME = "ST_GEOMETRY_TYPE";
+  private TransformFunction _transformFunction;
+  private String[] _results;
+  public static final String FUNCTION_NAME = "ST_GEOMETRY_TYPE";
 
-    @Override
-    public String getName() {
-        return FUNCTION_NAME;
-    }
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
+  }
 
-    @Override
-    public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-        Preconditions
-                .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
-                        getName());
-        TransformFunction transformFunction = arguments.get(0);
-        Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-                "Argument must be single-valued for transform function: %s", getName());
-        _transformFunction = transformFunction;
-    }
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+    Preconditions
+        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    TransformFunction transformFunction = arguments.get(0);
+    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+        "Argument must be single-valued for transform function: %s", getName());
+    _transformFunction = transformFunction;
+  }
 
-    @Override
-    public TransformResultMetadata getResultMetadata() {
-        return STRING_SV_NO_DICTIONARY_METADATA;
-    }
+  @Override
+  public TransformResultMetadata getResultMetadata() {
+    return STRING_SV_NO_DICTIONARY_METADATA;
+  }
 
-    @Override
-    public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-        if (_results == null) {
-            _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        }
-        byte[][] values = _transformFunction.transformToBytesValuesSV(projectionBlock);
-        Geometry geometry;
-        for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-            geometry = GeometrySerializer.deserialize(values[i]);
-            _results[i] = geometry.getGeometryType();
-        }
-        return _results;
+  @Override
+  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+    if (_results == null) {
+      _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
+    byte[][] values = _transformFunction.transformToBytesValuesSV(projectionBlock);
+    Geometry geometry;
+    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+      geometry = GeometrySerializer.deserialize(values[i]);
+      _results[i] = geometry.getGeometryType();
+    }
+    return _results;
+  }
 }

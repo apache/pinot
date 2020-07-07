@@ -21,16 +21,20 @@ package org.apache.pinot.core.geospatial.transform.function;
 import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.locationtech.jts.geom.GeometryFactory;
 
+
+/**
+ * Constructor function for polygon object from text.
+ */
 public class StPolygonFunction extends ConstructFromTextFunction {
-    public static final String FUNCTION_NAME = "ST_Polygon";
+  public static final String FUNCTION_NAME = "ST_Polygon";
 
-    @Override
-    protected GeometryFactory getGeometryFactory() {
-        return GeometryUtils.GEOMETRY_FACTORY;
-    }
+  @Override
+  protected GeometryFactory getGeometryFactory() {
+    return GeometryUtils.GEOMETRY_FACTORY;
+  }
 
-    @Override
-    public String getName() {
-        return FUNCTION_NAME;
-    }
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
+  }
 }

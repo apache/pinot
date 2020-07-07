@@ -23,21 +23,32 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
 
-public class GeometryUtils {
-    /**
-     * Coordinate system of lat/lng per https://epsg.io/4326
-     */
-    public static int GEOGRAPHY_SRID = 4326;
-    public static byte GEOGRAPHY_SET_MASK = (byte) 0x80;
-    public static byte GEOGRAPHY_GET_MASK = (byte) 0x7f;
-    public static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
-    public static final GeometryFactory GEOGRAPHY_FACTORY = new GeometryFactory(new PrecisionModel(), GEOGRAPHY_SRID);
-    public static final double EARTH_RADIUS_KM = 6371.01;
-    public static final double EARTH_RADIUS_M = EARTH_RADIUS_KM * 1000.0;
-    public static final Joiner OR_JOINER = Joiner.on(" or ");
-    private GeometryUtils(){}
 
-    public static boolean isGeography(Geometry geometry) {
-        return geometry.getSRID() == GEOGRAPHY_SRID;
-    }
+/**
+ * Utility methods for the geometry.
+ */
+public class GeometryUtils {
+  /**
+   * Coordinate system of lat/lng per https://epsg.io/4326
+   */
+  public static int GEOGRAPHY_SRID = 4326;
+  public static byte GEOGRAPHY_SET_MASK = (byte) 0x80;
+  public static byte GEOGRAPHY_GET_MASK = (byte) 0x7f;
+  public static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
+  public static final GeometryFactory GEOGRAPHY_FACTORY = new GeometryFactory(new PrecisionModel(), GEOGRAPHY_SRID);
+  public static final double EARTH_RADIUS_KM = 6371.01;
+  public static final double EARTH_RADIUS_M = EARTH_RADIUS_KM * 1000.0;
+  public static final Joiner OR_JOINER = Joiner.on(" or ");
+
+  private GeometryUtils() {
+  }
+
+  /**
+   * Checks if the given geo-spatial object is a geography object.
+   * @param geometry the given object to check
+   * @return <code>true</code> if the given geo-spatial object is a geography object, <code>false</code> otherwise
+   */
+  public static boolean isGeography(Geometry geometry) {
+    return geometry.getSRID() == GEOGRAPHY_SRID;
+  }
 }

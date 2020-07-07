@@ -21,15 +21,20 @@ package org.apache.pinot.core.geospatial.transform.function;
 import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.locationtech.jts.geom.GeometryFactory;
 
-public class StGeogFromWKBFunction extends ConstructFromWKBFunction {
-    public static final String FUNCTION_NAME = "ST_GeogFromWKB";
-    @Override
-    protected GeometryFactory getGeometryFactory() {
-        return GeometryUtils.GEOGRAPHY_FACTORY;
-    }
 
-    @Override
-    public String getName() {
-        return FUNCTION_NAME;
-    }
+/**
+ * Constructor function for geography object from WKB.
+ */
+public class StGeogFromWKBFunction extends ConstructFromWKBFunction {
+  public static final String FUNCTION_NAME = "ST_GeogFromWKB";
+
+  @Override
+  protected GeometryFactory getGeometryFactory() {
+    return GeometryUtils.GEOGRAPHY_FACTORY;
+  }
+
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
+  }
 }

@@ -33,33 +33,33 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+
 public class StPointFunctionTest extends BaseTransformFunctionTest {
-    @Test
-    public void testStPointFunction() {
-        ExpressionContext expression = QueryContextConverterUtils.getExpression(String.format("ST_Point(%s,%s)", DOUBLE_SV_COLUMN,
-                        DOUBLE_SV_COLUMN));
-        TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-        Assert.assertTrue(transformFunction instanceof StPointFunction);
-        Assert.assertEquals(transformFunction.getName(), StPointFunction.FUNCTION_NAME);
-        byte[][] expectedValues = new byte[NUM_ROWS][];
-        for (int i = 0; i < NUM_ROWS; i++) {
-            Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(_doubleSVValues[i],
-                    _doubleSVValues[i]));
-            expectedValues[i] = GeometrySerializer.serialize(point);
-        }
-        testTransformFunction(transformFunction, expectedValues);
+  @Test
+  public void testStPointFunction() {
+    ExpressionContext expression =
+        QueryContextConverterUtils.getExpression(String.format("ST_Point(%s,%s)", DOUBLE_SV_COLUMN, DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof StPointFunction);
+    Assert.assertEquals(transformFunction.getName(), StPointFunction.FUNCTION_NAME);
+    byte[][] expectedValues = new byte[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(_doubleSVValues[i], _doubleSVValues[i]));
+      expectedValues[i] = GeometrySerializer.serialize(point);
     }
+    testTransformFunction(transformFunction, expectedValues);
+  }
 
-    @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
-    public void testIllegalArguments(String expressionStr) {
-        ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
-        TransformFunctionFactory.get(expression, _dataSourceMap);
-    }
+  @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
+  public void testIllegalArguments(String expressionStr) {
+    ExpressionContext expression = QueryContextConverterUtils.getExpression(expressionStr);
+    TransformFunctionFactory.get(expression, _dataSourceMap);
+  }
 
-    @DataProvider(name = "testIllegalArguments")
-    public Object[][] testIllegalArguments() {
-        return new Object[][]{new Object[]{String.format("ST_Point(%s)", DOUBLE_SV_COLUMN)}, new Object[]{String.format(
-                "ST_Point(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)}, new Object[]{String.format("st_Point(%s, %s)", LONG_SV_COLUMN,
-                INT_MV_COLUMN)}};
-    }
+  @DataProvider(name = "testIllegalArguments")
+  public Object[][] testIllegalArguments() {
+    return new Object[][]{new Object[]{String.format("ST_Point(%s)", DOUBLE_SV_COLUMN)}, new Object[]{String.format(
+        "ST_Point(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)}, new Object[]{String.format("st_Point(%s, %s)",
+        LONG_SV_COLUMN, INT_MV_COLUMN)}};
+  }
 }

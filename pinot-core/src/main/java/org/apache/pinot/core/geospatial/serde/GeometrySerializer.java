@@ -26,25 +26,39 @@ import org.locationtech.jts.geom.Geometry;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 
+
+/**
+ * A serializer that serializes a geometry object into bytes and vice versa.
+ */
 public class GeometrySerializer {
-    private static GeometrySerde serde = new GeometrySerde();
+  private static GeometrySerde serde = new GeometrySerde();
 
-    private GeometrySerializer() {
-    }
+  private GeometrySerializer() {
+  }
 
-    public static byte[] serialize(Geometry geometry) {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Output output = new Output(out);
-        serde.write(new Kryo(), output, geometry);
-        output.close();
-        return out.toByteArray();
-    }
+  /**
+   * Serializes a geometry object into bytes
+   * @param geometry the geometry object to serialize
+   * @return the serialized bytes
+   */
+  public static byte[] serialize(Geometry geometry) {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    Output output = new Output(out);
+    serde.write(new Kryo(), output, geometry);
+    output.close();
+    return out.toByteArray();
+  }
 
-    public static Geometry deserialize(byte[] bytes) {
-        ByteArrayInputStream in = new ByteArrayInputStream(bytes);
-        Input input = new Input(in);
-        Object deserialized = serde.read(new Kryo(), input, Geometry.class);
-        input.close();
-        return (Geometry) deserialized;
-    }
+  /**
+   * Deserializes bytes into a geometry object
+   * @param bytes the bytes to deserialize
+   * @return the deserialized object
+   */
+  public static Geometry deserialize(byte[] bytes) {
+    ByteArrayInputStream in = new ByteArrayInputStream(bytes);
+    Input input = new Input(in);
+    Object deserialized = serde.read(new Kryo(), input, Geometry.class);
+    input.close();
+    return (Geometry) deserialized;
+  }
 }

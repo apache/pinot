@@ -76,7 +76,8 @@ public class GeoFunctionTest {
 
   protected void assertRelation(String functionName, String leftWkt, String rightWkt, boolean result)
       throws Exception {
-    assertIntFunction(String.format("%s(ST_GeomFromText(%s),ST_GeomFromText(%s))", functionName, STRING_SV_COLUMN, STRING_SV_COLUMN2),
+    assertIntFunction(
+        String.format("%s(ST_GeomFromText(%s),ST_GeomFromText(%s))", functionName, STRING_SV_COLUMN, STRING_SV_COLUMN2),
         new int[]{result ? 1 : 0}, Arrays
             .asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{leftWkt}),
                 new Column(STRING_SV_COLUMN2, FieldSpec.DataType.STRING, new String[]{rightWkt})));

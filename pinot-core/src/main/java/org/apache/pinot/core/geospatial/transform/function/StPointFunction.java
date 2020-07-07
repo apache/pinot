@@ -36,54 +36,58 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 
+
+/**
+ * Function that returns a geometry type point object with the given coordinate values.
+ */
 public class StPointFunction extends BaseTransformFunction {
-    private static final Logger LOGGER = LoggerFactory.getLogger(StPointFunction.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(StPointFunction.class);
 
-    public static final String FUNCTION_NAME = "ST_Point";
-    private TransformFunction _firstArgument;
-    private TransformFunction _secondArgument;
-    private byte[][] _results;
+  public static final String FUNCTION_NAME = "ST_Point";
+  private TransformFunction _firstArgument;
+  private TransformFunction _secondArgument;
+  private byte[][] _results;
 
-    @Override
-    public String getName() {
-        return FUNCTION_NAME;
+  @Override
+  public String getName() {
+    return FUNCTION_NAME;
+  }
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+    Preconditions
+        .checkArgument(arguments.size() == 2, "2 arguments are required for transform function: %s", getName());
+    TransformFunction transformFunction = arguments.get(0);
+    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+        "First argument must be single-valued for transform function: %s", getName());
+    _firstArgument = transformFunction;
+    transformFunction = arguments.get(1);
+    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+        "Second argument must be single-valued for transform function: %s", getName());
+    _secondArgument = transformFunction;
+  }
+
+  @Override
+  public TransformResultMetadata getResultMetadata() {
+    return BYTES_SV_NO_DICTIONARY_METADATA;
+  }
+
+  @Override
+  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+    if (_results == null) {
+      _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
     }
-
-    @Override
-    public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-        Preconditions
-            .checkArgument(arguments.size() == 2, "2 arguments are required for transform function: %s", getName());
-        TransformFunction transformFunction = arguments.get(0);
-        Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-            "First argument must be single-valued for transform function: %s", getName());
-        _firstArgument = transformFunction;
-        transformFunction = arguments.get(1);
-        Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-            "Second argument must be single-valued for transform function: %s", getName());
-        _secondArgument = transformFunction;
+    double[] firstValues = _firstArgument.transformToDoubleValuesSV(projectionBlock);
+    double[] secondValues = _secondArgument.transformToDoubleValuesSV(projectionBlock);
+    for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
+      _results[i] = stPoint(firstValues[i], secondValues[i]);
     }
+    return _results;
+  }
 
-    @Override
-    public TransformResultMetadata getResultMetadata() {
-        return BYTES_SV_NO_DICTIONARY_METADATA;
-    }
-
-    @Override
-    public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-        if (_results == null) {
-            _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        }
-        double[] firstValues = _firstArgument.transformToDoubleValuesSV(projectionBlock);
-        double[] secondValues = _secondArgument.transformToDoubleValuesSV(projectionBlock);
-        for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-            _results[i] = stPoint(firstValues[i], secondValues[i]);
-        }
-        return _results;
-    }
-
-    @ScalarFunction
-    public static byte[] stPoint(double longitude, double latitude) {
-        return GeometrySerializer
-            .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
-    }
+  @ScalarFunction
+  public static byte[] stPoint(double longitude, double latitude) {
+    return GeometrySerializer
+        .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
+  }
 }

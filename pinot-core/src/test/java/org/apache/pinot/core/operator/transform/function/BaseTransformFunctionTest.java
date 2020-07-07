@@ -197,7 +197,7 @@ public abstract class BaseTransformFunctionTest {
     }
   }
 
-  protected  void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {
+  protected void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {
     byte[][] bytesValues = transformFunction.transformToBytesValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(bytesValues[i], expectedValues[i]);
