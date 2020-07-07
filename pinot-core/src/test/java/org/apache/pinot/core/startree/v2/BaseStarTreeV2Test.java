@@ -55,7 +55,7 @@ import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
 import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder.BuildMode;
-import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -134,16 +134,17 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));
     driver.build();
 
-    StarTreeV2BuilderConfig starTreeV2BuilderConfig =
-        new StarTreeV2BuilderConfig.Builder().setDimensionsSplitOrder(Arrays.asList(DIMENSION_D1, DIMENSION_D2))
-            .setFunctionColumnPairs(
-                Collections.singleton(new AggregationFunctionColumnPair(_valueAggregator.getAggregationType(), METRIC)))
-            .setMaxLeafRecords(MAX_LEAF_RECORDS).build();
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null,
+        Collections.singletonList(
+            new AggregationFunctionColumnPair(_valueAggregator.getAggregationType(), METRIC).toColumnName()),
+        MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
-
     // Randomly build star-tree using on-heap or off-heap mode
     BuildMode buildMode = RANDOM.nextBoolean() ? BuildMode.ON_HEAP : BuildMode.OFF_HEAP;
-    new MultipleTreesBuilder(Collections.singletonList(starTreeV2BuilderConfig), indexDir, buildMode).build();
+    try (MultipleTreesBuilder builder = new MultipleTreesBuilder(Collections.singletonList(starTreeIndexConfig), false,
+        indexDir, buildMode)) {
+      builder.build();
+    }
 
     _indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     _starTreeV2 = _indexSegment.getStarTrees().get(0);

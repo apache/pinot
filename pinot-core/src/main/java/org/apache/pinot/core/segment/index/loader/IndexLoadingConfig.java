@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
@@ -33,6 +32,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
@@ -52,6 +52,8 @@ public class IndexLoadingConfig {
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private Set<String> _bloomFilterColumns = new HashSet<>();
+  private List<StarTreeIndexConfig> _starTreeIndexConfigs;
+  private boolean _enableDefaultStarTree;
 
   private SegmentVersion _segmentVersion;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
@@ -64,13 +66,12 @@ public class IndexLoadingConfig {
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
-  public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
-      @Nonnull TableConfig tableConfig) {
+  public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
     extractFromTableConfig(tableConfig);
   }
 
-  private void extractFromTableConfig(@Nonnull TableConfig tableConfig) {
+  private void extractFromTableConfig(TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     String tableReadMode = indexingConfig.getLoadMode();
     if (tableReadMode != null) {
@@ -126,6 +127,11 @@ public class IndexLoadingConfig {
       _onHeapDictionaryColumns.addAll(onHeapDictionaryColumns);
     }
 
+    if (indexingConfig.isEnableDynamicStarTreeCreation()) {
+      _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+      _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
+    }
+
     String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
     if (tableSegmentVersion != null) {
       _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
@@ -153,7 +159,8 @@ public class IndexLoadingConfig {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
           if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !_noDictionaryColumns.contains(column)) {
-            throw new UnsupportedOperationException("Text index is currently not supported on dictionary encoded column: " + column);
+            throw new UnsupportedOperationException(
+                "Text index is currently not supported on dictionary encoded column: " + column);
           }
           _textIndexColumns.add(column);
         }
@@ -161,7 +168,7 @@ public class IndexLoadingConfig {
     }
   }
 
-  private void extractFromInstanceConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig) {
+  private void extractFromInstanceConfig(InstanceDataManagerConfig instanceDataManagerConfig) {
     ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
     if (instanceReadMode != null) {
       _readMode = instanceReadMode;
@@ -190,7 +197,6 @@ public class IndexLoadingConfig {
   public IndexLoadingConfig() {
   }
 
-  @Nonnull
   public ReadMode getReadMode() {
     return _readMode;
   }
@@ -198,25 +204,22 @@ public class IndexLoadingConfig {
   /**
    * For tests only.
    */
-  public void setReadMode(@Nonnull ReadMode readMode) {
+  public void setReadMode(ReadMode readMode) {
     _readMode = readMode;
   }
 
-  @Nonnull
   public List<String> getSortedColumns() {
     return _sortedColumns;
   }
 
-  @Nonnull
   public Set<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
-  }  @Nonnull
+  }
 
   public Set<String> getRangeIndexColumns() {
     return _rangeIndexColumns;
   }
 
-  @Nonnull
   public Map<String, Map<String, String>> getColumnProperties() {
     return _columnProperties;
   }
@@ -231,7 +234,6 @@ public class IndexLoadingConfig {
    * to-be-created Mutable Segments
    * @return a set containing names of text index columns
    */
-  @Nonnull
   public Set<String> getTextIndexColumns() {
     return _textIndexColumns;
   }
@@ -240,7 +242,7 @@ public class IndexLoadingConfig {
    * For tests only.
    */
   @VisibleForTesting
-  public void setInvertedIndexColumns(@Nonnull Set<String> invertedIndexColumns) {
+  public void setInvertedIndexColumns(Set<String> invertedIndexColumns) {
     _invertedIndexColumns = invertedIndexColumns;
   }
 
@@ -248,7 +250,7 @@ public class IndexLoadingConfig {
    * For tests only.
    */
   @VisibleForTesting
-  public void setRangeIndexColumns(@Nonnull Set<String> rangeIndexColumns) {
+  public void setRangeIndexColumns(Set<String> rangeIndexColumns) {
     _rangeIndexColumns = rangeIndexColumns;
   }
 
@@ -259,42 +261,47 @@ public class IndexLoadingConfig {
    * and then loading those segments.
    */
   @VisibleForTesting
-  public void setTextIndexColumns(@Nonnull Set<String> textIndexColumns) {
+  public void setTextIndexColumns(Set<String> textIndexColumns) {
     _textIndexColumns = textIndexColumns;
   }
 
   @VisibleForTesting
-  public void setBloomFilterColumns(@Nonnull Set<String> bloomFilterColumns) {
+  public void setBloomFilterColumns(Set<String> bloomFilterColumns) {
     _bloomFilterColumns = bloomFilterColumns;
   }
 
   @VisibleForTesting
-  public void setOnHeapDictionaryColumns(@Nonnull Set<String> onHeapDictionaryColumns) {
+  public void setOnHeapDictionaryColumns(Set<String> onHeapDictionaryColumns) {
     _onHeapDictionaryColumns = onHeapDictionaryColumns;
   }
 
-  @Nonnull
   public Set<String> getNoDictionaryColumns() {
     return _noDictionaryColumns;
   }
 
-  @Nonnull
   public Map<String, String> getnoDictionaryConfig() {
     return _noDictionaryConfig;
   }
 
-  @Nonnull
   public Set<String> getVarLengthDictionaryColumns() {
     return _varLengthDictionaryColumns;
   }
 
-  @Nonnull
   public Set<String> getOnHeapDictionaryColumns() {
     return _onHeapDictionaryColumns;
   }
 
   public Set<String> getBloomFilterColumns() {
     return _bloomFilterColumns;
+  }
+
+  @Nullable
+  public List<StarTreeIndexConfig> getStarTreeIndexConfigs() {
+    return _starTreeIndexConfigs;
+  }
+
+  public boolean isEnableDefaultStarTree() {
+    return _enableDefaultStarTree;
   }
 
   @Nullable
@@ -305,7 +312,7 @@ public class IndexLoadingConfig {
   /**
    * For tests only.
    */
-  public void setSegmentVersion(@Nonnull SegmentVersion segmentVersion) {
+  public void setSegmentVersion(SegmentVersion segmentVersion) {
     _segmentVersion = segmentVersion;
   }
 
@@ -325,7 +332,6 @@ public class IndexLoadingConfig {
     return _isDirectRealtimeOffheapAllocation;
   }
 
-  @Nonnull
   public ColumnMinMaxValueGeneratorMode getColumnMinMaxValueGeneratorMode() {
     return _columnMinMaxValueGeneratorMode;
   }
