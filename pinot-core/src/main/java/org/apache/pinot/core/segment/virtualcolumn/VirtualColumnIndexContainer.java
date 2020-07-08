@@ -58,6 +58,11 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
+  public InvertedIndexReader<?> getTextIndex() {
+    return null;
+  }
+
+  @Override
   public Dictionary getDictionary() {
     return _dictionary;
   }

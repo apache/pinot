@@ -83,6 +83,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private Map<String, InvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
+  private Map<String, InvertedIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
@@ -199,16 +200,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         _forwardIndexCreatorMap.put(columnName,
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
                 indexCreationInfo.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion));
+      }
 
+      if (_textIndexColumns.contains(columnName)) {
         // Initialize text index creator
-        if (_textIndexColumns.contains(columnName)) {
-          _invertedIndexCreatorMap
-              .put(columnName, new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
-        }
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            "Text index is currently only supported on single-value columns");
+        Preconditions.checkState(fieldSpec.getDataType() == DataType.STRING,
+            "Text index is currently only supported on STRING type columns");
+        _textIndexCreatorMap
+            .put(columnName, new LuceneTextIndexCreator(columnName, _indexDir, true /* commitOnClose */));
       }
 
       _nullHandlingEnabled = config.isNullHandlingEnabled();
-
       if (_nullHandlingEnabled) {
         // Initialize Null value vector map
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
@@ -285,11 +289,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       FieldSpec spec) {
     String column = spec.getName();
 
-    if (_textIndexColumns.contains(column)) {
-      // TODO: Explore creating dictionary for such columns
-      return false;
-    }
-
     if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
         .containsKey(column)) {
       if (!spec.isSingleValueField()) {
@@ -356,12 +355,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             default:
               throw new IllegalStateException();
           }
-          // text-search enabled column
-          if (_textIndexColumns.contains(columnName)) {
-            InvertedIndexCreator textInvertedIndexCreator = _invertedIndexCreatorMap.get(columnName);
-            // add the column value to lucene index
-            textInvertedIndexCreator.addDoc(columnValueToIndex, docIdCounter);
-          }
+        }
+        // text-index enabled SV column
+        if (_textIndexColumns.contains(columnName)) {
+          InvertedIndexCreator textInvertedIndexCreator = _textIndexCreatorMap.get(columnName);
+          // add the column value to lucene index
+          textInvertedIndexCreator.addDoc(columnValueToIndex, docIdCounter);
         }
       } else {
         // MV column (always dictionary encoded)
@@ -627,6 +626,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     FileUtils.close(Iterables
         .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(),
-            _nullValueVectorCreatorMap.values()));
+            _nullValueVectorCreatorMap.values(), _textIndexCreatorMap.values()));
   }
 }

@@ -36,40 +36,6 @@ import static org.testng.Assert.fail;
 public class TableConfigUtilsTest {
 
   @Test
-  public void testValidate() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-
-    // Default table config
-    TableConfigUtils.validate(tableConfig);
-
-    // Invalid field config (dictionary encoding & text index)
-    try {
-      FieldConfig textFieldConfig =
-          new FieldConfig("text", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null);
-      tableConfig.setFieldConfigList(Collections.singletonList(textFieldConfig));
-      TableConfigUtils.validate(tableConfig);
-      fail();
-    } catch (IllegalStateException e) {
-      // Expected
-    }
-
-    // Valid field config (no-dictionary & text index) but raw index not configured in indexing config
-    try {
-      FieldConfig textFieldConfig =
-          new FieldConfig("text", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null);
-      tableConfig.setFieldConfigList(Collections.singletonList(textFieldConfig));
-      TableConfigUtils.validate(tableConfig);
-      fail();
-    } catch (IllegalStateException e) {
-      // Expected
-    }
-
-    // Valid field config (no-dictionary & text index) and indexing config
-    tableConfig.getIndexingConfig().setNoDictionaryColumns(Collections.singletonList("text"));
-    TableConfigUtils.validate(tableConfig);
-  }
-
-  @Test
   public void validateIngestionConfig() {
     // null ingestion config
     TableConfig tableConfig =

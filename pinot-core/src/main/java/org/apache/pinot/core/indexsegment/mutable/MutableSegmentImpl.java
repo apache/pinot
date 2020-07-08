@@ -114,6 +114,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, MutableForwardIndex> _forwardIndexMap = new HashMap<>();
   private final Map<String, InvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, InvertedIndexReader> _rangeIndexMap = new HashMap<>();
+  private final Map<String, InvertedIndexReader> _textIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
   // Only store min/max for non-dictionary fields
   private final Map<String, Comparable> _minValueMap = new HashMap<>();
@@ -289,7 +290,7 @@ public class MutableSegmentImpl implements MutableSegment {
       if (textIndexColumns.contains(column)) {
         RealtimeLuceneTextIndexReader realtimeLuceneIndexReader =
             new RealtimeLuceneTextIndexReader(column, new File(config.getConsumerDir()), _segmentName);
-        _invertedIndexMap.put(column, realtimeLuceneIndexReader);
+        _textIndexMap.put(column, realtimeLuceneIndexReader);
         if (_realtimeLuceneReaders == null) {
           _realtimeLuceneReaders = new RealtimeLuceneReaders(_segmentName);
         }
@@ -688,13 +689,14 @@ public class MutableSegmentImpl implements MutableSegment {
       BaseMutableDictionary dictionary = _dictionaryMap.get(column);
       InvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
       InvertedIndexReader rangeIndex = _rangeIndexMap.get(column);
+      InvertedIndexReader textIndex = _textIndexMap.get(column);
       BloomFilterReader bloomFilter = _bloomFilterMap.get(column);
       Comparable minValue = getMinVal(column);
       Comparable maxValue = getMaxVal(column);
       RealtimeNullValueVectorReaderWriter nullValueVector = _nullValueVectorMap.get(column);
       return new MutableDataSource(fieldSpec, _numDocsIndexed, numValuesInfo.getNumValues(),
           numValuesInfo.getMaxNumValuesPerMVEntry(), partitionFunction, partitionId, minValue, maxValue, forwardIndex,
-          dictionary, invertedIndex, rangeIndex, bloomFilter, nullValueVector);
+          dictionary, invertedIndex, textIndex, rangeIndex, bloomFilter, nullValueVector);
     }
   }
 

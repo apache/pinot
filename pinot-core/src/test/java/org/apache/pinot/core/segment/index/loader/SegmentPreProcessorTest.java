@@ -167,68 +167,77 @@ public class SegmentPreProcessorTest {
 
   /**
    * Test to check for default column handling and text index creation during
-   * segment load after a new column is added to the schema with text index
-   * creation enabled
-   * @throws Exception
+   * segment load after a new raw column is added to the schema with text index
+   * creation enabled.
+   * This will exercise both code paths in SegmentPreprocessor (segment load):
+   * (1) Default column handler to add forward index and dictionary
+   * (2) Text index handler to add text index
    */
   @Test
-  public void testEnableTextIndexOnNewColumn()
+  public void testEnableTextIndexOnNewColumnRaw()
       throws Exception {
     Set<String> textIndexColumns = new HashSet<>();
     textIndexColumns.add(NEWLY_ADDED_STRING_COL_RAW);
     _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
     _indexLoadingConfig.getNoDictionaryColumns().add(NEWLY_ADDED_STRING_COL_RAW);
 
-    // Create a segment in V3, add a new column with text index enabled
+    // Create a segment in V3, add a new raw column with text index enabled
     constructV3Segment();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_STRING_COL_RAW);
     // should be null since column does not exist in the schema
     Assert.assertNull(columnMetadata);
-    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true);
+    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
 
-    // Create a segment in V1, add a new column with text index enabled
+    // Create a segment in V1, add a new raw column with text index enabled
     constructV1Segment();
     segmentMetadata = new SegmentMetadataImpl(_indexDir);
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_STRING_COL_RAW);
     // should be null since column does not exist in the schema
     Assert.assertNull(columnMetadata);
-    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true);
+    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
   }
 
   /**
-   * Test to check for failure case where text index is enabled on an existing
-   * column that is dictionary encoded. This is currently not supported.
-   * @throws Exception
+   * Test to check for default column handling and text index creation during
+   * segment load after a new dictionary encoded column is added to the schema
+   * with text index creation enabled.
+   * This will exercise both code paths in SegmentPreprocessor (segment load):
+   * (1) Default column handler to add forward index and dictionary
+   * (2) Text index handler to add text index
    */
   @Test
   public void testEnableTextIndexOnNewColumnDictEncoded()
       throws Exception {
-    constructV3Segment();
     Set<String> textIndexColumns = new HashSet<>();
     textIndexColumns.add(NEWLY_ADDED_STRING_COL_DICT);
     _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_STRING_COL_DICT);
-    Assert.assertNull(columnMetadata);
 
-    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig,
-        _newColumnsSchemaWithText)) {
-      processor.process();
-      Assert.fail("operation should have failed");
-    } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains(
-          "Text index is currently not supported on dictionary encoded column: " + NEWLY_ADDED_STRING_COL_DICT));
-    }
+    // Create a segment in V3, add a new dict encoded column with text index enabled
+    constructV3Segment();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_STRING_COL_RAW);
+    // should be null since column does not exist in the schema
+    Assert.assertNull(columnMetadata);
+    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_DICT, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
+
+    // Create a segment in V1, add a new dict encoded column with text index enabled
+    constructV1Segment();
+    segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NEWLY_ADDED_STRING_COL_RAW);
+    // should be null since column does not exist in the schema
+    Assert.assertNull(columnMetadata);
+    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_DICT, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
   }
 
   /**
    * Test to check text index creation during segment load after text index
-   * creation is enabled on an existing column
+   * creation is enabled on an existing raw column.
+   * This will exercise the SegmentPreprocessor code path during segment load
    * @throws Exception
    */
   @Test
-  public void testEnableTextIndexOnExistingColumn()
+  public void testEnableTextIndexOnExistingRawColumn()
       throws Exception {
     Set<String> textIndexColumns = new HashSet<>();
     textIndexColumns.add(EXISTING_STRING_COL_RAW);
@@ -241,7 +250,7 @@ public class SegmentPreProcessorTest {
     // column exists and does not have text index enabled
     Assert.assertNotNull(columnMetadata);
     Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
-    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, null, false);
+    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
 
     // Create a segment in V1, add a new column with text index enabled
     constructV1Segment();
@@ -250,37 +259,46 @@ public class SegmentPreProcessorTest {
     // column exists and does not have text index enabled
     Assert.assertNotNull(columnMetadata);
     Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
-    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, null, false);
+    checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
   }
 
   /**
-   * Test to check for failure case where text index is enabled on an existing
-   * column that is dictionary encoded. This is currently not supported.
+   * Test to check text index creation during segment load after text index
+   * creation is enabled on an existing dictionary encoded column.
+   * This will exercise the SegmentPreprocessor code path during segment load
    * @throws Exception
    */
   @Test
-  public void testEnableTextIndexOnExistingColumnDictEncoded()
+  public void testEnableTextIndexOnExistingDictEncodedColumn()
       throws Exception {
     constructV3Segment();
     Set<String> textIndexColumns = new HashSet<>();
     textIndexColumns.add(EXISTING_STRING_COL_DICT);
     _indexLoadingConfig.setTextIndexColumns(textIndexColumns);
+
+    // Create a segment in V3, enable text index on existing column
+    constructV3Segment();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_DICT);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
+    // column exists and does not have text index enabled
     Assert.assertNotNull(columnMetadata);
     Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
+    // SegmentPreprocessor should have created the text index using TextIndexHandler
+    checkTextIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26);
 
-    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig,
-        _newColumnsSchemaWithText)) {
-      processor.process();
-      Assert.fail("operation should have failed");
-    } catch (Exception e) {
-      Assert.assertTrue(e.getMessage()
-          .contains("Text index is currently not supported on dictionary encoded column: " + EXISTING_STRING_COL_DICT));
-    }
+    // Create a segment in V1, add a new column with text index enabled
+    constructV1Segment();
+    segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
+    // column exists and does not have text index enabled
+    Assert.assertNotNull(columnMetadata);
+    Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.NONE);
+    // SegmentPreprocessor should have created the text index using TextIndexHandler
+    checkTextIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26);
   }
 
-  private void checkTextIndexCreation(String column, int cardinality, int bits, Schema schema, boolean isAutoGenerated)
+  private void checkTextIndexCreation(String column, int cardinality, int bits, Schema schema, boolean isAutoGenerated,
+      boolean hasDictionary, boolean isSorted, int dictionaryElementSize)
       throws Exception {
     try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, schema)) {
       processor.process();
@@ -291,11 +309,11 @@ public class SegmentPreProcessorTest {
       Assert.assertEquals(columnMetadata.getTotalDocs(), 100000);
       Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.STRING);
       Assert.assertEquals(columnMetadata.getBitsPerElement(), bits);
-      Assert.assertEquals(columnMetadata.getColumnMaxLength(), 0);
+      Assert.assertEquals(columnMetadata.getColumnMaxLength(), dictionaryElementSize);
       Assert.assertEquals(columnMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
-      Assert.assertFalse(columnMetadata.isSorted());
+      Assert.assertEquals(columnMetadata.isSorted(), isSorted);
       Assert.assertFalse(columnMetadata.hasNulls());
-      Assert.assertFalse(columnMetadata.hasDictionary());
+      Assert.assertEquals(columnMetadata.hasDictionary(), hasDictionary);
       Assert.assertEquals(columnMetadata.getTextIndexType(), TextIndexType.LUCENE);
       Assert.assertTrue(columnMetadata.isSingleValue());
       Assert.assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 0);
@@ -306,6 +324,14 @@ public class SegmentPreProcessorTest {
       try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
         Assert.assertTrue(reader.hasIndexFor(column, ColumnIndexType.TEXT_INDEX));
+        Assert.assertTrue(reader.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX));
+        // if the text index is enabled on a new column with dictionary,
+        // then dictionary should be created by the default column handler
+        if (hasDictionary) {
+          Assert.assertTrue(reader.hasIndexFor(column, ColumnIndexType.DICTIONARY));
+        } else {
+          Assert.assertFalse(reader.hasIndexFor(column, ColumnIndexType.DICTIONARY));
+        }
       }
     }
   }
