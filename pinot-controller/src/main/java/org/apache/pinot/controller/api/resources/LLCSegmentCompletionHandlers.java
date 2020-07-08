@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api.resources;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -466,21 +465,12 @@ public class LLCSegmentCompletionHandlers {
       FileUtils.forceMkdir(tempIndexDir);
 
       // Extract metadata.properties
-      try (InputStream metadataPropertiesInputStream = TarGzCompressionUtils
-          .unTarOneFile(new FileInputStream(segmentFile), V1Constants.MetadataKeys.METADATA_FILE_NAME)) {
-        Preconditions.checkState(metadataPropertiesInputStream != null, "Failed to find: %s from: %s",
-            V1Constants.MetadataKeys.METADATA_FILE_NAME, segmentFile);
-        Files.copy(metadataPropertiesInputStream,
-            new File(tempIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME).toPath());
-      }
+      TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
+          new File(tempIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
       // Extract creation.meta
-      try (InputStream metadataPropertiesInputStream = TarGzCompressionUtils
-          .unTarOneFile(new FileInputStream(segmentFile), V1Constants.SEGMENT_CREATION_META)) {
-        Preconditions.checkState(metadataPropertiesInputStream != null, "Failed to find: %s from: %s",
-            V1Constants.SEGMENT_CREATION_META, segmentFile);
-        Files.copy(metadataPropertiesInputStream, new File(tempIndexDir, V1Constants.SEGMENT_CREATION_META).toPath());
-      }
+      TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
+          new File(tempIndexDir, V1Constants.SEGMENT_CREATION_META));
 
       // Load segment metadata
       return new SegmentMetadataImpl(tempIndexDir);

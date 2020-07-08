@@ -19,24 +19,19 @@
 package org.apache.pinot.server.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.IOException;
 import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,11 +171,11 @@ public class TablesResourceTest extends BaseResourceTest {
   public void testDownloadSegments()
       throws Exception {
     // Verify the content of the downloaded segment from a realtime table.
-    Assert.assertTrue(downLoadAndVerifySegmentContent(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        _realtimeIndexSegments.get(0)));
+    downLoadAndVerifySegmentContent(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        _realtimeIndexSegments.get(0));
     // Verify the content of the downloaded segment from an offline table.
-    Assert.assertTrue(downLoadAndVerifySegmentContent(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
-        _offlineIndexSegments.get(0)));
+    downLoadAndVerifySegmentContent(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
+        _offlineIndexSegments.get(0));
 
     // Verify non-existent table and segment download return NOT_FOUND status.
     Response response = _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname").request().get(Response.class);
@@ -193,7 +188,8 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   // Verify metadata file from segments.
-  private boolean downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment) {
+  private void downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment)
+      throws IOException {
     String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
     // Download the segment and save to a temp local file.
@@ -202,35 +198,20 @@ public class TablesResourceTest extends BaseResourceTest {
     File segmentFile = response.readEntity(File.class);
 
     File tempMetadataDir = new File(FileUtils.getTempDirectory(), "segment_metadata");
-    try (// Extract metadata.properties
-        InputStream metadataPropertiesInputStream = TarGzCompressionUtils
-            .unTarOneFile(new FileInputStream(segmentFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-        // Extract creation.meta
-        InputStream creationMetaInputStream = TarGzCompressionUtils
-            .unTarOneFile(new FileInputStream(segmentFile), V1Constants.SEGMENT_CREATION_META)) {
-      Preconditions
-          .checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDir.getAbsolutePath());
+    Assert.assertTrue(tempMetadataDir.mkdirs());
 
-      Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
-          V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      Path metadataPropertiesPath = FileSystems.getDefault()
-          .getPath(tempMetadataDir.getAbsolutePath(), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
+    // Extract metadata.properties
+    TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
+        new File(tempMetadataDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
-      Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
-      Path creationMetaPath =
-          FileSystems.getDefault().getPath(tempMetadataDir.getAbsolutePath(), V1Constants.SEGMENT_CREATION_META);
-      Files.copy(creationMetaInputStream, creationMetaPath);
-      // Load segment metadata
-      SegmentMetadataImpl metadata = new SegmentMetadataImpl(tempMetadataDir);
+    // Extract creation.meta
+    TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
+        new File(tempMetadataDir, V1Constants.SEGMENT_CREATION_META));
 
-      Assert.assertEquals(tableNameWithType, metadata.getTableName());
-      return true;
-    } catch (Exception e) {
-      LOGGER.error("Failure in segment extraction and verification:", e);
-      return false;
-    } finally {
-      FileUtils.deleteQuietly(tempMetadataDir);
-    }
+    // Load segment metadata
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(tempMetadataDir);
+    Assert.assertEquals(tableNameWithType, metadata.getTableName());
+
+    FileUtils.forceDelete(tempMetadataDir);
   }
 }

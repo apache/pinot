@@ -26,7 +26,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -39,9 +38,7 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.Command;
@@ -139,10 +136,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
           inputIndexDirs.add(segmentFile);
         } else {
           File segmentDir = new File(untarredSegments, "segmentDir_" + segmentNum++);
-          TarGzCompressionUtils.unTar(segmentFile, segmentDir);
-          File[] files = segmentDir.listFiles();
-          Preconditions.checkState(files != null && files.length == 1);
-          File indexDir = files[0];
+          File indexDir = TarGzCompressionUtils.untar(segmentFile, segmentDir).get(0);
           inputIndexDirs.add(indexDir);
         }
       }
@@ -214,13 +208,10 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
 
       // Move the merged segment to output directory.
       File finalOutputPath = new File(outputDir, outputSegmentName);
-      boolean tarOutputSegment = Boolean.valueOf(_tarOutputSegment);
-      if (tarOutputSegment) {
-        File tarredOutputSegmentsDir = new File(workingDir, "tarredOutputSegments");
-        Preconditions.checkState(tarredOutputSegmentsDir.mkdir());
-        outputSegment = new File(TarGzCompressionUtils.createTarGzOfDirectory(outputSegment.getPath(),
-            new File(tarredOutputSegmentsDir, outputSegment.getName()).getPath()));
-        FileUtils.moveFile(outputSegment, finalOutputPath);
+      if (Boolean.parseBoolean(_tarOutputSegment)) {
+        File segmentTarFile = new File(workingDir, outputSegmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        TarGzCompressionUtils.createTarGzFile(outputSegment, segmentTarFile);
+        FileUtils.moveFile(segmentTarFile, finalOutputPath);
       } else {
         FileUtils.moveDirectory(outputSegment, finalOutputPath);
       }

@@ -41,8 +41,9 @@ public class DefaultSegmentCommitter implements SegmentCommitter {
   }
 
   @Override
-  public SegmentCompletionProtocol.Response commit(LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
-    final File segmentTarFile = new File(segmentBuildDescriptor.getSegmentTarFilePath());
+  public SegmentCompletionProtocol.Response commit(
+      LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
+    File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
 
     SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(_params, segmentTarFile);
     if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {

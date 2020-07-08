@@ -222,7 +222,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         if (localPluginsTarFile.exists()) {
           File pluginsDirFile = new File(PINOT_PLUGINS_DIR + "-" + idx);
           try {
-            TarGzCompressionUtils.unTar(localPluginsTarFile, pluginsDirFile);
+            TarGzCompressionUtils.untar(localPluginsTarFile, pluginsDirFile);
           } catch (Exception e) {
             LOGGER.error("Failed to untar local Pinot plugins tarball file [{}]", localPluginsTarFile, e);
             throw new RuntimeException(e);
@@ -276,7 +276,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
         File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
         LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-        TarGzCompressionUtils.createTarGzOfDirectory(localSegmentDir.getPath(), localSegmentTarFile.getPath());
+        TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
         long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
         long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
         LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
@@ -331,15 +331,16 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
   }
 
   protected void packPluginsToDistributedCache(JavaSparkContext sparkContext) {
-    String pluginsRootDir = PluginManager.get().getPluginsRootDir();
-    if (pluginsRootDir == null) {
+    String pluginsRootDirPath = PluginManager.get().getPluginsRootDir();
+    if (pluginsRootDirPath == null) {
       LOGGER.warn("Local Pinot plugins directory is null, skip packaging...");
       return;
     }
-    if (new File(pluginsRootDir).exists()) {
+    File pluginsRootDir = new File(pluginsRootDirPath);
+    if (pluginsRootDir.exists()) {
       File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
       try {
-        TarGzCompressionUtils.createTarGzOfDirectory(pluginsRootDir, pluginsTarGzFile.getPath());
+        TarGzCompressionUtils.createTarGzFile(pluginsRootDir, pluginsTarGzFile);
       } catch (IOException e) {
         LOGGER.error("Failed to tar plugins directory", e);
       }
@@ -349,7 +350,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         sparkContext.getConf().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
       }
     } else {
-      LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", pluginsRootDir);
+      LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", pluginsRootDirPath);
     }
   }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.metadata;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
@@ -30,15 +29,13 @@ import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
  * By default, the metadata extractor we will use will assume that we are provided a .tar.gz pinot segment file.
  */
 public class DefaultMetadataExtractor implements MetadataExtractor {
+
   @Override
   public SegmentMetadata extractMetadata(File tarredSegmentFile, File unzippedSegmentDir)
       throws Exception {
-    // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files
-    // in the segment in order to ensure the segment is not corrupted
-    TarGzCompressionUtils.unTar(tarredSegmentFile, unzippedSegmentDir);
-    File[] files = unzippedSegmentDir.listFiles();
-    Preconditions.checkState(files != null && files.length == 1);
-    File indexDir = files[0];
+    // NOTE: While there is TarGzCompressionUtils.untarOneFile(), we use untar() here to unpack all files in the segment
+    //       in order to ensure the segment is not corrupted.
+    File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, unzippedSegmentDir).get(0);
     return new SegmentMetadataImpl(indexDir);
   }
 }

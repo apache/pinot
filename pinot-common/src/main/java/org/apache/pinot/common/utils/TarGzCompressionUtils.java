@@ -18,225 +18,151 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.base.Preconditions;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.compress.archivers.ArchiveException;
-import org.apache.commons.compress.archivers.ArchiveStreamFactory;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveInputStream;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.common.Utils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
- * Taken from http://www.thoughtspark.org/node/53
- *
+ * Utility class to compress/de-compress tar.gz files.
  */
 public class TarGzCompressionUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TarGzCompressionUtils.class);
+  private TarGzCompressionUtils() {
+  }
+
   public static final String TAR_GZ_FILE_EXTENSION = ".tar.gz";
+  private static final char ENTRY_NAME_SEPARATOR = '/';
 
   /**
-   * Creates a tar.gz file at the specified path with the contents of the
-   * specified directory.
-   *
-   * @param directoryPath
-   *          The path to the directory to create an archive of
-   * @param tarGzPath
-   *          The path to the archive to create. The file may not exist but
-   *          it's parent must exist and the parent must be a directory
-   * @return tarGzPath
-   * @throws IOException
-   *           If anything goes wrong
+   * Creates a tar.gz file from the input file/directory to the output file. The output file must have ".tar.gz" as the
+   * file extension.
    */
-  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath)
+  public static void createTarGzFile(File inputFile, File outputFile)
       throws IOException {
-    return createTarGzOfDirectory(directoryPath, tarGzPath, "");
-  }
-
-  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath, String entryPrefix)
-      throws IOException {
-    if (!tarGzPath.endsWith(TAR_GZ_FILE_EXTENSION)) {
-      tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENSION;
+    Preconditions.checkArgument(outputFile.getName().endsWith(TAR_GZ_FILE_EXTENSION),
+        "Output file: %s does not have '.tar.gz' file extension", outputFile);
+    try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
+        BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
+        OutputStream gzipOut = new GzipCompressorOutputStream(bufferedOut);
+        TarArchiveOutputStream tarGzOut = new TarArchiveOutputStream(gzipOut)) {
+      tarGzOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
+      addFileToTarGz(tarGzOut, inputFile, "");
     }
-    try (FileOutputStream fOut = new FileOutputStream(new File(tarGzPath));
-        BufferedOutputStream bOut = new BufferedOutputStream(fOut);
-        GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(bOut);
-        TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)) {
-      tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
-      addFileToTarGz(tOut, directoryPath, entryPrefix);
-    } catch (IOException e) {
-      LOGGER.error("Failed to create tar.gz file for {} at path: {}", directoryPath, tarGzPath, e);
-      Utils.rethrowException(e);
-    }
-    return tarGzPath;
-  }
-
-  public static String createTarGzOfDirectory(String directoryPath)
-      throws IOException {
-    String tarGzPath = directoryPath.substring(0);
-    while (tarGzPath.endsWith("/")) {
-      tarGzPath = tarGzPath.substring(0, tarGzPath.length() - 1);
-    }
-    tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENSION;
-    return createTarGzOfDirectory(directoryPath, tarGzPath);
   }
 
   /**
-   * Creates a tar entry for the path specified with a name built from the base
-   * passed in and the file/directory name. If the path is a directory, a
-   * recursive call is made such that the full directory is added to the tar.
-   *
-   * @param tOut
-   *          The tar file's output stream
-   * @param path
-   *          The filesystem path of the file/directory being added
-   * @param base
-   *          The base prefix to for the name of the tar file entry
-   *
-   * @throws IOException
-   *           If anything goes wrong
+   * Helper method to write a file into the tar.gz file output stream. The base entry name is the relative path of the
+   * file to the root directory.
    */
-  private static void addFileToTarGz(TarArchiveOutputStream tOut, String path, String base)
+  private static void addFileToTarGz(ArchiveOutputStream tarGzOut, File file, String baseEntryName)
       throws IOException {
-    File f = new File(path);
-    String entryName = base + f.getName();
-    TarArchiveEntry tarEntry = new TarArchiveEntry(f, entryName);
-
-    tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
-    tOut.putArchiveEntry(tarEntry);
-
-    if (f.isFile()) {
-      IOUtils.copy(new FileInputStream(f), tOut);
-
-      tOut.closeArchiveEntry();
+    String entryName = baseEntryName + file.getName();
+    TarArchiveEntry entry = new TarArchiveEntry(file, entryName);
+    tarGzOut.putArchiveEntry(entry);
+    if (file.isFile()) {
+      try (InputStream in = Files.newInputStream(file.toPath())) {
+        IOUtils.copy(in, tarGzOut);
+      }
+      tarGzOut.closeArchiveEntry();
     } else {
-      tOut.closeArchiveEntry();
+      tarGzOut.closeArchiveEntry();
 
-      File[] children = f.listFiles();
-
-      if (children != null) {
-        for (File child : children) {
-          addFileToTarGz(tOut, child.getAbsolutePath(), entryName + "/");
-        }
+      File[] children = file.listFiles();
+      assert children != null;
+      String baseEntryNameForChildren = entryName + ENTRY_NAME_SEPARATOR;
+      for (File child : children) {
+        addFileToTarGz(tarGzOut, child, baseEntryNameForChildren);
       }
     }
   }
 
-  /** Untar an input file into an output file.
-   * The output file is created in the output folder, having the same name
-   * as the input file, minus the '.tar' extension.
-   *
-   * @param inputFile     the input .tar file
-   * @param outputDir     the output directory file.
-   * @throws IOException
-   * @throws FileNotFoundException
-   *
-   * @return The {@link List} of {@link File}s with the untared content.
-   * @throws ArchiveException
+  /**
+   * Un-tars a tar.gz file into a directory, returns all the untarred files/directories.
+   * <p>For security reason, the untarred files must reside in the output directory.
    */
-  public static List<File> unTar(final File inputFile, final File outputDir)
-      throws IOException, ArchiveException {
-
-    String outputDirectoryPath = outputDir.getCanonicalPath();
-    LOGGER.debug("Untaring {} to dir {}.", inputFile.getAbsolutePath(), outputDirectoryPath);
-    TarArchiveInputStream debInputStream = null;
-    InputStream is = null;
-    final List<File> untaredFiles = new LinkedList<File>();
-    try {
-      is = new GzipCompressorInputStream(new BufferedInputStream(new FileInputStream(inputFile)));
-      debInputStream = (TarArchiveInputStream) new ArchiveStreamFactory().createArchiveInputStream("tar", is);
-      TarArchiveEntry entry = null;
-      while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
-        final File outputFile = new File(outputDir, entry.getName());
-        // Check whether the untarred file will be put outside of the target output directory.
-        if (!outputFile.getCanonicalPath().startsWith(outputDirectoryPath)) {
-          throw new IOException("Tar file must not be untarred outside of the target output directory!");
+  public static List<File> untar(File inputFile, File outputDir)
+      throws IOException {
+    String outputDirCanonicalPath = outputDir.getCanonicalPath();
+    List<File> untarredFiles = new ArrayList<>();
+    try (InputStream fileIn = Files.newInputStream(inputFile.toPath());
+        InputStream bufferedIn = new BufferedInputStream(fileIn);
+        InputStream gzipIn = new GzipCompressorInputStream(bufferedIn);
+        ArchiveInputStream tarGzIn = new TarArchiveInputStream(gzipIn)) {
+      ArchiveEntry entry;
+      while ((entry = tarGzIn.getNextEntry()) != null) {
+        String entryName = entry.getName();
+        String[] parts = StringUtils.split(entryName, ENTRY_NAME_SEPARATOR);
+        File outputFile = outputDir;
+        for (String part : parts) {
+          outputFile = new File(outputFile, part);
         }
         if (entry.isDirectory()) {
-          // creating directory
-          LOGGER.debug(String.format("Attempting to write output directory %s.", outputFile.getAbsolutePath()));
-          if (!outputFile.exists()) {
-            // does not exist
-            LOGGER.debug(String.format("Attempting to create output directory %s.", outputFile.getAbsolutePath()));
-            try {
-              // create the directory including any non-existent parent directories
-              Files.createDirectories(outputFile.toPath());
-            } catch (Exception e) {
-              LOGGER.error("Caught exception while creating directory: {}, error: {}", outputFile.getAbsolutePath(), e);
-              throw e;
-            }
-          } else {
-            // directory already exists
-            LOGGER.error("The directory already there. Deleting - " + outputFile.getAbsolutePath());
-            FileUtils.deleteDirectory(outputFile);
+          if (!outputFile.getCanonicalPath().startsWith(outputDirCanonicalPath)) {
+            throw new IOException(String
+                .format("Trying to create directory: %s outside of the output directory: %s", outputFile, outputDir));
+          }
+          if (!outputFile.isDirectory() && !outputFile.mkdirs()) {
+            throw new IOException(String.format("Failed to create directory: %s", outputFile));
           }
         } else {
-          // creating file
-          LOGGER.debug(String.format("Creating output file %s.", outputFile.getAbsolutePath()));
-          File parentDirectory = outputFile.getParentFile();
-          if (!parentDirectory.exists()) {
-            try {
-              Files.createDirectories(parentDirectory.toPath());
-            } catch (Exception e) {
-              LOGGER.error("Caught exception while creating parent : {}, error: {}", parentDirectory.getAbsolutePath(), e);
-              throw e;
-            }
+          File parentFile = outputFile.getParentFile();
+          if (!parentFile.getCanonicalPath().startsWith(outputDirCanonicalPath)) {
+            throw new IOException(String
+                .format("Trying to create directory: %s outside of the output directory: %s", parentFile, outputDir));
           }
-          OutputStream outputFileStream = null;
-          try {
-            outputFileStream = new FileOutputStream(outputFile);
-            IOUtils.copy(debInputStream, outputFileStream);
-          } finally {
-            IOUtils.closeQuietly(outputFileStream);
+          if (!parentFile.isDirectory() && !parentFile.mkdirs()) {
+            throw new IOException(String.format("Failed to create directory: %s", parentFile));
+          }
+          try (OutputStream out = Files.newOutputStream(outputFile.toPath())) {
+            IOUtils.copy(tarGzIn, out);
           }
         }
-        untaredFiles.add(outputFile);
+        untarredFiles.add(outputFile);
       }
-    } finally {
-      IOUtils.closeQuietly(debInputStream);
-      IOUtils.closeQuietly(is);
     }
-    return untaredFiles;
+    return untarredFiles;
   }
 
-  public static InputStream unTarOneFile(InputStream tarGzInputStream, final String filename)
-      throws FileNotFoundException, IOException, ArchiveException {
-    TarArchiveInputStream debInputStream = null;
-    InputStream is = null;
-    try {
-      is = new GzipCompressorInputStream(tarGzInputStream);
-      debInputStream = (TarArchiveInputStream) new ArchiveStreamFactory().createArchiveInputStream("tar", is);
-      TarArchiveEntry entry = null;
-      while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
-        if (entry.getName().contains(filename)) {
-          ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-          IOUtils.copy(debInputStream, byteArrayOutputStream);
-          return new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
+  /**
+   * Un-tars one single file with the given file name from a tar.gz file.
+   */
+  public static void untarOneFile(File inputFile, String fileName, File outputFile)
+      throws IOException {
+    try (InputStream fileIn = Files.newInputStream(inputFile.toPath());
+        InputStream bufferedIn = new BufferedInputStream(fileIn);
+        InputStream gzipIn = new GzipCompressorInputStream(bufferedIn);
+        ArchiveInputStream tarGzIn = new TarArchiveInputStream(gzipIn)) {
+      ArchiveEntry entry;
+      while ((entry = tarGzIn.getNextEntry()) != null) {
+        if (!entry.isDirectory()) {
+          String entryName = entry.getName();
+          String[] parts = StringUtils.split(entryName, ENTRY_NAME_SEPARATOR);
+          if (parts.length > 0 && parts[parts.length - 1].equals(fileName)) {
+            try (OutputStream out = Files.newOutputStream(outputFile.toPath())) {
+              IOUtils.copy(tarGzIn, out);
+            }
+            return;
+          }
         }
       }
-    } finally {
-      IOUtils.closeQuietly(debInputStream);
-      IOUtils.closeQuietly(is);
+      throw new IOException(String.format("Failed to find file: %s in: %s", fileName, inputFile));
     }
-    return null;
   }
 }
