@@ -98,12 +98,13 @@ public class SelectionOperatorUtils {
 
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (orderByExpressions != null && queryContext.getLimit() > 0) {
-      // NOTE: Order-by expressions are ignored for queries with LIMIT 0.
+      // NOTE:
+      //   1. Order-by expressions are ignored for queries with LIMIT 0.
+      //   2. Order-by expressions are already deduped in QueryContext.
       for (OrderByExpressionContext orderByExpression : orderByExpressions) {
         ExpressionContext expression = orderByExpression.getExpression();
-        if (expressionSet.add(expression)) {
-          expressions.add(expression);
-        }
+        expressionSet.add(expression);
+        expressions.add(expression);
       }
     }
 

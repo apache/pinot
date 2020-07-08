@@ -21,8 +21,10 @@ package org.apache.pinot.core.query.request.context.utils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
@@ -150,23 +152,30 @@ public class BrokerRequestToQueryContextConverter {
     if (pinotQuery != null) {
       List<Expression> orderByList = pinotQuery.getOrderByList();
       if (CollectionUtils.isNotEmpty(orderByList)) {
+        // Deduplicate the order-by expressions
         orderByExpressions = new ArrayList<>(orderByList.size());
+        Set<ExpressionContext> expressionSet = new HashSet<>();
         for (Expression orderBy : orderByList) {
           // NOTE: Order-by is always a Function with the ordering of the Expression
           Function thriftFunction = orderBy.getFunctionCall();
-          boolean isAsc = thriftFunction.getOperator().equalsIgnoreCase("ASC");
           ExpressionContext expression = QueryContextConverterUtils.getExpression(thriftFunction.getOperands().get(0));
-          orderByExpressions.add(new OrderByExpressionContext(expression, isAsc));
+          if (expressionSet.add(expression)) {
+            boolean isAsc = thriftFunction.getOperator().equalsIgnoreCase("ASC");
+            orderByExpressions.add(new OrderByExpressionContext(expression, isAsc));
+          }
         }
       }
     } else {
       List<SelectionSort> orderBy = brokerRequest.getOrderBy();
       if (CollectionUtils.isNotEmpty(orderBy)) {
+        // Deduplicate the order-by expressions
         orderByExpressions = new ArrayList<>(orderBy.size());
+        Set<ExpressionContext> expressionSet = new HashSet<>();
         for (SelectionSort selectionSort : orderBy) {
-          orderByExpressions.add(
-              new OrderByExpressionContext(QueryContextConverterUtils.getExpression(selectionSort.getColumn()),
-                  selectionSort.isIsAsc()));
+          ExpressionContext expression = QueryContextConverterUtils.getExpression(selectionSort.getColumn());
+          if (expressionSet.add(expression)) {
+            orderByExpressions.add(new OrderByExpressionContext(expression, selectionSort.isIsAsc()));
+          }
         }
       }
     }
