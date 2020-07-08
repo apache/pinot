@@ -248,10 +248,11 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     for (Object[] row : _rows) {
       rowList.add(row);
-      docIds.add((int) row[numOrderByExpressions]);
+      int docId = (int) row[numOrderByExpressions];
+      docIds.add(docId);
     }
 
-    // Sort the rows so that the docIds are in ascending order (bitmap always returns values in ascending order)
+    // Sort the rows with docIds to match the order of the bitmap (bitmap always returns values in ascending order)
     rowList.sort(Comparator.comparingInt(o -> (int) o[numOrderByExpressions]));
 
     // Construct a new TransformOperator to fetch the non-order-by expressions for the top rows
