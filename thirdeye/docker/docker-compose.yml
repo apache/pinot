@@ -17,16 +17,20 @@ services:
 #        - default
   dashboard:
     image: utkarshsaxena/pinot_thirdeye:latest
+    environment:
+      - CLASSPATH="org.apache.pinot.thirdeye.anomaly.ThirdEyeDashboardApplication"
     ports:
       - "1426:1426"
       - "1427:1427"
-    command: java -cp "./bin/thirdeye-pinot-1.0.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication "./config"
+    #entrypoint: java -cp "/opt/thirdeye/bin/thirdeye-pinot-1.0.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeDashboardApplication "/opt/thirdeye/config"
   backend:
     image: utkarshsaxena/pinot_thirdeye:latest
+    environment:
+      - CLASSPATH="org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication"
     ports:
       - "1428:1426"
       - "1429:1427"
-    command: java -cp "./bin/thirdeye-pinot-1.0.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "./config"
+    #entrypoint: java -cp "/opt/thirdeye/bin/thirdeye-pinot-1.0.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication "/opt/thirdeye/config"
   thirdeye_postgres:
     image: postgres:9.6
     container_name: thirdeye_postgres
