@@ -168,7 +168,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
     }
 
     // Init Druid datasources
-    if (properties.containsKey(POSTGRESQL)) {
+    if (properties.containsKey(DRUID)) {
       List<Map<String, Object>> mysqlMapList = ConfigUtils.getList(properties.get(DRUID));
       for (Map<String, Object> objMap: mysqlMapList) {
         Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
