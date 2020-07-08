@@ -32,9 +32,9 @@ RUN echo '{ "allow_root": true }' > /root/.bowerrc \
 
 RUN git clone ${PINOT_GIT_URL} ${TE_BUILD_DIR} --single-branch --branch ${PINOT_BRANCH} --depth=1 \
     && cd ${TE_BUILD_DIR} \
-    && mvn install -DskipTests -pl pinot-common,pinot-core,pinot-spi,pinot-clients -am -Pbuild-shaded-jar \
+    && mvn clean install -DskipTests -pl pinot-common,pinot-core,pinot-spi,pinot-clients -am -Pbuild-shaded-jar \
     && cd ${TE_BUILD_DIR}/thirdeye \
-    && mvn clean install -X -DskipTests \
+    && mvn install -X -DskipTests \
     && mkdir -p ${TE_HOME}/config \
     && mkdir -p ${TE_HOME}/bin \
     && cp -rp ${TE_BUILD_DIR}/thirdeye/thirdeye-pinot/config/* ${TE_HOME}/config/. \

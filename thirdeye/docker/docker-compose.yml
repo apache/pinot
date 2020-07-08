@@ -18,15 +18,14 @@ services:
   dashboard:
     image: utkarshsaxena/pinot_thirdeye:latest
     environment:
-      - CLASSPATH="org.apache.pinot.thirdeye.anomaly.ThirdEyeDashboardApplication"
+      - CLASSPATH=org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication
     ports:
       - "1426:1426"
       - "1427:1427"
-    #entrypoint: java -cp "/opt/thirdeye/bin/thirdeye-pinot-1.0.0-SNAPSHOT.jar" org.apache.pinot.thirdeye.anomaly.ThirdEyeDashboardApplication "/opt/thirdeye/config"
   backend:
     image: utkarshsaxena/pinot_thirdeye:latest
     environment:
-      - CLASSPATH="org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication"
+      - CLASSPATH=org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication
     ports:
       - "1428:1426"
       - "1429:1427"
