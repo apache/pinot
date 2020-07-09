@@ -46,5 +46,11 @@ VOLUME ["${TE_HOME}/config"]
 EXPOSE 1426 1427
 WORKDIR ${TE_HOME}
 
+COPY qubole_ca.cer /thirdeye/qubole_presto/ca.cer
+RUN keytool -noprompt -import -alias QuboleCA \
+    -file /thirdeye/qubole_presto/ca.cer \
+    -keystore /usr/lib/jvm/bellsoft-java8.x86_64/jre/lib/security/cacerts \
+    -storepass changeit
+
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
