@@ -60,19 +60,19 @@ public class PinotFSFactory {
     }
   }
 
-  public static void init(PinotConfiguration fsConfig) {
+  public static void init(PinotConfiguration config) {
     // Get schemes and their respective classes
-    PinotConfiguration schemesConfiguration = fsConfig.subset(CLASS);
+    PinotConfiguration schemesConfiguration = config.subset(CLASS);
     List<String> schemes = schemesConfiguration.getKeys();
     if (!schemes.isEmpty()) {
       LOGGER.info("Did not find any fs classes in the configuration");
     }
     
     for(String scheme : schemes){
-      String fsClassName = (String) schemesConfiguration.getProperty(scheme);
-      
-      LOGGER.info("Got scheme {}, classname {}, starting to initialize", scheme, fsClassName);
-      register(scheme, fsClassName, schemesConfiguration.subset(scheme));
+      String fsClassName = schemesConfiguration.getProperty(scheme);
+      PinotConfiguration fsConfiguration = config.subset(scheme);
+      LOGGER.info("Got scheme {}, initializing class {} with config : {} ", scheme, fsClassName, fsConfiguration.toMap());
+      register(scheme, fsClassName, fsConfiguration);
     }
   }
 
