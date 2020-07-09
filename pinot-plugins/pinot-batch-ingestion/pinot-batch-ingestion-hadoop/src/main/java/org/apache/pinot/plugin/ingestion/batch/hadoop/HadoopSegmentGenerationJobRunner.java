@@ -132,7 +132,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     //init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      new PinotConfiguration(pinotFSSpec);
+      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
 
     //Get pinotFS for input
