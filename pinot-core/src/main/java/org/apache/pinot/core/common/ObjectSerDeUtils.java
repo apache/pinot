@@ -36,10 +36,12 @@ import java.util.Map;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.function.customobject.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.locationtech.jts.geom.Geometry;
 
 
 /**
@@ -63,7 +65,8 @@ public class ObjectSerDeUtils {
     IntSet(9),
     TDigest(10),
     DistinctTable(11),
-    DataSketch(12);
+    DataSketch(12),
+    Geometry(13);
 
     private int _value;
 
@@ -102,6 +105,8 @@ public class ObjectSerDeUtils {
         return ObjectType.DistinctTable;
       } else if (value instanceof Sketch) {
         return ObjectType.DataSketch;
+      } else if (value instanceof Geometry) {
+        return ObjectType.Geometry;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -482,6 +487,25 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<Geometry> GEOMETRY_SER_DE = new ObjectSerDe<Geometry>() {
+    @Override
+    public byte[] serialize(Geometry value) {
+      return GeometrySerializer.serialize(value);
+    }
+
+    @Override
+    public Geometry deserialize(byte[] bytes) {
+      return GeometrySerializer.deserialize(bytes);
+    }
+
+    @Override
+    public Geometry deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return GeometrySerializer.deserialize(bytes);
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -497,7 +521,8 @@ public class ObjectSerDeUtils {
       INT_SET_SER_DE,
       TDIGEST_SER_DE,
       DISTINCT_TABLE_SER_DE,
-      DATA_SKETCH_SER_DE
+      DATA_SKETCH_SER_DE,
+      GEOMETRY_SER_DE
   };
   //@formatter:on
 
