@@ -185,7 +185,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
   }
 
   private void runAndVerifyInnerSegmentQuery(String query, double expectedSum, int expectedCount) {
-    AggregationOperator aggregationOperator = getOperatorForQuery(query);
+    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
@@ -210,7 +210,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
   }
 
   private void verifyDateTruncationResult(String query, String expectedStringKey) {
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(query);
+    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);

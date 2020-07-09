@@ -1066,7 +1066,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
   private void testTextSearchSelectQueryHelper(String query, int expectedResultSize, boolean compareGrepOutput,
       List<Serializable[]> expectedResults)
       throws Exception {
-    SelectionOnlyOperator operator = getOperatorForQuery(query);
+    SelectionOnlyOperator operator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
@@ -1108,7 +1108,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {  private static fin
   }
 
   private void testTextSearchAggregationQueryHelper(String query, int expectedCount) {
-    AggregationOperator operator = getOperatorForQuery(query);
+    AggregationOperator operator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     long count = (Long) operatorResult.getAggregationResult().get(0);
     Assert.assertEquals(expectedCount, count);

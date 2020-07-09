@@ -354,6 +354,15 @@ public class CalciteSqlParser {
     validate(aliasMap, pinotQuery);
   }
 
+  /**
+   * Rewrite non-aggregate group by query to distinct query.
+   * E.g.
+   * ```
+   *   SELECT col1+col2*5 FROM foo GROUP BY col1, col2 => SELECT distinct col1+col2*5 FROM foo
+   *   SELECT col1, col2 FROM foo GROUP BY col1, col2 => SELECT distinct col1, col2 FROM foo
+   * ```
+   * @param pinotQuery
+   */
   private static void rewriteNonAggregationGroupByToDistinct(PinotQuery pinotQuery) {
     boolean hasAggregation = false;
     for (Expression select : pinotQuery.getSelectList()) {

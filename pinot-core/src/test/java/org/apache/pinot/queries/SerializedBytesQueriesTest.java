@@ -225,7 +225,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentAggregation()
       throws Exception {
-    AggregationOperator aggregationOperator = getOperatorForQuery(getAggregationQuery());
+    AggregationOperator aggregationOperator = getOperatorForPqlQuery(getAggregationQuery());
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
@@ -386,7 +386,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentSVGroupBy()
       throws Exception {
-    AggregationGroupByOperator groupByOperator = getOperatorForQuery(getSVGroupByQuery());
+    AggregationGroupByOperator groupByOperator = getOperatorForPqlQuery(getSVGroupByQuery());
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(groupByResult);
@@ -582,7 +582,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentMVGroupBy()
       throws Exception {
-    AggregationGroupByOperator groupByOperator = getOperatorForQuery(getMVGroupByQuery());
+    AggregationGroupByOperator groupByOperator = getOperatorForPqlQuery(getMVGroupByQuery());
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(groupByResult);
