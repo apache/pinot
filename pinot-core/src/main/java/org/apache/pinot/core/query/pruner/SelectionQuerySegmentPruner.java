@@ -1,0 +1,228 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.core.query.pruner;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.TableDataManager;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.ExpressionContext;
+import org.apache.pinot.core.query.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+
+
+/**
+ * Segment pruner for selection queries.
+ * <ul>
+ *   <li>For selection query with LIMIT 0, keep 1 segment to create the data schema</li>
+ *   <li>For selection only query without filter, keep enough documents to fulfill the LIMIT requirement</li>
+ *   <li>
+ *     For selection order-by query without filer, if the first order-by expression is an identifier (column), prune
+ *     segments based on the column min/max value and keep enough documents to fulfill the LIMIT and OFFSET requirement.
+ *   </li>
+ * </ul>
+ */
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class SelectionQuerySegmentPruner implements SegmentPruner {
+
+  @Override
+  public void init(PinotConfiguration config) {
+  }
+
+  @Override
+  public List<SegmentDataManager> prune(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
+      ServerQueryRequest queryRequest) {
+    int numSegments = segmentDataManagers.size();
+    if (numSegments == 0) {
+      return Collections.emptyList();
+    }
+
+    // Do not prune aggregation queries
+    QueryContext queryContext = queryRequest.getQueryContext();
+    if (QueryContextUtils.isAggregationQuery(queryContext)) {
+      return segmentDataManagers;
+    }
+
+    // For LIMIT 0 case, keep one segment to create the schema
+    int limit = queryContext.getLimit();
+    if (limit == 0) {
+      for (int i = 1; i < numSegments; i++) {
+        tableDataManager.releaseSegment(segmentDataManagers.get(i));
+      }
+      return Collections.singletonList(segmentDataManagers.get(0));
+    }
+
+    // If LIMIT is not 0, only prune segments for selection queries without filter
+    FilterContext filter = queryContext.getFilter();
+    if (filter != null) {
+      return segmentDataManagers;
+    }
+
+    if (queryContext.getOrderByExpressions() == null) {
+      return pruneSelectionOnly(tableDataManager, segmentDataManagers, queryContext);
+    } else {
+      return pruneSelectionOrderBy(tableDataManager, segmentDataManagers, queryContext);
+    }
+  }
+
+  /**
+   * Helper method to prune segments for selection only queries without filter.
+   * <p>We just need to keep enough documents to fulfill the LIMIT requirement.
+   */
+  private List<SegmentDataManager> pruneSelectionOnly(TableDataManager tableDataManager,
+      List<SegmentDataManager> segmentDataManagers, QueryContext queryContext) {
+    List<SegmentDataManager> selectedSegmentDataManagers = new ArrayList<>(segmentDataManagers.size());
+    int remainingDocs = queryContext.getLimit();
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      if (remainingDocs > 0) {
+        selectedSegmentDataManagers.add(segmentDataManager);
+        remainingDocs -= segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs();
+      } else {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+    return selectedSegmentDataManagers;
+  }
+
+  /**
+   * Helper method to prune segments for selection order-by queries without filter.
+   * <p>When the first order-by expression is an identifier (column), we can prune segments based on the column min/max
+   * value:
+   * <ul>
+   *   <li>1. Sort all the segments by the column min/max value</li>
+   *   <li>2. Pick the top segments until we get enough documents to fulfill the LIMIT and OFFSET requirement</li>
+   *   <li>3. Keep the segments that has value overlap with the selected ones; remove the others</li>
+   * </ul>
+   */
+  private List<SegmentDataManager> pruneSelectionOrderBy(TableDataManager tableDataManager,
+      List<SegmentDataManager> segmentDataManagers, QueryContext queryContext) {
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    assert orderByExpressions != null;
+    int numOrderByExpressions = orderByExpressions.size();
+    assert numOrderByExpressions > 0;
+    OrderByExpressionContext firstOrderByExpression = orderByExpressions.get(0);
+    if (firstOrderByExpression.getExpression().getType() != ExpressionContext.Type.IDENTIFIER) {
+      return segmentDataManagers;
+    }
+    String firstOrderByColumn = firstOrderByExpression.getExpression().getIdentifier();
+
+    // Extract the column min/max value from each segment
+    int numSegments = segmentDataManagers.size();
+    List<SegmentDataManager> selectedSegmentDataManagers = new ArrayList<>(numSegments);
+    List<MinMaxValue> minMaxValues = new ArrayList<>(numSegments);
+    for (int i = 0; i < numSegments; i++) {
+      SegmentDataManager segmentDataManager = segmentDataManagers.get(i);
+      DataSourceMetadata dataSourceMetadata =
+          segmentDataManager.getSegment().getDataSource(firstOrderByColumn).getDataSourceMetadata();
+      Comparable minValue = dataSourceMetadata.getMinValue();
+      Comparable maxValue = dataSourceMetadata.getMaxValue();
+      // Always keep the segment if it does not have column min/max value in the metadata
+      if (minValue == null || maxValue == null) {
+        selectedSegmentDataManagers.add(segmentDataManager);
+      } else {
+        minMaxValues.add(new MinMaxValue(i, minValue, maxValue));
+      }
+    }
+    if (minMaxValues.isEmpty()) {
+      return segmentDataManagers;
+    }
+
+    int remainingDocs = queryContext.getLimit() + queryContext.getOffset();
+    if (firstOrderByExpression.isAsc()) {
+      // For ascending order, sort on column max value in ascending order
+      try {
+        minMaxValues.sort(Comparator.comparing(o -> o._maxValue));
+      } catch (Exception e) {
+        // Skip the pruning when segments have different data types for the first order-by column
+        return segmentDataManagers;
+      }
+
+      // Maintain the max value for all the selected segments
+      Comparable maxValue = null;
+      for (MinMaxValue minMaxValue : minMaxValues) {
+        SegmentDataManager segmentDataManager = segmentDataManagers.get(minMaxValue._index);
+        if (remainingDocs > 0) {
+          selectedSegmentDataManagers.add(segmentDataManager);
+          remainingDocs -= segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs();
+          maxValue = minMaxValue._maxValue;
+        } else {
+          // After getting enough documents, prune all the segments with min value larger than the current max value, or
+          // min value equal to the current max value and there is only one order-by expression
+          assert maxValue != null;
+          int result = minMaxValue._minValue.compareTo(maxValue);
+          if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
+            tableDataManager.releaseSegment(segmentDataManager);
+          } else {
+            selectedSegmentDataManagers.add(segmentDataManager);
+          }
+        }
+      }
+    } else {
+      // For descending order, sort on column min value in descending order
+      try {
+        minMaxValues.sort((o1, o2) -> o2._minValue.compareTo(o1._minValue));
+      } catch (Exception e) {
+        // Skip the pruning when segments have different data types for the first order-by column
+        return segmentDataManagers;
+      }
+
+      // Maintain the min value for all the selected segments
+      Comparable minValue = null;
+      for (MinMaxValue minMaxValue : minMaxValues) {
+        SegmentDataManager segmentDataManager = segmentDataManagers.get(minMaxValue._index);
+        if (remainingDocs > 0) {
+          selectedSegmentDataManagers.add(segmentDataManager);
+          remainingDocs -= segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs();
+          minValue = minMaxValue._minValue;
+        } else {
+          // After getting enough documents, prune all the segments with max value smaller than the current min value,
+          // or max value equal to the current min value and there is only one order-by expression
+          assert minValue != null;
+          int result = minMaxValue._maxValue.compareTo(minValue);
+          if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
+            tableDataManager.releaseSegment(segmentDataManager);
+          } else {
+            selectedSegmentDataManagers.add(segmentDataManager);
+          }
+        }
+      }
+    }
+
+    return selectedSegmentDataManagers;
+  }
+
+  private static class MinMaxValue {
+    final int _index;
+    final Comparable _minValue;
+    final Comparable _maxValue;
+
+    private MinMaxValue(int index, Comparable minValue, Comparable maxValue) {
+      _index = index;
+      _minValue = minValue;
+      _maxValue = maxValue;
+    }
+  }
+}
