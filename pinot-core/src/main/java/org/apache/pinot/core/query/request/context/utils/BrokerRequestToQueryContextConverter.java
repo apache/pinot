@@ -104,6 +104,11 @@ public class BrokerRequestToQueryContextConverter {
         groupByExpressions = null;
         limit = brokerRequest.getLimit();
         offset = selections.getOffset();
+        // Some old Pinot clients set LIMIT and OFFSET in Selection object.
+        // E.g. Presto segment level query.
+        if (limit == 0) {
+          limit = selections.getSize();
+        }
       } else {
         // Aggregation query
         List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();

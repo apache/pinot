@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.query.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.FunctionContext;
@@ -35,6 +36,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.predicate.InPredicate;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -424,6 +426,31 @@ public class BrokerRequestToQueryContextConverterTest {
   private QueryContext[] getQueryContexts(String pqlQuery, String sqlQuery) {
     return new QueryContext[]{QueryContextConverterUtils.getQueryContextFromPQL(
         pqlQuery), QueryContextConverterUtils.getQueryContextFromSQL(sqlQuery)};
+  }
+
+  @Test
+  public void testServerQueryBackwardCompatible() {
+    // Backward compatible: Select query with LIMIT set only in Select
+    // Presto may send a BrokerRequest with LIMIT only set in side brokerRequest.getSelections().getSize()
+    String pqlQuery = "SELECT foo, bar FROM testTable LIMIT 50, 100";
+    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(pqlQuery);
+    brokerRequest.setLimit(0);
+    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    assertEquals(selectExpressions.size(), 2);
+    assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("foo"));
+    assertEquals(selectExpressions.get(0).toString(), "foo");
+    assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
+    assertEquals(selectExpressions.get(1).toString(), "bar");
+    assertTrue(queryContext.getAliasMap().isEmpty());
+    assertNull(queryContext.getFilter());
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    assertNull(orderByExpressions);
+    assertNull(queryContext.getHavingFilter());
+    assertEquals(queryContext.getLimit(), 100);
+    assertEquals(queryContext.getOffset(), 50);
+    assertEquals(QueryContextUtils.getAllColumns(queryContext), new HashSet<>(Arrays.asList("foo", "bar")));
+    assertFalse(QueryContextUtils.isAggregationQuery(queryContext));
   }
 
   @Test
