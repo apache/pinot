@@ -31,19 +31,19 @@ public enum GeometryType {
   MULTI_POLYGON(true, "ST_MultiPolygon"),
   GEOMETRY_COLLECTION(true, "ST_GeomCollection");
 
-  private final boolean multitype;
-  private final String name;
+  private final boolean _multitype;
+  private final String _name;
 
   GeometryType(boolean multitype, String name) {
-    this.multitype = multitype;
-    this.name = name;
+    _multitype = multitype;
+    _name = name;
   }
 
   public boolean isMultitype() {
-    return multitype;
+    return _multitype;
   }
 
   public String getName() {
-    return name;
+    return _name;
   }
 }

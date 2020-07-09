@@ -31,7 +31,7 @@ import java.io.ByteArrayOutputStream;
  * A serializer that serializes a geometry object into bytes and vice versa.
  */
 public class GeometrySerializer {
-  private static GeometrySerde serde = new GeometrySerde();
+  private static final GeometrySerde SERDE = new GeometrySerde();
 
   private GeometrySerializer() {
   }
@@ -44,7 +44,7 @@ public class GeometrySerializer {
   public static byte[] serialize(Geometry geometry) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     Output output = new Output(out);
-    serde.write(new Kryo(), output, geometry);
+    SERDE.write(new Kryo(), output, geometry);
     output.close();
     return out.toByteArray();
   }
@@ -57,7 +57,7 @@ public class GeometrySerializer {
   public static Geometry deserialize(byte[] bytes) {
     ByteArrayInputStream in = new ByteArrayInputStream(bytes);
     Input input = new Input(in);
-    Object deserialized = serde.read(new Kryo(), input, Geometry.class);
+    Object deserialized = SERDE.read(new Kryo(), input, Geometry.class);
     input.close();
     return (Geometry) deserialized;
   }
