@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -55,5 +57,24 @@ public class PinotDriverTest {
     rs.close();
     statement.close();;
     conn.close();
+  }
+
+  public static void main(String[] args) throws Exception {
+    String query  = "SELECT baseballStats.AtBatting AS AtBatting,\n" + "  baseballStats.G_old AS G_old,\n"
+        + "  baseballStats.baseOnBalls AS baseOnBalls,\n" + "  baseballStats.caughtStealing AS caughtStealing,\n"
+        + "  baseballStats.doules AS doules,\n"
+        + "  baseballStats.groundedIntoDoublePlays AS groundedIntoDoublePlays,\n" + "  baseballStats.hits AS hits,\n"
+        + "  baseballStats.hitsByPitch AS hitsByPitch,\n" + "  baseballStats.homeRuns AS homeRuns,\n"
+        + "  baseballStats.intentionalWalks AS intentionalWalks,\n" + "  baseballStats.league AS league,\n"
+        + "  baseballStats.numberOfGames AS numberOfGames,\n"
+        + "  baseballStats.numberOfGamesAsBatter AS numberOfGamesAsBatter,\n"
+        + "  baseballStats.playerID AS playerID,\n" + "  baseballStats.playerName AS playerName,\n"
+        + "  baseballStats.playerStint AS playerStint,\n" + "  baseballStats.runs AS runs,\n"
+        + "  baseballStats.runsBattedIn AS runsBattedIn,\n" + "  baseballStats.sacrificeFlies AS sacrificeFlies,\n"
+        + "  baseballStats.sacrificeHits AS sacrificeHits,\n" + "  baseballStats.stolenBases AS stolenBases,\n"
+        + "  baseballStats.strikeouts AS strikeouts,\n" + "  baseballStats.teamID AS teamID,\n"
+        + "  baseballStats.tripples AS tripples\n" + "FROM baseballStats\n" + "LIMIT 1000 ";
+    System.out.println(query.replaceAll("baseballStats[.]", ""));
+    System.out.println(query.replaceAll("baseballStats[.]", "").replaceAll(" AS (.*?)(\n)", ",").replace(",F", " F"));
   }
 }

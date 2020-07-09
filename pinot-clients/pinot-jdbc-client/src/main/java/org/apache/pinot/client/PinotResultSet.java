@@ -81,7 +81,16 @@ public class PinotResultSet extends AbstractBaseResultSet {
       ResultSet resultSet = new ResultTableResultSet(brokerResponse.get("resultTable"));
       return new PinotResultSet(resultSet);
     } catch (Exception e) {
-      LOG.error("Error encoutered while creating result set from JSON", e);
+      LOG.error("Error encountered while creating result set from JSON", e);
+      return empty();
+    }
+  }
+
+  public static PinotResultSet fromResultTable(ResultSet resultSet) {
+    try {
+      return new PinotResultSet(resultSet);
+    } catch (Exception e) {
+      LOG.error("Error encountered while creating result set from Result Table", e);
       return empty();
     }
   }

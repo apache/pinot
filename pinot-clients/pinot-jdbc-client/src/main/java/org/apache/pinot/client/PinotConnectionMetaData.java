@@ -18,24 +18,44 @@
  */
 package org.apache.pinot.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.RowIdLifetime;
 import java.sql.SQLException;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.pinot.client.controller.PinotControllerTransport;
+import org.apache.pinot.client.controller.response.SchemaResponse;
+import org.apache.pinot.client.controller.response.TableResponse;
 import org.apache.pinot.client.utils.DriverUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.client.utils.Constants.*;
 
 
 public class PinotConnectionMetaData implements DatabaseMetaData {
-  private final PinotConnection _connection;
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotConnectionMetaData.class);
 
-  private static final String SYS_FUNCTIONS = "maxTimeuuid,minTimeuuid,now,token,uuid";
-  private static final String NUM_FUNCTIONS = "avg,count,max,min,sum";
-  private static final String TIME_FUNCTIONS = "toDate,toTimestamp,toUnixTimestamp,dateOf,unixTimestampOf";
-  private static final String STRING_FUNCTIONS = "toDate,toTimestamp,toUnixTimestamp,dateOf,unixTimestampOf";
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private final PinotConnection _connection;
+  private final PinotControllerTransport _controllerTransport;
+  private final String _controllerURL;
 
   public PinotConnectionMetaData(PinotConnection connection) {
+    this(connection, null, null);
+  }
+
+  public PinotConnectionMetaData(PinotConnection connection, String controllerURL,
+      PinotControllerTransport controllerTransport) {
     _connection = connection;
+    _controllerURL = controllerURL;
+    _controllerTransport = controllerTransport;
   }
 
   @Override
@@ -189,7 +209,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public String getIdentifierQuoteString()
       throws SQLException {
-    return "\"";
+    return " ";
   }
 
   @Override
@@ -207,7 +227,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public String getStringFunctions()
       throws SQLException {
-    return "";
+    return STRING_FUNCTIONS;
   }
 
   @Override
@@ -249,7 +269,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsColumnAliasing()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -328,7 +348,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsMultipleTransactions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -376,7 +396,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsIntegrityEnhancementFacility()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -424,37 +444,37 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public String getCatalogSeparator()
       throws SQLException {
-    return ".";
+    return "";
   }
 
   @Override
   public boolean supportsSchemasInDataManipulation()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSchemasInProcedureCalls()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSchemasInTableDefinitions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSchemasInIndexDefinitions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsSchemasInPrivilegeDefinitions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -724,25 +744,25 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsDataDefinitionAndDataManipulationTransactions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean supportsDataManipulationTransactionsOnly()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean dataDefinitionCausesTransactionCommit()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
   public boolean dataDefinitionIgnoredInTransactions()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -761,31 +781,140 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types)
       throws SQLException {
-    return PinotResultSet.empty();
+    try {
+      PinotMeta pinotMeta = new PinotMeta();
+      pinotMeta.setColumnNames(TABLE_COLUMNS);
+      pinotMeta.setColumnDataTypes(TABLE_COLUMNS_DTYPES);
+
+      TableResponse tableResponse = _controllerTransport.getAllTables(_controllerURL);
+      if (tableResponse.getNumTables() == 0) {
+        LOGGER.warn("No tables found in database");
+      }
+      for (String table : tableResponse.getAllTables()) {
+        Object[] row = new Object[]{GLOBAL_CATALOG, GLOBAL_CATALOG, table, TABLE_TYPE, table, "", "", "", "", ""};
+        pinotMeta.addRow(Arrays.asList(row));
+      }
+
+      JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
+      return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
+    } catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   @Override
   public ResultSet getSchemas()
       throws SQLException {
-    return PinotResultSet.empty();
+    try {
+      PinotMeta pinotMeta = new PinotMeta();
+      pinotMeta.setColumnNames(SCHEMA_COLUMNS);
+      pinotMeta.setColumnDataTypes(SCHEMA_COLUMNS_DTYPES);
+
+      List<Object> row = new ArrayList<>();
+      row.add(GLOBAL_CATALOG);
+      row.add(GLOBAL_CATALOG);
+      pinotMeta.addRow(row);
+
+      JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
+      return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
+    } catch (Exception e) {
+      throw new SQLException(e);
+    }
   }
 
   @Override
   public ResultSet getCatalogs()
       throws SQLException {
-    return PinotResultSet.empty();
+    PinotMeta pinotMeta = new PinotMeta();
+    pinotMeta.setColumnNames(CATALOG_COLUMNS);
+    pinotMeta.setColumnDataTypes(CATALOG_COLUMNS_DTYPES);
+
+    List<Object> row = new ArrayList<>();
+    row.add(GLOBAL_CATALOG);
+    pinotMeta.addRow(row);
+
+    JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
+    return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
   }
 
   @Override
   public ResultSet getTableTypes()
       throws SQLException {
-    return PinotResultSet.empty();
+    PinotMeta pinotMeta = new PinotMeta();
+    pinotMeta.setColumnNames(TABLE_TYPES_COLUMNS);
+    pinotMeta.setColumnDataTypes(TABLE_TYPES_COLUMNS_DTYPES);
+
+    List<Object> row = new ArrayList<>();
+    row.add(TABLE_TYPE);
+    pinotMeta.addRow(row);
+
+    JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
+    return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
   }
 
   @Override
   public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
       throws SQLException {
-    return PinotResultSet.empty();
+
+    SchemaResponse schemaResponse = _controllerTransport.getTableSchema(tableNamePattern, _controllerURL);
+    PinotMeta pinotMeta = new PinotMeta();
+    pinotMeta.setColumnNames(TABLE_SCHEMA_COLUMNS);
+    pinotMeta.setColumnDataTypes(TABLE_SCHEMA_COLUMNS_DTYPES);
+
+    String tableName = schemaResponse.getSchemaName();
+    int ordinalPosition = 1;
+    for (JsonNode columns : schemaResponse.getDimensions()) {
+      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+      ordinalPosition++;
+    }
+
+    for (JsonNode columns : schemaResponse.getMetrics()) {
+      appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+      ordinalPosition++;
+    }
+
+    JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
+    return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
+  }
+
+  private void appendColumnMeta(PinotMeta pinotMeta, String tableName, int ordinalPosition, JsonNode columns) {
+    String columnName = columns.get("name").textValue();
+    String columnDataType = columns.get("dataType").textValue();
+    Integer columnsSQLDataType = getSQLDataType(columnDataType);
+
+    Object[] row =
+        new Object[]{GLOBAL_CATALOG, GLOBAL_CATALOG, tableName, columnName, columnsSQLDataType, columnDataType, -1, -1, -1, -1, 1, null, null, -1, -1, -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"};
+    pinotMeta.addRow(Arrays.asList(row));
+  }
+
+  private Integer getSQLDataType(String columnDataType) {
+    Integer columnsSQLDataType;
+    switch (columnDataType) {
+      case "STRING":
+        columnsSQLDataType = Types.VARCHAR;
+        break;
+      case "INT":
+        columnsSQLDataType = Types.INTEGER;
+        break;
+      case "LONG":
+        columnsSQLDataType = Types.INTEGER;
+        break;
+      case "FLOAT":
+        columnsSQLDataType = Types.FLOAT;
+        break;
+      case "DOUBLE":
+        columnsSQLDataType = Types.DOUBLE;
+        break;
+      case "BOOLEAN":
+        columnsSQLDataType = Types.BOOLEAN;
+        break;
+      case "BYTES":
+        columnsSQLDataType = Types.BINARY;
+        break;
+      default:
+        columnsSQLDataType = Types.NULL;
+    }
+    return columnsSQLDataType;
   }
 
   @Override
@@ -858,8 +987,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsResultSetConcurrency(int type, int concurrency)
       throws SQLException {
-    return type == ResultSet.TYPE_FORWARD_ONLY
-        && concurrency == ResultSet.CONCUR_READ_ONLY;
+    return type == ResultSet.TYPE_FORWARD_ONLY && concurrency == ResultSet.CONCUR_READ_ONLY;
   }
 
   @Override
@@ -943,7 +1071,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsNamedParameters()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -955,7 +1083,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsGetGeneratedKeys()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -1040,7 +1168,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public ResultSet getSchemas(String catalog, String schemaPattern)
       throws SQLException {
-    return PinotResultSet.empty();
+    return getSchemas();
   }
 
   @Override
@@ -1052,7 +1180,7 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
   @Override
   public boolean autoCommitFailureClosesAllResultSets()
       throws SQLException {
-    return true;
+    return false;
   }
 
   @Override
@@ -1098,5 +1226,4 @@ public class PinotConnectionMetaData implements DatabaseMetaData {
       throws SQLException {
     return true;
   }
-
 }

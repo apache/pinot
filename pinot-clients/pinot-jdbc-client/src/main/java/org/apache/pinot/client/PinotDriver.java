@@ -45,10 +45,10 @@ public class PinotDriver implements Driver {
       LOGGER.info("Initiating connection to database for url: " + url);
       PinotClientTransport pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
       List<String> brokerList = DriverUtils.getBrokersFromURL(url);
-      return new PinotConnection(brokerList, pinotClientTransport);
+      String controllerUrl = DriverUtils.getControllerFromURL(url);
+      return new PinotConnection(brokerList, controllerUrl, pinotClientTransport);
     } catch (Exception e) {
-      LOGGER.error("Failed to connect to url : {}", url, e);
-      throw new SQLException("Failed to connect to url : {}", url, e);
+      throw new SQLException(String.format("Failed to connect to url : %s", url), e);
     }
   }
 

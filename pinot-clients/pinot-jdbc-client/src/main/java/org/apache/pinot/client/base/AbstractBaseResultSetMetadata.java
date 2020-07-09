@@ -22,6 +22,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLData;
 import java.sql.SQLException;
 import java.sql.Types;
+import org.apache.pinot.client.utils.Constants;
 
 
 public abstract class AbstractBaseResultSetMetadata implements ResultSetMetaData {
@@ -77,7 +78,7 @@ public abstract class AbstractBaseResultSetMetadata implements ResultSetMetaData
   @Override
   public String getSchemaName(int column)
       throws SQLException {
-    return "";
+    return "baseballStats";
   }
 
   @Override
@@ -95,24 +96,26 @@ public abstract class AbstractBaseResultSetMetadata implements ResultSetMetaData
   @Override
   public String getTableName(int column)
       throws SQLException {
-    return "";
+    return "baseballStats";
   }
 
   @Override
   public String getCatalogName(int column)
       throws SQLException {
-    return "";
+    return Constants.GLOBAL_CATALOG;
   }
 
   @Override
   public int getColumnType(int column)
       throws SQLException {
+    //TODO: Implement type mapping
     return Types.VARCHAR;
   }
 
   @Override
   public String getColumnTypeName(int column)
       throws SQLException {
+    //TODO: Implement type mapping
     return "STRING";
   }
 
@@ -132,12 +135,6 @@ public abstract class AbstractBaseResultSetMetadata implements ResultSetMetaData
   public boolean isDefinitelyWritable(int column)
       throws SQLException {
     return false;
-  }
-
-  @Override
-  public String getColumnClassName(int column)
-      throws SQLException {
-    return null;
   }
 
   @Override

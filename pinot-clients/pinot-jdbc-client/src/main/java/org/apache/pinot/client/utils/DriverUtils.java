@@ -31,6 +31,9 @@ public class DriverUtils {
   public static final String SCHEME = "jdbc";
   public static final String DRIVER = "pinot";
   public static final Logger LOG = LoggerFactory.getLogger(DriverUtils.class);
+  public static final String QUERY_SEPERATOR = "&";
+  public static final String PARAM_SEPERATOR = "=";
+  public static final String CONTROLLER = "controller";
 
   private DriverUtils() {
   }
@@ -60,4 +63,20 @@ public class DriverUtils {
     }
     return "";
   }
+
+  public static String getControllerFromURL(String url) {
+    if (url.toLowerCase().startsWith("jdbc:")) {
+      url = url.substring(5);
+    }
+    URI uri = URI.create(url);
+    String[] params = uri.getRawQuery().split(QUERY_SEPERATOR);
+    for (String param : params) {
+      String[] query = param.split(PARAM_SEPERATOR);
+      if (query[0].toLowerCase().contentEquals(CONTROLLER)) {
+        return query[1];
+      }
+    }
+    return null;
+  }
+
 }

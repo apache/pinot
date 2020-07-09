@@ -47,4 +47,10 @@ public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
       throws SQLException {
     return _columns.getOrDefault(column, "");
   }
+
+  @Override
+  public String getColumnClassName(int column)
+      throws SQLException {
+    return String.class.toString();
+  }
 }
