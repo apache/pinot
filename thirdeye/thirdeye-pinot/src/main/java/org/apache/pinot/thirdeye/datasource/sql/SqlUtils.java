@@ -605,6 +605,10 @@ public class SqlUtils {
       timeFormat = timeFormat.replaceAll("(?i):mm", ":mi");
     }
 
+    if (timeFormat == "yyyy-MM-dd hh:mm:ss") {
+      timeFormat = "yyyy-MM-dd HH:mm:ss";
+    }
+
     // in postgres HH is 12 hour format and in Java it's 24 hour format, convert it
     if (timeFormat.contains("HH")) {
       timeFormat = timeFormat.replaceAll("HH", "HH24");
