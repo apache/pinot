@@ -21,7 +21,6 @@ package org.apache.pinot.client;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.client.base.AbstractBaseResultSetMetadata;
 
 
