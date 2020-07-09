@@ -24,24 +24,116 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class PinotConfigurationTest {
+
+  @Test
+  public void assertBaseOperations() {
+    Map<String, Object> typedProperties = new HashMap<>();
+
+    typedProperties.put("config.boolean", "true");
+    typedProperties.put("config.double", "10.0");
+    typedProperties.put("config.int", "100");
+    typedProperties.put("config.long", "10000000");
+    typedProperties.put("config.string", "val");
+    typedProperties.put("config.list", "val1,val2,val3");
+
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(typedProperties);
+
+    Assert.assertEquals(pinotConfiguration.getProperty("config.boolean", false), true);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.boolean", Boolean.class), Boolean.TRUE);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.boolean-missing", false), false);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.double", 0d), 10.0d);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.double-missing", 20d), 20d);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.int", 0), 100);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.int-missing", 200), 200);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.long", 0l), 10000000l);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.long-missing", 20000000l), 20000000l);
+    Assert.assertEquals(pinotConfiguration.getProperty("config.string", "missing-val"), "val");
+    Assert.assertEquals(pinotConfiguration.getProperty("config.string-missing", "missing-val"), "missing-val");
+
+    // Asserts array properties can be read as string and array.
+    Assert.assertEquals(pinotConfiguration.getProperty("config.list"), "val1,val2,val3");
+    List<String> listValues = pinotConfiguration.getProperty("config.list", Arrays.asList());
+    Assert.assertEquals(listValues.size(), 3);
+    Assert.assertTrue(listValues.contains("val1"));
+    Assert.assertTrue(listValues.contains("val2"));
+    Assert.assertTrue(listValues.contains("val3"));
+    Assert.assertEquals(pinotConfiguration.getProperty("config.list-missing", Arrays.asList()), Arrays.asList());
+
+    Assert.assertFalse(pinotConfiguration.containsKey("missing-property"));
+    Assert.assertNull(pinotConfiguration.getProperty("missing-property"));
+
+  }
+
+  @Test
+  public void assertGetKeys() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("property.1.key", "val1");
+    properties.put("property.2.key", "val1");
+    properties.put("property.3.key", "val1");
+    properties.put("property.4.key", "val1");
+
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(properties);
+
+    List<String> keys = pinotConfiguration.getKeys();
+    Assert.assertTrue(keys.contains("property.1.key"));
+    Assert.assertTrue(keys.contains("property.2.key"));
+    Assert.assertTrue(keys.contains("property.3.key"));
+    Assert.assertTrue(keys.contains("property.4.key"));
+    Assert.assertEquals(keys.size(), 4);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void assertUnsupportedTypeBehavior() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("property.invalid-type", "true");
+
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(properties);
+
+    pinotConfiguration.getProperty("property.invalid-type", Math.class);
+  }
+
+  @Test
+  public void assertPropertyOverride() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty("property.override", "overriden-value");
+
+    pinotConfiguration.containsKey("property.override");
+    Assert.assertEquals(pinotConfiguration.getProperty("property.override"), "overriden-value");
+
+    pinotConfiguration = new PinotConfiguration(pinotConfiguration.toMap()).clone().subset("property");
+
+    pinotConfiguration.addProperty("override", "overriden-value-2");
+
+    Assert.assertEquals(pinotConfiguration.getProperty("override"), "overriden-value,overriden-value-2");
+
+    Object object = new Object();
+    pinotConfiguration.setProperty("raw-property", object);
+    Assert.assertEquals(pinotConfiguration.getRawProperty("raw-property"), object);
+  }
+
   @Test
   public void assertPropertyPriorities() throws IOException {
-    Map<String, Object> cliArguments = new HashMap<>();
+    Map<String, Object> baseProperties = new HashMap<>();
     Map<String, String> mockedEnvironmentVariables = new HashMap<>();
 
     String configFile2 = File.createTempFile("pinot-configuration-test-2", ".properties").getAbsolutePath();
     String configFile3 = File.createTempFile("pinot-configuration-test-3", ".properties").getAbsolutePath();
 
-    cliArguments.put("controller.host", "cli-argument-controller-host");
-    cliArguments.put("config.paths", "classpath:/pinot-configuration-1.properties");
+    baseProperties.put("controller.host", "cli-argument-controller-host");
+    baseProperties.put("config.paths", "classpath:/pinot-configuration-1.properties");
     mockedEnvironmentVariables.put("PINOT_CONTROLLER_HOST", "env-var-controller-host");
     mockedEnvironmentVariables.put("PINOT_CONTROLLER_PORT", "env-var-controller-port");
     mockedEnvironmentVariables.put("PINOT_RELAXEDPROPERTY_TEST", "true");
@@ -50,7 +142,7 @@ public class PinotConfigurationTest {
     copyClasspathResource("/pinot-configuration-2.properties", configFile2);
     copyClasspathResource("/pinot-configuration-3.properties", configFile3);
 
-    PinotConfiguration configuration = new PinotConfiguration(cliArguments, mockedEnvironmentVariables);
+    PinotConfiguration configuration = new PinotConfiguration(baseProperties, mockedEnvironmentVariables);
 
     // Tests that cli arguments have the highest priority.
     Assert.assertEquals(configuration.getProperty("controller.host"), "cli-argument-controller-host");
@@ -74,6 +166,45 @@ public class PinotConfigurationTest {
 
     // Tests relaxed binding on environment variables
     Assert.assertEquals(configuration.getProperty("relaxed-property.test"), "true");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void assertInvalidConfigPathBehavior() {
+    Map<String, Object> baseProperties = new HashMap<>();
+
+    baseProperties.put("config.paths", "invalid-path.properties");
+
+    new PinotConfiguration(baseProperties);
+  }
+
+  @Test
+  public void assertPropertiesFromBaseConfiguration() throws ConfigurationException {
+    PinotConfiguration config = new PinotConfiguration(new PropertiesConfiguration(
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile()));
+
+    Assert.assertEquals(config.getProperty("pinot.server.storage.factory.class.s3"),
+        "org.apache.pinot.plugin.filesystem.S3PinotFS");
+    Assert.assertEquals(config.getProperty("pinot.server.segment.fetcher.protocols"), "file,http,s3");
+  }
+
+  @Test
+  public void assertPropertiesFromFSSpec() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("config.property.1", "val1");
+    configs.put("config.property.2", "val2");
+    configs.put("config.property.3", "val3");
+
+    PinotFSSpec pinotFSSpec = new PinotFSSpec();
+    pinotFSSpec.setConfigs(configs);
+
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(pinotFSSpec);
+
+    Assert.assertEquals(pinotConfiguration.getProperty("config.property.1"), "val1");
+    Assert.assertEquals(pinotConfiguration.getProperty("config.property.2"), "val2");
+    Assert.assertEquals(pinotConfiguration.getProperty("config.property.3"), "val3");
+
+    // Asserts no error occurs when no configuration is provided in the spec. 
+    new PinotConfiguration(new PinotFSSpec());
   }
 
   private void copyClasspathResource(String classpathResource, String target) throws IOException {
