@@ -201,41 +201,11 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   private void appendColumnMeta(PinotMeta pinotMeta, String tableName, int ordinalPosition, JsonNode columns) {
     String columnName = columns.get("name").textValue();
     String columnDataType = columns.get("dataType").textValue();
-    Integer columnsSQLDataType = getSQLDataType(columnDataType);
+    Integer columnsSQLDataType = DriverUtils.getSQLDataType(columnDataType);
 
     Object[] row =
         new Object[]{GLOBAL_CATALOG, GLOBAL_CATALOG, tableName, columnName, columnsSQLDataType, columnDataType, -1, -1, -1, -1, 1, null, null, -1, -1, -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"};
     pinotMeta.addRow(Arrays.asList(row));
-  }
-
-  private Integer getSQLDataType(String columnDataType) {
-    Integer columnsSQLDataType;
-    switch (columnDataType) {
-      case "STRING":
-        columnsSQLDataType = Types.VARCHAR;
-        break;
-      case "INT":
-        columnsSQLDataType = Types.INTEGER;
-        break;
-      case "LONG":
-        columnsSQLDataType = Types.INTEGER;
-        break;
-      case "FLOAT":
-        columnsSQLDataType = Types.FLOAT;
-        break;
-      case "DOUBLE":
-        columnsSQLDataType = Types.DOUBLE;
-        break;
-      case "BOOLEAN":
-        columnsSQLDataType = Types.BOOLEAN;
-        break;
-      case "BYTES":
-        columnsSQLDataType = Types.BINARY;
-        break;
-      default:
-        columnsSQLDataType = Types.NULL;
-    }
-    return columnsSQLDataType;
   }
 
   @Override
