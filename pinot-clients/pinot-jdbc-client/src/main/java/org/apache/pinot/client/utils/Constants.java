@@ -3,6 +3,10 @@ package org.apache.pinot.client.utils;
 
 
 public class Constants {
+  public static final String DRIVER_NAME = "APACHE_PINOT_DRIVER";
+  public static final String DRIVER_VERSION = "1.0";
+  public static final String PRODUCT_NAME = "APACHE_PINOT";
+  public static final String PINOT_VERSION = "0.5"; //This needs to be changed as per the project maven version
 
   public static final String[] CATALOG_COLUMNS = {"TABLE_CAT"};
   public static final String[] CATALOG_COLUMNS_DTYPES = {"STRING"};
@@ -33,4 +37,5 @@ public class Constants {
           + "toDateTime,fromDateTime,round,now";
   public static final String STRING_FUNCTIONS =
               "lower,upper,trim,ltrim,rtrim,subst,reverse,replace,lpad,rpad,length,strpos,startsWith,concat";
+
 }
