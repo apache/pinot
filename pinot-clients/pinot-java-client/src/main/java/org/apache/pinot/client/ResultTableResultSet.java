@@ -19,6 +19,8 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -59,6 +61,33 @@ class ResultTableResultSet extends AbstractResultSet {
     } else {
       return jsonValue.toString();
     }
+  }
+
+  public List<String> getAllColumns() {
+    List<String> columns = new ArrayList<>();
+    if (_columnNamesArray == null) {
+      return columns;
+    }
+
+    for (JsonNode column : _columnNamesArray) {
+      columns.add(column.textValue());
+    }
+
+    return columns;
+  }
+
+
+  public List<String> getAllColumnsDataTypes() {
+    List<String> columnDataTypes = new ArrayList<>();
+    if (_columnDataTypesArray == null) {
+      return columnDataTypes;
+    }
+
+    for (JsonNode columnDataType : _columnDataTypesArray) {
+      columnDataTypes.add(columnDataType.textValue());
+    }
+
+    return columnDataTypes;
   }
 
   @Override
