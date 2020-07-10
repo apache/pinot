@@ -179,7 +179,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *   <li>Selecting some columns with filter that does not match any record</li>
    * </ul>
    */
-  public void testDistinctInnerSegmentHelper(String[] queries, boolean isPql)
+  private void testDistinctInnerSegmentHelper(String[] queries, boolean isPql)
       throws Exception {
     _indexSegment = createSegment(0, generateRecords(0));
     try {
@@ -389,7 +389,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *   </li>
    * </ul>
    */
-  public void testDistinctInterSegmentHelper(String[] pqlQueries, String[] sqlQueries)
+  private void testDistinctInterSegmentHelper(String[] pqlQueries, String[] sqlQueries)
       throws Exception {
     ImmutableSegment segment0 = createSegment(0, generateRecords(0));
     ImmutableSegment segment1 = createSegment(1, generateRecords(1000));
