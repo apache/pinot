@@ -47,12 +47,11 @@ public class PinotFSFactory {
     }
   };
 
-
-  public static void register(String scheme, String fsClassName, PinotConfiguration configuration) {
+  public static void register(String scheme, String fsClassName, PinotConfiguration fsConfiguration) {
     try {
       LOGGER.info("Initializing PinotFS for scheme {}, classname {}", scheme, fsClassName);
       PinotFS pinotFS = PluginManager.get().createInstance(fsClassName);
-      pinotFS.init(configuration);
+      pinotFS.init(fsConfiguration);
       PINOT_FS_MAP.put(scheme, pinotFS);
     } catch (Exception e) {
       LOGGER.error("Could not instantiate file system for class {} with scheme {}", fsClassName, scheme, e);
@@ -60,19 +59,19 @@ public class PinotFSFactory {
     }
   }
 
-  public static void init(PinotConfiguration fsConfig) {
+  public static void init(PinotConfiguration fsFactoryConfig) {
     // Get schemes and their respective classes
-    PinotConfiguration schemesConfiguration = fsConfig.subset(CLASS);
+    PinotConfiguration schemesConfiguration = fsFactoryConfig.subset(CLASS);
     List<String> schemes = schemesConfiguration.getKeys();
     if (!schemes.isEmpty()) {
       LOGGER.info("Did not find any fs classes in the configuration");
     }
-    
-    for(String scheme : schemes){
-      String fsClassName = (String) schemesConfiguration.getProperty(scheme);
-      
-      LOGGER.info("Got scheme {}, classname {}, starting to initialize", scheme, fsClassName);
-      register(scheme, fsClassName, schemesConfiguration.subset(scheme));
+
+    for (String scheme : schemes) {
+      String fsClassName = schemesConfiguration.getProperty(scheme);
+      PinotConfiguration fsConfiguration = fsFactoryConfig.subset(scheme);
+      LOGGER.info("Got scheme {}, initializing class {}", scheme, fsClassName);
+      register(scheme, fsClassName, fsConfiguration);
     }
   }
 
