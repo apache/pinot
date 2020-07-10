@@ -129,11 +129,6 @@
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-controller/src/main/resources/webapp</directory>
-      <outputDirectory>query_console</outputDirectory>
-    </fileSet>
-    <fileSet>
-      <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/pinot-tools/src/main/resources/conf</directory>
       <outputDirectory>conf</outputDirectory>
     </fileSet>

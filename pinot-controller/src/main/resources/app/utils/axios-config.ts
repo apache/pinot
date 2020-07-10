@@ -16,27 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
 
-import java.io.InputStream;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+/* eslint-disable no-console */
 
+import axios from 'axios';
 
-@Path("/")
-public class LandingPageHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LandingPageHandler.class);
+const isDev = process.env.NODE_ENV !== 'production';
 
-  // We configure this webapp resource as jersey handler because all our APIs are at "/"
-  // So, the framework does not serve base index.html page correctly. See ControllerAdminApiApplication
-  // for more details.
-  @GET
-  @Produces(MediaType.TEXT_HTML)
-  public InputStream getIndexPage() {
-    return getClass().getClassLoader().getResourceAsStream("webapp/index.html");
+const handleError = (error: any) => {
+  if (isDev) {
+    console.log(error);
   }
-}
+  return error;
+};
+
+const handleResponse = (response: any) => {
+  if (isDev) {
+    console.log(response);
+  }
+  return response;
+};
+
+const handleConfig = (config: any) => {
+  if (isDev) {
+    console.log(config);
+  }
+  return config;
+};
+
+export const baseApi = axios.create({ baseURL: '/' });
+baseApi.interceptors.request.use(handleConfig, handleError);
+baseApi.interceptors.response.use(handleResponse, handleError);

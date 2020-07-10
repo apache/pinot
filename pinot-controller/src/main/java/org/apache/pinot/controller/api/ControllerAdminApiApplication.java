@@ -132,12 +132,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // So, we setup specific handlers for static resource directory. index.html is served directly
     // by a jersey handler
 
-    _httpServer.getServerConfiguration()
-        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/query/"), "/query/");
-    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/css/"), "/css/");
-    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/js/"), "/js/");
-    // without this explicit request to /index.html will not work
-    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/"), "/index.html");
+    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
+    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
 
     LOGGER.info("Admin API started on ports: {}", listenerConfigs.stream().map(ListenerConfig::getPort)
         .map(port -> port.toString()).collect(Collectors.joining(",")));

@@ -16,27 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
 
-import java.io.InputStream;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import * as React from 'react';
 
+import Backdrop from '@material-ui/core/Backdrop';
+import CircularProgress from '@material-ui/core/CircularProgress';
+import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
 
-@Path("/")
-public class LandingPageHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LandingPageHandler.class);
+const useStyles = makeStyles((theme: Theme) =>
+  createStyles({
+    backdrop: {
+      zIndex: theme.zIndex.drawer + 2,
+      color: '#fff',
+    },
+  })
+);
 
-  // We configure this webapp resource as jersey handler because all our APIs are at "/"
-  // So, the framework does not serve base index.html page correctly. See ControllerAdminApiApplication
-  // for more details.
-  @GET
-  @Produces(MediaType.TEXT_HTML)
-  public InputStream getIndexPage() {
-    return getClass().getClassLoader().getResourceAsStream("webapp/index.html");
-  }
-}
+const AppLoader = () => {
+  const classes = useStyles();
+  return (
+    <Backdrop className={classes.backdrop} open>
+      <CircularProgress color="inherit" />
+    </Backdrop>
+  );
+};
+
+export default AppLoader;
