@@ -54,6 +54,11 @@ class ResultTableResultSet extends AbstractResultSet {
   }
 
   @Override
+  public String getColumnDataType(int columnIndex) {
+    return _columnDataTypesArray.get(columnIndex).asText();
+  }
+
+  @Override
   public String getString(int rowIndex, int columnIndex) {
     JsonNode jsonValue = _rowsArray.get(rowIndex).get(columnIndex);
     if (jsonValue.isTextual()) {
