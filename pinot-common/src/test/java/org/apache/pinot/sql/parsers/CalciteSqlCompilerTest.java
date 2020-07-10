@@ -1724,4 +1724,73 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.IS_NULL);
     Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "col");
   }
+
+  @Test
+  public void testNonAggregationGroupByQuery() {
+    PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
+    String query = "SELECT col1 FROM foo GROUP BY col1";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    BrokerRequest brokerRequest = converter.convert(pinotQuery);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator().toUpperCase(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().size(), 1);
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationType().toUpperCase(), "DISTINCT");
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"), "col1");
+
+    query = "SELECT col1, col2 FROM foo GROUP BY col1, col2";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    brokerRequest = converter.convert(pinotQuery);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator().toUpperCase(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "col2");
+
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().size(), 1);
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationType().toUpperCase(), "DISTINCT");
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"), "col1:col2");
+
+    query = "SELECT col1+col2*5 FROM foo GROUP BY col1, col2";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    brokerRequest = converter.convert(pinotQuery);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator().toUpperCase(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "TIMES");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col2");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 5L);
+
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().size(), 1);
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationType().toUpperCase(), "DISTINCT");
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"), "plus(col1,times(col2,'5'))");
+
+    query = "SELECT col1+col2*5 AS col3 FROM foo GROUP BY col1, col2";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    brokerRequest = converter.convert(pinotQuery);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator().toUpperCase(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "TIMES");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col2");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 5L);
+
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().size(), 1);
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationType().toUpperCase(), "DISTINCT");
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"), "plus(col1,times(col2,'5'))");
+  }
+
+  @Test(expectedExceptions = SqlCompilationException.class)
+  public void testInvalidNonAggregationGroupBy() {
+    // Not support Aggregation functions in case statements.
+    try {
+      CalciteSqlParser.compileToPinotQuery("SELECT col1+col2 FROM foo GROUP BY col1");
+    } catch (SqlCompilationException e) {
+      Assert.assertEquals(e.getMessage(),
+          "For non-aggregation group by query, all the identifiers in select clause should be in groupBys. Found identifier: [col2]");
+      throw e;
+    }
+  }
 }

@@ -195,7 +195,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
   }
 
   private void runQuery(String query, int count, List<Pairs.IntPair> intPairs, int numColumns) {
-    SelectionOnlyOperator operator = getOperatorForQuery(query);
+    SelectionOnlyOperator operator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     assertNotNull(rows, ERROR_MESSAGE);

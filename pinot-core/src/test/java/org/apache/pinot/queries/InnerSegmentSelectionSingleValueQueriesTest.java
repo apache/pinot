@@ -41,7 +41,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String query = "SELECT * FROM testTable LIMIT 0";
 
     // Test query without filter
-    EmptySelectionOperator emptySelectionOperator = getOperatorForQuery(query);
+    EmptySelectionOperator emptySelectionOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = emptySelectionOperator.nextBlock();
     ExecutionStatistics executionStatistics = emptySelectionOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
@@ -60,7 +60,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertTrue(resultsBlock.getSelectionResult().isEmpty());
 
     // Test query with filter
-    emptySelectionOperator = getOperatorForQueryWithFilter(query);
+    emptySelectionOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = emptySelectionOperator.nextBlock();
     executionStatistics = emptySelectionOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
@@ -85,7 +85,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String query = "SELECT * FROM testTable";
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperatorForQuery(query);
+    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -110,7 +110,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals((String) firstRow[columnIndexMap.get("column11")], "P");
 
     // Test query with filter
-    selectionOnlyOperator = getOperatorForQueryWithFilter(query);
+    selectionOnlyOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -140,7 +140,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String query = "SELECT" + SELECTION + " FROM testTable";
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperatorForQuery(query);
+    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -165,7 +165,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals((String) firstRow[2], "P");
 
     // Test query with filter
-    selectionOnlyOperator = getOperatorForQueryWithFilter(query);
+    selectionOnlyOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -194,7 +194,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String query = "SELECT" + SELECTION + " FROM testTable" + ORDER_BY;
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForQuery(query);
+    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
@@ -220,7 +220,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(((Integer) lastRow[columnIndexMap.get("column1")]).intValue(), 10542595);
 
     // Test query with filter
-    selectionOrderByOperator = getOperatorForQueryWithFilter(query);
+    selectionOrderByOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);
@@ -251,7 +251,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String query = "SELECT * " + " FROM testTable" + ORDER_BY;
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForQuery(query);
+    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
@@ -278,7 +278,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(((Integer) lastRow[columnIndexMap.get("column1")]).intValue(), 10542595);
 
     // Test query with filter
-    selectionOrderByOperator = getOperatorForQueryWithFilter(query);
+    selectionOrderByOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);
@@ -310,7 +310,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String query = "SELECT * " + " FROM testTable" + ORDER_BY + " LIMIT 5000, 7000";
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForQuery(query);
+    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperatorForPqlQuery(query);
     IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
@@ -337,7 +337,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals((int) lastRow[columnIndexMap.get("column1")], 1715964282);
 
     // Test query with filter
-    selectionOrderByOperator = getOperatorForQueryWithFilter(query);
+    selectionOrderByOperator = getOperatorForPqlQueryWithFilter(query);
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);

@@ -857,7 +857,7 @@ public class ClusterIntegrationTestUtils {
     // compare results
     BrokerRequest brokerRequest =
         PinotQueryParserFactory.get(CommonConstants.Broker.Request.SQL).compileToBrokerRequest(pinotQuery);
-    if (brokerRequest.getSelections() != null) { // selection
+    if (isSelectionQuery(brokerRequest)) { // selection
       // TODO: compare results for selection queries, w/o order by
 
       // Compare results for selection queries, with order by
@@ -867,9 +867,9 @@ public class ClusterIntegrationTestUtils {
           return;
         }
         Set<String> orderByColumns =
-            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList());
+            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList(), false);
         Set<String> selectionColumns =
-            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getSelectList());
+            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getSelectList(), false);
         if (!selectionColumns.containsAll(orderByColumns)) {
           // Selection columns has no overlap with order by column, don't compare.
           return;
@@ -881,7 +881,7 @@ public class ClusterIntegrationTestUtils {
               String brokerValue = brokerResponseRows.get(i).get(c).asText();
               String connectionValue = resultTableResultSet.getString(i, c);
               if (orderByColumns.containsAll(CalciteSqlParser
-                  .extractIdentifiers(Arrays.asList(brokerRequest.getPinotQuery().getSelectList().get(c))))) {
+                  .extractIdentifiers(Arrays.asList(brokerRequest.getPinotQuery().getSelectList().get(c)), false))) {
                 boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
                 if (error) {
                   String failureMessage =
@@ -960,6 +960,16 @@ public class ClusterIntegrationTestUtils {
         }
       }
     }
+  }
+
+  private static boolean isSelectionQuery(BrokerRequest brokerRequest) {
+    if (brokerRequest.getSelections() != null) {
+      return true;
+    }
+    if (brokerRequest.getAggregationsInfo() != null && brokerRequest.getAggregationsInfo().get(0).getAggregationType().equalsIgnoreCase("DISTINCT")) {
+      return true;
+    }
+    return false;
   }
 
   private static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
