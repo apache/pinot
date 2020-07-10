@@ -42,6 +42,7 @@ public class FunctionEvaluatorFactory {
     FunctionEvaluator functionEvaluator = null;
 
     String columnName = fieldSpec.getName();
+    // TODO: once we have published a release w/ IngestionConfig#TransformConfigs, stop reading transform function from schema in next release
     String transformExpression = fieldSpec.getTransformFunction();
     if (transformExpression != null && !transformExpression.isEmpty()) {
 

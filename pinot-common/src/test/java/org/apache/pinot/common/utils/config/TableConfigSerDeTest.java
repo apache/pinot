@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,6 +46,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -254,7 +256,9 @@ public class TableConfigSerDeTest {
     }
     {
       // With ingestion config
-      IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig("filterFunc(foo)"));
+      List<TransformConfig> transformConfigs =
+          Lists.newArrayList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()"));
+      IngestionConfig ingestionConfig = new IngestionConfig(new FilterConfig("filterFunc(foo)"), transformConfigs);
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);
@@ -364,7 +368,15 @@ public class TableConfigSerDeTest {
   private void checkIngestionConfig(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     assertNotNull(ingestionConfig);
+    assertNotNull(ingestionConfig.getFilterConfig());
     assertEquals(ingestionConfig.getFilterConfig().getFilterFunction(), "filterFunc(foo)");
+    List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
+    assertNotNull(transformConfigs);
+    assertEquals(transformConfigs.size(), 2);
+    assertEquals(transformConfigs.get(0).getColumnName(), "bar");
+    assertEquals(transformConfigs.get(0).getTransformFunction(), "func(moo)");
+    assertEquals(transformConfigs.get(1).getColumnName(), "zoo");
+    assertEquals(transformConfigs.get(1).getTransformFunction(), "myfunc()");
   }
 
   private void checkInstanceAssignmentConfig(TableConfig tableConfig) {

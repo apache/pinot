@@ -345,6 +345,14 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
+   * Queries the broker's sql query endpoint (/query/sql)
+   */
+  protected JsonNode postSqlQuery(String query)
+      throws Exception {
+    return postSqlQuery(query, _brokerBaseApiUrl);
+  }
+
+  /**
    * Queries the broker's sql query endpoint (/sql)
    */
   static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)

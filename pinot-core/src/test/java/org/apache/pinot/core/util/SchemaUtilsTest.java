@@ -34,6 +34,10 @@ import org.testng.annotations.Test;
  */
 public class SchemaUtilsTest {
 
+  /**
+   * TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test backward compatibility/
+   *  Remove these when we totally stop honoring transform functions in schema
+   */
   @Test
   public void testValidate() {
     Schema pinotSchema;
