@@ -78,7 +78,7 @@ public abstract class AbstractBaseResultSetMetadata implements ResultSetMetaData
   @Override
   public String getSchemaName(int column)
       throws SQLException {
-    return "baseballStats";
+    return Constants.GLOBAL_CATALOG;
   }
 
   @Override
@@ -96,27 +96,14 @@ public abstract class AbstractBaseResultSetMetadata implements ResultSetMetaData
   @Override
   public String getTableName(int column)
       throws SQLException {
-    return "baseballStats";
+    //TODO: Implement API to provide tableName with BrokerResponse.
+    return Constants.GLOBAL_CATALOG;
   }
 
   @Override
   public String getCatalogName(int column)
       throws SQLException {
     return Constants.GLOBAL_CATALOG;
-  }
-
-  @Override
-  public int getColumnType(int column)
-      throws SQLException {
-    //TODO: Implement type mapping
-    return Types.VARCHAR;
-  }
-
-  @Override
-  public String getColumnTypeName(int column)
-      throws SQLException {
-    //TODO: Implement type mapping
-    return "STRING";
   }
 
   @Override

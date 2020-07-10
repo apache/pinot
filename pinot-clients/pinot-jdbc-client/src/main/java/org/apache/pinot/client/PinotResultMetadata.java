@@ -19,19 +19,28 @@
 package org.apache.pinot.client;
 
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.client.base.AbstractBaseResultSetMetadata;
+import org.apache.pinot.client.utils.DriverUtils;
 
 
 public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
   private int _totalColumns;
   private Map<Integer, String> _columns = new HashMap<>();
+  private Map<Integer, String> _columnDataTypes = new HashMap<>();
 
   public PinotResultMetadata(int totalColumns, Map<String, Integer> columnsNameToIndex) {
     _totalColumns = totalColumns;
     for (Map.Entry<String, Integer> entry : columnsNameToIndex.entrySet()) {
       _columns.put(entry.getValue(), entry.getKey());
+    }
+  }
+
+  private void validateState(int column) throws SQLException {
+    if (column > _totalColumns) {
+      throw new SQLException("Column Index " + column + "is greater than total columns " + _totalColumns);
     }
   }
 
@@ -44,12 +53,28 @@ public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
   @Override
   public String getColumnName(int column)
       throws SQLException {
+    validateState(column);
     return _columns.getOrDefault(column, "");
   }
 
   @Override
   public String getColumnClassName(int column)
       throws SQLException {
-    return String.class.toString();
+    String columnTypeName = getColumnTypeName(column);
+    return DriverUtils.getJavaClassName(columnTypeName);
+  }
+
+  @Override
+  public int getColumnType(int column)
+      throws SQLException {
+    String columnTypeName = getColumnTypeName(column);
+    return DriverUtils.getSQLDataType(columnTypeName);
+  }
+
+  @Override
+  public String getColumnTypeName(int column)
+      throws SQLException {
+    validateState(column);
+    return _columnDataTypes.get(column);
   }
 }

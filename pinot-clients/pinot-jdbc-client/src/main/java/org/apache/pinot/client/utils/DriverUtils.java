@@ -20,6 +20,7 @@ package org.apache.pinot.client.utils;
 
 import com.ning.http.client.uri.Uri;
 import java.net.URI;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -77,6 +78,67 @@ public class DriverUtils {
       }
     }
     return null;
+  }
+
+  public static Integer getSQLDataType(String columnDataType) {
+    Integer columnsSQLDataType;
+    switch (columnDataType) {
+      case "STRING":
+        columnsSQLDataType = Types.VARCHAR;
+        break;
+      case "INT":
+        columnsSQLDataType = Types.INTEGER;
+        break;
+      case "LONG":
+        columnsSQLDataType = Types.INTEGER;
+        break;
+      case "FLOAT":
+        columnsSQLDataType = Types.FLOAT;
+        break;
+      case "DOUBLE":
+        columnsSQLDataType = Types.DOUBLE;
+        break;
+      case "BOOLEAN":
+        columnsSQLDataType = Types.BOOLEAN;
+        break;
+      case "BYTES":
+        columnsSQLDataType = Types.BINARY;
+        break;
+      default:
+        columnsSQLDataType = Types.NULL;
+    }
+    return columnsSQLDataType;
+  }
+
+
+  public static String getJavaClassName(String columnDataType) {
+    String columnsJavaClassName;
+    switch (columnDataType) {
+      case "STRING":
+        columnsJavaClassName = String.class.getTypeName();
+        break;
+      case "INT":
+        columnsJavaClassName = Integer.class.getTypeName();
+        break;
+      case "LONG":
+        columnsJavaClassName = Long.class.getTypeName();
+        break;
+      case "FLOAT":
+        columnsJavaClassName = Float.class.getTypeName();
+        break;
+      case "DOUBLE":
+        columnsJavaClassName = Double.class.getTypeName();
+        break;
+      case "BOOLEAN":
+        columnsJavaClassName = Boolean.class.getTypeName();
+        break;
+      case "BYTES":
+        columnsJavaClassName = byte.class.getTypeName();
+        break;
+      default:
+        columnsJavaClassName = String.class.getTypeName();;
+    }
+    return columnsJavaClassName;
   }
 
 }
