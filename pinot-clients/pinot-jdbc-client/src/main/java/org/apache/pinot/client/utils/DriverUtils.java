@@ -81,6 +81,9 @@ public class DriverUtils {
   }
 
   public static Integer getSQLDataType(String columnDataType) {
+    if (columnDataType == null) {
+      return Types.VARCHAR;
+    }
     Integer columnsSQLDataType;
     switch (columnDataType) {
       case "STRING":
@@ -110,8 +113,10 @@ public class DriverUtils {
     return columnsSQLDataType;
   }
 
-
   public static String getJavaClassName(String columnDataType) {
+    if (columnDataType == null) {
+      return String.class.getTypeName();
+    }
     String columnsJavaClassName;
     switch (columnDataType) {
       case "STRING":
@@ -136,9 +141,8 @@ public class DriverUtils {
         columnsJavaClassName = byte.class.getTypeName();
         break;
       default:
-        columnsJavaClassName = String.class.getTypeName();;
+        columnsJavaClassName = String.class.getTypeName();
     }
     return columnsJavaClassName;
   }
-
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -112,7 +113,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
         LOGGER.warn("No tables found in database");
       }
       for (String table : tableResponse.getAllTables()) {
-        Object[] row = new Object[]{GLOBAL_CATALOG, GLOBAL_CATALOG, table, TABLE_TYPE, table, "", "", "", "", ""};
+        Object[] row = new Object[]{null, null, table, TABLE_TYPE, table, "", "", "", "", ""};
         pinotMeta.addRow(Arrays.asList(row));
       }
 
@@ -126,36 +127,13 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   @Override
   public ResultSet getSchemas()
       throws SQLException {
-    try {
-      PinotMeta pinotMeta = new PinotMeta();
-      pinotMeta.setColumnNames(SCHEMA_COLUMNS);
-      pinotMeta.setColumnDataTypes(SCHEMA_COLUMNS_DTYPES);
-
-      List<Object> row = new ArrayList<>();
-      row.add(GLOBAL_CATALOG);
-      row.add(GLOBAL_CATALOG);
-      pinotMeta.addRow(row);
-
-      JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
-      return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
-    } catch (Exception e) {
-      throw new SQLException(e);
-    }
+    return PinotResultSet.empty();
   }
 
   @Override
   public ResultSet getCatalogs()
       throws SQLException {
-    PinotMeta pinotMeta = new PinotMeta();
-    pinotMeta.setColumnNames(CATALOG_COLUMNS);
-    pinotMeta.setColumnDataTypes(CATALOG_COLUMNS_DTYPES);
-
-    List<Object> row = new ArrayList<>();
-    row.add(GLOBAL_CATALOG);
-    pinotMeta.addRow(row);
-
-    JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
-    return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
+    return PinotResultSet.empty();
   }
 
   @Override
@@ -204,7 +182,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
     Integer columnsSQLDataType = DriverUtils.getSQLDataType(columnDataType);
 
     Object[] row =
-        new Object[]{GLOBAL_CATALOG, GLOBAL_CATALOG, tableName, columnName, columnsSQLDataType, columnDataType, -1, -1, -1, -1, 1, null, null, -1, -1, -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"};
+        new Object[]{null, null, tableName, columnName, columnsSQLDataType, columnDataType, -1, -1, -1, -1, 1, null, null, -1, -1, -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"};
     pinotMeta.addRow(Arrays.asList(row));
   }
 
