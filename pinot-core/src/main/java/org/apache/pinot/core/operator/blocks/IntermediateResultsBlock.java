@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,8 +61,8 @@ public class IntermediateResultsBlock implements Block {
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private long _numTotalDocs;
-  private long _numSegmentsProcessed;
-  private long _numSegmentsMatched;
+  private int _numSegmentsProcessed;
+  private int _numSegmentsMatched;
   private boolean _numGroupsLimitReached;
 
   private Table _table;
@@ -198,19 +199,11 @@ public class IntermediateResultsBlock implements Block {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
 
-  public long getNumSegmentsProcessed() {
-    return _numSegmentsProcessed;
-  }
-
-  public void setNumSegmentsProcessed(long numSegmentsProcessed) {
+  public void setNumSegmentsProcessed(int numSegmentsProcessed) {
     _numSegmentsProcessed = numSegmentsProcessed;
   }
 
-  public long getNumSegmentsMatched() {
-    return _numSegmentsMatched;
-  }
-
-  public void setNumSegmentsMatched(long numSegmentsMatched) {
+  public void setNumSegmentsMatched(int numSegmentsMatched) {
     _numSegmentsMatched = numSegmentsMatched;
   }
 
@@ -220,6 +213,41 @@ public class IntermediateResultsBlock implements Block {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @VisibleForTesting
+  public long getNumDocsScanned() {
+    return _numDocsScanned;
+  }
+
+  @VisibleForTesting
+  public long getNumEntriesScannedInFilter() {
+    return _numEntriesScannedInFilter;
+  }
+
+  @VisibleForTesting
+  public long getNumEntriesScannedPostFilter() {
+    return _numEntriesScannedPostFilter;
+  }
+
+  @VisibleForTesting
+  public int getNumSegmentsProcessed() {
+    return _numSegmentsProcessed;
+  }
+
+  @VisibleForTesting
+  public int getNumSegmentsMatched() {
+    return _numSegmentsMatched;
+  }
+
+  @VisibleForTesting
+  public long getNumTotalDocs() {
+    return _numTotalDocs;
+  }
+
+  @VisibleForTesting
+  public boolean isNumGroupsLimitReached() {
+    return _numGroupsLimitReached;
   }
 
   public DataTable getDataTable()

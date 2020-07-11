@@ -166,6 +166,10 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     };
   }
 
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
+  }
+
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     if (_expressions.size() == _orderByExpressions.size()) {
@@ -183,6 +187,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     // Fetch all the expressions and insert them into the priority queue
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numExpressions; i++) {
@@ -191,12 +196,12 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
-      _numDocsScanned += numDocsFetched;
       for (int i = 0; i < numDocsFetched; i++) {
         SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
       }
+      _numDocsScanned += numDocsFetched;
+      _numEntriesScannedPostFilter += numDocsFetched * numColumnsProjected;
     }
-    _numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
 
     // Create the data schema
     String[] columnNames = new String[numExpressions];
@@ -221,6 +226,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     // Fetch the order-by expressions and docIds and insert them into the priority queue
     BlockValSet[] blockValSets = new BlockValSet[numOrderByExpressions + 1];
+    int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numOrderByExpressions; i++) {
@@ -230,7 +236,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       blockValSets[numOrderByExpressions] = transformBlock.getBlockValueSet(BuiltInVirtualColumn.DOCID);
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
-      _numDocsScanned += numDocsFetched;
       for (int i = 0; i < numDocsFetched; i++) {
         // NOTE: We pre-allocate the complete row so that we can fill up the non-order-by output expression values later
         //       without creating extra rows or re-constructing the priority queue. We can change the values in-place
@@ -239,6 +244,8 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         blockValueFetcher.getRow(i, row, 0);
         SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
       }
+      _numDocsScanned += numDocsFetched;
+      _numEntriesScannedPostFilter += numDocsFetched * numColumnsProjected;
     }
 
     // Copy the rows (shallow copy so that any modification will also be reflected to the priority queue) into a list,
@@ -261,6 +268,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     for (ExpressionContext expressionContext : nonOrderByExpressions) {
       expressionContext.getColumns(columns);
     }
+    int numColumns = columns.size();
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : columns) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
@@ -283,11 +291,9 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       for (int i = 0; i < numDocsFetched; i++) {
         blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
       }
+      _numEntriesScannedPostFilter += numDocsFetched * numColumns;
       rowBaseId += numDocsFetched;
     }
-    _numEntriesScannedPostFilter =
-        (long) _numDocsScanned * _transformOperator.getNumColumnsProjected() + (long) numRows * transformOperator
-            .getNumColumnsProjected();
 
     // Create the data schema
     String[] columnNames = new String[numExpressions];

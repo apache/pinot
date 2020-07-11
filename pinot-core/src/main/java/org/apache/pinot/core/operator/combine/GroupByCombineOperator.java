@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator;
+package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -48,12 +49,15 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>CombineGroupByOperator</code> class is the operator to combine aggregation group-by results.
+ * Combine operator for aggregation group-by queries with PQL semantic.
+ * TODO:
+ *   - Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using all threads
+ *   - Try to extend BaseCombineOperator to reduce duplicate code
  */
 @SuppressWarnings("rawtypes")
-public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CombineGroupByOperator.class);
-  private static final String OPERATOR_NAME = "CombineGroupByOperator";
+public class GroupByCombineOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
+  private static final String OPERATOR_NAME = "GroupByCombineOperator";
 
   // Use a higher limit for groups stored across segments. For most cases, most groups from each segment should be the
   // same, thus the total number of groups across segments should be equal or slightly higher than the number of groups
@@ -69,7 +73,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
   private final int _innerSegmentNumGroupsLimit;
   private final int _interSegmentNumGroupsLimit;
 
-  public CombineGroupByOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
+  public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService,
       long timeOutMs, int innerSegmentNumGroupsLimit) {
     _operators = operators;
     _queryContext = queryContext;
@@ -208,16 +212,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       }
 
       // Set the execution statistics.
-      ExecutionStatistics executionStatistics = new ExecutionStatistics();
-      for (Operator operator : _operators) {
-        executionStatistics.merge(operator.getExecutionStatistics());
-      }
-      mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
-      mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
-      mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
-      mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());
-      mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
-      mergedBlock.setNumTotalDocs(executionStatistics.getNumTotalDocs());
+      CombineOperatorUtils.setExecutionStatistics(mergedBlock, _operators);
 
       // TODO: this value should be set in the inner-segment operators. Setting it here might cause false positive as we
       //       are comparing number of groups across segments with the groups limit for each segment.
