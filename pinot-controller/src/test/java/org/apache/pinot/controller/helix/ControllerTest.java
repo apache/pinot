@@ -396,6 +396,16 @@ public abstract class ControllerTest {
     _fakeInstanceHelixManagers.clear();
   }
 
+  protected void stopFakeInstance(String instanceId) {
+    for (HelixManager helixManager : _fakeInstanceHelixManagers) {
+      if (helixManager.getInstanceName().equalsIgnoreCase(instanceId)) {
+        helixManager.disconnect();
+        _fakeInstanceHelixManagers.remove(helixManager);
+        return;
+      }
+    }
+  }
+
   protected Schema createDummySchema(String tableName) {
     Schema schema = new Schema();
     schema.setSchemaName(tableName);
