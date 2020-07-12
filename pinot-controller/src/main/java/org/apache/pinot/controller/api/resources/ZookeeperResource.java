@@ -57,7 +57,7 @@ public class ZookeeperResource {
   @GET
   @Path("/zookeeper/get")
   @Produces(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Get the data of the specific path", notes = "Get the data of the specific path")
+  @ApiOperation(value = "Get content on the znode")
   @ApiResponses(value = { //
       @ApiResponse(code = 200, message = "Success"), //
       @ApiResponse(code = 404, message = "ZK Path not found"), //
@@ -78,7 +78,7 @@ public class ZookeeperResource {
   @GET
   @Path("/zookeeper/ls")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Listing the child nodes of one path", notes = "Listing the child nodes of one path")
+  @ApiOperation(value = "List the child znodes")
   @ApiResponses(value = { //
       @ApiResponse(code = 200, message = "Success"), //
       @ApiResponse(code = 404, message = "ZK Path not found"), //
@@ -99,7 +99,7 @@ public class ZookeeperResource {
   @GET
   @Path("/zookeeper/lsl")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Listing the child nodes of one path along with stats", notes = "Listing the child nodes of one path along with stats")
+  @ApiOperation(value = "List the child znodes along with Stats")
   @ApiResponses(value = { //
       @ApiResponse(code = 200, message = "Success"), //
       @ApiResponse(code = 404, message = "ZK Path not found"), //
@@ -121,7 +121,7 @@ public class ZookeeperResource {
   @GET
   @Path("/zookeeper/stat")
   @Produces(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "", notes = "Listing the child nodes of one path")
+  @ApiOperation(value = "Get the stat", notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren etc ")
   @ApiResponses(value = { //
       @ApiResponse(code = 200, message = "Success"), //
       @ApiResponse(code = 404, message = "Table not found"), //
