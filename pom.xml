@@ -1566,6 +1566,9 @@
             <!-- Test Resources -->
             <exclude>**/test/resources/**</exclude>
 
+            <!-- JDBC Drivers -->
+            <exclude>**/main/resources/java.sql.*</exclude>
+
             <!-- Pinot Website (not part of the distribution) -->
             <exclude>website/**</exclude>
 
