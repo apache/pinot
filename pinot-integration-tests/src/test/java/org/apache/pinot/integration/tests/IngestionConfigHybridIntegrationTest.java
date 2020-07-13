@@ -47,13 +47,8 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
-  private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls_ingestion_config.schema";
+  // query result of SELECT COUNT(*) FROM mytable WHERE AirlineID != 19393 AND ArrDelayMinutes > 5 on unfiltered data
   private static final long FILTERED_COUNT_STAR_RESULT = 24047L;
-
-  @Override
-  protected String getSchemaFileName() {
-    return SCHEMA_FILE_NAME;
-  }
 
   @Override
   protected String getTimeColumnName() {

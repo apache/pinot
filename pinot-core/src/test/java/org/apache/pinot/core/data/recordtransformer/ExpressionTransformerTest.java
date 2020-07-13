@@ -43,7 +43,7 @@ import org.testng.annotations.Test;
 public class ExpressionTransformerTest {
 
   @Test
-  public void testTransformConfigsFromTable() {
+  public void testTransformConfigsFromTableConfig() {
     Schema pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("userId", FieldSpec.DataType.LONG)
         .addSingleValueDimension("fullName", FieldSpec.DataType.STRING)
         .addMultiValueDimension("bids", FieldSpec.DataType.INT)
