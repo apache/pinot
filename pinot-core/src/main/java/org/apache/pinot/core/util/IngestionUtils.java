@@ -87,7 +87,7 @@ public class IngestionUtils {
           FunctionEvaluator expressionEvaluator =
               FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
-          fields.add(transformConfig.getColumnName());
+          fields.add(transformConfig.getColumnName()); // add the column itself too, so that if it is already transformed, we won't transform again
         }
       }
     }

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -417,6 +418,37 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getBaseKafkaPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+  }
+
+  protected List<File> getAllAvroFiles()
+          throws Exception {
+    // Unpack the Avro files
+    int numSegments = unpackAvroData(_tempDir).size();
+
+    // Avro files has to be ordered as time series data
+    List<File> avroFiles = new ArrayList<>(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+
+    return avroFiles;
+  }
+
+  protected List<File> getOfflineAvroFiles(List<File> avroFiles, int numOfflineSegments) {
+    List<File> offlineAvroFiles = new ArrayList<>(numOfflineSegments);
+    for (int i = 0; i < numOfflineSegments; i++) {
+      offlineAvroFiles.add(avroFiles.get(i));
+    }
+    return offlineAvroFiles;
+  }
+
+  protected List<File> getRealtimeAvroFiles(List<File> avroFiles, int numRealtimeSegments) {
+    int numSegments = avroFiles.size();
+    List<File> realtimeAvroFiles = new ArrayList<>(numRealtimeSegments);
+    for (int i = numSegments - numRealtimeSegments; i < numSegments; i++) {
+      realtimeAvroFiles.add(avroFiles.get(i));
+    }
+    return realtimeAvroFiles;
   }
 
   protected void startKafka() {

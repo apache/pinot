@@ -38,7 +38,7 @@ public class ExpressionTransformer implements RecordTransformer {
 
   private final Map<String, FunctionEvaluator> _expressionEvaluators = new HashMap<>();
 
-  public ExpressionTransformer(Schema schema, TableConfig tableConfig) {
+  public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
         _expressionEvaluators.put(transformConfig.getColumnName(),

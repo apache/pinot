@@ -131,6 +131,7 @@ public class TableConfigUtilsTest {
             new TransformConfig("transformedCol", "Groovy({x+y}, x, y)")))).build();
     TableConfigUtils.validate(tableConfig);
 
+    // null transform column name
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(
         new IngestionConfig(null, Lists.newArrayList(new TransformConfig(null, "reverse(anotherCol)")))).build();
     try {
@@ -140,6 +141,7 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    // null transform function string
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setIngestionConfig(new IngestionConfig(null, Lists.newArrayList(new TransformConfig("myCol", null)))).build();
     try {
@@ -198,6 +200,18 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig);
       Assert.fail("Should fail due to duplicate transform config");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // chained transform functions
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(
+            new IngestionConfig(null,
+                    Lists.newArrayList(new TransformConfig("a", "reverse(x)"), new TransformConfig("b", "lower(a)"))))
+            .build();
+    try {
+      TableConfigUtils.validate(tableConfig);
+      Assert.fail("Should fail due to using transformed column 'a' as argument for transform function of column 'b'");
     } catch (IllegalStateException e) {
       // expected
     }

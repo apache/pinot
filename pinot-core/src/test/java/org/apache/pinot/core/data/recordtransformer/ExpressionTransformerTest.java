@@ -64,7 +64,7 @@ public class ExpressionTransformerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTransformFunctions")
         .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
 
-    ExpressionTransformer expressionTransformer = new ExpressionTransformer(pinotSchema, tableConfig);
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(pinotSchema);
 
     // test functions from schema
@@ -152,7 +152,7 @@ public class ExpressionTransformerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTransformFunctions")
         .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
 
-    ExpressionTransformer expressionTransformer = new ExpressionTransformer(pinotSchema, tableConfig);
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
     GenericRow genericRow = new GenericRow();
     genericRow.putValue("user_id", 1L);
@@ -204,7 +204,7 @@ public class ExpressionTransformerTest {
     transformConfigs.add(new TransformConfig("fullName", "Groovy({firstName + ' ' + lastName}, firstName, lastName)"));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testValueExists")
         .setIngestionConfig(new IngestionConfig(null, transformConfigs)).build();
-    ExpressionTransformer expressionTransformer = new ExpressionTransformer(pinotSchema, tableConfig);
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
     GenericRow genericRow = new GenericRow();
     genericRow.putValue("firstName", "John");
@@ -220,7 +220,7 @@ public class ExpressionTransformerTest {
             new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing")).build();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testValueExists")
         .setIngestionConfig(new IngestionConfig(null, null)).build();
-    expressionTransformer = new ExpressionTransformer(pinotSchema, tableConfig);
+    expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
     genericRow = new GenericRow();
     genericRow.putValue("incoming", "123456789");

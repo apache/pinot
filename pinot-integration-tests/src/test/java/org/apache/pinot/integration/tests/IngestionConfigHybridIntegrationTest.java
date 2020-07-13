@@ -19,17 +19,17 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import org.apache.commons.io.FileUtils;
+import javax.annotation.Nullable;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.IngestionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -38,84 +38,19 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 
 /**
  * Hybrid cluster integration test that uses one of the DateTimeFieldSpec as primary time column
  */
-public class Temp extends BaseClusterIntegrationTest {
-
+public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegrationTest {
+  private static final int NUM_OFFLINE_SEGMENTS = 8;
+  private static final int NUM_REALTIME_SEGMENTS = 6;
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls_ingestion_config.schema";
+  private static final long FILTERED_COUNT_STAR_RESULT = 24047L;
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
-
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServers(2);
-
-    // Start Kafka
-    //startKafka();
-
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    TableConfig offlineTableConfig = createOfflineTableConfig();
-    addTableConfig(offlineTableConfig);
-    List<File> avroFiles = unpackAvroData(_tempDir);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles.subList(0, avroFiles.size() - 1), offlineTableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
-
-    addTableConfig(createRealtimeTableConfig(null));
-
-    // Push data into Kafka
-    pushAvroIntoKafka(avroFiles.subList(avroFiles.size() - 1, avroFiles.size() - 1));
-
-    Thread.sleep(120_000);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
-  }
-
-  protected List<File> getAllAvroFiles()
-      throws Exception {
-    // Unpack the Avro files
-    int numSegments = unpackAvroData(_tempDir).size();
-
-    // Avro files has to be ordered as time series data
-    List<File> avroFiles = new ArrayList<>(numSegments);
-    for (int i = 1; i <= numSegments; i++) {
-      avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
-    }
-
-    return avroFiles;
-  }
-
-  protected List<File> getOfflineAvroFiles(List<File> avroFiles) {
-    int numOfflineSegments = 2;
-    List<File> offlineAvroFiles = new ArrayList<>(numOfflineSegments);
-    for (int i = 0; i < numOfflineSegments; i++) {
-      offlineAvroFiles.add(avroFiles.get(i));
-    }
-    return offlineAvroFiles;
-  }
-
-  protected List<File> getRealtimeAvroFiles(List<File> avroFiles) {
-    int numSegments = avroFiles.size();
-    int numRealtimeSegments = 2;
-    List<File> realtimeAvroFiles = new ArrayList<>(numRealtimeSegments);
-    for (int i = numSegments - numRealtimeSegments; i < numSegments; i++) {
-      realtimeAvroFiles.add(avroFiles.get(i));
-    }
-    return realtimeAvroFiles;
-  }
-
+  @Override
   protected String getSchemaFileName() {
     return SCHEMA_FILE_NAME;
   }
@@ -125,9 +60,8 @@ public class Temp extends BaseClusterIntegrationTest {
     return TIME_COLUMN_NAME;
   }
 
-  @Override
-  protected boolean useLlc() {
-    return true;
+  protected long getCountStarResult() {
+    return FILTERED_COUNT_STAR_RESULT;
   }
 
   @Override
@@ -140,9 +74,80 @@ public class Temp extends BaseClusterIntegrationTest {
     return new IngestionConfig(filterConfig, transformConfigs);
   }
 
+  @Override
+  protected Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME).addSingleValueDimension("AirlineID", FieldSpec.DataType.LONG)
+            .addSingleValueDimension("DepTime", FieldSpec.DataType.INT)
+            .addSingleValueDimension("AmPm", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("lowerCaseDestCityName", FieldSpec.DataType.STRING)
+            .addMetric("ArrDelayMinutes", FieldSpec.DataType.DOUBLE)
+            .addDateTime("millisSinceEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS").build();
+  }
+
+  @Override
+  protected String getSortedColumn() {
+    return null;
+  }
+
+  @Override
+  protected List<String> getInvertedIndexColumns() {
+    return null;
+  }
+
+  @Override
+  protected List<String> getNoDictionaryColumns() {
+    return null;
+  }
+
+  @Override
+  protected List<String> getRangeIndexColumns() {
+    return null;
+  }
+
+  @Override
+  protected List<String> getBloomFilterColumns() {
+    return null;
+  }
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    // Start Zk and Kafka
+    startZk();
+    startKafka();
+
+    // Start the Pinot cluster
+    startController();
+    startBroker();
+    startServer();
+
+    List<File> avroFiles = getAllAvroFiles();
+    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
+    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
+
+    // Create and upload the schema and table config
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    addTableConfig(offlineTableConfig);
+    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
+
+    // Create and upload segments
+    ClusterIntegrationTestUtils
+            .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
+    uploadSegments(getTableName(), _tarDir);
+
+    // Push data into Kafka
+    pushAvroIntoKafka(realtimeAvroFiles);
+
+    // Wait for all documents loaded
+    waitForAllDocsLoaded(600_000L);
+  }
+
   @Test
   public void testQueries()
-      throws Exception {
+          throws Exception {
     // Select column created with transform function
     String sqlQuery = "Select millisSinceEpoch from " + DEFAULT_TABLE_NAME;
     JsonNode response = postSqlQuery(sqlQuery);
@@ -190,35 +195,33 @@ public class Temp extends BaseClusterIntegrationTest {
 
     // Check there's no values that should've been filtered
     sqlQuery = "Select * from " + DEFAULT_TABLE_NAME
-        + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+            + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postSqlQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
 
     // Check there's no values that should've been filtered - realtime table
     sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_REALTIME"
-        + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+            + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postSqlQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
 
     // Check there's no values that should've been filtered - offline table
     sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_OFFLINE"
-        + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+            + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postSqlQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
-
   }
+
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    String tableName = getTableName();
-    dropOfflineTable(tableName);
-    dropRealtimeTable(tableName);
+    dropOfflineTable(getTableName());
+    dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
   }
 }
