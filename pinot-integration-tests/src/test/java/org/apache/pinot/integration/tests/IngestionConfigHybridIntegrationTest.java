@@ -41,7 +41,7 @@ import static org.testng.Assert.assertEquals;
 
 
 /**
- * Hybrid cluster integration test that uses one of the DateTimeFieldSpec as primary time column
+ * Tests ingestion configs on a hybrid table
  */
 public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
