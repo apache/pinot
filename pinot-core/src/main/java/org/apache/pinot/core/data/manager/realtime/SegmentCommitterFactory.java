@@ -43,4 +43,9 @@ public class SegmentCommitterFactory {
   public SegmentCommitter createDefaultSegmentCommitter(SegmentCompletionProtocol.Request.Params params) {
     return new DefaultSegmentCommitter(LOGGER, _protocolHandler, params);
   }
+
+  public SegmentCommitter createPeerSchemeSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
+      SegmentUploader segmentUploader) {
+    return new PeerSchemeSplitSegmentCommitter(LOGGER, _protocolHandler, params, segmentUploader);
+  }
 }

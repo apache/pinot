@@ -846,16 +846,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (isSplitCommit) {
       // TODO: make segment uploader used in the segment committer configurable.
       SegmentUploader segmentUploader;
-      try {
-        segmentUploader =
-            new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
-                _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
-                ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
-      } catch (URISyntaxException e) {
-        segmentLogger.error("Segment commit upload url error: ", e);
-        return SegmentCompletionProtocol.RESP_NOT_SENT;
+      if (this._tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null) {
+        segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
+            PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
+        segmentCommitter = _segmentCommitterFactory.createPeerSchemeSplitSegmentCommitter(params, segmentUploader);
+      } else {
+        try {
+          segmentUploader =
+              new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
+                  _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
+                  ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
+        } catch (URISyntaxException e) {
+          segmentLogger.error("Segment commit upload url error: ", e);
+          return SegmentCompletionProtocol.RESP_NOT_SENT;
+        }
+        segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
       }
-      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
     } else {
       segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
     }

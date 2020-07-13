@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
  */
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
+  private static final String SEGMENT_STORE_URI = "segment.store.uri";
 
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
@@ -62,6 +63,7 @@ public class IndexLoadingConfig {
   private boolean _isRealtimeOffheapAllocation;
   private boolean _isDirectRealtimeOffheapAllocation;
   private boolean _enableSplitCommitEndWithMetadata;
+  private String _segmentStoreURI;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
@@ -189,6 +191,7 @@ public class IndexLoadingConfig {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
     _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
+    _segmentStoreURI = instanceDataManagerConfig.getConfig().getProperty(SEGMENT_STORE_URI);
   }
 
   /**
@@ -335,6 +338,10 @@ public class IndexLoadingConfig {
   public ColumnMinMaxValueGeneratorMode getColumnMinMaxValueGeneratorMode() {
     return _columnMinMaxValueGeneratorMode;
   }
+
+
+  public String getSegmentStoreURI() { return _segmentStoreURI; }
+
 
   /**
    * For tests only.
