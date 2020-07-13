@@ -297,6 +297,7 @@ const QueryPage = () => {
                 value={inputQuery}
                 onChange={handleOutputDataChange}
                 className={classes.codeMirror}
+                autoCursor={false}
               />
             </div>
 
@@ -387,6 +388,7 @@ const QueryPage = () => {
                 options={jsonoptions}
                 value={outputResult}
                 className={classes.queryOutput}
+                autoCursor={false}
               />
             ) : null}
           </Grid>
