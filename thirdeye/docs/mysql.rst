@@ -19,15 +19,21 @@
 
 .. _mysql:
 
+****************************
 MySQL
-=====
+****************************
 
-**0: Prerequisites**
+This doc will help you understand how to add data sources to ThirdEye.
+Please run through the **Quick Start** guide and shut down the frontend server process.
 
-Run through the **Quick Start** guide and shut down the frontend server process.
+Prerequisites
+######################
+
+An accessible MySQL server containing data.
 
 
-**1: Update the data sources configuration**
+Data sources configuration
+#####################################################
 
 Add your MySQL database URL and credentials in `thirdeye-pinot/config/datasources/data-sources-config.yml`. You will be able to add multiple databases with multiple credentials, as follows:
 
@@ -51,17 +57,36 @@ Add your MySQL database URL and credentials in `thirdeye-pinot/config/datasource
 Note: the `dbname` here is an arbitrary name that you want to name it. 
 In `dburl`, you still need to include the specific database you are using.
 
-**2: Run ThirdEye frontend**
+Here's an example below.
+
+.. code-block:: yaml
+
+  dataSourceConfigs:
+    - className: org.apache.pinot.thirdeye.datasource.sql.SqlThirdEyeDataSource
+      properties:
+        MySQL:
+          - db:
+              dataset_pageviews: jdbc:mysql://localhost/dataset
+            user: uthirdeye
+            password: pass
+
+
+Run ThirdEye frontend
+####################################
+
+Start the ThirdEye server.
 
 .. code-block:: bash
 
     ./run-frontend.sh
 
-**3: Import metric from MySQL**
+Import metric from MySQL
+####################################
 
-See :ref:`import-sql-metric`.
+The next step is to import metrics from your dataset into the ThirdEye system. Please see :ref:`import-sql-metric`.
 
-**4: Start an analysis**
+Start an analysis
+####################################
 
 Point your favorite browser to
 

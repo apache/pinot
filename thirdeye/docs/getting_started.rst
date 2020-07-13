@@ -30,6 +30,8 @@ Prerequisites
 
 You'll need Java 8+, Maven 3.6+, and NPM 3.10+
 
+.. warning:: On MacOS, Java 8 is the recommended version. Higher versions of JDK including Java 9 and Java 14 are known to have issues.
+
 
 Building ThirdEye from source
 ##########################################
@@ -129,3 +131,32 @@ You can use the command below to run ThirdEye assuming your working dir to be ``
 
 .. note:: You can stop the ThirdEye dashboard server anytime by pressing **Ctrl+C** in the terminal
 
+
+Creating an Application
+##########################################
+
+An application is a basic TE entity can serves as a container for metrics, alerts and other entities.
+
+In order to create an application, follow the steps below.
+
+1. Go to the ``thirdeye-admin`` page. http://localhost:1426/thirdeye-admin
+2. Click the ``Entity Editor`` tab
+3. Choose ``Application`` from ``Select config type``.
+4. In the ``Select Entity to Edit`` menu, select ``Create New``
+5. Copy paste the json block below into the textbox on the right and click ``load to editor``
+6. Click ``Submit`` on the bottom left to create an application.
+
+
+.. code-block:: json
+
+  {
+    "application": "myApp",
+    "recipients": ""
+  }
+
+We'll be using this application when creating alerts.
+
+Setting up Alerts
+##########################################
+
+You can set up alerts and do root cause analysis on this application. See more at :ref:`alert-setup`.
