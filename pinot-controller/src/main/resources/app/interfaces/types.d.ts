@@ -75,7 +75,8 @@ declare module 'Models' {
 
   export type TableSchema = {
     dimensionFieldSpecs: Array<schema>;
-    metricFieldSpecs: Array<schema>;
+    metricFieldSpecs?: Array<schema>;
+    dateTimeFieldSpecs?: Array<schema>;
   };
 
   type schema = {
