@@ -217,9 +217,10 @@ const QueryPage = () => {
 
   const fetchSQLData = (tableName) => {
     getTableSchema(tableName).then(({ data }) => {
+      const columnList = [...data.dimensionFieldSpecs, ...data.metricFieldSpecs];
       setTableSchema({
         columns: ['column', 'type'],
-        records: data.dimensionFieldSpecs.map((field) => {
+        records: columnList.map((field) => {
           return [field.name, field.dataType];
         }),
       });

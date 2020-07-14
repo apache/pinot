@@ -98,6 +98,7 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema }: Props) => {
               title="Tables"
               data={tableList}
               isPagination={false}
+              noOfRows={tableList.records.length}
               cellClickCallback={fetchSQLData}
               isCellClickable
             />
@@ -107,6 +108,7 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema }: Props) => {
                 title="Schema:"
                 data={tableSchema}
                 isPagination={false}
+                noOfRows={tableSchema.records.length}
                 highlightBackground
               />
             ) : null}
