@@ -60,7 +60,7 @@ public class PinotClusterConfigs {
   @GET
   @Path("/cluster/info")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get cluster Ingo", notes = "Get cluster Info")
+  @ApiOperation(value = "Get cluster Info", notes = "Get cluster Info")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
   public String getClusterInfo() {
     ObjectNode ret = JsonUtils.newObjectNode();

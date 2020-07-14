@@ -55,7 +55,7 @@ public class ZookeeperResource {
   ZNRecordSerializer _znRecordSerializer = new ZNRecordSerializer();
 
   @GET
-  @Path("/zookeeper/get")
+  @Path("/zk/get")
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Get content of the znode")
   @ApiResponses(value = { //
@@ -76,7 +76,7 @@ public class ZookeeperResource {
   }
 
   @GET
-  @Path("/zookeeper/ls")
+  @Path("/zk/ls")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes")
   @ApiResponses(value = { //
@@ -97,7 +97,7 @@ public class ZookeeperResource {
   }
 
   @GET
-  @Path("/zookeeper/lsl")
+  @Path("/zk/lsl")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes along with Stats")
   @ApiResponses(value = { //
@@ -119,7 +119,7 @@ public class ZookeeperResource {
   }
 
   @GET
-  @Path("/zookeeper/stat")
+  @Path("/zk/stat")
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Get the stat", notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren etc ")
   @ApiResponses(value = { //
