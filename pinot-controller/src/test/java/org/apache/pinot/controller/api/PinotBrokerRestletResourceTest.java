@@ -71,8 +71,8 @@ public class PinotBrokerRestletResourceTest extends ControllerTest {
 
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(allMap.get("tenants").get("DefaultTenant").contains(expectedBroker));
-      Assert.assertTrue(allMap.get("tables").get("testTable1_OFFLINE").contains(expectedBroker));
-      Assert.assertTrue(allMap.get("tables").get("testTable2_OFFLINE").contains(expectedBroker));
+      Assert.assertTrue(allMap.get("tables").get("testTable1").contains(expectedBroker));
+      Assert.assertTrue(allMap.get("tables").get("testTable2").contains(expectedBroker));
     }
 
     Map<String, List<String>> tenantsMap =
@@ -88,46 +88,48 @@ public class PinotBrokerRestletResourceTest extends ControllerTest {
       Assert.assertTrue(tenantBrokers.contains(expectedBroker));
     }
 
-    tenantBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet("nonExistTenant", state)),
-            List.class);
-    Assert.assertTrue(tenantBrokers.isEmpty());
+    try {
+      sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet("nonExistTenant", state));
+      Assert.fail("Shouldn't reach here");
+    } catch (Exception e) {
+    }
 
     Map<String, List<String>> tablesMap =
         JsonUtils.stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTablesGet(state)), Map.class);
     for (String expectedBroker : expectedBrokers) {
-      Assert.assertTrue(tablesMap.get("testTable1_OFFLINE").contains(expectedBroker));
-      Assert.assertTrue(tablesMap.get("testTable2_OFFLINE").contains(expectedBroker));
+      Assert.assertTrue(tablesMap.get("testTable1").contains(expectedBroker));
+      Assert.assertTrue(tablesMap.get("testTable2").contains(expectedBroker));
     }
 
     List<String> tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1_OFFLINE", state)),
+        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", "OFFLINE", state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
     tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", state)),
+        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable1", null, state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
     tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2_OFFLINE", state)),
+        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", "OFFLINE", state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
     tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", state)),
+        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("testTable2", null, state)),
             List.class);
     for (String expectedBroker : expectedBrokers) {
       Assert.assertTrue(tableBrokers.contains(expectedBroker));
     }
-    tableBrokers = JsonUtils
-        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("nonExistTable", state)),
-            List.class);
-    Assert.assertTrue(tableBrokers.isEmpty());
+    try {
+      sendGetRequest(_controllerRequestURLBuilder.forBrokerTableGet("nonExistTable", null, state));
+      Assert.fail("Shouldn't reach here");
+    } catch (Exception e) {
+    }
   }
 
   @Test

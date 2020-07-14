@@ -118,11 +118,18 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "brokers", "tables", "?state=" + state);
   }
 
-  public String forBrokerTableGet(String table, String state) {
-    if (state == null) {
-      return StringUtil.join("/", _baseUrl, "brokers", "tables", table);
+  public String forBrokerTableGet(String table, String tableType, String state) {
+    StringBuilder params = new StringBuilder();
+    if (tableType != null) {
+      params.append("?type=" + tableType);
     }
-    return StringUtil.join("/", _baseUrl, "brokers", "tables", table, "?state=" + state);
+    if (state != null) {
+      if (params.length() > 0) {
+        params.append("&");
+      }
+      params.append("?state=" + state);
+    }
+    return StringUtil.join("/", _baseUrl, "brokers", "tables", table, params.toString());
   }
 
   public String forTableCreate() {

@@ -34,8 +34,10 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +46,8 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotBrokerRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerRestletResource.class);
+  private static final String TYPE_REALTIME = "_REALTIME";
+  private static final String TYPE_OFFLINE = "_OFFLINE";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -79,8 +83,11 @@ public class PinotBrokerRestletResource {
   public List<String> getBrokersForTenant(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    Set<String> tenantBrokers = new HashSet<>();
-    tenantBrokers.addAll(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
+    if (!_pinotHelixResourceManager.getAllBrokerTenantNames().contains(tenantName)) {
+      throw new ControllerApplicationException(LOGGER, String.format("Tenant [%s] not found.", tenantName),
+          Response.Status.NOT_FOUND);
+    }
+    Set<String> tenantBrokers = new HashSet<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
     applyStateChanges(tenantBrokers, state);
     return ImmutableList.copyOf(tenantBrokers);
   }
@@ -92,8 +99,8 @@ public class PinotBrokerRestletResource {
   public Map<String, List<String>> getTablesToBrokersMapping(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
     Map<String, List<String>> resultMap = new HashMap<>();
-    _pinotHelixResourceManager.getAllTables().stream()
-        .forEach(table -> resultMap.put(table, getBrokersForTable(table, state)));
+    _pinotHelixResourceManager.getAllRawTables().stream()
+        .forEach(table -> resultMap.put(table, getBrokersForTable(table, null, state)));
     return resultMap;
   }
 
@@ -103,17 +110,24 @@ public class PinotBrokerRestletResource {
   @ApiOperation(value = "List brokers for a given table", notes = "List brokers for a given table")
   public List<String> getBrokersForTable(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
-    String actualTableName = _pinotHelixResourceManager.getActualTableName(tableName);
-    Set<String> tableBrokers = new HashSet<>();
-    if (_pinotHelixResourceManager.hasOfflineTable(actualTableName)) {
-      tableBrokers.addAll(_pinotHelixResourceManager.getBrokerInstancesForTable(actualTableName, TableType.OFFLINE));
+    try {
+      List<String> tableNamesWithType = _pinotHelixResourceManager
+          .getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
+      if (tableNamesWithType.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER, String.format("Table [%s] not found.", tableName),
+            Response.Status.NOT_FOUND);
+      }
+      Set<String> tableBrokers =
+          new HashSet<>(_pinotHelixResourceManager.getBrokerInstancesFor(tableNamesWithType.get(0)));
+      applyStateChanges(tableBrokers, state);
+      return ImmutableList.copyOf(tableBrokers);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
     }
-    if (_pinotHelixResourceManager.hasRealtimeTable(actualTableName)) {
-      tableBrokers.addAll(_pinotHelixResourceManager.getBrokerInstancesForTable(actualTableName, TableType.REALTIME));
-    }
-    applyStateChanges(tableBrokers, state);
-    return ImmutableList.copyOf(tableBrokers);
   }
 
   private void applyStateChanges(Set<String> brokers, String state) {
@@ -121,10 +135,10 @@ public class PinotBrokerRestletResource {
       return;
     }
     switch (state) {
-      case "ONLINE":
+      case CommonConstants.Helix.StateModel.BrokerResourceStateModel.ONLINE:
         brokers.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
         break;
-      case "OFFLINE":
+      case CommonConstants.Helix.StateModel.BrokerResourceStateModel.OFFLINE:
         brokers.removeAll(_pinotHelixResourceManager.getOnlineInstanceList());
         break;
     }
