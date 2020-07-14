@@ -27,6 +27,7 @@ import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.Message;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.ZkStarter;
@@ -263,10 +264,10 @@ public class PinotControllerModeTest extends ControllerTest {
     ClusterConstraints constraints =
         helixAdmin.getConstraints(getHelixClusterName(), ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT);
     ConstraintItem item = constraints.getConstraintItem("MaxStateTransitionsPerInstance");
-    Assert.assertEquals(".*", item.getAttributeValue(ClusterConstraints.ConstraintAttribute.INSTANCE));
-    Assert
-        .assertEquals("STATE_TRANSITION", item.getAttributeValue(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE));
-    Assert.assertEquals(CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS, item.getConstraintValue());
+    Assert.assertEquals(item.getAttributeValue(ClusterConstraints.ConstraintAttribute.INSTANCE), ".*");
+    Assert.assertEquals(item.getAttributeValue(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE),
+        Message.MessageType.STATE_TRANSITION.name());
+    Assert.assertEquals(item.getConstraintValue(), CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
   }
 
   private void checkInstanceState(HelixAdmin helixAdmin) {

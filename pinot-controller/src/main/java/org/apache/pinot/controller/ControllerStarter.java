@@ -210,13 +210,14 @@ public class ControllerStarter implements ServiceStartable {
   }
 
   private void setupHelixClusterConstraints() {
-    String maxMessageLimit = _config.getString(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
-        CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
+    String maxStateTransitions = _config
+        .getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
+            CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
     Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
     constraintAttributes
         .put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE, Message.MessageType.STATE_TRANSITION.name());
-    ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxMessageLimit);
+    ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxStateTransitions);
 
     _helixControllerManager.getClusterManagmentTool()
         .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
