@@ -46,8 +46,6 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotBrokerRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerRestletResource.class);
-  private static final String TYPE_REALTIME = "_REALTIME";
-  private static final String TYPE_OFFLINE = "_OFFLINE";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -84,7 +82,7 @@ public class PinotBrokerRestletResource {
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state) {
     if (!_pinotHelixResourceManager.getAllBrokerTenantNames().contains(tenantName)) {
-      throw new ControllerApplicationException(LOGGER, String.format("Tenant [%s] not found.", tenantName),
+      throw new ControllerApplicationException(LOGGER, String.format("Tenant '%s' not found.", tenantName),
           Response.Status.NOT_FOUND);
     }
     Set<String> tenantBrokers = new HashSet<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
@@ -116,7 +114,7 @@ public class PinotBrokerRestletResource {
       List<String> tableNamesWithType = _pinotHelixResourceManager
           .getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
       if (tableNamesWithType.isEmpty()) {
-        throw new ControllerApplicationException(LOGGER, String.format("Table [%s] not found.", tableName),
+        throw new ControllerApplicationException(LOGGER, String.format("Table '%s' not found.", tableName),
             Response.Status.NOT_FOUND);
       }
       Set<String> tableBrokers =
@@ -124,7 +122,8 @@ public class PinotBrokerRestletResource {
       applyStateChanges(tableBrokers, state);
       return ImmutableList.copyOf(tableBrokers);
     } catch (TableNotFoundException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, String.format("Table '%s' not found.", tableName),
+          Response.Status.NOT_FOUND);
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
     }
