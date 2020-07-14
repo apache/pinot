@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class FloatDictionary extends BaseImmutableDictionary {
@@ -30,6 +31,11 @@ public class FloatDictionary extends BaseImmutableDictionary {
   @Override
   public int insertionIndexOf(String stringValue) {
     return binarySearch(Float.parseFloat(stringValue));
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.FLOAT;
   }
 
   @Override

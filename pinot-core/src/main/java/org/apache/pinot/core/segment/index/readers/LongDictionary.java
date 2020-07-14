@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class LongDictionary extends BaseImmutableDictionary {
@@ -30,6 +31,11 @@ public class LongDictionary extends BaseImmutableDictionary {
   @Override
   public int insertionIndexOf(String stringValue) {
     return binarySearch(Long.parseLong(stringValue));
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.LONG;
   }
 
   @Override

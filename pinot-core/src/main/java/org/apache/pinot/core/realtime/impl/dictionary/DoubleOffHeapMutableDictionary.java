@@ -170,6 +170,11 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.DOUBLE;
+  }
+
+  @Override
   public int indexOf(String stringValue) {
     return getDictId(Double.valueOf(stringValue), null);
   }

@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
 import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
@@ -165,7 +166,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (ExpressionContext expression : selectExpressions) {
       FunctionContext function = expression.getFunction();
       String functionName = function.getFunctionName();
-      if(!AggregationFunctionUtils.isFitForDictionaryBasedComputation(functionName)) {
+      if (!AggregationFunctionUtils.isFitForDictionaryBasedComputation(functionName)) {
         return false;
       }
 
@@ -175,7 +176,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       }
       String column = argument.getIdentifier();
       Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-      if (dictionary == null || !dictionary.isSorted()) {
+      if (dictionary == null) {
+        return false;
+      }
+      // NOTE: DISTINCTCOUNT does not require sorted dictionary
+      if (!dictionary.isSorted() && !functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCTCOUNT.name())) {
         return false;
       }
     }

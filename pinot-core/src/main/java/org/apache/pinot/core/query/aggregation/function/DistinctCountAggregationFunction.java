@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -95,6 +96,12 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
           valueSet.add(stringValues[i].hashCode());
         }
         break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          valueSet.add(Arrays.hashCode(bytesValues[i]));
+        }
+        break;
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
     }
@@ -135,6 +142,12 @@ public class DistinctCountAggregationFunction extends BaseSingleInputAggregation
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], stringValues[i].hashCode());
+        }
+        break;
+      case BYTES:
+        byte[][] bytesValues = blockValSet.getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Arrays.hashCode(bytesValues[i]));
         }
         break;
       default:

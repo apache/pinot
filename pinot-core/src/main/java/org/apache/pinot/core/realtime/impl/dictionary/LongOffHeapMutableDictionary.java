@@ -170,6 +170,11 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.LONG;
+  }
+
+  @Override
   public int indexOf(String stringValue) {
     return getDictId(Long.valueOf(stringValue), null);
   }
