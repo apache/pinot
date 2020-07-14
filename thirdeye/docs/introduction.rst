@@ -25,3 +25,4 @@ Introduction
 
     intro
     quick_start
+    getting_started

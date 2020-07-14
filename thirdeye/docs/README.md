@@ -27,9 +27,9 @@ This directory contains the documentation for ThirdEye. It is available online a
 
 The documentation is built using the [sphinx](https://www.sphinx-doc.org/) framework.
 
-If you have python/pip, you can install sphinx using
+If you have python/pip, you can install the dependencies using the command below.
 ```
-pip install sphinx sphinx_rtd_theme
+pip3 install -r requirements.txt
 ``` 
 
 Build docs using
@@ -40,8 +40,8 @@ The rendered html can be found at `_build/html/index.html`
 
 ### Updating docs
 1. Edit or add files as needed.
-2. Build using `make html`
-3. Open `_build/html/index.html` in your favorite browser
+2. Build using `make livedocs`.
+3. Open `_build/html/index.html` in your favorite browser. The page should auto-update with your changes.
 4. Ensure the contents and links work correctly
 5. Submit a PR!
 
