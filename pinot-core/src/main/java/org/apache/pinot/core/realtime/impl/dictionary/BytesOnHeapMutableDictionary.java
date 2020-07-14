@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
 import java.util.Arrays;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -110,6 +111,11 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
     Arrays.sort(sortedValues);
     return sortedValues;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.BYTES;
   }
 
   @Override

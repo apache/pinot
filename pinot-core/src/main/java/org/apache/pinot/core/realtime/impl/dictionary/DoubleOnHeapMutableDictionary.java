@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
 import java.util.Arrays;
 import org.apache.pinot.core.query.request.context.predicate.RangePredicate;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 @SuppressWarnings("Duplicates")
@@ -153,6 +154,11 @@ public class DoubleOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
     Arrays.sort(sortedValues);
     return sortedValues;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.DOUBLE;
   }
 
   @Override
