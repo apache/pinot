@@ -257,7 +257,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
   @AfterClass
   public void tearDown()
       throws IOException {
-    FileUtils.deleteDirectory(INDEX_DIR);
     _indexSegment.destroy();
+    FileUtils.deleteDirectory(INDEX_DIR);
   }
 }

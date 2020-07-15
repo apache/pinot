@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
-import java.util.Map;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -30,7 +31,8 @@ import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory
 import org.apache.pinot.core.query.request.context.ExpressionContext;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.util.FixedIntArray;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -45,7 +47,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext[] _groupByExpressions;
   private final int _numGroupByExpressions;
-  private final FieldSpec.DataType[] _dataTypes;
+  private final DataType[] _dataTypes;
   private final Dictionary[] _dictionaries;
   private final ValueToIdMap[] _onTheFlyDictionaries;
   private final Object2IntOpenHashMap<FixedIntArray> _groupKeyMap;
@@ -57,7 +59,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       ExpressionContext[] groupByExpressions, int numGroupsLimit) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
-    _dataTypes = new FieldSpec.DataType[_numGroupByExpressions];
+    _dataTypes = new DataType[_numGroupByExpressions];
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _onTheFlyDictionaries = new ValueToIdMap[_numGroupByExpressions];
 
@@ -82,55 +84,63 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     return _globalGroupIdUpperBound;
   }
 
-  @SuppressWarnings("ConstantConditions")
   @Override
   public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
     int numDocs = transformBlock.getNumDocs();
-    Object[] values = new Object[_numGroupByExpressions];
+    int[][] keys = new int[numDocs][_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
       BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
       if (_dictionaries[i] != null) {
-        values[i] = blockValSet.getDictionaryIdsSV();
+        int[] dictIds = blockValSet.getDictionaryIdsSV();
+        for (int j = 0; j < numDocs; j++) {
+          keys[j][i] = dictIds[j];
+        }
       } else {
-        values[i] = getValuesFromBlockValSet(blockValSet, _dataTypes[i]);
-      }
-    }
-
-    for (int i = 0; i < numDocs; i++) {
-      int[] keys = new int[_numGroupByExpressions];
-      for (int j = 0; j < _numGroupByExpressions; j++) {
-        if (_dictionaries[j] != null) {
-          int[] dictIds = (int[]) values[j];
-          keys[j] = dictIds[i];
-        } else {
-          FieldSpec.DataType dataType = _dataTypes[j];
-          switch (dataType) {
-            case INT:
-              int[] intValues = (int[]) values[j];
-              keys[j] = _onTheFlyDictionaries[j].put(intValues[i]);
-              break;
-            case LONG:
-              long[] longValues = (long[]) values[j];
-              keys[j] = _onTheFlyDictionaries[j].put(longValues[i]);
-              break;
-            case FLOAT:
-              float[] floatValues = (float[]) values[j];
-              keys[j] = _onTheFlyDictionaries[j].put(floatValues[i]);
-              break;
-            case DOUBLE:
-              double[] doubleValues = (double[]) values[j];
-              keys[j] = _onTheFlyDictionaries[j].put(doubleValues[i]);
-              break;
-            case STRING:
-              String[] stringValues = (String[]) values[j];
-              keys[j] = _onTheFlyDictionaries[j].put(stringValues[i]);
-              break;
-            default:
-              throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + dataType);
-          }
+        ValueToIdMap onTheFlyDictionary = _onTheFlyDictionaries[i];
+        switch (_dataTypes[i]) {
+          case INT:
+            int[] intValues = blockValSet.getIntValuesSV();
+            for (int j = 0; j < numDocs; j++) {
+              keys[j][i] = onTheFlyDictionary.put(intValues[j]);
+            }
+            break;
+          case LONG:
+            long[] longValues = blockValSet.getLongValuesSV();
+            for (int j = 0; j < numDocs; j++) {
+              keys[j][i] = onTheFlyDictionary.put(longValues[j]);
+            }
+            break;
+          case FLOAT:
+            float[] floatValues = blockValSet.getFloatValuesSV();
+            for (int j = 0; j < numDocs; j++) {
+              keys[j][i] = onTheFlyDictionary.put(floatValues[j]);
+            }
+            break;
+          case DOUBLE:
+            double[] doubleValues = blockValSet.getDoubleValuesSV();
+            for (int j = 0; j < numDocs; j++) {
+              keys[j][i] = onTheFlyDictionary.put(doubleValues[j]);
+            }
+            break;
+          case STRING:
+            String[] stringValues = blockValSet.getStringValuesSV();
+            for (int j = 0; j < numDocs; j++) {
+              keys[j][i] = onTheFlyDictionary.put(stringValues[j]);
+            }
+            break;
+          case BYTES:
+            byte[][] bytesValues = blockValSet.getBytesValuesSV();
+            for (int j = 0; j < numDocs; j++) {
+              keys[j][i] = onTheFlyDictionary.put(new ByteArray(bytesValues[j]));
+            }
+            break;
+          default:
+            throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataTypes[i]);
         }
       }
-      groupKeys[i] = getGroupIdForKey(new FixedIntArray(keys));
+    }
+    for (int i = 0; i < numDocs; i++) {
+      groupKeys[i] = getGroupIdForKey(new FixedIntArray(keys[i]));
     }
   }
 
@@ -147,7 +157,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
   @Override
   public Iterator<GroupKey> getUniqueGroupKeys() {
-    return new GroupKeyIterator(_groupKeyMap);
+    return new GroupKeyIterator();
   }
 
   /**
@@ -170,12 +180,12 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   /**
    * Iterator for {Group-Key, Group-id) pair.
    */
-  class GroupKeyIterator implements Iterator<GroupKey> {
-    Iterator<Map.Entry<FixedIntArray, Integer>> _iterator;
-    GroupKey _groupKey;
+  private class GroupKeyIterator implements Iterator<GroupKey> {
+    final ObjectIterator<Object2IntMap.Entry<FixedIntArray>> _iterator;
+    final GroupKey _groupKey;
 
-    public GroupKeyIterator(Map<FixedIntArray, Integer> map) {
-      _iterator = map.entrySet().iterator();
+    public GroupKeyIterator() {
+      _iterator = _groupKeyMap.object2IntEntrySet().fastIterator();
       _groupKey = new GroupKey();
     }
 
@@ -186,8 +196,8 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
     @Override
     public GroupKey next() {
-      Map.Entry<FixedIntArray, Integer> entry = _iterator.next();
-      _groupKey._groupId = entry.getValue();
+      Object2IntMap.Entry<FixedIntArray> entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
       _groupKey._stringKey = buildStringKeyFromIds(entry.getKey());
       return _groupKey;
     }
@@ -201,58 +211,16 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   private String buildStringKeyFromIds(FixedIntArray keyList) {
     StringBuilder builder = new StringBuilder();
     int[] keys = keyList.elements();
-    for (int i = 0; i < keyList.size(); i++) {
-      String key;
-      int dictId = keys[i];
-
-      if (_dictionaries[i] != null) {
-        key = _dictionaries[i].get(dictId).toString();
-      } else {
-        key = _onTheFlyDictionaries[i].getString(dictId);
-      }
-
+    for (int i = 0; i < _numGroupByExpressions; i++) {
       if (i > 0) {
         builder.append(GroupKeyGenerator.DELIMITER);
       }
-      builder.append(key);
+      if (_dictionaries[i] != null) {
+        builder.append(_dictionaries[i].getStringValue(keys[i]));
+      } else {
+        builder.append(_onTheFlyDictionaries[i].getString(keys[i]));
+      }
     }
-
     return builder.toString();
-  }
-
-  /**
-   * Helper method to fetch values from BlockValSet
-   * @param dataType Data type
-   * @param blockValSet Block val set
-   * @return Values from block val set
-   */
-  private Object getValuesFromBlockValSet(BlockValSet blockValSet, FieldSpec.DataType dataType) {
-    Object values;
-
-    switch (dataType) {
-      case INT:
-        values = blockValSet.getIntValuesSV();
-        break;
-
-      case LONG:
-        values = blockValSet.getLongValuesSV();
-        break;
-
-      case FLOAT:
-        values = blockValSet.getFloatValuesSV();
-        break;
-
-      case DOUBLE:
-        values = blockValSet.getDoubleValuesSV();
-        break;
-
-      case STRING:
-        values = blockValSet.getStringValuesSV();
-        break;
-
-      default:
-        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + dataType);
-    }
-    return values;
   }
 }

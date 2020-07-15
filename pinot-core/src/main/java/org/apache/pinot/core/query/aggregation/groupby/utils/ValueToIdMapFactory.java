@@ -33,19 +33,16 @@ public class ValueToIdMapFactory {
     switch (dataType) {
       case INT:
         return new IntToIdMap();
-
       case LONG:
         return new LongToIdMap();
-
       case FLOAT:
         return new FloatToIdMap();
-
       case DOUBLE:
         return new DoubleToIdMap();
-
       case STRING:
         return new StringToIdMap();
-
+      case BYTES:
+        return new BytesToIdMap();
       default:
         throw new IllegalArgumentException("Illegal data type for ValueToIdMapFactory: " + dataType);
     }
