@@ -39,7 +39,7 @@ const Layout = (props) => {
   };
   return (
     <Grid container direction="column">
-      <Header highlightSidebarLink={highlightSidebarLink} />
+      <Header highlightSidebarLink={highlightSidebarLink} {...props}/>
       <Grid item xs={12}>
         <Grid container>
           <Grid item>

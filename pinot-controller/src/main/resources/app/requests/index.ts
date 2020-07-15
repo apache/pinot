@@ -30,6 +30,9 @@ export const getTenant = (name: string): Promise<AxiosResponse<TableData>> =>
 export const getTenantTable = (name: string): Promise<AxiosResponse<TableName>> =>
   baseApi.get(`/tenants/${name}/tables`);
 
+export const getTenantTableDetails = (tableName: string): Promise<AxiosResponse<IdealState>> =>
+  baseApi.get(`/tables/${tableName}`);
+
 export const getTableSize = (name: string): Promise<AxiosResponse<TableSize>> =>
   baseApi.get(`/tables/${name}/size`);
 

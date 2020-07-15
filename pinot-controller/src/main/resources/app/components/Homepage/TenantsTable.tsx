@@ -50,7 +50,7 @@ const TenantsTable = () => {
   }, []);
 
   return (
-    fetching ? <AppLoader /> : <CustomizedTables title="Tenants" data={tableData} addLinks isPagination />
+    fetching ? <AppLoader /> : <CustomizedTables title="Tenants" data={tableData} addLinks isPagination baseURL="/tenants/" />
   );
 };
 

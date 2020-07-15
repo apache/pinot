@@ -26,11 +26,12 @@ import AppLoader from '../components/AppLoader';
 import { getTenantTable, getTableSize, getIdealState } from '../requests';
 
 type Props = {
-  name: string
+  tenantName: string
 };
 
 const TenantPage = ({ match }: RouteComponentProps<Props>) => {
 
+  const tenantName = match.params.tenantName;
   const [fetching, setFetching] = useState(true);
   const [tableData, setTableData] = useState<TableData>({
     columns: [],
@@ -38,7 +39,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
   });
 
   useEffect(() => {
-    getTenantTable(match.params.name).then(({ data }) => {
+    getTenantTable(tenantName).then(({ data }) => {
       const tableArr = data.tables.map(table => table);
       if(tableArr.length){
         const promiseArr = tableArr.map(name => getTableSize(name));
@@ -85,7 +86,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
   return (
     fetching ? <AppLoader /> :
     <Grid item xs style={{ padding: 20, backgroundColor: 'white', maxHeight: 'calc(100vh - 70px)', overflowY: 'auto' }}>
-      <CustomizedTables title={match.params.name} data={tableData} isPagination />
+      <CustomizedTables title={tenantName} data={tableData} isPagination addLinks baseURL={`/tenants/${tenantName}/table/`} />
     </Grid>
   );
 };

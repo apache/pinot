@@ -18,7 +18,7 @@
  */
 
 import React from 'react';
-import { useLocation, Link as RouterLink } from 'react-router-dom';
+import { useLocation, Link as RouterLink, RouteComponentProps } from 'react-router-dom';
 
 import Breadcrumbs from '@material-ui/core/Breadcrumbs';
 import Typography from '@material-ui/core/Typography';
@@ -26,6 +26,7 @@ import Link, { LinkProps } from '@material-ui/core/Link';
 import NavigateNextIcon from '@material-ui/icons/NavigateNext';
 import Box from '@material-ui/core/Box';
 import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
+import _ from 'lodash';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -46,15 +47,56 @@ const LinkRouter = (props: LinkRouterProps) => (
 
 const breadcrumbNameMap: { [key: string]: string } = {
   '/': 'Home',
-  '/tenants': 'Tenants',
-  '/tenants/DefaultTenant': 'DefaultTenant',
   '/query': 'Query Console',
 };
 
-function BreadcrumbsComponent() {
+const BreadcrumbsComponent = ({ ...props }) => {
   const location = useLocation();
   const pathNames = location.pathname.split('/').filter((x) => x);
   const classes = useStyles();
+
+  const getLabel = (name: string) => {
+    return (
+      <Typography variant="subtitle2" key={name} className={classes.root}>
+        {name}
+      </Typography>
+    );
+  };
+
+  const getClickableLabel = (name: string, link: string) => {
+    return (
+      <LinkRouter
+        underline="none"
+        variant="subtitle2"
+        to={link}
+        key={name}
+        className={classes.root}
+      >
+        {name}
+      </LinkRouter>
+    );
+  };
+
+  const generateBreadcrumb = () => {
+    if(!pathNames.length){
+      return getLabel(breadcrumbNameMap['/']);
+    } else {
+      const breadcrumbs = [getClickableLabel(breadcrumbNameMap['/'], '/')];
+      const paramsKeys = _.keys(props.match.params);
+      if(paramsKeys.length){
+        const {tenantName, tableName} = props.match.params;
+        if(!tableName && tenantName){
+          breadcrumbs.push(getLabel(tenantName));
+        } else {
+          breadcrumbs.push(getClickableLabel(tenantName, `/tenants/${tenantName}`));
+          breadcrumbs.push(getLabel(tableName));
+        }
+      } else {
+        breadcrumbs.push(getLabel(breadcrumbNameMap[location.pathname]));
+      }
+      return breadcrumbs;
+    }
+  };
 
   return (
     <Box marginY="auto" padding="0.25rem 1.5rem" display="flex">
@@ -62,40 +104,7 @@ function BreadcrumbsComponent() {
         separator={<NavigateNextIcon fontSize="small" style={{ fill: '#fff' }} />}
         aria-label="breadcrumb"
       >
-        {pathNames.length ? (
-          <LinkRouter
-            underline="none"
-            variant="subtitle2"
-            to='/'
-            key='/'
-            className={classes.root}
-          >
-            {breadcrumbNameMap['/']}
-          </LinkRouter>
-        ) : (
-          <Typography variant="subtitle2" key="home" className={classes.root}>
-            {breadcrumbNameMap['/']}
-          </Typography>
-        )}
-        {pathNames.map((value, index) => {
-          const last = index === pathNames.length - 1;
-          const to = `/${pathNames.slice(0, index + 1).join('/')}`;
-          return last ? (
-            <Typography variant="subtitle2" key={to} className={classes.root}>
-              {breadcrumbNameMap[to]}
-            </Typography>
-          ) : (
-            <LinkRouter
-              underline="none"
-              variant="subtitle1"
-              to={to}
-              key={to}
-              className={classes.root}
-            >
-              {breadcrumbNameMap[to]}
-            </LinkRouter>
-          );
-        })}
+        {generateBreadcrumb()}
       </Breadcrumbs>
     </Box>
   );

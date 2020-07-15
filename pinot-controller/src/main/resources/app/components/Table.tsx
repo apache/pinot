@@ -57,6 +57,7 @@ type Props = {
   isCellClickable?: boolean,
   highlightBackground?: boolean,
   isSticky?: boolean
+  baseURL?: string
 };
 
 const StyledTableRow = withStyles((theme) =>
@@ -236,7 +237,8 @@ export default function CustomizedTables({
   cellClickCallback,
   isCellClickable,
   highlightBackground,
-  isSticky
+  isSticky,
+  baseURL
 }: Props) {
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
 
@@ -372,7 +374,7 @@ export default function CustomizedTables({
                         <StyledTableCell key={idx}>
                           <NavLink
                             className={classes.link}
-                            to={`/tenants/${cell}`}
+                            to={`${baseURL}${cell}`}
                           >
                             {cell}
                           </NavLink>

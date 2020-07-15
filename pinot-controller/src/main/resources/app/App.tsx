@@ -21,23 +21,31 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { MuiThemeProvider } from '@material-ui/core';
 import { Switch, Route, HashRouter as Router } from 'react-router-dom';
-import HomePage from './pages/HomePage';
 import theme from './theme';
-
 import Layout from './components/Layout';
-import TenantsPage from './pages/Tenants';
-import QueryPage from './pages/Query';
+import RouterData from './router';
 
 const App = () => (
   <MuiThemeProvider theme={theme}>
     <Router>
-      <Layout>
-        <Switch>
-          <Route exact path="/" component={HomePage} />
-          <Route exact path="/tenants/:name" component={TenantsPage} />
-          <Route exact path="/query" component={QueryPage} />
-        </Switch>
-      </Layout>
+      <Switch>
+        {RouterData.map(({ path, Component }, key) => (
+          <Route
+            exact
+            path={path}
+            key={key}
+            render={props => {
+              return (
+                <div className="p-8">
+                  <Layout {...props}>
+                    <Component {...props} />
+                  </Layout>
+                </div>
+              );
+            }}
+          />
+        ))}
+      </Switch>
     </Router>
   </MuiThemeProvider>
 );
