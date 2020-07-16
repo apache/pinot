@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.io.File;
@@ -536,10 +537,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     String maxValue = columnIndexCreationInfo.getMax().toString();
     String defaultNullValue = columnIndexCreationInfo.getDefaultNullValue().toString();
     if (dataType == DataType.STRING) {
-      // Escape special character for STRING column
-      properties.setProperty(getKeyFor(column, MIN_VALUE), escapeSpecialCharacter(minValue));
-      properties.setProperty(getKeyFor(column, MAX_VALUE), escapeSpecialCharacter(maxValue));
-      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), escapeSpecialCharacter(defaultNullValue));
+      // Check special characters for STRING column
+      if (isValidPropertyValue(minValue)) {
+        properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
+      }
+      if (isValidPropertyValue(maxValue)) {
+        properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
+      }
+      if (isValidPropertyValue(defaultNullValue)) {
+        properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+      }
     } else {
       properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
       properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
@@ -549,17 +556,33 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
       String maxValue) {
-    // Escape special character for STRING column
-    properties.setProperty(getKeyFor(column, MIN_VALUE), escapeSpecialCharacter(minValue));
-    properties.setProperty(getKeyFor(column, MAX_VALUE), escapeSpecialCharacter(maxValue));
+    // Check special characters for STRING column
+    if (isValidPropertyValue(minValue)) {
+      properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
+    }
+    if (isValidPropertyValue(maxValue)) {
+      properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
+    }
   }
 
   /**
-   * Helper method to escape special character for the property value.
+   * Helper method to check whether the given value is a valid property value.
+   * <p>Value is invalid iff:
+   * <ul>
+   *   <li>It contains leading/trailing whitespace</li>
+   *   <li>It contains list separator (',')</li>
+   * </ul>
    */
-  private static String escapeSpecialCharacter(String value) {
-    // Escape the list separator ','
-    return value.replace(",", "\\,");
+  @VisibleForTesting
+  static boolean isValidPropertyValue(String value) {
+    int length = value.length();
+    if (length == 0) {
+      return true;
+    }
+    if (Character.isWhitespace(value.charAt(0)) || Character.isWhitespace(value.charAt(length - 1))) {
+      return false;
+    }
+    return value.indexOf(',') == -1;
   }
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {

@@ -82,7 +82,8 @@ public class ColumnMinMaxValueGenerator {
       throws Exception {
     // Skip column without dictionary or with min/max value already set
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
-    if (!columnMetadata.hasDictionary() || columnMetadata.getMinValue() != null) {
+    if (!columnMetadata.hasDictionary() || columnMetadata.getMinValue() != null
+        || columnMetadata.getMaxValue() != null) {
       return;
     }
 

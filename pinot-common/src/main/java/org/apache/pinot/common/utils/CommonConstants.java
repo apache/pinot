@@ -247,7 +247,7 @@ public class CommonConstants {
         "pinot.server.shutdown.resourceCheckIntervalMs";
     public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
 
-    public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
+    public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "ALL";
 
     public static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
 
