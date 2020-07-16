@@ -450,32 +450,33 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private void updateQuerySource(BrokerRequest brokerRequest) {
     String tableName = brokerRequest.getQuerySource().getTableName();
     // Check if table is in the format of [database_name].[table_name]
-    String[] querySourceSplits = tableName.split("\\.", 2);
-    if (querySourceSplits.length != 2) {
+    String[] tableNameSplits = StringUtils.split(tableName, '.');
+    if (tableNameSplits.length != 2) {
       return;
     }
     // Update table name if there is no existing table in the format of [database_name].[table_name] but only [table_name]
-    if (_enableCaseInsensitive && _tableCache.existTableName(querySourceSplits[1]) && !_tableCache
-        .existTableName(tableName)) {
-      // Use TableCache to check case insensitive table name.
-      brokerRequest.getQuerySource().setTableName(querySourceSplits[1]);
+    if (_enableCaseInsensitive) {
+      if (_tableCache.containsTable(tableNameSplits[1]) && !_tableCache.containsTable(tableName)) {
+        // Use TableCache to check case insensitive table name.
+        brokerRequest.getQuerySource().setTableName(tableNameSplits[1]);
+      }
       return;
     }
     // Use RoutingManager to check case sensitive table name.
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType != null && _routingManager.routingExists(querySourceSplits[1]) && !_routingManager
-        .routingExists(tableName)) {
-      brokerRequest.getQuerySource().setTableName(querySourceSplits[1]);
-      return;
+    if (TableNameBuilder.isTableResource(tableName)) {
+      if (_routingManager.routingExists(tableNameSplits[1]) && !_routingManager.routingExists(tableName)) {
+        brokerRequest.getQuerySource().setTableName(tableNameSplits[1]);
+        return;
+      }
     }
-    if (_routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(querySourceSplits[1]))
+    if (_routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableNameSplits[1]))
         && !_routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
-      brokerRequest.getQuerySource().setTableName(querySourceSplits[1]);
+      brokerRequest.getQuerySource().setTableName(tableNameSplits[1]);
       return;
     }
-    if (_routingManager.routingExists(TableNameBuilder.OFFLINE.tableNameWithType(querySourceSplits[1]))
+    if (_routingManager.routingExists(TableNameBuilder.OFFLINE.tableNameWithType(tableNameSplits[1]))
         && !_routingManager.routingExists(TableNameBuilder.OFFLINE.tableNameWithType(tableName))) {
-      brokerRequest.getQuerySource().setTableName(querySourceSplits[1]);
+      brokerRequest.getQuerySource().setTableName(tableNameSplits[1]);
     }
   }
 

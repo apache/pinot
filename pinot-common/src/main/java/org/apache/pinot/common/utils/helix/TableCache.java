@@ -67,7 +67,7 @@ public class TableCache {
     return _tableConfigChangeListener._tableNameMap.getOrDefault(tableName.toLowerCase(), tableName);
   }
 
-  public boolean existTableName(String tableName) {
+  public boolean containsTable(String tableName) {
     return _tableConfigChangeListener._tableNameMap.containsKey(tableName.toLowerCase());
   }
 
