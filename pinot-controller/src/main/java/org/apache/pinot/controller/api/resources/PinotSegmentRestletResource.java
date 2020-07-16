@@ -24,9 +24,12 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -42,17 +45,21 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.helix.SegmentStatusChecker;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -132,17 +139,30 @@ public class PinotSegmentRestletResource {
   private static Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);
 
   @Inject
+  ControllerConf _controllerConf;
+
+  @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  Executor _executor;
+
+  @Inject
+  HttpConnectionManager _connectionManager;
+
+  @Inject
+  ControllerMetrics _controllerMetrics;
+
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}")
   @ApiOperation(value = "List all segments", notes = "List all segments")
   public List<Map<TableType, List<String>>> getSegments(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+          @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+          @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     List<String> tableNamesWithType =
-        getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
+            getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
     List<Map<TableType, List<String>>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -251,20 +271,6 @@ public class PinotSegmentRestletResource {
     }
   }
 
-  @Nullable
-  private Map<String, String> getSegmentMetadataInternal(String tableNameWithType, String segmentName) {
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
-      return offlineSegmentZKMetadata != null ? offlineSegmentZKMetadata.toMap() : null;
-    } else {
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-          ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
-      return realtimeSegmentZKMetadata != null ? realtimeSegmentZKMetadata.toMap() : null;
-    }
-  }
-
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/{segmentName}/metadata")
@@ -333,16 +339,6 @@ public class PinotSegmentRestletResource {
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
     }
   }
-
-//  @GET
-//  @Path("segments/{tableName}/{segmentName}/status")
-//  @Produces(MediaType.APPLICATION_JSON)
-//  @ApiOperation(value = "Status of segment reload", notes = "Status of segment reload")
-//  public SegmentStatus getSegmentStatus(@ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-//      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName) {
-//
-//  }
-
 
   @Deprecated
   @POST
@@ -496,4 +492,91 @@ public class PinotSegmentRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.FORBIDDEN);
     }
   }
+
+  @GET
+  @Path("segments/{tableName}/reload-status")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Status of segment reload", notes = "Status of segment reload")
+  public Map<String, ServerSegmentMetadataReader.TableReloadStatus> getReloadStatus(
+          @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+          @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+    List<String> tableNamesWithType = getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
+    Map<String, ServerSegmentMetadataReader.TableReloadStatus> reloadStatusMap = new HashMap<>();
+    for (String tableNameWithType : tableNamesWithType) {
+      ServerSegmentMetadataReader.TableReloadStatus tableReloadStatus = null;
+      try {
+        tableReloadStatus = getSegmentsReloadStatus(tableNameWithType);
+      } catch (InvalidConfigException e) {
+        throw new ControllerApplicationException(LOGGER,
+                "Failed to load segment reload status for table: " + tableName, Status.NOT_FOUND);
+      }
+      if (Objects.isNull(tableReloadStatus))
+        throw new ControllerApplicationException(LOGGER,
+                "Table: " + tableName + " not found.", Status.NOT_FOUND);
+      reloadStatusMap.put(tableNameWithType, tableReloadStatus);
+    }
+    return reloadStatusMap;
+  }
+
+  private ServerSegmentMetadataReader.TableReloadStatus getSegmentsReloadStatus(String tableNameWithType)
+          throws InvalidConfigException {
+    final Map<String, List<String>> serversToSegmentsMap =
+            _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    TableMetadataReader tableMetadataReader =
+            new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    return tableMetadataReader.getReloadStatus(tableNameWithType, serversToSegmentsMap,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+  }
+
+  @GET
+  @Path("segments/{tableName}/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the metadata for a segment", notes = "Get the metadata for a segment")
+  public Map<String, String> getServerMetadata(@ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+                                               @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == TableType.REALTIME)
+      throw new ControllerApplicationException(LOGGER,
+              "Table type : " + tableTypeStr + " not yet supported.", Status.NOT_IMPLEMENTED);
+
+    List<String> tableNamesWithType = getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));
+    Map<String, String> segmentsMetadata = null;
+    try {
+      segmentsMetadata = getSegmentsMetadataFromServer(tableNamesWithType.get(0));
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER,
+              "Failed to load segment reload status for table: " + tableName, Status.NOT_FOUND);
+
+    }
+    if (segmentsMetadata == null)
+      throw new ControllerApplicationException(LOGGER,
+              "Table: " + tableName + " not found.", Status.NOT_FOUND);
+    return segmentsMetadata;
+  }
+
+  private Map<String, String> getSegmentsMetadataFromServer(String tableNameWithType)
+          throws InvalidConfigException {
+    LOGGER.trace("Inside getSegmentsMetadataFromServer() entry");
+    TableMetadataReader tableMetadataReader =
+            new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    LOGGER.trace("Inside getSegmentsMetadataFromServer() exit");
+    return tableMetadataReader.getSegmentsMetadata(tableNameWithType,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+  }
+
+  @Nullable
+  private Map<String, String> getSegmentMetadataInternal(String tableNameWithType, String segmentName) {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+              ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
+      return offlineSegmentZKMetadata != null ? offlineSegmentZKMetadata.toMap() : null;
+    } else {
+      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+              ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
+      return realtimeSegmentZKMetadata != null ? realtimeSegmentZKMetadata.toMap() : null;
+    }
+  }
+
+
 }

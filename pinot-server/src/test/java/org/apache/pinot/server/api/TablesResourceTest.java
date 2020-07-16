@@ -214,4 +214,51 @@ public class TablesResourceTest extends BaseResourceTest {
 
     FileUtils.forceDelete(tempMetadataDir);
   }
+
+  @Test
+  public void testOfflineSegmentMetadata() throws Exception {
+    IndexSegment defaultSegment = _offlineIndexSegments.get(0);
+    String segmentMetadataPath =
+            "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
+                    .getSegmentName() + "/metadata";
+
+    JsonNode jsonResponse =
+            JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
+
+    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
+    Assert.assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
+    Assert.assertEquals(jsonResponse.get("crc").asText(), segmentMetadata.getCrc());
+    Assert.assertEquals(jsonResponse.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
+    Assert.assertEquals(jsonResponse.get("paddingCharacter").asText(),
+            String.valueOf(segmentMetadata.getPaddingCharacter()));
+    Assert.assertEquals(jsonResponse.get("refreshTimeMillis").asLong(), segmentMetadata.getRefreshTime());
+    Assert.assertEquals(jsonResponse.get("pushTimeMillis").asLong(), segmentMetadata.getPushTime());
+    Assert.assertTrue(jsonResponse.has("pushTimeReadable"));
+    Assert.assertTrue(jsonResponse.has("refreshTimeReadable"));
+    Assert.assertTrue(jsonResponse.has("startTimeReadable"));
+    Assert.assertTrue(jsonResponse.has("endTimeReadable"));
+    Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
+    Assert.assertEquals(jsonResponse.get("columns").size(), 0);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), 1);
+
+
+    jsonResponse = JsonUtils.stringToJsonNode(
+            _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
+                    .get(String.class));
+    Assert.assertEquals(jsonResponse.get("columns").size(), 2);
+    Assert.assertEquals(jsonResponse.get("indexes").size(), 1);
+
+    jsonResponse = JsonUtils.stringToJsonNode(
+            (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
+    Assert.assertEquals(jsonResponse.get("columns").size(), segmentMetadata.getAllColumns().size());
+
+    Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName()).request()
+            .get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+
+    response = _webTarget
+            .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
+            .request().get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
 }

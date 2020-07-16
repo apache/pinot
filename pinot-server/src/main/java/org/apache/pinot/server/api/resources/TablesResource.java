@@ -27,10 +27,9 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -48,6 +47,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
+import org.apache.pinot.common.restlet.resources.SegmentStatus;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -144,21 +144,13 @@ public class TablesResource {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
           Response.Status.NOT_FOUND);
     }
+
     try {
-      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
-      Set<String> columnSet;
-      if (columns.size() == 1 && columns.get(0).equals("*")) {
-        columnSet = null;
-      } else {
-        columnSet = new HashSet<>(columns);
-      }
-      try {
-        return segmentMetadata.toJson(columnSet).toString();
-      } catch (Exception e) {
-        LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentMetadata);
-        throw new WebApplicationException("Failed to convert segment metadata to json",
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
+      return SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, columns);
+    } catch (Exception e) {
+      LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentName);
+      throw new WebApplicationException("Failed to convert segment metadata to json",
+              Response.Status.INTERNAL_SERVER_ERROR);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -245,6 +237,33 @@ public class TablesResource {
       builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + segmentTarFile.getName());
       builder.header(HttpHeaders.CONTENT_LENGTH, segmentTarFile.length());
       return builder.build();
+    } finally {
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
+  @GET
+  @Path("tables/{tableName}/{segmentName}/reload-status")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Metadata from server segment directory", notes = "Metadata from server that hosts the segment provided.")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  public String getSegmentReloadStatus(
+          @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
+          @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName) {
+    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (Objects.isNull(segmentDataManager)) {
+      throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
+              Response.Status.NOT_FOUND);
+    }
+
+    try {
+      SegmentStatus segmentStatus = SegmentMetadataFetcher.getSegmentReloadStatus(segmentDataManager);
+      return ResourceUtils.convertToJsonString(segmentStatus);
+    } catch (Exception e) {
+      LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentName);
+      throw new WebApplicationException("Failed to convert segment metadata to json",
+              Response.Status.INTERNAL_SERVER_ERROR);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
