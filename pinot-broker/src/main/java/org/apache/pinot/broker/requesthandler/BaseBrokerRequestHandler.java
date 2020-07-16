@@ -466,8 +466,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (TableNameBuilder.isTableResource(tableName)) {
       if (_routingManager.routingExists(tableNameSplits[1]) && !_routingManager.routingExists(tableName)) {
         brokerRequest.getQuerySource().setTableName(tableNameSplits[1]);
-        return;
       }
+      return;
     }
     if (_routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableNameSplits[1]))
         && !_routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
