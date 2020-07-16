@@ -39,7 +39,7 @@ public class AsyncQueryResponse {
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
 
-  private Exception _brokerRequestSendException;
+  private volatile Exception _brokerRequestSendException;
 
   public AsyncQueryResponse(QueryRouter queryRouter, long requestId, Set<ServerRoutingInstance> serversQueried,
       long startTimeMs, long timeoutMs) {
@@ -112,7 +112,7 @@ public class AsyncQueryResponse {
     return _brokerRequestSendException;
   }
 
-  public void setBrokerRequestSendException(Exception brokerRequestSendException) {
+  void setBrokerRequestSendException(Exception brokerRequestSendException) {
     _brokerRequestSendException = brokerRequestSendException;
   }
 }

@@ -49,8 +49,6 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
-import static org.apache.pinot.common.exception.QueryException.BROKER_REQUEST_SEND_ERROR_CODE;
-
 
 /**
  * The <code>SingleConnectionBrokerRequestHandler</code> class is a thread-safe broker request handler using a single
@@ -118,9 +116,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     brokerResponse.setNumServersQueried(numServersQueried);
     brokerResponse.setNumServersResponded(numServersResponded);
 
-    if (asyncQueryResponse.getBrokerRequestSendException() != null) {
-      String errorMsg = QueryException.getTruncatedStackTrace(asyncQueryResponse.getBrokerRequestSendException());
-      brokerResponse.addToExceptions(new QueryProcessingException(BROKER_REQUEST_SEND_ERROR_CODE, errorMsg));
+    Exception brokerRequestSendException = asyncQueryResponse.getBrokerRequestSendException();
+    if (brokerRequestSendException != null) {
+      String errorMsg = QueryException.getTruncatedStackTrace(brokerRequestSendException);
+      brokerResponse
+          .addToExceptions(new QueryProcessingException(QueryException.BROKER_REQUEST_SEND_ERROR_CODE, errorMsg));
     }
     if (brokerResponse.getExceptionsSize() > 0) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
