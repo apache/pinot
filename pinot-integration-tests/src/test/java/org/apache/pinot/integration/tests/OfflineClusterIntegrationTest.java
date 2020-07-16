@@ -1133,7 +1133,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testCaseInsensitivity() {
     int daysSinceEpoch = 16138;
     long secondsSinceEpoch = 16138 * 24 * 60 * 60;
-    List<String> queries = Arrays.asList("SELECT * FROM mytable",
+    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
@@ -1142,7 +1142,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + daysSinceEpoch,
         "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
-    queries.replaceAll(query -> query.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch"));
+    List<String> queries = new ArrayList<>();
+    baseQueries.stream().forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+    baseQueries.stream().forEach(q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
     // Wait for at most 10 seconds for broker to get the ZK callback of the schema change
     TestUtils.waitForCondition(aVoid -> {
@@ -1159,6 +1161,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
       return true;
     }, 10_000L, "Failed to get results for case-insensitive queries");
+  }
+
+  @Test
+  public void testQuerySourceWithDatabaseName()
+      throws Exception {
+    // by default 10 rows will be returned, so use high limit
+    String pql = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
+    String sql = "SELECT DISTINCT Carrier FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
+    pql = "SELECT DISTINCT Carrier FROM db.mytable LIMIT 1000000";
+    testSqlQuery(pql, Collections.singletonList(sql));
   }
 
   @Test

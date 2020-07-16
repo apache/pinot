@@ -67,6 +67,10 @@ public class TableCache {
     return _tableConfigChangeListener._tableNameMap.getOrDefault(tableName.toLowerCase(), tableName);
   }
 
+  public boolean containsTable(String tableName) {
+    return _tableConfigChangeListener._tableNameMap.containsKey(tableName.toLowerCase());
+  }
+
   public String getActualColumnName(String tableName, String columnName) {
     String schemaName = _tableConfigChangeListener._table2SchemaConfigMap.get(tableName.toLowerCase());
     if (schemaName != null) {
