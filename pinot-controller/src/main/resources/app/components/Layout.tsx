@@ -23,9 +23,9 @@ import Sidebar from './SideBar';
 import Header from './Header';
 
 const navigationItems = [
-  { id: 1, name: 'Cluster Manager', link: '/' },
-  { id: 2, name: 'Query Console', link: '/query', },
-  { id: 3, name: 'Swagger REST API', link: 'help', target: '_blank' },
+  // { id: 1, name: 'Cluster Manager', link: '/' },
+  { id: 1, name: 'Query Console', link: '/', },
+  { id: 2, name: 'Swagger REST API', link: 'help', target: '_blank' },
 ];
 
 const Layout = (props) => {

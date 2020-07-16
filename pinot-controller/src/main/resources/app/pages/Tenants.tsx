@@ -48,7 +48,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
         Promise.all(promiseArr).then(results => {
           Promise.all(promiseArr2).then(response => {
             setTableData({
-              columns: ['Name', 'Reported Size', 'Extimated Size', 'Number of Segments', 'Status'],
+              columns: ['Table Name', 'Reported Size', 'Estimated Size', 'Number of Segments', 'Status'],
               records: [
                 ...results.map(( result ) => {
                   let actualValue; let idealValue;
@@ -76,7 +76,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
         });
       }else {
         setTableData({
-          columns: ['Name', 'Reported Size', 'Extimated Size', 'Number of Segments', 'Status'],
+          columns: ['Table Name', 'Reported Size', 'Estimated Size', 'Number of Segments', 'Status'],
           records: []
         });
         setFetching(false);

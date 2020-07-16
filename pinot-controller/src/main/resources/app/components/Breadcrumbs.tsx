@@ -48,6 +48,7 @@ const LinkRouter = (props: LinkRouterProps) => (
 const breadcrumbNameMap: { [key: string]: string } = {
   '/': 'Home',
   '/query': 'Query Console',
+  '/cluster': 'Cluster Manager',
 };
 
 const BreadcrumbsComponent = ({ ...props }) => {
