@@ -46,16 +46,26 @@ public class SchemaTest {
     Schema schemaToValidate;
 
     schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true));
-    Assert.assertTrue(schemaToValidate.validate(LOGGER));
+    schemaToValidate.validate();
 
     schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.BOOLEAN, FieldSpec.DataType.STRING, true));
-    Assert.assertFalse(schemaToValidate.validate(LOGGER));
+    try {
+      schemaToValidate.validate();
+      Assert.fail("Should have failed validation for invalid schema.");
+    } catch (IllegalStateException e) {
+      // expected
+    }
 
     schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.STRING, FieldSpec.DataType.STRING, false));
-    Assert.assertFalse(schemaToValidate.validate(LOGGER));
+    try {
+      schemaToValidate.validate();
+      Assert.fail("Should have failed validation for invalid schema.");
+    } catch (IllegalStateException e) {
+      // expected
+    }
 
     schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.BOOLEAN, false));
-    Assert.assertTrue(schemaToValidate.validate(LOGGER));
+    schemaToValidate.validate();
   }
 
   private String makeSchema(FieldSpec.DataType metricType, FieldSpec.DataType dimensionType, boolean isSingleValue) {

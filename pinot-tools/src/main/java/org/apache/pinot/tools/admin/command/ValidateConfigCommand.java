@@ -142,9 +142,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
       try {
         ZNRecord record = _helixPropertyStore.get(SCHEMA_PATH + "/" + schemaName, null, 0);
         Schema schema = SchemaUtils.fromZNRecord(record);
-        if (!SchemaValidator.validate(schema)) {
-          LOGGER.error("    Schema validation failed for schema: \"{}\"", schemaName);
-        }
+        SchemaValidator.validate(schema);
       } catch (Exception e) {
         LOGGER.error("    Caught exception while validating schema: \"{}\"", schemaName, e);
       }

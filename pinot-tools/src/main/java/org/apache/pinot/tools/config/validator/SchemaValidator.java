@@ -26,8 +26,7 @@ public class SchemaValidator {
   private SchemaValidator() {
   }
 
-  public static boolean validate(Schema schema) {
-    // TODO: ADD MORE VALIDATIONS.
-    return SchemaUtils.validate(schema);
+  public static void validate(Schema schema) {
+    SchemaUtils.validate(schema);
   }
 }
