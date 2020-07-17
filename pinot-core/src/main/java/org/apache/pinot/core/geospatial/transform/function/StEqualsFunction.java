@@ -76,9 +76,9 @@ public class StEqualsFunction extends BaseTransformFunction {
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
       Geometry firstGeometry = GeometrySerializer.deserialize(firstValues[i]);
       Geometry secondGeometry = GeometrySerializer.deserialize(secondValues[i]);
-      if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
+      if (GeometryUtils.isGeography(firstGeometry) || GeometryUtils.isGeography(secondGeometry)) {
         throw new RuntimeException(
-            String.format("The first and second arguments shall either all be geometry" + " or all geography"));
+            String.format("%s is available for Geometry objects only", FUNCTION_NAME));
       }
       _results[i] = firstGeometry.equals(secondGeometry) ? 1 : 0;
     }
