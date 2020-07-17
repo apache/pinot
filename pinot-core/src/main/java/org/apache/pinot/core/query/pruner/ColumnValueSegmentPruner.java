@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.pruner;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.data.partition.PartitionFunction;
@@ -132,9 +131,13 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     // Check min/max value
     Comparable minValue = dataSourceMetadata.getMinValue();
     if (minValue != null) {
-      Comparable maxValue = dataSourceMetadata.getMaxValue();
-      assert maxValue != null;
-      if (value.compareTo(minValue) < 0 || value.compareTo(maxValue) > 0) {
+      if (value.compareTo(minValue) < 0) {
+        return true;
+      }
+    }
+    Comparable maxValue = dataSourceMetadata.getMaxValue();
+    if (maxValue != null) {
+      if (value.compareTo(maxValue) > 0) {
         return true;
       }
     }
@@ -206,20 +209,6 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     // Check min/max value
     Comparable minValue = dataSourceMetadata.getMinValue();
     if (minValue != null) {
-      Comparable maxValue = dataSourceMetadata.getMaxValue();
-      assert maxValue != null;
-
-      if (lowerBoundValue != null) {
-        if (lowerInclusive) {
-          if (lowerBoundValue.compareTo(maxValue) > 0) {
-            return true;
-          }
-        } else {
-          if (lowerBoundValue.compareTo(maxValue) >= 0) {
-            return true;
-          }
-        }
-      }
       if (upperBoundValue != null) {
         if (upperInclusive) {
           if (upperBoundValue.compareTo(minValue) < 0) {
@@ -227,6 +216,20 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
           }
         } else {
           if (upperBoundValue.compareTo(minValue) <= 0) {
+            return true;
+          }
+        }
+      }
+    }
+    Comparable maxValue = dataSourceMetadata.getMaxValue();
+    if (maxValue != null) {
+      if (lowerBoundValue != null) {
+        if (lowerInclusive) {
+          if (lowerBoundValue.compareTo(maxValue) > 0) {
+            return true;
+          }
+        } else {
+          if (lowerBoundValue.compareTo(maxValue) >= 0) {
             return true;
           }
         }
