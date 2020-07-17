@@ -33,9 +33,9 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,14 +140,8 @@ public class BackfillSegmentUtils {
       FileUtils.copyFileToDirectory(segmentTar, tableBackupDir);
 
       LOGGER.info("Extracting segment {} to {}", segmentTar, downloadSegmentDir);
-      TarGzCompressionUtils.unTar(segmentTar, downloadSegmentDir);
-
-      File segmentDir = new File(downloadSegmentDir, segmentName);
-      if (!segmentDir.exists()) {
-        throw new RuntimeException("Unable to untar segment " + segmentName);
-      } else {
-        FileUtils.deleteQuietly(segmentTar);
-      }
+      TarGzCompressionUtils.untar(segmentTar, downloadSegmentDir);
+      FileUtils.deleteQuietly(segmentTar);
     } catch (Exception e) {
       LOGGER.error("Error in downloading segment {}", segmentName, e);
       downloadSuccess = false;
@@ -162,15 +156,14 @@ public class BackfillSegmentUtils {
   public boolean uploadSegment(String rawTableName, String segmentName, File segmentDir, File outputDir) {
     boolean success = true;
 
-    File segmentTar = new File(outputDir, segmentName + TAR_SUFFIX);
-
+    File segmentTarFile = new File(outputDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try {
-      TarGzCompressionUtils.createTarGzOfDirectory(segmentDir.getAbsolutePath(), segmentTar.getAbsolutePath());
-      LOGGER.info("Created tar of {} at {}", segmentDir.getAbsolutePath(), segmentTar.getAbsolutePath());
+      TarGzCompressionUtils.createTarGzFile(segmentDir, segmentTarFile);
+      LOGGER.info("Created tar of {} at {}", segmentDir.getAbsolutePath(), segmentTarFile.getAbsolutePath());
       try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
         SimpleHttpResponse response = fileUploadDownloadClient.uploadSegment(
             FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
-            segmentName, segmentTar, rawTableName);
+            segmentName, segmentTarFile, rawTableName);
         int statusCode = response.getStatusCode();
         if (statusCode != HttpStatus.SC_OK) {
           success = false;
@@ -179,7 +172,7 @@ public class BackfillSegmentUtils {
             response.getResponse());
       }
     } catch (Exception e) {
-      LOGGER.error("Exception in segment upload {}", segmentTar, e);
+      LOGGER.error("Exception in segment upload {}", segmentTarFile, e);
       success = false;
     }
     return success;

@@ -291,8 +291,9 @@ public class ClusterIntegrationTestUtils {
 
     // Tar the segment
     String segmentName = driver.getSegmentName();
-    File indexDir = new File(segmentDir, driver.getSegmentName());
-    TarGzCompressionUtils.createTarGzOfDirectory(indexDir.getPath(), new File(tarDir, segmentName).getPath());
+    File indexDir = new File(segmentDir, segmentName);
+    File segmentTarFile = new File(tarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
   }
 
   /**

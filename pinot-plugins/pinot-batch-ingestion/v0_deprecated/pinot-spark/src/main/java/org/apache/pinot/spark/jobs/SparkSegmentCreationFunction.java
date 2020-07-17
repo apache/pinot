@@ -26,7 +26,6 @@ import java.io.Serializable;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -47,9 +46,7 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
@@ -241,7 +238,7 @@ public class SparkSegmentCreationFunction implements Serializable {
     String segmentTarFileName = segmentName + JobConfigConstants.TAR_GZ_FILE_EXT;
     File localSegmentTarFile = new File(_localSegmentTarDir, segmentTarFileName);
     _logger.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-    TarGzCompressionUtils.createTarGzOfDirectory(localSegmentDir.getPath(), localSegmentTarFile.getPath());
+    TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
 
     long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
     long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);

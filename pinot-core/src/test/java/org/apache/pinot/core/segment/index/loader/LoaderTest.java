@@ -23,7 +23,6 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -157,8 +156,8 @@ public class LoaderTest {
     // Old Format
     URL resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_OLD);
     Assert.assertNotNull(resourceUrl);
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
-    File segmentDirectory = new File(INDEX_DIR, "paddingOld");
+    File segmentDirectory =
+        TarGzCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR).get(0);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
@@ -178,8 +177,8 @@ public class LoaderTest {
     // New Format Padding character %
     resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_PERCENT);
     Assert.assertNotNull(resourceUrl);
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
-    segmentDirectory = new File(INDEX_DIR, "paddingPercent");
+    segmentDirectory =
+        TarGzCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR).get(0);
     segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
@@ -198,8 +197,8 @@ public class LoaderTest {
     // New Format Padding character Null
     resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_NULL);
     Assert.assertNotNull(resourceUrl);
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
-    segmentDirectory = new File(INDEX_DIR, "paddingNull");
+    segmentDirectory =
+        TarGzCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR).get(0);
     segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.DEFAULT_STRING_PAD_CHAR);

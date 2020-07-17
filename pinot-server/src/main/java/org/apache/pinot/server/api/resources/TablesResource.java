@@ -208,8 +208,8 @@ public class TablesResource {
       AccessControl accessControl = _accessControlFactory.create();
       hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableNameWithType);
     } catch (Exception e) {
-      throw new WebApplicationException(
-          "Caught exception while validating access to table: " + tableNameWithType, Response.Status.INTERNAL_SERVER_ERROR);
+      throw new WebApplicationException("Caught exception while validating access to table: " + tableNameWithType,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
     if (!hasDataAccess) {
       throw new WebApplicationException("No data access to table: " + tableNameWithType, Response.Status.FORBIDDEN);
@@ -227,24 +227,23 @@ public class TablesResource {
       // Store the tar.gz segment file in the server's segmentTarDir folder with a unique file name.
       // Note that two clients asking the same segment file will result in the same tar.gz files being created twice.
       // Will revisit for optimization if performance becomes an issue.
-      File tmpSegmentTarDir = new File(serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
+      File tmpSegmentTarDir =
+          new File(serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
       tmpSegmentTarDir.mkdir();
 
-      String tarFilePath = TarGzCompressionUtils
-          .createTarGzOfDirectory(new File(tableDataManager.getTableDataDir(), segmentName).getAbsolutePath(),
-              new File(tmpSegmentTarDir, tableNameWithType+ "_" + segmentName + "_" + UUID.randomUUID()).getAbsolutePath());
-      File tarFile = new File(tarFilePath);
-      tarFile.deleteOnExit();
+      File segmentTarFile = new File(tmpSegmentTarDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
+          + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
         try {
-          Files.copy(tarFile.toPath(), output);
+          Files.copy(segmentTarFile.toPath(), output);
         } finally {
-          FileUtils.deleteQuietly(tarFile);
+          FileUtils.deleteQuietly(segmentTarFile);
         }
       });
-      builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + tarFile.getName());
-      builder.header(HttpHeaders.CONTENT_LENGTH, tarFile.length());
+      builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + segmentTarFile.getName());
+      builder.header(HttpHeaders.CONTENT_LENGTH, segmentTarFile.length());
       return builder.build();
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);

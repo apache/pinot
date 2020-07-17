@@ -86,10 +86,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
 
       // Un-tar the segment file
       File segmentDir = new File(tempDataDir, "segmentDir");
-      TarGzCompressionUtils.unTar(tarredSegmentFile, segmentDir);
-      File[] files = segmentDir.listFiles();
-      Preconditions.checkState(files != null && files.length == 1);
-      File indexDir = files[0];
+      File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
 
       // Convert the segment
       File workingDir = new File(tempDataDir, "workingDir");
@@ -100,9 +97,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           segmentConversionResult.getSegmentName(), segmentName);
 
       // Tar the converted segment
-      File convertedTarredSegment = new File(TarGzCompressionUtils
-          .createTarGzOfDirectory(segmentConversionResult.getFile().getPath(),
-              new File(tempDataDir, "convertedTarredSegment").getPath()));
+      File convertedSegmentTarFile = new File(tempDataDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarGzCompressionUtils.createTarGzFile(segmentConversionResult.getFile(), convertedSegmentTarFile);
 
       // Check whether the task get cancelled before uploading the segment
       if (_cancelled) {
@@ -134,7 +130,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
 
       // Upload the tarred segment
       SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName, uploadURL,
-          convertedTarredSegment);
+          convertedSegmentTarFile);
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
       return segmentConversionResult;

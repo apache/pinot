@@ -204,14 +204,13 @@ public class DictionaryToRawIndexConverter {
     if (segmentDir.isFile()) {
       if (segmentDir.getName().endsWith(".tar.gz") || segmentDir.getName().endsWith(".tgz")) {
         LOGGER.info("Uncompressing input segment '{}'", segmentDir);
-        newSegment = TarGzCompressionUtils.unTar(segmentDir, outputDir).get(0);
+        newSegment = TarGzCompressionUtils.untar(segmentDir, outputDir).get(0);
       } else {
         LOGGER.warn("Skipping non-segment file '{}'", segmentDir.getAbsoluteFile());
         return false;
       }
     } else {
       newSegment = new File(outputDir, segmentDir.getName());
-      newSegment.mkdir();
       FileUtils.copyDirectory(segmentDir, newSegment);
     }
 
@@ -226,7 +225,8 @@ public class DictionaryToRawIndexConverter {
 
     if (compressOutput) {
       LOGGER.info("Compressing segment '{}'", newSegment);
-      TarGzCompressionUtils.createTarGzOfDirectory(newSegment.getAbsolutePath(), newSegment.getAbsolutePath());
+      File segmentTarFile = new File(outputDir, newSegment.getName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarGzCompressionUtils.createTarGzFile(newSegment, segmentTarFile);
       FileUtils.deleteQuietly(newSegment);
     }
     return true;

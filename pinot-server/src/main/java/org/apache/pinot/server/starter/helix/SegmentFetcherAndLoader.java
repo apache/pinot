@@ -204,11 +204,7 @@ public class SegmentFetcherAndLoader {
 
       // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
       // Thus, there's no need to retry again.
-      TarGzCompressionUtils.unTar(tempTarFile, tempSegmentDir);
-
-      File[] files = tempSegmentDir.listFiles();
-      Preconditions.checkState(files != null && files.length == 1);
-      File tempIndexDir = files[0];
+      File tempIndexDir = TarGzCompressionUtils.untar(tempTarFile, tempSegmentDir).get(0);
 
       File indexDir = new File(new File(_instanceDataManager.getSegmentDataDirectory(), tableName), segmentName);
       if (indexDir.exists()) {

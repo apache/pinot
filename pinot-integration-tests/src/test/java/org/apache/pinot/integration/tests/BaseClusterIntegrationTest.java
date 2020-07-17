@@ -406,7 +406,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getAvroTarFileName());
     Assert.assertNotNull(resourceUrl);
-    return TarGzCompressionUtils.unTar(new File(resourceUrl.getFile()), outputDir);
+    return TarGzCompressionUtils.untar(new File(resourceUrl.getFile()), outputDir);
   }
 
   /**

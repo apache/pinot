@@ -45,8 +45,9 @@ public class SplitSegmentCommitter implements SegmentCommitter {
   }
 
   @Override
-  public SegmentCompletionProtocol.Response commit(LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
-    final File segmentTarFile = new File(segmentBuildDescriptor.getSegmentTarFilePath());
+  public SegmentCompletionProtocol.Response commit(
+      LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
+    File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
 
     SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_params);
     if (!segmentCommitStartResponse.getStatus()
