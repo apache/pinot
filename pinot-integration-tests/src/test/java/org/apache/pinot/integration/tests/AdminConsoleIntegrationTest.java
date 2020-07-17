@@ -82,15 +82,6 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertEquals(response, expected);
   }
 
-  @Test
-  public void testQuery() throws Exception {
-    // test controller query console
-    String response = sendGetRequest(_controllerBaseApiUrl + "/query");
-    String expected =
-        IOUtils.toString(ControllerAdminApiApplication.class.getClassLoader().getResourceAsStream("static/query/index.html"),
-            "UTF-8").replace("\n", "");
-    Assert.assertEquals(response, expected);
-  }
 }
 
 

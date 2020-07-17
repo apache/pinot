@@ -16,27 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
 
-import java.io.InputStream;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import HomePage from './pages/HomePage';
+import TenantsPage from './pages/Tenants';
+import TenantPageDetails from './pages/TenantDetails';
+import QueryPage from './pages/Query';
 
-
-@Path("/")
-public class LandingPageHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LandingPageHandler.class);
-
-  // We configure this webapp resource as jersey handler because all our APIs are at "/"
-  // So, the framework does not serve base index.html page correctly. See ControllerAdminApiApplication
-  // for more details.
-  @GET
-  @Produces(MediaType.TEXT_HTML)
-  public InputStream getIndexPage() {
-    return getClass().getClassLoader().getResourceAsStream("webapp/index.html");
-  }
-}
+export default [
+  { path: "/cluster", Component: HomePage },
+  { path: "/tenants/:tenantName", Component: TenantsPage },
+  { path: "/tenants/:tenantName/table/:tableName", Component: TenantPageDetails },
+  { path: "/", Component: QueryPage }
+];

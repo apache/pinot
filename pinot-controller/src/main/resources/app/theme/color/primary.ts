@@ -16,27 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
 
-import java.io.InputStream;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+const primary = {
+  50: '#EAF7F9',
+  100: '#CCEAEF',
+  200: '#CCEAEF',
+  300: '#AADDE4',
+  400: '#6EC4D1',
+  500: '#4285F4',
+  600: '#4DB3C3',
+  700: '#43ABBC',
+  800: '#3AA3B5',
+  900: '#115293',
 
+  A100: '#ea80fc',
+  A200: '#e040fb',
+  A400: '#d500f9',
+  A700: '#aa00ff',
+};
 
-@Path("/")
-public class LandingPageHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LandingPageHandler.class);
-
-  // We configure this webapp resource as jersey handler because all our APIs are at "/"
-  // So, the framework does not serve base index.html page correctly. See ControllerAdminApiApplication
-  // for more details.
-  @GET
-  @Produces(MediaType.TEXT_HTML)
-  public InputStream getIndexPage() {
-    return getClass().getClassLoader().getResourceAsStream("webapp/index.html");
-  }
-}
+export default primary;
