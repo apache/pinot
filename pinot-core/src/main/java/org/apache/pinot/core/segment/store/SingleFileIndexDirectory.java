@@ -344,10 +344,12 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void removeIndex(String columnName, ColumnIndexType indexType) {
-    Preconditions.checkState(indexType == ColumnIndexType.INVERTED_INDEX);
+    if (indexType != ColumnIndexType.INVERTED_INDEX) {
+      throw new UnsupportedOperationException("Currently only inverted index removal is supported");
+    }
     IndexKey indexKey = new IndexKey(columnName, indexType);
     if (!columnEntries.containsKey(indexKey)) {
-      throw new IllegalStateException("Attempting to drop inverted index for non-existent column and index combination");
+      throw new IllegalStateException("Attempting to drop inverted index for non-existent column");
     }
     IndexEntry indexEntry = columnEntries.get(indexKey);
     long indexStartOffset = indexEntry.startOffset;
