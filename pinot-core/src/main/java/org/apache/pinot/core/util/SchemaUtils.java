@@ -18,15 +18,20 @@
  */
 package org.apache.pinot.core.util;
 
+import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.core.data.function.FunctionEvaluator;
 import org.apache.pinot.core.data.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,67 +42,79 @@ public class SchemaUtils {
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
   public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SchemaUtils.class);
-
   /**
-   * Validates that for a field spec with transform function, the source column name and destination column name are exclusive
-   * i.e. do not allow using source column name for destination column
+   * Validates the following:
+   * 1) Checks valid transform function -
+   *   for a field spec with transform function, the source column name and destination column name are exclusive i.e. do not allow using source column name for destination column
+   *   ensure transform function string can be used to create a {@link FunctionEvaluator}
+   * 2) Checks for chained transforms/derived transform - not supported yet
+   * TODO: Transform functions have moved to table config. Once we stop supporting them in schema, remove the validations 1 and 2
+   * 3) Checks valid timeFieldSpec - if incoming and outgoing granularity spec are different a) the names cannot be same b) cannot use SIMPLE_DATE_FORMAT for conversion
+   * 4) Checks valid dateTimeFieldSpecs - checks format and granularity string
+   * 5) Schema validations from {@link Schema#validate}
    */
-  public static boolean validate(Schema schema) {
-    return validate(schema, LOGGER);
+  public static void validate(Schema schema) {
+    schema.validate();
+
+    Set<String> transformedColumns = new HashSet<>();
+    Set<String> argumentColumns = new HashSet<>();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        String column = fieldSpec.getName();
+        String transformFunction = fieldSpec.getTransformFunction();
+        if (transformFunction != null) {
+          try {
+            List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments();
+            Preconditions.checkState(!arguments.contains(column),
+                "The arguments of transform function %s should not contain the destination column %s",
+                transformFunction, column);
+            transformedColumns.add(column);
+            argumentColumns.addAll(arguments);
+          } catch (Exception e) {
+            throw new IllegalStateException(
+                "Exception in getting arguments for transform function '" + transformFunction + "' for column '"
+                    + column + "'", e);
+          }
+        }
+        if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
+          validateTimeFieldSpec(fieldSpec);
+        }
+        if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.DATE_TIME)) {
+          validateDateTimeFieldSpec(fieldSpec);
+        }
+      }
+    }
+    Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
+        "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
+        transformedColumns.retainAll(argumentColumns));
   }
 
   /**
-   * Validates the following:
-   * 1) for a field spec with transform function, the source column name and destination column name are exclusive
-   * i.e. do not allow using source column name for destination column
-   * 2) Basic schema validations
+   * Checks for valid incoming and outgoing granularity spec in the time field spec
    */
-  public static boolean validate(Schema schema, Logger logger) {
-    try {
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        if (!fieldSpec.isVirtualColumn()) {
-          String column = fieldSpec.getName();
-          String transformFunction = fieldSpec.getTransformFunction();
-          if (transformFunction != null) {
-            FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-            if (functionEvaluator != null) {
-              List<String> arguments = functionEvaluator.getArguments();
-              // output column used as input
-              if (arguments.contains(column)) {
-                logger.error("The arguments of transform function: {}, should not contain the destination column: {}",
-                    transformFunction, column);
-                return false;
-              }
-            }
-          } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
-            TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
-            TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
-            TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+  private static void validateTimeFieldSpec(FieldSpec fieldSpec) {
+    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+    TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
+    TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
 
-            if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
-              // different incoming and outgoing spec, but same name
-              if (incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
-                logger.error("Cannot convert from incoming field spec:{} to outgoing field spec:{} if name is the same",
-                    incomingGranularitySpec, outgoingGranularitySpec);
-                return false;
-              } else {
-                if (!incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
-                    || !outgoingGranularitySpec.getTimeFormat()
-                    .equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-                  logger.error(
-                      "When incoming and outgoing specs are different, cannot perform time conversion for time format other than EPOCH");
-                  return false;
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (Exception e) {
-      logger.error("Exception in validating schema {}", schema.getSchemaName(), e);
-      return false;
+    if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
+      Preconditions.checkState(!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName()),
+          "Cannot convert from incoming field spec %s to outgoing field spec %s if name is the same",
+          incomingGranularitySpec, outgoingGranularitySpec);
+
+      Preconditions.checkState(
+          incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
+              && outgoingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
+          "Cannot perform time conversion for time format other than EPOCH. TimeFieldSpec: %s", fieldSpec);
     }
-    return schema.validate(logger);
+  }
+
+  /**
+   * Checks for valid format and granularity string in dateTimeFieldSpec
+   */
+  private static void validateDateTimeFieldSpec(FieldSpec fieldSpec) {
+    DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
+    DateTimeFormatSpec.validateFormat(dateTimeFieldSpec.getFormat());
+    DateTimeGranularitySpec.validateGranularity(dateTimeFieldSpec.getGranularity());
   }
 }

@@ -397,8 +397,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * If we add more validations, it may make sense to split this method into multiple validation methods.
    * But then, we are trying to figure out all the invalid cases before we return from this method...
    *
-   * @param schema
-   * @param indexingConfig
    * @return true if schema is valid.
    */
   private boolean isValid(Schema schema, IndexingConfig indexingConfig) {
@@ -417,10 +415,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       }
     }
     // 2. We want to get the schema errors, if any, even if isValid is false;
-    if (!SchemaUtils.validate(schema, _logger)) {
+    try {
+      SchemaUtils.validate(schema);
+    } catch (Exception e) {
+      _logger.error("Caught exception while validating schema: {}", schema.getSchemaName(), e);
       isValid = false;
     }
-
     return isValid;
   }
 }

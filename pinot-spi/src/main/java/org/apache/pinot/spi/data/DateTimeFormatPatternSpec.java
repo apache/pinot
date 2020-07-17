@@ -39,7 +39,7 @@ public class DateTimeFormatPatternSpec {
   public static final DateTimeZone DEFAULT_DATETIMEZONE = DateTimeZone.UTC;
   public static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 
-  private TimeFormat _timeFormat;
+  private final TimeFormat _timeFormat;
   private String _sdfPattern = null;
   private DateTimeZone _dateTimeZone = DEFAULT_DATETIMEZONE;
   private transient DateTimeFormatter _dateTimeFormatter;
