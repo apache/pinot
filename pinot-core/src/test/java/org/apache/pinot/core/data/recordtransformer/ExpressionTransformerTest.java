@@ -122,9 +122,6 @@ public class ExpressionTransformerTest {
     Assert.assertEquals(genericRow.getValue("cost"), 1000.0);
     // convert to LONG
     Assert.assertEquals(genericRow.getValue("hoursSinceEpoch"), 437222L);
-
-    // geo-spatial transformer
-    Assert.assertEquals(genericRow.getValue("point"), "POINT (1 2)");
   }
 
   /**
