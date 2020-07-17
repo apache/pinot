@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -64,10 +65,9 @@ public class SchemaUtils {
         if (transformFunction != null) {
           try {
             List<String> arguments = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec).getArguments();
-            if (arguments.contains(column)) {
-              throw new IllegalStateException("The arguments of transform function '" + transformFunction
-                  + "' should not contain the destination column '" + column + "'");
-            }
+            Preconditions.checkState(!arguments.contains(column),
+                "The arguments of transform function %s should not contain the destination column %s",
+                transformFunction, column);
             transformedColumns.add(column);
             argumentColumns.addAll(arguments);
           } catch (Exception e) {
@@ -84,12 +84,10 @@ public class SchemaUtils {
         }
       }
     }
-    if (!Collections.disjoint(transformedColumns, argumentColumns)) {
-      throw new IllegalStateException("Columns:" + transformedColumns.retainAll(argumentColumns)
-          + ", are a result of transformations, and cannot be used as arguments to other transform functions");
-    }
+    Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
+        "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
+        transformedColumns.retainAll(argumentColumns));
   }
-
 
   /**
    * Checks for valid incoming and outgoing granularity spec in the time field spec
@@ -100,19 +98,14 @@ public class SchemaUtils {
     TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
 
     if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
-      // different incoming and outgoing spec, but same name
-      if (incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName())) {
-        throw new IllegalStateException(
-            "Cannot convert from incoming field spec '" + incomingGranularitySpec + "' to outgoing field spec '"
-                + outgoingGranularitySpec + "' if name is the same");
-      } else {
-        if (!incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
-            || !outgoingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-          throw new IllegalStateException(
-              "Cannot perform time conversion for time format other than EPOCH. Incoming '" + incomingGranularitySpec
-                  + "', Outgoing '" + outgoingGranularitySpec + "'");
-        }
-      }
+      Preconditions.checkState(!incomingGranularitySpec.getName().equals(outgoingGranularitySpec.getName()),
+          "Cannot convert from incoming field spec %s to outgoing field spec %s if name is the same",
+          incomingGranularitySpec, outgoingGranularitySpec);
+
+      Preconditions.checkState(
+          incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
+              && outgoingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
+          "Cannot perform time conversion for time format other than EPOCH. TimeFieldSpec: %s", fieldSpec);
     }
   }
 

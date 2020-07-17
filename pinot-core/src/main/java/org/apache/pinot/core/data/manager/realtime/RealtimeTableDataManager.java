@@ -418,6 +418,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       SchemaUtils.validate(schema);
     } catch (Exception e) {
+      _logger.error("Caught exception while validating schema: {}", schema.getSchemaName(), e);
       isValid = false;
     }
     return isValid;

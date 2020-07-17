@@ -184,22 +184,22 @@ public class DateTimeFormatSpec {
   public static void validateFormat(String format) {
     Preconditions.checkNotNull(format, "Format string in dateTimeFieldSpec must not be null");
     String[] formatTokens = format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
-    Preconditions.checkArgument(formatTokens.length >= MIN_FORMAT_TOKENS && formatTokens.length <= MAX_FORMAT_TOKENS,
-        "Incorrect format:%. Must be of format size:timeunit:timeformat(:pattern)", format);
-    Preconditions.checkArgument(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX),
-        "Incorrect format size:% in format:%. Must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)",
+    Preconditions.checkState(formatTokens.length >= MIN_FORMAT_TOKENS && formatTokens.length <= MAX_FORMAT_TOKENS,
+        "Incorrect format: %s. Must be of format 'size:timeunit:timeformat(:pattern)'", format);
+    Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX),
+        "Incorrect format size: %s in format: %s. Must be of format '[0-9]+:<TimeUnit>:<TimeFormat>(:pattern)'",
         formatTokens[FORMAT_SIZE_POSITION], format);
 
     DateTimeFormatUnitSpec.validateUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
 
     if (formatTokens.length == MIN_FORMAT_TOKENS) {
-      Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
-          "Incorrect format type:% in format:%. Must be of [0-9]+:<TimeUnit>:EPOCH",
+      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
+          "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:EPOCH'",
           formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     } else {
       Preconditions
-          .checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-              "Incorrect format type:% in format:%. Must be of [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern",
+          .checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+              "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern'",
               formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     }
   }

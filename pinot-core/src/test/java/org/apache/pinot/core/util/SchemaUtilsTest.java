@@ -181,7 +181,7 @@ public class SchemaUtilsTest {
     try {
       SchemaUtils.validate(pinotSchema);
       Assert.fail("Schema validation should have failed.");
-    } catch (IllegalStateException | IllegalArgumentException e) {
+    } catch (IllegalStateException e) {
       // expected
     }
   }

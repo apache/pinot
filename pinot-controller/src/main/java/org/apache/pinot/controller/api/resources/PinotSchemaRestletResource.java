@@ -173,7 +173,7 @@ public class PinotSchemaRestletResource {
     try {
       SchemaUtils.validate(schema);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid schema:%s.", schema.getSchemaName()),
+      throw new ControllerApplicationException(LOGGER, "Invalid schema: " + schema.getSchemaName(),
           Response.Status.BAD_REQUEST, e);
     }
     return schema.toPrettyJsonString();
@@ -190,7 +190,7 @@ public class PinotSchemaRestletResource {
     try {
       SchemaUtils.validate(schema);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid schema:%s", schema.getSchemaName()),
+      throw new ControllerApplicationException(LOGGER, "Invalid schema: " + schema.getSchemaName(),
           Response.Status.BAD_REQUEST, e);
     }
     return schema.toPrettyJsonString();
@@ -205,8 +205,8 @@ public class PinotSchemaRestletResource {
     try {
       SchemaUtils.validate(schema);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Cannot add invalid schema:%s.", schema.getSchemaName()), Response.Status.BAD_REQUEST, e);
+      throw new ControllerApplicationException(LOGGER, "Cannot add invalid schema: " + schema.getSchemaName(),
+          Response.Status.BAD_REQUEST, e);
     }
 
     try {
@@ -235,7 +235,7 @@ public class PinotSchemaRestletResource {
     try {
       SchemaUtils.validate(schema);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Cannot add invalid schema:%s.", schemaName),
+      throw new ControllerApplicationException(LOGGER, "Cannot add invalid schema: " + schemaName,
           Response.Status.BAD_REQUEST, e);
     }
 
