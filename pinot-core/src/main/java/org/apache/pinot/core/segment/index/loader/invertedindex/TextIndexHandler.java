@@ -46,8 +46,15 @@ import org.apache.pinot.core.segment.creator.TextIndexType;
 import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.metadata.ColumnMetadata;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.ForwardIndexReaderContext;
+import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.index.readers.forward.BaseChunkSVForwardIndexReader.ChunkReaderContext;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitMVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.core.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.core.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -111,34 +118,19 @@ public class TextIndexHandler {
   }
 
   /**
-   * Right now the text index is supported on RAW (non-dictionary encoded)
-   * single-value STRING columns. Eventually we will relax the constraints
-   * step by step.
-   * For example, later on user should be able to create text index on
-   * a dictionary encoded STRING column that also has native Pinot's inverted
-   * index. We can also support it on BYTE columns later.
+   * Right now the text index is supported on RAW and dictionary encoded
+   * single-value STRING columns. Later we can add support for text index
+   * on multi-value columns and BYTE type columns
    * @param columnMetadata metadata for column
    */
   private void checkUnsupportedOperationsForTextIndex(ColumnMetadata columnMetadata) {
     String column = columnMetadata.getColumnName();
-    if (columnMetadata.hasDictionary()) {
-      throw new UnsupportedOperationException(
-          "Text index is currently not supported on dictionary encoded column: " + column);
+    if (columnMetadata.getDataType() != DataType.STRING) {
+      throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
     }
-
-    if (columnMetadata.isSorted()) {
-      // since Pinot's current implementation doesn't support raw sorted columns,
-      // we need to check for this too
-      throw new UnsupportedOperationException("Text index is currently not supported on sorted columns: " + column);
-    }
-
     if (!columnMetadata.isSingleValue()) {
       throw new UnsupportedOperationException(
           "Text index is currently not supported on multi-value columns: " + column);
-    }
-
-    if (columnMetadata.getDataType() != DataType.STRING) {
-      throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
     }
   }
 
@@ -151,30 +143,74 @@ public class TextIndexHandler {
       return;
     }
     int numDocs = columnMetadata.getTotalDocs();
-    LOGGER.info("Creating new text index for column: {} in segment: {}", column, _segmentName);
+    boolean hasDictionary = columnMetadata.hasDictionary();
+    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", column, _segmentName, hasDictionary);
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, _segmentVersion);
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
     // further need to move around the lucene index directory since it is created with correct directory structure
     // based on segmentVersion.
-    try (LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true);
-        VarByteChunkSVForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata);
-        ChunkReaderContext readerContext = forwardIndexReader.createContext()) {
-      for (int docId = 0; docId < numDocs; docId++) {
-        textIndexCreator.addDoc(forwardIndexReader.getString(docId, readerContext), docId);
+    try (ForwardIndexReader forwardIndexReader = getForwardIndexReader(columnMetadata);
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
+        LuceneTextIndexCreator textIndexCreator = new LuceneTextIndexCreator(column, segmentDirectory, true)) {
+      if (!hasDictionary) {
+        // text index on raw column, just read the raw forward index
+        VarByteChunkSVForwardIndexReader rawIndexReader = (VarByteChunkSVForwardIndexReader)forwardIndexReader;
+        ChunkReaderContext chunkReaderContext = (ChunkReaderContext)readerContext;
+        for (int docId = 0; docId < numDocs; docId++) {
+          textIndexCreator.addDoc(rawIndexReader.getString(docId, chunkReaderContext), docId);
+        }
+      } else {
+        // text index on dictionary encoded SV column
+        // read forward index to get dictId
+        // read the raw value from dictionary using dictId
+        try (BaseImmutableDictionary dictionary = getDictionaryReader(columnMetadata)) {
+          for (int docId = 0; docId < numDocs; docId++) {
+            int dictId = forwardIndexReader.getDictId(docId, readerContext);
+            String value = dictionary.getStringValue(dictId);
+            textIndexCreator.addDoc(value, docId);
+          }
+        }
       }
       textIndexCreator.seal();
     }
+
     LOGGER.info("Created text index for column: {} in segment: {}", column, _segmentName);
     PropertiesConfiguration properties = SegmentMetadataImpl.getPropertiesConfiguration(_indexDir);
     properties.setProperty(getKeyFor(column, TEXT_INDEX_TYPE), TextIndexType.LUCENE.name());
     properties.save();
   }
 
-  private VarByteChunkSVForwardIndexReader getForwardIndexReader(ColumnMetadata columnMetadata)
+  private ForwardIndexReader<?> getForwardIndexReader(ColumnMetadata columnMetadata)
       throws IOException {
-    PinotDataBuffer buffer = _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    return new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+    if (!columnMetadata.hasDictionary()) {
+      // text index on raw column
+      PinotDataBuffer buffer = _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+      return new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+    } else {
+      // text index on dictionary encoded column
+      // two cases:
+      // 1. column is sorted
+      // 2. column is unsorted
+      PinotDataBuffer buffer = _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+      int numRows = columnMetadata.getTotalDocs();
+      int numBitsPerValue = columnMetadata.getBitsPerElement();
+      if (columnMetadata.isSorted()) {
+        // created sorted dictionary based forward index reader
+        return new SortedIndexReaderImpl(buffer, columnMetadata.getCardinality());
+      } else {
+        // create bit-encoded dictionary based forward index reader
+        return new FixedBitSVForwardIndexReader(buffer, numRows, numBitsPerValue);
+      }
+    }
+  }
+
+  private BaseImmutableDictionary getDictionaryReader(ColumnMetadata columnMetadata)
+      throws IOException {
+    PinotDataBuffer dictionaryBuffer =
+        _segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
+    return new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
+        (byte) columnMetadata.getPaddingCharacter());
   }
 }

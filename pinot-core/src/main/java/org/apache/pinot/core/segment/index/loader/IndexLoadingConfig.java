@@ -158,10 +158,6 @@ public class IndexLoadingConfig {
       for (FieldConfig fieldConfig : fieldConfigList) {
         String column = fieldConfig.getName();
         if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || !_noDictionaryColumns.contains(column)) {
-            throw new UnsupportedOperationException(
-                "Text index is currently not supported on dictionary encoded column: " + column);
-          }
           _textIndexColumns.add(column);
         }
       }

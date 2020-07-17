@@ -48,33 +48,12 @@ public final class TableConfigUtils {
   /**
    * Validates the table config with the following rules:
    * <ul>
-   *   <li>Text index column must be raw</li>
    *   <li>peerSegmentDownloadScheme in ValidationConfig must be http or https</li>
    * </ul>
    */
   public static void validate(TableConfig tableConfig) {
-    validateFieldConfigList(tableConfig);
     validateValidationConfig(tableConfig);
     validateIngestionConfig(tableConfig.getIngestionConfig());
-  }
-
-  private static void validateFieldConfigList(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      List<String> noDictionaryColumns = tableConfig.getIndexingConfig().getNoDictionaryColumns();
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          // For Text index column, it must be raw (no-dictionary)
-          // NOTE: Check both encodingType and noDictionaryColumns before migrating indexing configs into field configs
-          String column = fieldConfig.getName();
-          if (fieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW || noDictionaryColumns == null
-              || !noDictionaryColumns.contains(column)) {
-            throw new IllegalStateException(
-                "Text index column: " + column + " must be raw (no-dictionary) in both FieldConfig and IndexingConfig");
-          }
-        }
-      }
-    }
   }
 
   private static void validateValidationConfig(TableConfig tableConfig) {
