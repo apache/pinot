@@ -181,7 +181,7 @@ public class FieldSpecTest {
     boolean exceptionActual = false;
     try {
       dateTimeFieldActual = new DateTimeFieldSpec(name, dataType, format, granularity);
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalStateException e) {
       exceptionActual = true;
     }
     Assert.assertEquals(exceptionActual, exceptionExpected);
