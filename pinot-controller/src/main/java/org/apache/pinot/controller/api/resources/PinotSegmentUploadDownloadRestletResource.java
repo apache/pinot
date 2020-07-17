@@ -60,6 +60,8 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.BatchId;
+import org.apache.pinot.common.restlet.resources.StartBatchUploadRequest;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.StringUtil;
@@ -75,10 +77,12 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
 import org.apache.pinot.core.metadata.MetadataExtractorFactory;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadata;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -452,6 +456,45 @@ public class PinotSegmentUploadDownloadRestletResource {
       asyncResponse.resume(uploadSegment(tableName, multiPart, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
+    }
+  }
+
+  @POST
+  @Path("segments/{tableName}/startBatchUpload")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Start the batch upload", notes = "Start the batch upload")
+  public Response startBatchUpload(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, String body)
+      throws IOException {
+    StartBatchUploadRequest request = JsonUtils.stringToObject(body, StartBatchUploadRequest.class);
+    String tableNameWithType =
+        TableNameBuilder.forType(TableType.valueOf(tableTypeStr.toUpperCase())).tableNameWithType(tableName);
+    try {
+      String batchId = _pinotHelixResourceManager
+          .startBatchUpload(tableNameWithType, request.getSegmentsFrom(), request.getSegmentsTo());
+      return Response.ok(new BatchId(batchId)).build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @Path("segments/{tableName}/endBatchUpload")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "End the batch upload", notes = "End the batch upload")
+  public Response endBatchUpload(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, String body)
+      throws IOException {
+    BatchId batchId = JsonUtils.stringToObject(body, BatchId.class);
+    String tableNameWithType =
+        TableNameBuilder.forType(TableType.valueOf(tableTypeStr.toUpperCase())).tableNameWithType(tableName);
+    try {
+      _pinotHelixResourceManager.endBatchUpload(tableNameWithType, batchId.getBatchId());
+      return Response.ok().build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

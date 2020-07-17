@@ -25,7 +25,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -64,6 +64,10 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.lineage.LineageEntry;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -2162,6 +2166,190 @@ public class PinotHelixResourceManager {
     }
 
     return tableNamesWithType;
+  }
+
+  /**
+   * Computes the start batch upload phase
+   *
+   * 1. Generate a batch id
+   * 2. Compute validation on the user inputs
+   * 3. Add the new lineage entry to the segment lineage metadata in the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType Table name with type
+   * @param segmentsFrom a list of segments to be merged
+   * @param segmentsTo a list of merged segments
+   * @return Bath Id
+   *
+   * @throws InvalidConfigException
+   */
+  public String startBatchUpload(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo) {
+    // Create a batch id
+    String batchId = UUID.randomUUID().toString();
+
+    // Check that segmentsTo is not empty.
+    if (segmentsTo == null || segmentsTo.isEmpty()) {
+      String errorMsg = String
+          .format("'segmentsTo' cannot be null or empty (tableName = '%s', segmentsFrom = '%s', segmentsTo = '%s'",
+              tableNameWithType, segmentsFrom, segmentsTo);
+      throw new IllegalArgumentException(errorMsg);
+    }
+
+    // segmentsFrom can be empty in case of the initial upload
+    if (segmentsFrom == null) {
+      segmentsFrom = new ArrayList<>();
+    }
+
+    // Check that all the segments from 'segmentsFrom' exist in the table
+    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+    if (!segmentsForTable.containsAll(segmentsFrom)) {
+      String errorMsg = String.format(
+          "Not all segments from 'segmentsFrom' are available in the table. (tableName = '%s', segmentsFrom = '%s', "
+              + "segmentsTo = '%s', segmentsFromTable = '%s')", tableNameWithType, segmentsFrom, segmentsTo,
+          segmentsForTable);
+      throw new IllegalArgumentException(errorMsg);
+    }
+
+    try {
+      final List<String> finalSegmentsFrom = segmentsFrom;
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        SegmentLineage segmentLineage;
+        int expectedVersion = -1;
+        if (segmentLineageZNRecord == null) {
+          segmentLineage = new SegmentLineage(tableNameWithType);
+        } else {
+          segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+          expectedVersion = segmentLineageZNRecord.getVersion();
+        }
+
+        // Check that the batchId doesn't exists in the segment lineage
+        if (segmentLineage.getLineageEntry(batchId) != null) {
+          String errorMsg = String.format("BatchId (%s) already exists in the segment lineage.", batchId);
+          throw new IllegalArgumentException(errorMsg);
+        }
+
+        for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
+          LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
+
+          // Check that any segment from 'segmentsFrom' does not appear on the left side.
+          if (lineageEntry.getSegmentsFrom().stream().anyMatch(finalSegmentsFrom::contains)) {
+            String errorMsg = String.format(
+                "It is not allowed to merge segments that are already merged. (tableName = %s, segmentsFrom from "
+                    + "existing lineage entry = %s, requested segmentsFrom = %s)", tableNameWithType,
+                lineageEntry.getSegmentsFrom(), finalSegmentsFrom);
+            throw new IllegalArgumentException(errorMsg);
+          }
+
+          // Check that merged segments name cannot be the same for different lineage entry
+          if (lineageEntry.getSegmentsTo().stream().anyMatch(segmentsTo::contains)) {
+            String errorMsg = String.format(
+                "It is not allowed to have the same segment name for merged segments. (tableName = %s, segmentsTo from "
+                    + "existing lineage entry = %s, requested segmentsTo = %s)", tableNameWithType,
+                lineageEntry.getSegmentsTo(), segmentsTo);
+            throw new IllegalArgumentException(errorMsg);
+          }
+        }
+
+        // Update lineage entry
+        segmentLineage.addLineageEntry(batchId,
+            new LineageEntry(finalSegmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
+
+        // Write back to the lineage entry
+        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+      });
+    } catch (Exception e) {
+      String errorMsg = String
+          .format("Failed while updating the segment lineage. (tableName = %s, segmentsFrom = %s, segmentsTo = %s)",
+              tableNameWithType, segmentsFrom, segmentsTo);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    // Only successful attempt can reach here
+    LOGGER.info("startBatchUpload is successfully processed. (tableNameWithType = {}, segmentsFrom = {}, "
+        + "segmentsTo = {}, batchId = {})", tableNameWithType, segmentsFrom, segmentsTo, batchId);
+    return batchId;
+  }
+
+  /**
+   * Computes the end batch upload phase
+   *
+   * 1. Compute validation
+   * 2. Update the lineage entry state to "COMPLETED" and write metadata to the property store
+   *
+   * Update is done with retry logic along with read-modify-write block for achieving atomic update of the lineage
+   * metadata.
+   *
+   * @param tableNameWithType
+   * @param batchId
+   */
+  public void endBatchUpload(String tableNameWithType, String batchId) {
+    // Check that the batch id is valid
+    if (batchId == null || batchId.isEmpty()) {
+      throw new IllegalArgumentException("'batchId' cannot be null or empty");
+    }
+
+    try {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        // Fetch the segment lineage metadata
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+        SegmentLineage segmentLineage;
+        int expectedVersion = -1;
+        if (segmentLineageZNRecord == null) {
+          String errorMsg = String
+              .format("Segment lineage does not exist. (tableNameWithType = '%s', batchId = '%s')", tableNameWithType,
+                  batchId);
+          throw new IllegalArgumentException(errorMsg);
+        } else {
+          segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+          expectedVersion = segmentLineageZNRecord.getVersion();
+        }
+
+        // Look up the lineage entry based on the batch id
+        LineageEntry lineageEntry = segmentLineage.getLineageEntry(batchId);
+        if (lineageEntry == null) {
+          String errorMsg =
+              String.format("Invalid batch id (tableName='%s', batchId='%s')", tableNameWithType, batchId);
+          throw new IllegalArgumentException(errorMsg);
+        }
+
+        // Check that all the segments from 'segmentsTo' exist in the table
+        Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType));
+        if (!segmentsForTable.containsAll(lineageEntry.getSegmentsTo())) {
+          String errorMsg = String.format(
+              "Not all segments from 'segmentsTo' are available in the table. (tableName = '%s', segmentsTo = '%s', "
+                  + "segmentsFromTable = '%s')", tableNameWithType, lineageEntry.getSegmentsTo(), segmentsForTable);
+          throw new IllegalArgumentException(errorMsg);
+        }
+
+        // NO-OPS if the entry is already completed
+        if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+          LOGGER.info("Lineage entry state is already COMPLETED. Nothing to update. (tableNameWithType={}, batchId={})",
+              tableNameWithType, batchId);
+          return true;
+        }
+
+        // Update lineage entry
+        LineageEntry newLineageEntry =
+            new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED,
+                System.currentTimeMillis());
+        segmentLineage.addLineageEntry(batchId, newLineageEntry);
+
+        // Write back to the lineage entry
+        return SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion);
+      });
+    } catch (Exception e) {
+      String errorMsg = String
+          .format("Failed to update the segment lineage. (tableName = %s, batchId = %s)", tableNameWithType, batchId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
   }
 
   /*

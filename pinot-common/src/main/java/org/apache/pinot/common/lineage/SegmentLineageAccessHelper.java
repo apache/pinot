@@ -69,6 +69,7 @@ public class SegmentLineageAccessHelper {
    *
    * @param propertyStore a property store
    * @param segmentLineage a segment lineage
+   * @param expectedVersion expected version of ZNRecord. -1 for indicating to match any version.
    * @return true if update is successful. false otherwise.
    */
   public static boolean writeSegmentLineage(ZkHelixPropertyStore<ZNRecord> propertyStore,

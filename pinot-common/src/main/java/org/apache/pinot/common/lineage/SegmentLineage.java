@@ -19,6 +19,7 @@
 package org.apache.pinot.common.lineage;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -71,6 +72,17 @@ public class SegmentLineage {
   }
 
   /**
+   * Add lineage entry to the segment lineage metadata with the given lineage entry id
+   * @param lineageEntryId the id for the lineage entry
+   * @param lineageEntry a lineage entry
+   * @return the id for the input lineage entry for the access
+   */
+  public String addLineageEntry(String lineageEntryId, LineageEntry lineageEntry) {
+    _lineageEntries.put(lineageEntryId, lineageEntry);
+    return lineageEntryId;
+  }
+
+  /**
    * Retrieve lineage entry
    * @param lineageEntryId the id for the lineage entry
    * @return the lineage entry for the given lineage entry id
@@ -108,7 +120,9 @@ public class SegmentLineage {
       String lineageId = listField.getKey();
       List<String> value = listField.getValue();
       Preconditions.checkState(value.size() == 4);
-      List<String> segmentsFrom = Arrays.asList(value.get(0).split(COMMA_SEPARATOR));
+      String segmentsFromStr = value.get(0);
+      List<String> segmentsFrom = (segmentsFromStr == null || segmentsFromStr.length() == 0) ? new ArrayList<>()
+          : Arrays.asList(value.get(0).split(COMMA_SEPARATOR));
       List<String> segmentsTo = Arrays.asList(value.get(1).split(COMMA_SEPARATOR));
       LineageEntryState state = LineageEntryState.valueOf(value.get(2));
       long timestamp = Long.parseLong(value.get(3));
