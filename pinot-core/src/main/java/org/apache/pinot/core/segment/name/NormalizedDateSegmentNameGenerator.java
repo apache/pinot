@@ -25,6 +25,7 @@ import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 
@@ -54,7 +55,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
     // Include time info for APPEND push type
     if (_appendPushType) {
       // For HOURLY push frequency, include hours into output format
-      if ("HOURLY".equalsIgnoreCase(pushFrequency)) {
+      if (CommonConstants.Table.PUSH_FREQUENCY_HOURLY.equalsIgnoreCase(pushFrequency)) {
         _outputSDF = new SimpleDateFormat("yyyy-MM-dd-HH");
       } else {
         _outputSDF = new SimpleDateFormat("yyyy-MM-dd");

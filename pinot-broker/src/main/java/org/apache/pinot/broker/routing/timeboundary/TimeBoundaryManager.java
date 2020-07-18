@@ -82,7 +82,7 @@ public class TimeBoundaryManager {
 
     // For HOURLY table with time unit other than DAYS, use (maxEndTime - 1 HOUR) as the time boundary; otherwise, use
     // (maxEndTime - 1 DAY)
-    _isHourlyTable = "HOURLY".equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentPushFrequency())
+    _isHourlyTable = CommonConstants.Table.PUSH_FREQUENCY_HOURLY.equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentPushFrequency())
         && _timeUnit != TimeUnit.DAYS;
 
     LOGGER.info("Constructed TimeBoundaryManager with timeColumn: {}, timeUnit: {}, isHourlyTable: {} for table: {}",

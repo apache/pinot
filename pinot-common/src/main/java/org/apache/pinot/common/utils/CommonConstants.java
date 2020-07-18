@@ -27,6 +27,13 @@ public class CommonConstants {
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
 
+  public static class Table {
+    public static final String PUSH_FREQUENCY_HOURLY = "hourly";
+    public static final String PUSH_FREQUENCY_DAILY = "daily";
+    public static final String PUSH_FREQUENCY_WEEKLY = "weekly";
+    public static final String PUSH_FREQUENCY_MONTHLY = "monthly";
+  }
+
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
     public static final String QUERIES_DISABLED = "queriesDisabled";

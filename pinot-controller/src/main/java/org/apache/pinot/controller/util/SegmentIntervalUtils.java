@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.util;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.joda.time.Duration;
 
@@ -49,16 +50,16 @@ public class SegmentIntervalUtils {
    * Converts push frequency into duration. For invalid or less than 'hourly' push frequency, treats it as 'daily'.
    */
   public static Duration convertToDuration(String pushFrequency) {
-    if ("hourly".equalsIgnoreCase(pushFrequency)) {
+    if (CommonConstants.Table.PUSH_FREQUENCY_HOURLY.equalsIgnoreCase(pushFrequency)) {
       return Duration.standardHours(1L);
     }
-    if ("daily".equalsIgnoreCase(pushFrequency)) {
+    if (CommonConstants.Table.PUSH_FREQUENCY_DAILY.equalsIgnoreCase(pushFrequency)) {
       return Duration.standardDays(1L);
     }
-    if ("weekly".equalsIgnoreCase(pushFrequency)) {
+    if (CommonConstants.Table.PUSH_FREQUENCY_WEEKLY.equalsIgnoreCase(pushFrequency)) {
       return Duration.standardDays(7L);
     }
-    if ("monthly".equalsIgnoreCase(pushFrequency)) {
+    if (CommonConstants.Table.PUSH_FREQUENCY_MONTHLY.equalsIgnoreCase(pushFrequency)) {
       return Duration.standardDays(30L);
     }
     return Duration.standardDays(1L);
