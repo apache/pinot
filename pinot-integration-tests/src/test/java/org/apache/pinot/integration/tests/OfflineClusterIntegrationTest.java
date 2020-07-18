@@ -969,6 +969,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(query, Collections.singletonList(query));
   }
 
+  @Test
+  public void testQueryWithSameAlias()
+      throws Exception {
+    //test repeated columns in selection query
+    String query = "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+    testQuery(query, Collections.singletonList(query));
+
+    //test repeated columns in selection query
+    query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC";
+    testQuery(query, Collections.singletonList(query));
+
+    //test repeated columns in selection query
+    query = "SELECT ArrTime AS ArrTime, DaysSinceEpoch AS DaysSinceEpoch, Carrier AS Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
+    testQuery(query, Collections.singletonList(query));
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {

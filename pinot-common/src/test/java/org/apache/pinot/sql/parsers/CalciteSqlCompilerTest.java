@@ -1246,6 +1246,17 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testSameAliasInSelection() {
+    String sql;
+    PinotQuery pinotQuery;
+    sql = "SELECT C1 AS C1, C2 AS C2 FROM Foo";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "C1");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "C2");
+  }
+
+  @Test
   public void testArithmeticOperator() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select a,b+2,c*5,(d+5)*2 from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 4);
