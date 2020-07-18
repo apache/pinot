@@ -112,7 +112,11 @@ public class PinotTableRestletResource {
     TableConfig tableConfig;
     try {
       tableConfig = JsonUtils.stringToObject(tableConfigStr, TableConfig.class);
+      // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig);
+      // TableConfigUtils.validateTableName(...) checks table name rules.
+      // So it won't effect already created tables.
+      TableConfigUtils.validateTableName(tableConfig);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
