@@ -135,26 +135,7 @@ You can use the command below to run ThirdEye assuming your working dir to be ``
 Creating an Application
 ##########################################
 
-An application is a basic TE entity can serves as a container for metrics, alerts and other entities.
-
-In order to create an application, follow the steps below.
-
-1. Go to the ``thirdeye-admin`` page. http://localhost:1426/thirdeye-admin
-2. Click the ``Entity Editor`` tab
-3. Choose ``Application`` from ``Select config type``.
-4. In the ``Select Entity to Edit`` menu, select ``Create New``
-5. Copy paste the json block below into the textbox on the right and click ``load to editor``
-6. Click ``Submit`` on the bottom left to create an application.
-
-
-.. code-block:: json
-
-  {
-    "application": "myApp",
-    "recipients": ""
-  }
-
-We'll be using this application when creating alerts.
+See :ref:`application`. We'll be using this application when creating alerts.
 
 Setting up Alerts
 ##########################################
