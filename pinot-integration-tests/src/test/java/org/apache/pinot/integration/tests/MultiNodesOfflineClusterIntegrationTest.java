@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.integration.tests;
 
+import org.testng.annotations.Test;
+
+
 /**
  * Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
  */
@@ -33,5 +36,16 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   @Override
   protected int getNumServers() {
     return NUM_SERVERS;
+  }
+
+  @Override
+  protected void startServers() {
+    startServers(NUM_SERVERS);
+  }
+
+  @Test(enabled = false)
+  @Override
+  public void testGrpcQueryServer() {
+    // Ignored
   }
 }

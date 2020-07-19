@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.plan;
 
+import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +26,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.combine.AggregationOnlyCombineOperator;
@@ -32,6 +35,7 @@ import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
+import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -56,6 +60,7 @@ public class CombinePlanNode implements PlanNode {
   private final ExecutorService _executorService;
   private final long _endTimeMs;
   private final int _numGroupsLimit;
+  private final StreamObserver<Server.ServerResponse> _streamObserver;
 
   /**
    * Constructor for the class.
@@ -65,14 +70,16 @@ public class CombinePlanNode implements PlanNode {
    * @param executorService Executor service
    * @param endTimeMs End time in milliseconds for the query
    * @param numGroupsLimit Limit of number of groups stored in each segment
+   * @param streamObserver Optional stream observer for streaming query
    */
   public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
-      long endTimeMs, int numGroupsLimit) {
+      long endTimeMs, int numGroupsLimit, @Nullable StreamObserver<Server.ServerResponse> streamObserver) {
     _planNodes = planNodes;
     _queryContext = queryContext;
     _executorService = executorService;
     _endTimeMs = endTimeMs;
     _numGroupsLimit = numGroupsLimit;
+    _streamObserver = streamObserver;
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -155,6 +162,11 @@ public class CombinePlanNode implements PlanNode {
       }
     }
 
+    if (_streamObserver != null) {
+      // Streaming query (only support selection only)
+      return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService, _endTimeMs,
+          _streamObserver);
+    }
     if (QueryContextUtils.isAggregationQuery(_queryContext)) {
       if (_queryContext.getGroupByExpressions() == null) {
         // Aggregation only

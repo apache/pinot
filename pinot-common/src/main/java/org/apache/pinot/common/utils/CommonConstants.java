@@ -190,7 +190,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
+    public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
+    public static final boolean DEFAULT_ENABLE_GRPC_SERVER = false;
+    public static final String CONFIG_OF_GRPC_PORT = "pinot.server.grpc.port";
+    public static final int DEFAULT_GRPC_PORT = 8090;
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
+    public static final int DEFAULT_ADMIN_API_PORT = 8097;
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
@@ -211,7 +216,6 @@ public class CommonConstants {
         "pinot.server.starter.realtimeConsumptionCatchupWaitMs";
     public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
 
-    public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update. Will change default behavior to true when this feature is stabilized
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = false;
@@ -386,5 +390,37 @@ public class CommonConstants {
 
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
+  }
+
+  public static class Query {
+    public static class Request {
+      public static class MetadataKeys {
+        public static final String REQUEST_ID = "requestId";
+        public static final String BROKER_ID = "brokerId";
+        public static final String ENABLE_TRACE = "enableTrace";
+        public static final String ENABLE_STREAMING = "enableStreaming";
+        public static final String PAYLOAD_TYPE = "payloadType";
+      }
+
+      public static class PayloadType {
+        public static final String SQL = "sql";
+        public static final String BROKER_REQUEST = "brokerRequest";
+      }
+    }
+
+    public static class Response {
+      public static class MetadataKeys {
+        public static final String RESPONSE_TYPE = "responseType";
+      }
+
+      public static class ResponseType {
+        // For streaming response, multiple (could be 0 if no data should be returned, or query encounters exception)
+        // data responses will be returned, followed by one single metadata response
+        public static final String DATA = "data";
+        public static final String METADATA = "metadata";
+        // For non-streaming response
+        public static final String NON_STREAMING = "nonStreaming";
+      }
+    }
   }
 }

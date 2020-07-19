@@ -58,7 +58,7 @@ public class CombinePlanNodeTest {
       }
       CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService,
           System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null);
       combinePlanNode.run();
       Assert.assertEquals(numPlans, count.get());
     }
@@ -83,7 +83,7 @@ public class CombinePlanNodeTest {
     }
     CombinePlanNode combinePlanNode =
         new CombinePlanNode(planNodes, _queryContext, _executorService, System.currentTimeMillis() + 100,
-            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
@@ -105,7 +105,7 @@ public class CombinePlanNodeTest {
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService,
         System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS,
-        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, null);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {

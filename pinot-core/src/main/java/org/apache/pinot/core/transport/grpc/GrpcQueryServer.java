@@ -16,20 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.grpc;
+package org.apache.pinot.core.transport.grpc;
 
-import io.grpc.stub.StreamObserver;
-import org.apache.pinot.common.proto.PinotQueryServerGrpc;
-import org.apache.pinot.common.proto.Server;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
+import java.io.IOException;
+import org.apache.pinot.core.query.executor.GrpcQueryExecutor;
 
-/**
- * Handler for grpc server requests.
- * As data becomes available server responses will be added to the result stream.
- * Once the request is complete the client will aggregate the result metadata.
- */
-public class PinotQueryHandler extends PinotQueryServerGrpc.PinotQueryServerImplBase {
-  @Override
-  public void submit(Server.ServerRequest request, StreamObserver<Server.ServerResponse> responseObserver) {
 
+public class GrpcQueryServer {
+  private final Server _server;
+
+  public GrpcQueryServer(int port, GrpcQueryExecutor queryExecutor) {
+    _server = ServerBuilder.forPort(port).addService(queryExecutor).build();
+  }
+
+  public void start() {
+    try {
+      _server.start();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public void shutdown() {
+    try {
+      _server.shutdown().awaitTermination();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

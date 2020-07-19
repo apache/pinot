@@ -16,8 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.grpc;
+package org.apache.pinot.core.transport.grpc;
 
-public class PinotQueryService {
+import io.grpc.Channel;
+import io.grpc.ManagedChannelBuilder;
+import java.util.Iterator;
+import org.apache.pinot.common.proto.PinotQueryServerGrpc;
+import org.apache.pinot.common.proto.Server;
 
+
+public class GrpcQueryClient {
+  private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
+
+  public GrpcQueryClient(String host, int port) {
+    // Set max message size to 128MB
+    Channel channel =
+        ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(128 * 1024 * 1024).usePlaintext().build();
+    _blockingStub = PinotQueryServerGrpc.newBlockingStub(channel);
+  }
+
+  public Iterator<Server.ServerResponse> submit(Server.ServerRequest request) {
+    return _blockingStub.submit(request);
+  }
 }
