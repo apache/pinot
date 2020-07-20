@@ -1,10 +1,26 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.Preconditions;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,9 +46,9 @@ public class ServerSegmentMetadataReader {
     _connectionManager = connectionManager;
   }
 
-  public Map<String, String> getSegmentMetadata(String tableNameWithType,
-                                                Map<String, List<String>> serversToSegmentsMap,
-                                                BiMap<String, String> endpoints, int timeoutMs) {
+  public List<String> getSegmentMetadataFromServer(String tableNameWithType,
+                                                   Map<String, List<String>> serversToSegmentsMap,
+                                                   BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.info("Reading segment metadata from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serversToSegmentsMap.entrySet()) {
@@ -43,7 +59,7 @@ public class ServerSegmentMetadataReader {
     }
     CompletionService<GetMethod> completionService =
             new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
-    Map<String, String> segmentsMetadata = new HashMap<>();
+    List<String> segmentsMetadata = new ArrayList<>();
 
     BiMap<String, String> endpointsToServers = endpoints.inverse();
     for (int i = 0; i < serverURLs.size(); i++) {
@@ -56,9 +72,10 @@ public class ServerSegmentMetadataReader {
           LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
           continue;
         }
-        String segmentMetadata =
-                JsonUtils.inputStreamToObject(getMethod.getResponseBodyAsStream(), String.class);
-        segmentsMetadata.put(instance, segmentMetadata);
+        JsonNode segmentMetadata =
+                JsonUtils.inputStreamToJsonNode(getMethod.getResponseBodyAsStream());
+        segmentsMetadata.add(JsonUtils.objectToString(segmentMetadata));
+        LOGGER.info("Updated segment metadata: {}", segmentMetadata.size());
       } catch (Exception e) {
         // Ignore individual exceptions because the exception has been logged in MultiGetRequest
         // Log the number of failed servers after gathering all responses
@@ -79,22 +96,21 @@ public class ServerSegmentMetadataReader {
     return "http://" + endpoint + "/tables/" + tableNameWithType + "/segments/" + segmentName + "/reload-status";
   }
 
-  public TableReloadStatus getSegmentReloadTime(String tableNameWithType,
-                                                Map<String, List<String>> serversToSegmentsMap,
-                                                BiMap<String, String> endpoints, int timeoutMs) {
+  public List<SegmentStatus> getSegmentReloadTime(String tableNameWithType,
+                                                  Map<String, List<String>> serversToSegmentsMap,
+                                                  BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.info("Reading segment reload status from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serversToSegmentsMap.entrySet()) {
       List<String> segments = serverToSegments.getValue();
       for (String segment : segments) {
-        serverURLs.add(generateSegmentMetadataServerURL(tableNameWithType, segment, endpoints.get(serverToSegments.getKey())));
+        serverURLs.add(generateReloadStatusServerURL(tableNameWithType, segment, endpoints.get(serverToSegments.getKey())));
       }
     }
     CompletionService<GetMethod> completionService =
             new MultiGetRequest(_executor, _connectionManager).execute(serverURLs, timeoutMs);
     BiMap<String, String> endpointsToServers = endpoints.inverse();
-    TableReloadStatus tableReloadStatus = new TableReloadStatus();
-    tableReloadStatus._tableName = tableNameWithType;
+    List<SegmentStatus> segmentsStatus = new ArrayList<>();
 
     for (int i = 0; i < serverURLs.size(); i++) {
       GetMethod getMethod = null;
@@ -107,7 +123,7 @@ public class ServerSegmentMetadataReader {
           continue;
         }
         SegmentStatus segmentStatus = JsonUtils.inputStreamToObject(getMethod.getResponseBodyAsStream(), SegmentStatus.class);
-        tableReloadStatus._segmentStatus.add(segmentStatus);
+        segmentsStatus.add(segmentStatus);
       } catch (Exception e) {
         // Ignore individual exceptions because the exception has been logged in MultiGetRequest
         // Log the number of failed servers after gathering all responses
@@ -117,18 +133,7 @@ public class ServerSegmentMetadataReader {
         }
       }
     }
-    return tableReloadStatus;
+    return segmentsStatus;
   }
 
-  private String parseSegmentName(String uriPath) {
-    Preconditions.checkNotNull(uriPath, "Segment reload status URI path cannot be null!");
-    String[] uriSplit = uriPath.split("//");
-    return uriSplit[uriSplit.length - 2];
-  }
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public class TableReloadStatus {
-    String _tableName;
-    List<SegmentStatus> _segmentStatus;
-  }
 }

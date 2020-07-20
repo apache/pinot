@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -8,6 +26,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentStatus;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
@@ -31,7 +50,7 @@ public class SegmentMetadataFetcher {
     ObjectNode segmentMetadataObject = segmentMetadataJson.deepCopy();
     segmentMetadataObject.set("indexes", indexes);
     LOGGER.debug("Fetched all metadata for the segment.");
-    return segmentMetadataObject.toString();
+    return ResourceUtils.convertToJsonString(segmentMetadataObject);
   }
 
   /**
@@ -41,7 +60,7 @@ public class SegmentMetadataFetcher {
    */
   public static SegmentStatus getSegmentReloadStatus(SegmentDataManager segmentDataManager) {
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
-    DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
+    final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
     long refreshTime = segmentMetadata.getRefreshTime();
     String refreshTimeReadable = refreshTime != Long.MIN_VALUE ? dateFormat.format(new Date(refreshTime)) : "";
     return new SegmentStatus(segmentDataManager.getSegmentName(), refreshTimeReadable);

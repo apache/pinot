@@ -21,9 +21,13 @@ package org.apache.pinot.server.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.restlet.resources.SegmentStatus;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -44,7 +48,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
   @Test
   public void getTables()
-      throws Exception {
+          throws Exception {
     String tablesPath = "/tables";
 
     Response response = _webTarget.path(tablesPath).request().get(Response.class);
@@ -75,7 +79,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
   @Test
   public void getSegments()
-      throws Exception {
+          throws Exception {
     String segmentsPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments";
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
 
@@ -87,7 +91,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(segmentNames.get(0), _realtimeIndexSegments.get(0).getSegmentName());
 
     IndexSegment secondSegment =
-        setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), "0", _realtimeIndexSegments);
+            setUpSegment(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), "0", _realtimeIndexSegments);
     tableSegments = _webTarget.path(segmentsPath).request().get(TableSegments.class);
     Assert.assertNotNull(tableSegments);
     segmentNames = tableSegments.getSegments();
@@ -104,20 +108,20 @@ public class TablesResourceTest extends BaseResourceTest {
 
   @Test
   public void testSegmentMetadata()
-      throws Exception {
+          throws Exception {
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
     String segmentMetadataPath =
-        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
-            .getSegmentName() + "/metadata";
+            "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
+                    .getSegmentName() + "/metadata";
 
     JsonNode jsonResponse =
-        JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
+            JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
     Assert.assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
     Assert.assertEquals(jsonResponse.get("crc").asText(), segmentMetadata.getCrc());
     Assert.assertEquals(jsonResponse.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
     Assert.assertEquals(jsonResponse.get("paddingCharacter").asText(),
-        String.valueOf(segmentMetadata.getPaddingCharacter()));
+            String.valueOf(segmentMetadata.getPaddingCharacter()));
     Assert.assertEquals(jsonResponse.get("refreshTimeMillis").asLong(), segmentMetadata.getRefreshTime());
     Assert.assertEquals(jsonResponse.get("pushTimeMillis").asLong(), segmentMetadata.getPushTime());
     Assert.assertTrue(jsonResponse.has("pushTimeReadable"));
@@ -128,32 +132,32 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
-        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
-            .get(String.class));
+            _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
+                    .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
 
     jsonResponse = JsonUtils.stringToJsonNode(
-        (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
+            (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
     Assert.assertEquals(jsonResponse.get("columns").size(), segmentMetadata.getAllColumns().size());
 
     Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName()).request()
-        .get(Response.class);
+            .get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     response = _webTarget
-        .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
-        .request().get(Response.class);
+            .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
+            .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
   public void testSegmentCrcMetadata()
-      throws Exception {
+          throws Exception {
     String segmentsCrcPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/crc";
 
     // Upload segments
     List<ImmutableSegment> immutableSegments =
-        setUpSegments(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 2, _realtimeIndexSegments);
+            setUpSegments(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 2, _realtimeIndexSegments);
 
     // Trigger crc api to fetch crc information
     String response = _webTarget.path(segmentsCrcPath).request().get(String.class);
@@ -169,7 +173,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
   @Test
   public void testDownloadSegments()
-      throws Exception {
+          throws Exception {
     // Verify the content of the downloaded segment from a realtime table.
     downLoadAndVerifySegmentContent(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
         _realtimeIndexSegments.get(0));
@@ -182,8 +186,8 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     response = _webTarget
-        .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
-        .request().get(Response.class);
+            .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
+            .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
@@ -216,7 +220,7 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testOfflineSegmentMetadata() throws Exception {
+  public void testOfflineTableSegmentMetadata() throws Exception {
     IndexSegment defaultSegment = _offlineIndexSegments.get(0);
     String segmentMetadataPath =
             "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/segments/" + defaultSegment
@@ -260,5 +264,20 @@ public class TablesResourceTest extends BaseResourceTest {
             .path("/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
             .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  public void testOfflineTableSegmentsReloadStatus() throws Exception {
+    IndexSegment defaultSegment = _offlineIndexSegments.get(0);
+    String segmentMetadataPath =
+            "/tables/" + TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME) + "/" + defaultSegment
+                    .getSegmentName() + "/reload-status";
+    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
+    SegmentStatus segmentStatus =
+            JsonUtils.stringToObject(_webTarget.path(segmentMetadataPath).request().get(String.class), SegmentStatus.class);
+    Assert.assertEquals(segmentStatus.segmentName, segmentMetadata.getName());
+    final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
+    String refreshTimeReadable = segmentMetadata.getRefreshTime() != Long.MIN_VALUE ? dateFormat.format(new Date(segmentMetadata.getRefreshTime())) : "";
+    Assert.assertEquals(segmentStatus.segmentReloadTime, refreshTimeReadable);
   }
 }
