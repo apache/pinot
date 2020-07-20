@@ -49,6 +49,50 @@ public class ConnectionFactory {
   }
 
   /**
+   * Creates a connection to a Pinot cluster, given its Controller URL
+   * Please note that this client requires Pinot Controller supports getBroker APIs,
+   * which is supported from Pinot 0.5.0.
+   *
+   * @param controllerUrls The comma separated URLs to Pinot Controller, suggest to use Vip hostname or k8s service.
+   *                      E.g. http://pinot-controller:9000
+   *                      http://pinot-controller-0:9000,http://pinot-controller-1:9000,http://pinot-controller-2:9000
+   * @return A connection that connects to the brokers in the given Pinot cluster
+   */
+  public static Connection fromController(String controllerUrls) {
+    try {
+      BrokerSelector brokerSelector = new ControllerBasedBrokerSelector(controllerUrls);
+      return new Connection(brokerSelector, _transportFactory.buildTransport(null));
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
+   * Creates a connection to a Pinot cluster, given its Controller URL
+   * Please note that this client requires Pinot Controller supports getBroker APIs,
+   * which is supported from Pinot 0.5.0.
+   *
+   * @param controllerUrls The comma separated URLs to Pinot Controller, suggest to use Vip hostname or k8s service.
+   *                      E.g. http://pinot-controller:9000
+   *                      http://pinot-controller-0:9000,http://pinot-controller-1:9000,http://pinot-controller-2:9000
+   * @param controllerFetchRetries Retries before fail a broker info calls to controller.
+   * @param controllerFetchRetriesIntervalMills Retry interval of broker info calls to controller.
+   * @param controllerFetchScheduleIntervalMills Scheduler interval of broker info calls.
+   * @return A connection that connects to the brokers in the given Pinot cluster
+   */
+  public static Connection fromController(String controllerUrls, int controllerFetchRetries,
+      long controllerFetchRetriesIntervalMills, long controllerFetchScheduleIntervalMills) {
+    try {
+      BrokerSelector brokerSelector =
+          new ControllerBasedBrokerSelector(controllerUrls, controllerFetchRetries, controllerFetchRetriesIntervalMills,
+              controllerFetchScheduleIntervalMills);
+      return new Connection(brokerSelector, _transportFactory.buildTransport(null));
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
    * Creates a connection from properties containing the connection parameters.
    *
    * @param properties The properties to use for the connection

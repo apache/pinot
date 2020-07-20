@@ -72,8 +72,7 @@ public class ExternalViewReader {
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
             // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
-            String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
-            brokerUrls.add(brokerHostPort);
+            brokerUrls.add(Utils.generateBrokerHostPort(brokerName));
           }
         }
       }
@@ -105,8 +104,7 @@ public class ExternalViewReader {
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
             // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
-            String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
-            brokerUrls.add(brokerHostPort);
+            brokerUrls.add(Utils.generateBrokerHostPort(brokerName));
           }
         }
       }

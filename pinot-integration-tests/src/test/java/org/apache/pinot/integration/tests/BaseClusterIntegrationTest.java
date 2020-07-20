@@ -350,7 +350,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
     if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.DEFAULT_ZK_STR + "/" + getHelixClusterName());
+      if (System.currentTimeMillis() % 2 == 0) {
+        _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.DEFAULT_ZK_STR + "/" + getHelixClusterName());
+      } else {
+        _pinotConnection = ConnectionFactory.fromController(_controllerBaseApiUrl);
+      }
     }
     return _pinotConnection;
   }
