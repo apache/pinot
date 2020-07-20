@@ -86,7 +86,7 @@ Feel free to modify the values in the script below.
   	curl --location --request POST 'http://localhost:1426/thirdeye/entity?entityType=APPLICATION' \
   		--header "Authorization: Bearer ${token}" \
   		--header 'Content-Type: application/json' \
-  		--header 'Cookie: te_auth=8ba22acc7616b77fb62fc0aad88a638a16c74e7922209d30afe8a96fee4b55e9' \
+  		--header "Cookie: te_auth=${token}" \
   		--data-raw '{
   		  "application": "MyApp",
   		  "recipients": "myapp_owner@company.com"
