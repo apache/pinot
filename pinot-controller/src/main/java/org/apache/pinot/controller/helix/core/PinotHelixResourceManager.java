@@ -70,6 +70,7 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.messages.QueryQuotaStateMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -1750,6 +1751,19 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No table config refresh message sent to brokers for table: {}", tableNameWithType);
     }
+  }
+
+  public int sendToggleQpsStateMessage(String brokerInstanceName, String state) {
+    QueryQuotaStateMessage queryQuotaStateMessage = new QueryQuotaStateMessage(state);
+
+    // Send query quota toggle state message to dedicated broker
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName(brokerInstanceName);
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    int numMessagesSent = _helixZkManager.getMessagingService().send(recipientCriteria, queryQuotaStateMessage, null, -1);
+    return numMessagesSent;
   }
 
   /**

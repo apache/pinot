@@ -25,6 +25,7 @@ import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingManager;
+import org.apache.pinot.common.messages.QueryQuotaStateMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.slf4j.Logger;
@@ -58,6 +59,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RefreshSegmentMessageHandler(new SegmentRefreshMessage(message), context);
       case TableConfigRefreshMessage.REFRESH_TABLE_CONFIG_MSG_SUB_TYPE:
         return new RefreshTableConfigMessageHandler(new TableConfigRefreshMessage(message), context);
+      case QueryQuotaStateMessage.TOGGLE_QUERY_QUOTA_STATE_MSG_SUB_TYPE:
+        return new ToggleQueryQuotaStateMessageHandler(new QueryQuotaStateMessage(message), context);
       default:
         // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
         //       a new message sub-type is added, and the sender gets deployed first while receiver is still running the
@@ -123,6 +126,28 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error while refreshing table config for table: {} (error code: {}, error type: {})",
           _tableNameWithType, code, type, e);
+    }
+  }
+
+  private class ToggleQueryQuotaStateMessageHandler extends MessageHandler {
+    final String _state;
+    ToggleQueryQuotaStateMessageHandler(QueryQuotaStateMessage queryQuotaStateMessage, NotificationContext context) {
+      super(queryQuotaStateMessage, context);
+      _state = queryQuotaStateMessage.getQuotaState();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() throws InterruptedException {
+      _queryQuotaManager.toggleQueryQuota(_state);
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while toggling query quota state: {} for current broker (error code: {}, error type: {})",
+          _state, code, type, e);
     }
   }
 

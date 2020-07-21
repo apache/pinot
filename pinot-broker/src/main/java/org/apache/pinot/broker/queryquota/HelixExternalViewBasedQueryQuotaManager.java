@@ -62,9 +62,11 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private volatile boolean _enabled;
 
   public HelixExternalViewBasedQueryQuotaManager(BrokerMetrics brokerMetrics) {
     _brokerMetrics = brokerMetrics;
+    _enabled = true;
   }
 
   @Override
@@ -202,6 +204,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    */
   @Override
   public boolean acquire(String tableName) {
+    // Return true if query quota is disabled in the current broker.
+    if (!isEnabled()) {
+      return true;
+    }
     LOGGER.debug("Trying to acquire token for table: {}", tableName);
     String offlineTableName = null;
     String realtimeTableName = null;
@@ -357,6 +363,17 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     LOGGER
         .info("Processed query quota change in {}ms, {} out of {} query quota configs rebuilt.", (endTime - startTime),
             numRebuilt, _rateLimiterMap.size());
+  }
+
+  public void toggleQueryQuota(String state) {
+    LOGGER.info("Toggle query quota state to: {}", state);
+    _enabled = !"DISABLE".equals(state);
+    LOGGER.info("Finished toggling query quota state to: {} for {} tables in the current broker.", state,
+        _rateLimiterMap.size());
+  }
+
+  public boolean isEnabled() {
+    return _enabled;
   }
 
   /**
