@@ -44,7 +44,7 @@ public class PeerSchemeSplitSegmentCommitter extends SplitSegmentCommitter {
       params.withSegmentLocation(segmentLocation.toString());
     } else {
       params.withSegmentLocation(
-          StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, params.getSegmentName());
+          StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, params.getSegmentName()));
     }
     return true;
   }
