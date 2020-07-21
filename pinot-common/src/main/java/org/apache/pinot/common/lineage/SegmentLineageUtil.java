@@ -16,19 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.restlet.resources;
+package org.apache.pinot.common.lineage;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.UUID;
 
 
-public class BatchId {
-  private String _batchId;
-
-  public BatchId(@JsonProperty("batchId") String batchId) {
-    _batchId = batchId;
-  }
-
-  public String getBatchId() {
-    return _batchId;
+/**
+ * Util class for Segment Lineage
+ */
+public class SegmentLineageUtil {
+  /**
+   * Generate lineage entry id using UUID.
+   *
+   * @return lineage entry id
+   */
+  public static String generateLineageEntryId() {
+    return UUID.randomUUID().toString();
   }
 }

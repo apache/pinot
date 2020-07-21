@@ -535,11 +535,6 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Check null and empty segments from/to
     try {
-      _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, null, null);
-    } catch (Exception e) {
-      // expected
-    }
-    try {
       _helixResourceManager
           .startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, new ArrayList<>(), new ArrayList<>());
     } catch (Exception e) {
@@ -549,7 +544,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     List<String> segmentsFrom = new ArrayList<>();
     List<String> segmentsTo = Arrays.asList("s5", "s6");
 
-    String batchId = _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, null, segmentsTo);
+    String batchId = _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
     SegmentLineage segmentLineage =
         SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
@@ -557,8 +552,16 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(batchId).getSegmentsTo(), segmentsTo);
     Assert.assertEquals(segmentLineage.getLineageEntry(batchId).getState(), LineageEntryState.IN_PROGRESS);
 
+    // Check invalid segmentsTo
+    segmentsFrom = Arrays.asList("s1", "s2");
+    segmentsTo = Arrays.asList("s3", "s4");
+    try {
+      _helixResourceManager.startBatchUpload(OFFLINE_BATCH_UPLOAD_TEST_TABLE_NAME, segmentsFrom, segmentsTo);
+    } catch (Exception e) {
+      // expected
+    }
 
-    // Check invalid inputs
+    // Check invalid segmentsFrom
     segmentsFrom = Arrays.asList("s1", "s6");
     segmentsTo = Arrays.asList("merged1", "merged2");
     try {
