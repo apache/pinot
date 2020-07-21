@@ -21,16 +21,15 @@ package org.apache.pinot.core.realtime.impl.nullvalue;
 import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * Defines a real-time null value vector to be used in realtime ingestion.
+ * Mutable null value vector (for CONSUMING segment).
  */
-public class RealtimeNullValueVectorReaderWriter implements NullValueVectorReader {
+public class MutableNullValueVector implements NullValueVectorReader {
   private final ThreadSafeMutableRoaringBitmap _nullBitmap;
 
-  public RealtimeNullValueVectorReaderWriter() {
+  public MutableNullValueVector() {
     _nullBitmap = new ThreadSafeMutableRoaringBitmap();
   }
 
