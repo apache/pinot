@@ -114,10 +114,9 @@ public class CalciteSqlParser {
     Set<String> aliasKeys = new HashSet<>();
     for (Identifier identifier : aliasMap.keySet()) {
       String aliasName = identifier.getName().toLowerCase();
-      if (aliasKeys.contains(aliasName)) {
+      if (!aliasKeys.add(aliasName)) {
         throw new SqlCompilationException("Duplicated alias name found.");
       }
-      aliasKeys.add(aliasName);
     }
     for (Expression selectExpr : pinotQuery.getSelectList()) {
       matchIdentifierInAliasMap(selectExpr, aliasKeys);
