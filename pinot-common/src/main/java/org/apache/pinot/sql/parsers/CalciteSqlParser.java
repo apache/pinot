@@ -113,7 +113,10 @@ public class CalciteSqlParser {
     // Sanity check on selection expression shouldn't use alias reference.
     Set<String> aliasKeys = new HashSet<>();
     for (Identifier identifier : aliasMap.keySet()) {
-      aliasKeys.add(identifier.getName().toLowerCase());
+      String aliasName = identifier.getName().toLowerCase();
+      if (!aliasKeys.add(aliasName)) {
+        throw new SqlCompilationException("Duplicated alias name found.");
+      }
     }
     for (Expression selectExpr : pinotQuery.getSelectList()) {
       matchIdentifierInAliasMap(selectExpr, aliasKeys);
@@ -667,8 +670,7 @@ public class CalciteSqlParser {
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
       case AS:
         SqlBasicCall asFuncSqlNode = (SqlBasicCall) node;
-        final Expression asFuncExpr = RequestUtils.getFunctionExpression(SqlKind.AS.toString());
-        asFuncExpr.getFunctionCall().addToOperands(toExpression(asFuncSqlNode.getOperands()[0]));
+        Expression leftExpr = toExpression(asFuncSqlNode.getOperands()[0]);
         SqlNode aliasSqlNode = asFuncSqlNode.getOperands()[1];
         String aliasName;
         switch (aliasSqlNode.getKind()) {
@@ -681,7 +683,16 @@ public class CalciteSqlParser {
           default:
             throw new SqlCompilationException("Unsupported Alias sql node - " + aliasSqlNode);
         }
-        asFuncExpr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(aliasName));
+        Expression rightExpr = RequestUtils.getIdentifierExpression(aliasName);
+        // Just return left identifier if both sides are the same identifier.
+        if (leftExpr.isSetIdentifier() && rightExpr.isSetIdentifier()) {
+          if (leftExpr.getIdentifier().getName().equals(rightExpr.getIdentifier().getName())) {
+            return leftExpr;
+          }
+        }
+        final Expression asFuncExpr = RequestUtils.getFunctionExpression(SqlKind.AS.toString());
+        asFuncExpr.getFunctionCall().addToOperands(leftExpr);
+        asFuncExpr.getFunctionCall().addToOperands(rightExpr);
         return asFuncExpr;
       case CASE:
         // CASE WHEN Statement is model as a function with variable length parameters.
