@@ -155,16 +155,10 @@ public class PinotBrokerRestletResource {
           Response.Status.NOT_FOUND);
     }
     validateQueryQuotaStateChange(state);
-    int numMessagesSent = _pinotHelixResourceManager.sendToggleQpsStateMessage(brokerInstanceName, state);
-    if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} query quota toggle state messages to broker: {}", numMessagesSent, brokerInstanceName);
-      return new SuccessResponse("Sent " + numMessagesSent + " query quota toggle state messages");
-    } else {
-      LOGGER.warn("No query quota toggle state message sent to broker: {}", brokerInstanceName);
-      throw new ControllerApplicationException(LOGGER,
-          "Failed to send query quota toggle state message to broker: " + brokerInstanceName,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
+    _pinotHelixResourceManager.toggleQueryQuotaStateForBroker(brokerInstanceName, state);
+    String msg = String.format("Toggled query quota state to: %s for broker: %s", state, brokerInstanceName);
+    LOGGER.info(msg);
+    return new SuccessResponse(msg);
   }
 
   private void validateQueryQuotaStateChange(String state) {

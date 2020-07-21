@@ -57,6 +57,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   private static final int TIME_RANGE_IN_SECOND = 1;
 
   private final BrokerMetrics _brokerMetrics;
+  private final String _instanceId;
   private final AtomicInteger _lastKnownBrokerResourceVersion = new AtomicInteger(-1);
   private final Map<String, QueryQuotaEntity> _rateLimiterMap = new ConcurrentHashMap<>();
 
@@ -64,9 +65,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private volatile boolean _enabled;
 
-  public HelixExternalViewBasedQueryQuotaManager(BrokerMetrics brokerMetrics) {
+  public HelixExternalViewBasedQueryQuotaManager(BrokerMetrics brokerMetrics, String instanceId) {
     _brokerMetrics = brokerMetrics;
-    _enabled = true;
+    _instanceId = instanceId;
   }
 
   @Override
@@ -74,16 +75,22 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     Preconditions.checkState(_helixManager == null, "HelixExternalViewBasedQueryQuotaManager is already initialized");
     _helixManager = helixManager;
     _propertyStore = _helixManager.getHelixPropertyStore();
+    getQueryQuotaEnabledFlagFromInstanceConfig();
   }
 
   @Override
   public void processClusterChange(HelixConstants.ChangeType changeType) {
     Preconditions
-        .checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW, "Illegal change type: " + changeType);
-    ExternalView brokerResourceEV = HelixHelper
-        .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
-            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    processQueryQuotaChange(brokerResourceEV);
+        .checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW
+            || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: " + changeType);
+    if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
+      ExternalView brokerResourceEV = HelixHelper
+          .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
+              CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      processQueryQuotaChange(brokerResourceEV);
+    } else {
+      processQueryQuotaInstanceConfigChange();
+    }
   }
 
   public void initOrUpdateTableQueryQuota(String tableNameWithType) {
@@ -365,10 +372,20 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
             numRebuilt, _rateLimiterMap.size());
   }
 
-  public void toggleQueryQuota(String state) {
-    LOGGER.info("Toggle query quota state to: {}", state);
-    _enabled = !"DISABLE".equals(state);
-    LOGGER.info("Finished toggling query quota state to: {} for {} tables in the current broker.", state,
+  /**
+   * Process query quota state change when instance config gets changed
+   */
+  public void processQueryQuotaInstanceConfigChange() {
+    getQueryQuotaEnabledFlagFromInstanceConfig();
+  }
+
+  private void getQueryQuotaEnabledFlagFromInstanceConfig() {
+    Map<String, String> instanceConfigsMap =
+        HelixHelper.getInstanceConfigsMapFor(_instanceId, _helixManager.getClusterName(),
+            _helixManager.getClusterManagmentTool());
+    String queryQuotaEnabled = instanceConfigsMap.getOrDefault(CommonConstants.Helix.QUERY_QUOTA_STATE_ENABLED, "true");
+    _enabled = Boolean.parseBoolean(queryQuotaEnabled);
+    LOGGER.info("Set query quota state to: {} for {} tables in the current broker.", _enabled ? "ENABLE" : "DISABLE",
         _rateLimiterMap.size());
   }
 

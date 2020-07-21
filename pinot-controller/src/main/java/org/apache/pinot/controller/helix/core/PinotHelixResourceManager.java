@@ -60,9 +60,11 @@ import org.apache.helix.manager.zk.client.HelixZkClient;
 import org.apache.helix.manager.zk.client.SharedZkClientFactory;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -70,7 +72,6 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.messages.QueryQuotaStateMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -78,7 +79,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -1753,17 +1753,17 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public int sendToggleQpsStateMessage(String brokerInstanceName, String state) {
-    QueryQuotaStateMessage queryQuotaStateMessage = new QueryQuotaStateMessage(state);
-
-    // Send query quota toggle state message to dedicated broker
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName(brokerInstanceName);
-    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
-    recipientCriteria.setSessionSpecific(true);
-    int numMessagesSent = _helixZkManager.getMessagingService().send(recipientCriteria, queryQuotaStateMessage, null, -1);
-    return numMessagesSent;
+  /**
+   * Update the instance config given the broker instance id
+   */
+  public void toggleQueryQuotaStateForBroker(String brokerInstanceName, String state) {
+    Map<String, String> propToUpdate = new HashMap<>();
+    propToUpdate.put(Helix.QUERY_QUOTA_STATE_ENABLED, Boolean.toString(!"DISABLE".equals(state)));
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, _helixClusterName)
+            .forParticipant(brokerInstanceName)
+            .build();
+    _helixAdmin.setConfig(scope, propToUpdate);
   }
 
   /**
