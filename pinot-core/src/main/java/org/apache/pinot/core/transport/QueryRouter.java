@@ -92,6 +92,7 @@ public class QueryRouter {
         LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
             serverRoutingInstance, e);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
+        asyncQueryResponse.setBrokerRequestSendException(e);
         asyncQueryResponse.markQueryFailed();
         break;
       }

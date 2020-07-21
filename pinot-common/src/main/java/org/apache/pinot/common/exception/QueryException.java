@@ -53,6 +53,7 @@ public class QueryException {
   public static final int BROKER_TIMEOUT_ERROR_CODE = 400;
   public static final int BROKER_RESOURCE_MISSING_ERROR_CODE = 410;
   public static final int BROKER_INSTANCE_MISSING_ERROR_CODE = 420;
+  public static final int BROKER_REQUEST_SEND_ERROR_CODE = 425;
   public static final int TOO_MANY_REQUESTS_ERROR_CODE = 429;
   public static final int INTERNAL_ERROR_CODE = 450;
   public static final int MERGE_RESPONSE_ERROR_CODE = 500;
@@ -125,8 +126,17 @@ public class QueryException {
   }
 
   public static ProcessingException getException(ProcessingException processingException, Exception exception) {
+    return getException(processingException, getTruncatedStackTrace(exception));
+  }
+
+  public static ProcessingException getException(ProcessingException processingException, String errorMessage) {
     String errorType = processingException.getMessage();
     ProcessingException copiedProcessingException = processingException.deepCopy();
+    copiedProcessingException.setMessage(errorType + ":\n" + errorMessage);
+    return copiedProcessingException;
+  }
+
+  public static String getTruncatedStackTrace(Exception exception) {
     StringWriter stringWriter = new StringWriter();
     exception.printStackTrace(new PrintWriter(stringWriter));
     String fullStackTrace = stringWriter.toString();
@@ -136,15 +146,7 @@ public class QueryException {
     for (int i = 0; i < numLinesOfStackTrace; i++) {
       lengthOfStackTrace += lines[i].length();
     }
-    copiedProcessingException.setMessage(errorType + ":\n" + fullStackTrace.substring(0, lengthOfStackTrace));
-    return copiedProcessingException;
-  }
-
-  public static ProcessingException getException(ProcessingException processingException, String errorMessage) {
-    String errorType = processingException.getMessage();
-    ProcessingException copiedProcessingException = processingException.deepCopy();
-    copiedProcessingException.setMessage(errorType + ":\n" + errorMessage);
-    return copiedProcessingException;
+    return fullStackTrace.substring(0, lengthOfStackTrace);
   }
 
   /**
