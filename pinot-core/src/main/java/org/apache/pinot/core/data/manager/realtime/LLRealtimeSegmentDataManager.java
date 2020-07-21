@@ -842,30 +842,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     SegmentCommitter segmentCommitter;
-
-    if (isSplitCommit) {
-      // TODO: make segment uploader used in the segment committer configurable.
-      SegmentUploader segmentUploader;
-      if (this._tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null) {
-        segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
-            PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
-        segmentCommitter = _segmentCommitterFactory.createPeerSchemeSplitSegmentCommitter(params, segmentUploader);
-      } else {
-        try {
-          segmentUploader =
-              new Server2ControllerSegmentUploader(segmentLogger, _protocolHandler.getFileUploadDownloadClient(),
-                  _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), _segmentNameStr,
-                  ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
-        } catch (URISyntaxException e) {
-          segmentLogger.error("Segment commit upload url error: ", e);
-          return SegmentCompletionProtocol.RESP_NOT_SENT;
-        }
-        segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, segmentUploader);
-      }
-    } else {
-      segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
+    try {
+      segmentCommitter = _segmentCommitterFactory.createSegmentCommitter(isSplitCommit, params, controllerVipUrl);
+    } catch (URISyntaxException e) {
+      segmentLogger.error("Failed to create a segment committer: ", e);
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
-
     return segmentCommitter.commit(_segmentBuildDescriptor);
   }
 
@@ -1270,7 +1252,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _consumeEndTime = now + minConsumeTimeMillis;
     }
 
-    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _protocolHandler);
+    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
 
     segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _llcSegmentName,
