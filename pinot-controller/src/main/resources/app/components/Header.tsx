@@ -20,20 +20,26 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AppBar, Box } from '@material-ui/core';
-import Logo from './Logo';
+import MenuIcon from '@material-ui/icons/Menu';
+import Logo from './SvgIcons/Logo';
 import BreadcrumbsComponent from './Breadcrumbs';
 
 type Props = {
   highlightSidebarLink: (id: number) => void;
+  showHideSideBarHandler: () => void;
+  openSidebar: boolean;
 };
 
-const Header = ({ highlightSidebarLink, ...props }: Props) => (
+const Header = ({ highlightSidebarLink, showHideSideBarHandler, openSidebar, ...props }: Props) => (
   <AppBar position="static">
     <Box display="flex">
-      <Box textAlign="center" marginY="12.5px" width={250} borderRight="1px solid rgba(255,255,255,0.5)">
-        <Link to="/"><Logo onClick={(event) => highlightSidebarLink(1)} /></Link>
+      <Box textAlign="center" marginY="12.5px" width={openSidebar ? 250 : 90} borderRight="1px solid rgba(255,255,255,0.5)">
+        <Link to="/"><Logo onClick={() => highlightSidebarLink(1)} fulllogo={openSidebar.toString()} /></Link>
       </Box>
       <Box display="flex" alignItems="center">
+        <Box marginY="auto" padding="0.25rem 0 0.25rem 1.5rem" display="flex">
+          <MenuIcon onClick={() => showHideSideBarHandler()} />
+        </Box>
         <BreadcrumbsComponent {...props}/>
       </Box>
     </Box>
