@@ -21,7 +21,9 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.io.File;
 import java.net.URI;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
 
@@ -41,7 +43,8 @@ public class PeerSchemeSplitSegmentCommitter extends SplitSegmentCommitter {
     if (segmentLocation != null) {
       params.withSegmentLocation(segmentLocation.toString());
     } else {
-      params.withSegmentLocation("peer:///" + params.getSegmentName());
+      params.withSegmentLocation(
+          StringUtil.join("/", CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, params.getSegmentName());
     }
     return true;
   }
