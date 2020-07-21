@@ -30,7 +30,7 @@ public class CommonConstants {
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
     public static final String QUERIES_DISABLED = "queriesDisabled";
-    public static final String QUERY_QUOTA_STATE_ENABLED = "queryQuotaStateEnabled";
+    public static final String QUERY_RATE_LIMIT_DISABLED = "queryRateLimitDisabled";
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 

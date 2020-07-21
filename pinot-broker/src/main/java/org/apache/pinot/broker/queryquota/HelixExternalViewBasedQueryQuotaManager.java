@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.I0Itec.zkclient.exception.ZkNoNodeException;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;
@@ -63,7 +64,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private volatile boolean _enabled;
+  private volatile boolean _queryRateLimitDisabled;
 
   public HelixExternalViewBasedQueryQuotaManager(BrokerMetrics brokerMetrics, String instanceId) {
     _brokerMetrics = brokerMetrics;
@@ -201,6 +202,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     LOGGER.info(
         "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}. Table config stat version: {}",
         tableNameWithType, overallRate, perBrokerRate, onlineCount, stat.getVersion());
+    if (isQueryRateLimitDisabled()) {
+      LOGGER.info("Query rate limiting is currently disabled for this broker. So it won't take effect immediately.");
+    }
   }
 
   /**
@@ -212,7 +216,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   @Override
   public boolean acquire(String tableName) {
     // Return true if query quota is disabled in the current broker.
-    if (!isEnabled()) {
+    if (isQueryRateLimitDisabled()) {
       return true;
     }
     LOGGER.debug("Trying to acquire token for table: {}", tableName);
@@ -365,6 +369,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         numRebuilt++;
       }
     }
+    if (isQueryRateLimitDisabled()) {
+      LOGGER.info("Query rate limiting is currently disabled for this broker. So it won't take effect immediately.");
+    }
     _lastKnownBrokerResourceVersion.set(currentVersionNumber);
     long endTime = System.currentTimeMillis();
     LOGGER
@@ -380,17 +387,22 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   private void getQueryQuotaEnabledFlagFromInstanceConfig() {
-    Map<String, String> instanceConfigsMap =
-        HelixHelper.getInstanceConfigsMapFor(_instanceId, _helixManager.getClusterName(),
-            _helixManager.getClusterManagmentTool());
-    String queryQuotaEnabled = instanceConfigsMap.getOrDefault(CommonConstants.Helix.QUERY_QUOTA_STATE_ENABLED, "true");
-    _enabled = Boolean.parseBoolean(queryQuotaEnabled);
-    LOGGER.info("Set query quota state to: {} for {} tables in the current broker.", _enabled ? "ENABLE" : "DISABLE",
-        _rateLimiterMap.size());
+    try {
+      Map<String, String> instanceConfigsMap =
+          HelixHelper.getInstanceConfigsMapFor(_instanceId, _helixManager.getClusterName(), _helixManager.getClusterManagmentTool());
+      String queryRateLimitDisabled = instanceConfigsMap.getOrDefault(CommonConstants.Helix.QUERY_RATE_LIMIT_DISABLED, "false");
+      _queryRateLimitDisabled = Boolean.parseBoolean(queryRateLimitDisabled);
+      LOGGER.info("Set query rate limiting to: {} for all {} tables in this broker.", _queryRateLimitDisabled ? "DISABLED" : "ENABLED",
+          _rateLimiterMap.size());
+    } catch (ZkNoNodeException e) {
+      // It's a brand new broker. Skip checking instance config.
+      _queryRateLimitDisabled = false;
+    }
+    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.QUERY_RATE_LIMIT_DISABLED, _queryRateLimitDisabled ? 1L : 0L);
   }
 
-  public boolean isEnabled() {
-    return _enabled;
+  public boolean isQueryRateLimitDisabled() {
+    return _queryRateLimitDisabled;
   }
 
   /**

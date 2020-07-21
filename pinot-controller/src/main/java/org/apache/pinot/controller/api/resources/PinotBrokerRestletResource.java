@@ -138,25 +138,25 @@ public class PinotBrokerRestletResource {
   @Path("/brokers/instances/{instanceName}/qps")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Enable/disable the qps quotas of an broker instance", notes = "Enable/disable the qps quotas of an broker instance")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 409, message = "Instance cannot be dropped"), @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse toggleBrokerQpsState(
+  @ApiOperation(value = "Enable/disable the query rate limiting for a broker instance", notes = "Enable/disable the query rate limiting for a broker instance")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse toggleQueryRateLimiting(
       @ApiParam(value = "Broker instance name", required = true, example = "Broker_my.broker.com_30000") @PathParam("instanceName") String brokerInstanceName,
       @ApiParam(value = "ENABLE|DISABLE", allowableValues = "ENABLE, DISABLE", required = true)  @QueryParam("state") String state) {
-    List<String> liveInstances = _pinotHelixResourceManager.getOnlineInstanceList();
     if (brokerInstanceName == null || !brokerInstanceName.startsWith("Broker_")) {
       LOGGER.info("{} isn't a valid broker instance name", brokerInstanceName);
       throw new ControllerApplicationException(LOGGER,
           String.format("'%s' is not a valid broker instance name.", brokerInstanceName), Response.Status.BAD_REQUEST);
     }
+    validateQueryQuotaStateChange(state);
+    List<String> liveInstances = _pinotHelixResourceManager.getOnlineInstanceList();
     if (!liveInstances.contains(brokerInstanceName)) {
       LOGGER.info("Broker instance: {} not found from live instances", brokerInstanceName);
       throw new ControllerApplicationException(LOGGER, String.format("Instance '%s' not found.", brokerInstanceName),
           Response.Status.NOT_FOUND);
     }
-    validateQueryQuotaStateChange(state);
     _pinotHelixResourceManager.toggleQueryQuotaStateForBroker(brokerInstanceName, state);
-    String msg = String.format("Toggled query quota state to: %s for broker: %s", state, brokerInstanceName);
+    String msg = String.format("Set query rate limiting to: %s for all tables in broker: %s", state, brokerInstanceName);
     LOGGER.info(msg);
     return new SuccessResponse(msg);
   }
