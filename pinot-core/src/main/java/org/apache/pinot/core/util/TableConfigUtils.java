@@ -56,6 +56,20 @@ public final class TableConfigUtils {
     validateIngestionConfig(tableConfig.getIngestionConfig());
   }
 
+  /**
+   * Validates the table name with the following rules:
+   * <ul>
+   *   <li>Table name shouldn't contain dot in it</li>
+   * </ul>
+   */
+  public static void validateTableName(TableConfig tableConfig) {
+    String tableName = tableConfig.getTableName();
+    if (tableName.contains(".")) {
+      throw new IllegalStateException(
+          "Table name: '" + tableName + "' containing '.' is not allowed");
+    }
+  }
+
   private static void validateValidationConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig != null) {

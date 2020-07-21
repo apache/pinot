@@ -96,6 +96,17 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
 
+    offlineTableConfig = _offlineBuilder.build();
+    offlineTableConfigJson = (ObjectNode) offlineTableConfig.toJsonNode();
+    offlineTableConfigJson.put(TableConfig.TABLE_NAME_KEY, "bad.table.with.dot");
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfigJson.toString());
+      Assert.fail("Creation of an OFFLINE table with dot in the table name does not fail");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+
     // Create an OFFLINE table with a valid name which should succeed
     offlineTableConfig = _offlineBuilder.setTableName("valid_table_name").build();
     String offlineTableConfigString = offlineTableConfig.toJsonString();
