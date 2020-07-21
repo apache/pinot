@@ -18,28 +18,29 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
- * Implementation of {@link ValueToIdMap} for int.
+ * Implementation of {@link ValueToIdMap} for ByteArray.
  */
-public class IntToIdMap extends BaseValueToIdMap {
-  Int2IntMap _valueToIdMap;
-  IntList _idToValueMap;
+public class BytesToIdMap extends BaseValueToIdMap {
+  Object2IntMap<ByteArray> _valueToIdMap;
+  ObjectList<ByteArray> _idToValueMap;
 
-  public IntToIdMap() {
-    _valueToIdMap = new Int2IntOpenHashMap();
+  public BytesToIdMap() {
+    _valueToIdMap = new Object2IntOpenHashMap<>();
     _valueToIdMap.defaultReturnValue(INVALID_KEY);
-    _idToValueMap = new IntArrayList();
+    _idToValueMap = new ObjectArrayList<>();
   }
 
   @Override
-  public int put(int value) {
-    int id = _valueToIdMap.get(value);
+  public int put(ByteArray value) {
+    int id = _valueToIdMap.getInt(value);
     if (id == INVALID_KEY) {
       id = _idToValueMap.size();
       _valueToIdMap.put(value, id);
@@ -49,13 +50,13 @@ public class IntToIdMap extends BaseValueToIdMap {
   }
 
   @Override
-  public int getInt(int id) {
-    assert id < _idToValueMap.size();
-    return _idToValueMap.getInt(id);
+  public String getString(int id) {
+    return getBytes(id).toHexString();
   }
 
   @Override
-  public String getString(int id) {
-    return Integer.toString(getInt(id));
+  public ByteArray getBytes(int id) {
+    assert id < _idToValueMap.size();
+    return _idToValueMap.get(id);
   }
 }
