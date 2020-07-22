@@ -21,11 +21,13 @@ import * as React from 'react';
 import { Grid } from '@material-ui/core';
 import Sidebar from './SideBar';
 import Header from './Header';
+import QueryConsoleIcon from './SvgIcons/QueryConsoleIcon';
+import SwaggerIcon from './SvgIcons/SwaggerIcon';
 
 const navigationItems = [
   // { id: 1, name: 'Cluster Manager', link: '/' },
-  { id: 1, name: 'Query Console', link: '/', },
-  { id: 2, name: 'Swagger REST API', link: 'help', target: '_blank' },
+  { id: 1, name: 'Query Console', link: '/', icon: <QueryConsoleIcon/> },
+  { id: 2, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon/> }
 ];
 
 const Layout = (props) => {
@@ -33,19 +35,33 @@ const Layout = (props) => {
   const routeObj = navigationItems.find((obj)=>{ return obj.link === hash;});
 
   const [selectedId, setSelectedId] = React.useState(routeObj?.id || 1);
+  const sidebarOpenState = !(localStorage.getItem('pinot_ui:sidebarState') === 'false');
+  const [openSidebar, setOpenSidebar] = React.useState(sidebarOpenState);
 
   const highlightSidebarLink = (id: number) => {
     setSelectedId(id);
   };
+
+  const showHideSideBarHandler = () => {
+    const newSidebarState = !openSidebar;
+    localStorage.setItem('pinot_ui:sidebarState', newSidebarState.toString());
+    setOpenSidebar(newSidebarState);
+  };
+
   return (
     <Grid container direction="column">
-      <Header highlightSidebarLink={highlightSidebarLink} {...props}/>
+      <Header
+        highlightSidebarLink={highlightSidebarLink}
+        showHideSideBarHandler={showHideSideBarHandler}
+        openSidebar={openSidebar}
+        {...props}
+      />
       <Grid item xs={12}>
         <Grid container>
           <Grid item>
             <Sidebar
               list={navigationItems}
-              showMemu={false}
+              showMenu={openSidebar}
               selectedId={selectedId}
               highlightSidebarLink={highlightSidebarLink}
             />

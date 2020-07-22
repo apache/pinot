@@ -18,7 +18,7 @@
  */
 
 import * as React from 'react';
-
+import clsx from 'clsx';
 import { createStyles, Theme, makeStyles } from '@material-ui/core/styles';
 import Drawer from '@material-ui/core/Drawer';
 import List from '@material-ui/core/List';
@@ -27,8 +27,6 @@ import CssBaseline from '@material-ui/core/CssBaseline';
 import Box from '@material-ui/core/Box';
 import Typography from '@material-ui/core/Typography';
 import { NavLink } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
 const drawerWidth = 250;
 
@@ -46,69 +44,128 @@ const useStyles = makeStyles((theme: Theme) =>
       flexShrink: 0,
       backgroundColor: '#333333',
     },
+    drawerOpen: {
+      width: drawerWidth,
+      transition: theme.transitions.create('width', {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.enteringScreen,
+      }),
+    },
+    drawerClose: {
+      transition: theme.transitions.create('width', {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.leavingScreen,
+      }),
+      width: '90px',
+    },
     drawerPaper: {
       position: 'unset',
-      width: drawerWidth,
       backgroundColor: '#F5F7F9',
+      overflowY: 'visible'
     },
     drawerContainer: {
-      overflow: 'auto',
-      paddingTop: '20px'
+      padding: '20px 15px'
     },
     content: {
       flexGrow: 1,
       padding: theme.spacing(3),
     },
     itemContainer: {
+      width: 'auto',
+      display: 'block',
       color: '#3B454E',
-      borderRadius: '4px'
+      borderRadius: '4px',
+      '&:hover': {
+        backgroundColor: '#ecedef'
+      }
     },
     selectedItem: {
       background: '#D8E1E8!important'
     },
     link: {
-      textDecoration: 'none'
-    }
+      textDecoration: 'none',
+      '&:hover .menu-item': {
+        display: 'inline-block'
+      }
+    },
+    sidebarLabel: {
+      marginLeft: '10px'
+    },
+    sidebarLabelClose: {
+      display: 'none',
+      marginLeft: '10px',
+      top: 0,
+      position: 'absolute',
+      whiteSpace: 'nowrap',
+      backgroundColor: 'inherit',
+      padding: '8px 8px 8px 0',
+      borderRadius: '0 4px 4px 0',
+      zIndex: 9
+    },
+    popover: {
+      pointerEvents: 'none',
+    },
+    paper: {
+      padding: theme.spacing(1),
+    },
   }),
 );
 
 type Props = {
-  showMemu: boolean;
-  list: Array<{id:number, name: string, link: string, target?: string}>;
+  showMenu: boolean;
+  list: Array<{id:number, name: string, link: string, target?: string, icon: any}>;
   selectedId: number;
   highlightSidebarLink: (id: number) => void;
 };
 
-const Sidebar = ({ showMemu, list, selectedId, highlightSidebarLink }: Props) => {
+const Sidebar = ({ showMenu, list, selectedId, highlightSidebarLink }: Props) => {
   const classes = useStyles();
 
   return (
     <>
       <CssBaseline />
       <Drawer
-        open={showMemu}
-        className={classes.drawer}
-        variant="permanent"
+        className={clsx(classes.drawer, {
+          [classes.drawerOpen]: showMenu,
+          [classes.drawerClose]: !showMenu,
+        })}
         classes={{
-          paper: classes.drawerPaper,
+          paper: clsx(classes.drawerPaper, {
+            [classes.drawerOpen]: showMenu,
+            [classes.drawerClose]: !showMenu,
+          }),
         }}
+        transitionDuration={1000}
+        variant="permanent"
       >
         <div className={classes.drawerContainer}>
           <List disablePadding>
-            {list.map(({ id, name, link, target }) => (
-              <Box width="210px" marginX="auto" marginBottom="5px" key={name}>
+            {list.map(({ id, name, link, target, icon }) => (
+              <Box marginX="auto" marginBottom="5px" key={name}>
                 {link !== 'help' ?
                   <NavLink to={link} className={classes.link} target={target}>
                     <ListItem color="white" button className={`${classes.itemContainer} ${selectedId === id ? classes.selectedItem : ''}`} selected={selectedId === id} onClick={(event) => highlightSidebarLink(id)}>
-                      <Typography variant="subtitle2">{name} &ensp;</Typography>
+                      {icon}
+                      <Typography
+                        className={clsx('menu-item',{
+                          [classes.sidebarLabel]: showMenu,
+                          [classes.sidebarLabelClose]: !showMenu,
+                        })}
+                        component="span"
+                      >{name} &ensp;</Typography>
                     </ListItem>
                   </NavLink>
                   :
                   <a href={`${window.location.origin}/${link}`} className={classes.link} target={target}>
                     <ListItem color="white" button className={`${classes.itemContainer}`}>
-                      <Typography variant="subtitle2">{name} &ensp;
-                        <FontAwesomeIcon icon={faExternalLinkAlt} />
-                      </Typography>
+                      {icon}
+                      <Typography
+                        className={clsx('menu-item',{
+                          [classes.sidebarLabel]: showMenu,
+                          [classes.sidebarLabelClose]: !showMenu,
+                        })}
+                        component="span"
+                      >{name} &ensp;</Typography>
                     </ListItem>
                   </a>}
               </Box>
