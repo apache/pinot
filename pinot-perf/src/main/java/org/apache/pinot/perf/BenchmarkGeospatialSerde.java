@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.geospatial.serde;
+package org.apache.pinot.perf;
 
 import com.google.common.base.Joiner;
 import com.google.common.io.Resources;
@@ -56,7 +56,7 @@ import static org.apache.pinot.core.geospatial.serde.GeometrySerializer.deserial
 @Measurement(iterations = 5, time = 4, timeUnit = SECONDS)
 @OutputTimeUnit(SECONDS)
 @BenchmarkMode(Throughput)
-public class BenchmarkSerde {
+public class BenchmarkGeospatialSerde {
   // POINT
   @Benchmark
   public Object serializePoint(BenchmarkData data) {
@@ -314,9 +314,10 @@ public class BenchmarkSerde {
   public static void main(String[] args)
       throws RunnerException {
     Options options =
-        new OptionsBuilder().verbosity(VerboseMode.NORMAL).include(".*" + BenchmarkSerde.class.getSimpleName() + ".*")
+        new OptionsBuilder().verbosity(VerboseMode.NORMAL).include(".*" + BenchmarkData.class.getSimpleName() + ".*")
             .build();
     new Runner(options).run();
   }
 }
+
 

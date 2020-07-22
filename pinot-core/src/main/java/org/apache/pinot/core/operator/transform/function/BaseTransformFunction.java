@@ -44,7 +44,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
           new TransformResultMetadata(DataType.BYTES, true, false);
 
-  private boolean[] _booleanValuesSV;
   private int[] _intValuesSV;
   private long[] _longValuesSV;
   private float[] _floatValuesSV;

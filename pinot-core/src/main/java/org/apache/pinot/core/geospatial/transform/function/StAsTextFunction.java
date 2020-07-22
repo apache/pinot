@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.WKTWriter;
 import org.slf4j.Logger;
@@ -58,6 +59,8 @@ public class StAsTextFunction extends BaseTransformFunction {
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Argument must be single-valued for transform function: %s", getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
+        "The argument must be of bytes type");
     _transformFunction = transformFunction;
     _writer = new WKTWriter();
   }
@@ -79,11 +82,5 @@ public class StAsTextFunction extends BaseTransformFunction {
       _results[i] = _writer.write(geometry);
     }
     return _results;
-  }
-
-  @ScalarFunction
-  public static String stAsText(byte[] bytes) {
-    WKTWriter writer = new WKTWriter();
-    return writer.write(GeometrySerializer.deserialize(bytes));
   }
 }

@@ -58,7 +58,8 @@ public enum TransformFunctionType {
 
   // Special type for annotation based scalar functions
   SCALAR("scalar"),
-  // geo constructors
+
+  // Geo constructors
   ST_GEOG_FROM_TEXT("ST_GeogFromText"),
   ST_GEOM_FROM_TEXT("ST_GeomFromText"),
   ST_GEOG_FROM_WKB("ST_GeogFromWKB"),
@@ -66,18 +67,19 @@ public enum TransformFunctionType {
   ST_POINT("ST_Point"),
   ST_POLYGON("ST_Polygon"),
 
-  // geo measurements
+  // Geo measurements
   ST_AREA("ST_Area"),
   ST_DISTANCE("ST_Distance"),
-  ST_GEOMETRY_TYPE("ST_GEOMETRY_TYPE"),
+  ST_GEOMETRY_TYPE("ST_GeometryType"),
 
-  // geo outputs
+  // Geo outputs
   ST_AS_BINARY("ST_AsBinary"),
   ST_AS_TEXT("ST_AsText"),
 
-  // geo relationship
+  // Geo relationship
   ST_CONTAINS("ST_Contains"),
   ST_EQUALS("ST_Equals");
+
   private final String _name;
 
   TransformFunctionType(String name) {

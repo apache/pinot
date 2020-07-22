@@ -19,6 +19,8 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.geospatial.serde.GeometrySerializer;
@@ -27,22 +29,20 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
-
-import java.util.List;
-import java.util.Map;
 
 
 /**
  * An abstract class for implementing the geo constructor functions from text.
  */
 abstract class ConstructFromTextFunction extends BaseTransformFunction {
-  private TransformFunction _transformFunction;
-  private byte[][] _results;
-  private WKTReader _reader;
+  protected TransformFunction _transformFunction;
+  protected byte[][] _results;
+  protected WKTReader _reader;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
@@ -51,6 +51,8 @@ abstract class ConstructFromTextFunction extends BaseTransformFunction {
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "The argument must be single-valued for transform function: %s", getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.STRING,
+        "The argument must be of string type");
     _transformFunction = transformFunction;
     _reader = new WKTReader(getGeometryFactory());
   }
@@ -75,7 +77,7 @@ abstract class ConstructFromTextFunction extends BaseTransformFunction {
         _results[i] = GeometrySerializer.serialize(geometry);
       } catch (ParseException e) {
         Utils.rethrowException(
-            new RuntimeException(String.format("Failed to parse geometry from String %s", argumentValues[i])));
+            new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i])));
       }
     }
     return _results;

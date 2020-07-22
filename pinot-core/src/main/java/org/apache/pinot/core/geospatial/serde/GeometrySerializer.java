@@ -18,13 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.serde;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
 import org.locationtech.jts.geom.Geometry;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 
 
 /**
@@ -42,11 +36,7 @@ public class GeometrySerializer {
    * @return the serialized bytes
    */
   public static byte[] serialize(Geometry geometry) {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    Output output = new Output(out);
-    SERDE.write(new Kryo(), output, geometry);
-    output.close();
-    return out.toByteArray();
+    return SERDE.writeGeometry(geometry);
   }
 
   /**
@@ -55,10 +45,6 @@ public class GeometrySerializer {
    * @return the deserialized object
    */
   public static Geometry deserialize(byte[] bytes) {
-    ByteArrayInputStream in = new ByteArrayInputStream(bytes);
-    Input input = new Input(in);
-    Object deserialized = SERDE.read(new Kryo(), input, Geometry.class);
-    input.close();
-    return (Geometry) deserialized;
+    return SERDE.readGeometry(bytes);
   }
 }

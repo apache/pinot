@@ -80,14 +80,9 @@ public class StPointFunction extends BaseTransformFunction {
     double[] firstValues = _firstArgument.transformToDoubleValuesSV(projectionBlock);
     double[] secondValues = _secondArgument.transformToDoubleValuesSV(projectionBlock);
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      _results[i] = stPoint(firstValues[i], secondValues[i]);
+      _results[i] = ScalarFunctions.stPoint(firstValues[i], secondValues[i]);
     }
     return _results;
   }
 
-  @ScalarFunction
-  public static byte[] stPoint(double longitude, double latitude) {
-    return GeometrySerializer
-        .serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude)));
-  }
 }

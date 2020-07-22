@@ -39,10 +39,10 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
   private void assertType(String wkt, String type)
       throws Exception {
     // assert geometry
-    assertStringFunction(String.format("ST_GEOMETRY_TYPE(ST_GeomFromText(%s))))", STRING_SV_COLUMN), new String[]{type},
+    assertStringFunction(String.format("ST_GeometryType(ST_GeomFromText(%s))))", STRING_SV_COLUMN), new String[]{type},
         Arrays.asList(new GeoFunctionTest.Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));
     // assert geography
-    assertStringFunction(String.format("ST_GEOMETRY_TYPE(ST_GeogFromText(%s))))", STRING_SV_COLUMN), new String[]{type},
+    assertStringFunction(String.format("ST_GeometryType(ST_GeogFromText(%s))))", STRING_SV_COLUMN), new String[]{type},
         Arrays.asList(new GeoFunctionTest.Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));
   }
 }

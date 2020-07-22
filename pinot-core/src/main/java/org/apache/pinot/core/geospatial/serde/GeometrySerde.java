@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.geospatial.serde;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.Serializer;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
+import com.google.common.base.Verify;
+import com.google.common.collect.Iterables;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import org.apache.pinot.core.geospatial.GeometryType;
+import org.apache.pinot.core.geospatial.GeometryUtils;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LineString;
@@ -35,103 +38,97 @@ import org.locationtech.jts.geom.TopologyException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import static com.google.common.base.Verify.verify;
-import static com.google.common.collect.Iterables.getOnlyElement;
-import static java.lang.Double.NaN;
-import static java.lang.Double.isNaN;
-import static java.util.Objects.requireNonNull;
-import static org.apache.pinot.core.geospatial.GeometryUtils.GEOGRAPHY_FACTORY;
-import static org.apache.pinot.core.geospatial.GeometryUtils.GEOGRAPHY_GET_MASK;
-import static org.apache.pinot.core.geospatial.GeometryUtils.GEOGRAPHY_SET_MASK;
-import static org.apache.pinot.core.geospatial.GeometryUtils.GEOGRAPHY_SRID;
-import static org.apache.pinot.core.geospatial.GeometryUtils.GEOMETRY_FACTORY;
-
 
 /**
  * Provides methods to efficiently serialize and deserialize geometry types.
+ *
+ * This serialization is similar to Presto's https://github.com/prestodb/presto/blob/master/presto-geospatial-toolkit/src/main/java/com/facebook/presto/geospatial/serde/JtsGeometrySerde.java,
+ * with the following differences:
+ *  - The geometry vs geography info is encoded in the type byte.
+ *  - The envelope info is not serialized
  */
-public class GeometrySerde extends Serializer {
+public class GeometrySerde {
   private static final Logger LOGGER = LoggerFactory.getLogger(GeometrySerde.class);
+  private static final int TYPE_SIZE = Byte.BYTES;
+  private static final int COORDINATE_SIZE = Double.BYTES + Double.BYTES;
 
-  @Override
-  public void write(Kryo kryo, Output output, Object object) {
-    if (!(object instanceof Geometry)) {
-      throw new UnsupportedOperationException("Cannot serialize object of type " + object.getClass().getName());
-    }
-    writeGeometry(output, (Geometry) object);
+  byte[] writeGeometry(Geometry geometry) {
+    byte[] bytes = new byte[getByteSize(geometry)];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    writeGeometryByteBuffer(byteBuffer, geometry);
+    return bytes;
   }
 
-  @Override
-  public Object read(Kryo kryo, Input input, Class aClass) {
-    byte typeByte = input.readByte();
-    GeometrySerializationType type = readGeometryType(typeByte);
+  public Geometry readGeometry(byte[] bytes) {
+    return readGeometry(ByteBuffer.wrap(bytes));
+  }
+
+  private Geometry readGeometry(ByteBuffer byteBuffer) {
+    byte typeByte = byteBuffer.get();
+    GeometryType type = readGeometryType(typeByte);
     GeometryFactory factory = getGeometryFactory(typeByte);
-
-    return readGeometry(input, type, factory);
+    Geometry geometry = readGeometry(byteBuffer, type, factory);
+    return geometry;
   }
 
-  private Geometry readGeometry(Input input, GeometrySerializationType type, GeometryFactory factory) {
+  private Geometry readGeometry(ByteBuffer byteBuffer, GeometryType type, GeometryFactory factory) {
     switch (type) {
       case POINT:
-        return readPoint(input, factory);
+        return readPoint(byteBuffer, factory);
       case MULTI_POINT:
-        return readMultiPoint(input, factory);
+        return readMultiPoint(byteBuffer, factory);
       case LINE_STRING:
-        return readPolyline(input, false, factory);
+        return readPolyline(byteBuffer, false, factory);
       case MULTI_LINE_STRING:
-        return readPolyline(input, true, factory);
+        return readPolyline(byteBuffer, true, factory);
       case POLYGON:
-        return readPolygon(input, false, factory);
+        return readPolygon(byteBuffer, false, factory);
       case MULTI_POLYGON:
-        return readPolygon(input, true, factory);
+        return readPolygon(byteBuffer, true, factory);
       case GEOMETRY_COLLECTION:
-        return readGeometryCollection(input, factory);
+        return readGeometryCollection(byteBuffer, factory);
       default:
         throw new UnsupportedOperationException("Unexpected type: " + type);
     }
   }
 
-  private Point readPoint(Input input, GeometryFactory factory) {
-    Coordinate coordinates = readCoordinate(input);
-    if (isNaN(coordinates.x) || isNaN(coordinates.y)) {
+  private Point readPoint(ByteBuffer byteBuffer, GeometryFactory factory) {
+    Coordinate coordinates = readCoordinate(byteBuffer);
+    if (Double.isNaN(coordinates.x) || Double.isNaN(coordinates.y)) {
       return factory.createPoint();
     }
     return factory.createPoint(coordinates);
   }
 
-  private Coordinate readCoordinate(Input input) {
-    return new Coordinate(input.readDouble(), input.readDouble());
+  private Coordinate readCoordinate(ByteBuffer byteBuffer) {
+    return new Coordinate(byteBuffer.getDouble(), byteBuffer.getDouble());
   }
 
-  private Coordinate[] readCoordinates(Input input, int count) {
-    requireNonNull(input, "input is null");
-    verify(count > 0);
+  private Coordinate[] readCoordinates(ByteBuffer byteBuffer, int count) {
+    Objects.requireNonNull(byteBuffer, "input is null");
+    Verify.verify(count > 0);
     Coordinate[] coordinates = new Coordinate[count];
     for (int i = 0; i < count; i++) {
-      coordinates[i] = readCoordinate(input);
+      coordinates[i] = readCoordinate(byteBuffer);
     }
     return coordinates;
   }
 
-  private Geometry readMultiPoint(Input input, GeometryFactory factory) {
-    int pointCount = input.readInt();
+  private Geometry readMultiPoint(ByteBuffer byteBuffer, GeometryFactory factory) {
+    int pointCount = byteBuffer.getInt();
     Point[] points = new Point[pointCount];
     for (int i = 0; i < pointCount; i++) {
-      points[i] = readPoint(input, factory);
+      points[i] = readPoint(byteBuffer, factory);
     }
     return factory.createMultiPoint(points);
   }
 
-  private GeometrySerializationType readGeometryType(byte typeByte) {
-    return GeometrySerializationType.fromID(typeByte & GEOGRAPHY_GET_MASK);
+  private GeometryType readGeometryType(byte typeByte) {
+    return GeometryType.fromID(typeByte & GeometryUtils.GEOGRAPHY_GET_MASK);
   }
 
-  private Geometry readPolyline(Input input, boolean multitype, GeometryFactory factory) {
-    int partCount = input.readInt();
+  private Geometry readPolyline(ByteBuffer byteBuffer, boolean multitype, GeometryFactory factory) {
+    int partCount = byteBuffer.getInt();
     if (partCount == 0) {
       if (multitype) {
         return factory.createMultiLineString();
@@ -139,10 +136,10 @@ public class GeometrySerde extends Serializer {
       return factory.createLineString();
     }
 
-    int pointCount = input.readInt();
+    int pointCount = byteBuffer.getInt();
     int[] startIndexes = new int[partCount];
     for (int i = 0; i < partCount; i++) {
-      startIndexes[i] = input.readInt();
+      startIndexes[i] = byteBuffer.getInt();
     }
 
     int[] partLengths = new int[partCount];
@@ -157,18 +154,18 @@ public class GeometrySerde extends Serializer {
     LineString[] lineStrings = new LineString[partCount];
 
     for (int i = 0; i < partCount; i++) {
-      lineStrings[i] = factory.createLineString(readCoordinates(input, partLengths[i]));
+      lineStrings[i] = factory.createLineString(readCoordinates(byteBuffer, partLengths[i]));
     }
 
     if (multitype) {
       return factory.createMultiLineString(lineStrings);
     }
-    verify(lineStrings.length == 1);
+    Verify.verify(lineStrings.length == 1);
     return lineStrings[0];
   }
 
-  private Geometry readPolygon(Input input, boolean multitype, GeometryFactory factory) {
-    int partCount = input.readInt();
+  private Geometry readPolygon(ByteBuffer byteBuffer, boolean multitype, GeometryFactory factory) {
+    int partCount = byteBuffer.getInt();
     if (partCount == 0) {
       if (multitype) {
         return factory.createMultiPolygon();
@@ -176,10 +173,10 @@ public class GeometrySerde extends Serializer {
       return factory.createPolygon();
     }
 
-    int pointCount = input.readInt();
+    int pointCount = byteBuffer.getInt();
     int[] startIndexes = new int[partCount];
     for (int i = 0; i < partCount; i++) {
-      startIndexes[i] = input.readInt();
+      startIndexes[i] = byteBuffer.getInt();
     }
 
     int[] partLengths = new int[partCount];
@@ -196,7 +193,7 @@ public class GeometrySerde extends Serializer {
     List<Polygon> polygons = new ArrayList<>();
     try {
       for (int i = 0; i < partCount; i++) {
-        Coordinate[] coordinates = readCoordinates(input, partLengths[i]);
+        Coordinate[] coordinates = readCoordinates(byteBuffer, partLengths[i]);
         if (isClockwise(coordinates)) {
           // next polygon has started
           if (shell != null) {
@@ -216,23 +213,19 @@ public class GeometrySerde extends Serializer {
     if (multitype) {
       return factory.createMultiPolygon(polygons.toArray(new Polygon[0]));
     }
-    return getOnlyElement(polygons);
+    return Iterables.getOnlyElement(polygons);
   }
 
-  private Geometry readGeometryCollection(Input input, GeometryFactory factory) {
+  private Geometry readGeometryCollection(ByteBuffer byteBuffer, GeometryFactory factory) {
     List<Geometry> geometries = new ArrayList<>();
     while (true) {
-      try {
-        if (!(input.available() > 0)) {
-          break;
-        }
-      } catch (IOException e) {
-        throw new IllegalArgumentException("Corrupted data: failed to read geometry collection.");
+      if (!byteBuffer.hasRemaining()) {
+        break;
       }
-      byte typeByte = input.readByte();
-      GeometrySerializationType type = readGeometryType(typeByte);
+      byte typeByte = byteBuffer.get();
+      GeometryType type = readGeometryType(typeByte);
       GeometryFactory geometryFactory = getGeometryFactory(typeByte);
-      geometries.add(readGeometry(input, type, geometryFactory));
+      geometries.add(readGeometry(byteBuffer, type, geometryFactory));
     }
     return factory.createGeometryCollection(geometries.toArray(new Geometry[0]));
   }
@@ -254,99 +247,168 @@ public class GeometrySerde extends Serializer {
   }
 
   private GeometryFactory getGeometryFactory(byte typeByte) {
-    return typeByte < 0 ? GEOGRAPHY_FACTORY : GEOMETRY_FACTORY;
+    return typeByte < 0 ? GeometryUtils.GEOGRAPHY_FACTORY : GeometryUtils.GEOMETRY_FACTORY;
   }
 
-  private void writeGeometry(Output output, Geometry geometry) {
+  private void writeGeometryByteBuffer(ByteBuffer byteBuffer, Geometry geometry) {
     switch (geometry.getGeometryType()) {
       case "Point":
-        writePoint(output, (Point) geometry);
+        writePoint(byteBuffer, (Point) geometry);
         break;
       case "MultiPoint":
-        writeMultiPoint(output, (MultiPoint) geometry);
+        writeMultiPoint(byteBuffer, (MultiPoint) geometry);
         break;
       case "LineString":
       case "LinearRing":
         // LinearRings are a subclass of LineString
-        writePolyline(output, geometry, false);
+        writePolyline(byteBuffer, geometry, false);
         break;
       case "MultiLineString":
-        writePolyline(output, geometry, true);
+        writePolyline(byteBuffer, geometry, true);
         break;
       case "Polygon":
-        writePolygon(output, geometry, false);
+        writePolygon(byteBuffer, geometry, false);
         break;
       case "MultiPolygon":
-        writePolygon(output, geometry, true);
+        writePolygon(byteBuffer, geometry, true);
         break;
       case "GeometryCollection":
-        writeGeometryCollection(output, geometry);
+        writeGeometryCollection(byteBuffer, geometry);
         break;
       default:
         throw new IllegalArgumentException("Unsupported geometry type : " + geometry.getGeometryType());
     }
   }
 
-  private void writeType(Output output, GeometrySerializationType serializationType, int SRID) {
+  private int getByteSize(Geometry geometry) {
+    int size = TYPE_SIZE;
+    switch (geometry.getGeometryType()) {
+      case "Point":
+        size += COORDINATE_SIZE;
+        break;
+      case "MultiPoint":
+        size += Integer.BYTES + geometry.getNumPoints() * COORDINATE_SIZE;
+        break;
+      case "LineString":
+      case "LinearRing":
+        // LinearRings are a subclass of LineString
+        size += getPolylineByteSize(geometry, false);
+        break;
+      case "MultiLineString":
+        size += getPolylineByteSize(geometry, true);
+        break;
+      case "Polygon":
+        size += getPolygonByteSize(geometry, false);
+        break;
+      case "MultiPolygon":
+        size += getPolygonByteSize(geometry, true);
+        break;
+      case "GeometryCollection":
+        size += getGeometryCollectionByteSize(geometry);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported geometry type : " + geometry.getGeometryType());
+    }
+    return size;
+  }
+
+  private void writeType(ByteBuffer byteBuffer, GeometryType serializationType, int SRID) {
     byte type = Integer.valueOf(serializationType.id()).byteValue();
-    if (SRID == GEOGRAPHY_SRID) {
-      type |= GEOGRAPHY_SET_MASK;
+    if (SRID == GeometryUtils.GEOGRAPHY_SRID) {
+      type |= GeometryUtils.GEOGRAPHY_SET_MASK;
     }
-    output.writeByte(type);
+    byteBuffer.put(type);
   }
 
-  private void writePoint(Output output, Point point) {
-    writeType(output, GeometrySerializationType.POINT, point.getSRID());
+  /**
+   * Writes the byte of type, followed by the two coordinates in double.
+   */
+  private void writePoint(ByteBuffer byteBuffer, Point point) {
+    writeType(byteBuffer, GeometryType.POINT, point.getSRID());
     if (point.isEmpty()) {
-      output.writeDouble(NaN);
-      output.writeDouble(NaN);
+      byteBuffer.putDouble(Double.NaN);
+      byteBuffer.putDouble(Double.NaN);
     } else {
-      writeCoordinate(output, point.getCoordinate());
+      writeCoordinate(byteBuffer, point.getCoordinate());
     }
   }
 
-  private void writeCoordinate(Output output, Coordinate coordinate) {
-    output.writeDouble(coordinate.getX());
-    output.writeDouble(coordinate.getY());
+  private void writeCoordinate(ByteBuffer byteBuffer, Coordinate coordinate) {
+    byteBuffer.putDouble(coordinate.getX());
+    byteBuffer.putDouble(coordinate.getY());
   }
 
-  private void writeMultiPoint(Output output, MultiPoint geometry) {
-    writeType(output, GeometrySerializationType.MULTI_POINT, geometry.getSRID());
-    output.writeInt(geometry.getNumPoints());
+  /**
+   * Writes the byte of type, number of points in int, followed by the collection of points
+   */
+  private void writeMultiPoint(ByteBuffer byteBuffer, MultiPoint geometry) {
+    writeType(byteBuffer, GeometryType.MULTI_POINT, geometry.getSRID());
+    byteBuffer.putInt(geometry.getNumPoints());
     for (Coordinate coordinate : geometry.getCoordinates()) {
-      writeCoordinate(output, coordinate);
+      writeCoordinate(byteBuffer, coordinate);
     }
   }
 
-  private void writePolyline(Output output, Geometry geometry, boolean multitype) {
+  private int getPolylineByteSize(Geometry geometry, boolean multitype) {
+    int numPoints = geometry.getNumPoints();
+    int numParts = multitype ? geometry.getNumGeometries() : numPoints > 0 ? 1 : 0;
+    return Integer.BYTES + Integer.BYTES + numParts * Integer.BYTES + numPoints * COORDINATE_SIZE;
+  }
+
+  /**
+   * Writes the byte of type, the number of parts in int, number of points in int, followed by collection of part index
+   * in int, followed by collection of coordinates
+   */
+  private void writePolyline(ByteBuffer byteBuffer, Geometry geometry, boolean multitype) {
     int numParts;
     int numPoints = geometry.getNumPoints();
     if (multitype) {
       numParts = geometry.getNumGeometries();
-      writeType(output, GeometrySerializationType.MULTI_LINE_STRING, geometry.getSRID());
+      writeType(byteBuffer, GeometryType.MULTI_LINE_STRING, geometry.getSRID());
     } else {
       numParts = numPoints > 0 ? 1 : 0;
-      writeType(output, GeometrySerializationType.LINE_STRING, geometry.getSRID());
+      writeType(byteBuffer, GeometryType.LINE_STRING, geometry.getSRID());
     }
-    output.writeInt(numParts);
-    output.writeInt(numPoints);
+    byteBuffer.putInt(numParts);
+    byteBuffer.putInt(numPoints);
 
     int partIndex = 0;
     for (int i = 0; i < numParts; i++) {
-      output.writeInt(partIndex);
+      byteBuffer.putInt(partIndex);
       partIndex += geometry.getGeometryN(i).getNumPoints();
     }
 
-    writeCoordinates(output, geometry.getCoordinates());
+    writeCoordinates(byteBuffer, geometry.getCoordinates());
   }
 
-  private void writeCoordinates(Output output, Coordinate[] coordinates) {
+  private void writeCoordinates(ByteBuffer byteBuffer, Coordinate[] coordinates) {
     for (Coordinate coordinate : coordinates) {
-      writeCoordinate(output, coordinate);
+      writeCoordinate(byteBuffer, coordinate);
     }
   }
 
-  private void writePolygon(Output output, Geometry geometry, boolean multitype) {
+  private int getPolygonByteSize(Geometry geometry, boolean multitype) {
+    int numGeometries = geometry.getNumGeometries();
+    int numParts = 0;
+    int numPoints = geometry.getNumPoints();
+    for (int i = 0; i < numGeometries; i++) {
+      Polygon polygon = (Polygon) geometry.getGeometryN(i);
+      if (polygon.getNumPoints() > 0) {
+        numParts += polygon.getNumInteriorRing() + 1;
+      }
+    }
+    int size = Integer.BYTES + Integer.BYTES;
+    if (numParts == 0) {
+      return size;
+    }
+    return size + numParts * Integer.BYTES + numPoints * COORDINATE_SIZE;
+  }
+
+  /**
+   * Writes the byte of type, the number of parts in int, number of points in int, followed by collection of part index
+   * in int, followed by the canonicalized coordinates.
+   */
+  private void writePolygon(ByteBuffer byteBuffer, Geometry geometry, boolean multitype) {
     int numGeometries = geometry.getNumGeometries();
     int numParts = 0;
     int numPoints = geometry.getNumPoints();
@@ -358,13 +420,13 @@ public class GeometrySerde extends Serializer {
     }
 
     if (multitype) {
-      writeType(output, GeometrySerializationType.MULTI_POLYGON, geometry.getSRID());
+      writeType(byteBuffer, GeometryType.MULTI_POLYGON, geometry.getSRID());
     } else {
-      writeType(output, GeometrySerializationType.POLYGON, geometry.getSRID());
+      writeType(byteBuffer, GeometryType.POLYGON, geometry.getSRID());
     }
 
-    output.writeInt(numParts);
-    output.writeInt(numPoints);
+    byteBuffer.putInt(numParts);
+    byteBuffer.putInt(numPoints);
 
     if (numParts == 0) {
       return;
@@ -393,12 +455,12 @@ public class GeometrySerde extends Serializer {
     }
 
     for (int partIndex : partIndexes) {
-      output.writeInt(partIndex);
+      byteBuffer.putInt(partIndex);
     }
 
     Coordinate[] coordinates = geometry.getCoordinates();
     canonicalizePolygonCoordinates(coordinates, partIndexes, shellPart);
-    writeCoordinates(output, coordinates);
+    writeCoordinates(byteBuffer, coordinates);
   }
 
   private void canonicalizePolygonCoordinates(Coordinate[] coordinates, int[] partIndexes, boolean[] shellPart) {
@@ -421,7 +483,7 @@ public class GeometrySerde extends Serializer {
   }
 
   private void reverse(Coordinate[] coordinates, int start, int end) {
-    verify(start <= end, "start must be less or equal than end");
+    Verify.verify(start <= end, "start must be less or equal than end");
     for (int i = start; i < start + ((end - start) / 2); i++) {
       Coordinate buffer = coordinates[i];
       coordinates[i] = coordinates[start + end - i - 1];
@@ -429,11 +491,20 @@ public class GeometrySerde extends Serializer {
     }
   }
 
-  private void writeGeometryCollection(Output output, Geometry collection) {
-    writeType(output, GeometrySerializationType.GEOMETRY_COLLECTION, collection.getSRID());
+  private int getGeometryCollectionByteSize(Geometry collection) {
+    int size = 0;
     for (int geometryIndex = 0; geometryIndex < collection.getNumGeometries(); geometryIndex++) {
       Geometry geometry = collection.getGeometryN(geometryIndex);
-      writeGeometry(output, geometry);
+      size += getByteSize(geometry);
+    }
+    return size;
+  }
+
+  private void writeGeometryCollection(ByteBuffer byteBuffer, Geometry collection) {
+    writeType(byteBuffer, GeometryType.GEOMETRY_COLLECTION, collection.getSRID());
+    for (int geometryIndex = 0; geometryIndex < collection.getNumGeometries(); geometryIndex++) {
+      Geometry geometry = collection.getGeometryN(geometryIndex);
+      writeGeometryByteBuffer(byteBuffer, geometry);
     }
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.serde;
 
+import java.nio.ByteOrder;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.PrecisionModel;
@@ -44,7 +45,7 @@ public class GeometrySerdeTest {
 
   @Test
   public void testMultiPoint()
-      throws Exception {
+      throws Exception{
     testSerde("MULTIPOINT (0 0)");
     testSerde("MULTIPOINT (0 0, 0 0)");
     testSerde("MULTIPOINT (0 0, 1 1, 2 3)");

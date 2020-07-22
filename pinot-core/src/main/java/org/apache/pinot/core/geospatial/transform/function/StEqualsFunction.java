@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 
 import java.util.List;
@@ -54,10 +55,14 @@ public class StEqualsFunction extends BaseTransformFunction {
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "First argument must be single-valued for transform function: %s", getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
+        "The first argument must be of bytes type");
     _firstArgument = transformFunction;
     transformFunction = arguments.get(1);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Second argument must be single-valued for transform function: %s", getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
+        "The second argument must be of bytes type");
     _secondArgument = transformFunction;
   }
 
@@ -76,10 +81,6 @@ public class StEqualsFunction extends BaseTransformFunction {
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
       Geometry firstGeometry = GeometrySerializer.deserialize(firstValues[i]);
       Geometry secondGeometry = GeometrySerializer.deserialize(secondValues[i]);
-      if (GeometryUtils.isGeography(firstGeometry) || GeometryUtils.isGeography(secondGeometry)) {
-        throw new RuntimeException(
-            String.format("%s is available for Geometry objects only", FUNCTION_NAME));
-      }
       _results[i] = firstGeometry.equals(secondGeometry) ? 1 : 0;
     }
     return _results;

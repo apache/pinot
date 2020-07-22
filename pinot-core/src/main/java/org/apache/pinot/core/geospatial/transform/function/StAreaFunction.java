@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.Point;
@@ -62,6 +63,8 @@ public class StAreaFunction extends BaseTransformFunction {
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Argument must be single-valued for transform function: %s", getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
+        "The argument must be of bytes type");
     _transformFunction = transformFunction;
   }
 
@@ -100,7 +103,6 @@ public class StAreaFunction extends BaseTransformFunction {
     }
 
     // Math.abs is required here because for Polygons with a 2D area of 0
-    // isExteriorRing returns false for the exterior ring
     return Math.abs(sphericalExcess * GeometryUtils.EARTH_RADIUS_M * GeometryUtils.EARTH_RADIUS_M);
   }
 
@@ -114,9 +116,7 @@ public class StAreaFunction extends BaseTransformFunction {
     SphericalExcessCalculator calculator = new SphericalExcessCalculator(lineString.getEndPoint());
 
     // Our calculations rely on not processing the same point twice
-    int start = lineString.getStartPoint().equals(lineString.getEndPoint()) ? 1 : 0;
-
-    for (int i = start; i < lineString.getNumPoints(); i++) {
+    for (int i = 1; i < lineString.getNumPoints(); i++) {
       calculator.add(lineString.getPointN(i));
     }
     return calculator.computeSphericalExcess();
@@ -126,33 +126,33 @@ public class StAreaFunction extends BaseTransformFunction {
     private static final double TWO_PI = 2 * Math.PI;
     private static final double THREE_PI = 3 * Math.PI;
 
-    private double sphericalExcess;
+    private double _sphericalExcess;
     private double courseDelta;
 
-    private boolean firstPoint;
-    private double firstInitialBearing;
-    private double previousFinalBearing;
+    private boolean _firstPoint;
+    private double _firstInitialBearing;
+    private double _previousFinalBearing;
 
-    private double previousPhi;
-    private double previousCos;
-    private double previousSin;
-    private double previousTan;
-    private double previousLongitude;
+    private double _previousPhi;
+    private double _previousCos;
+    private double _previousSin;
+    private double _previousTan;
+    private double _previousLongitude;
 
-    private boolean done;
+    private boolean _done;
 
     public SphericalExcessCalculator(Point endPoint) {
-      previousPhi = toRadians(endPoint.getY());
-      previousSin = Math.sin(previousPhi);
-      previousCos = Math.cos(previousPhi);
-      previousTan = Math.tan(previousPhi / 2);
-      previousLongitude = toRadians(endPoint.getX());
-      firstPoint = true;
+      _previousPhi = toRadians(endPoint.getY());
+      _previousSin = Math.sin(_previousPhi);
+      _previousCos = Math.cos(_previousPhi);
+      _previousTan = Math.tan(_previousPhi / 2);
+      _previousLongitude = toRadians(endPoint.getX());
+      _firstPoint = true;
     }
 
     private void add(Point point)
         throws IllegalStateException {
-      checkState(!done, "Computation of spherical excess is complete");
+      checkState(!_done, "Computation of spherical excess is complete");
 
       double phi = toRadians(point.getY());
       double tan = Math.tan(phi / 2);
@@ -160,12 +160,12 @@ public class StAreaFunction extends BaseTransformFunction {
 
       // We need to check for that specifically
       // Otherwise calculating the bearing is not deterministic
-      if (longitude == previousLongitude && phi == previousPhi) {
+      if (longitude == _previousLongitude && phi == _previousPhi) {
         throw new RuntimeException("Polygon is not valid: it has two identical consecutive vertices");
       }
 
-      double deltaLongitude = longitude - previousLongitude;
-      sphericalExcess += 2 * Math.atan2(Math.tan(deltaLongitude / 2) * (previousTan + tan), 1 + previousTan * tan);
+      double deltaLongitude = longitude - _previousLongitude;
+      _sphericalExcess += 2 * Math.atan2(Math.tan(deltaLongitude / 2) * (_previousTan + tan), 1 + _previousTan * tan);
 
       double cos = Math.cos(phi);
       double sin = Math.sin(phi);
@@ -174,48 +174,48 @@ public class StAreaFunction extends BaseTransformFunction {
 
       // Initial bearing from previous to current
       double y = sinOfDeltaLongitude * cos;
-      double x = previousCos * sin - previousSin * cos * cosOfDeltaLongitude;
+      double x = _previousCos * sin - _previousSin * cos * cosOfDeltaLongitude;
       double initialBearing = (Math.atan2(y, x) + TWO_PI) % TWO_PI;
 
       // Final bearing from previous to current = opposite of bearing from current to previous
-      double finalY = -sinOfDeltaLongitude * previousCos;
-      double finalX = previousSin * cos - previousCos * sin * cosOfDeltaLongitude;
+      double finalY = -sinOfDeltaLongitude * _previousCos;
+      double finalX = _previousSin * cos - _previousCos * sin * cosOfDeltaLongitude;
       double finalBearing = (Math.atan2(finalY, finalX) + PI) % TWO_PI;
 
-      // When processing our first point we don't yet have a previousFinalBearing
-      if (firstPoint) {
+      // When processing our first point we don't yet have a _previousFinalBearing
+      if (_firstPoint) {
         // So keep our initial bearing around, and we'll use it at the end
         // with the last final bearing
-        firstInitialBearing = initialBearing;
-        firstPoint = false;
+        _firstInitialBearing = initialBearing;
+        _firstPoint = false;
       } else {
-        courseDelta += (initialBearing - previousFinalBearing + THREE_PI) % TWO_PI - PI;
+        courseDelta += (initialBearing - _previousFinalBearing + THREE_PI) % TWO_PI - PI;
       }
 
       courseDelta += (finalBearing - initialBearing + THREE_PI) % TWO_PI - PI;
 
-      previousFinalBearing = finalBearing;
-      previousCos = cos;
-      previousSin = sin;
-      previousPhi = phi;
-      previousTan = tan;
-      previousLongitude = longitude;
+      _previousFinalBearing = finalBearing;
+      _previousCos = cos;
+      _previousSin = sin;
+      _previousPhi = phi;
+      _previousTan = tan;
+      _previousLongitude = longitude;
     }
 
     public double computeSphericalExcess() {
-      if (!done) {
+      if (!_done) {
         // Now that we have our last final bearing, we can calculate the remaining course delta
-        courseDelta += (firstInitialBearing - previousFinalBearing + THREE_PI) % TWO_PI - PI;
+        courseDelta += (_firstInitialBearing - _previousFinalBearing + THREE_PI) % TWO_PI - PI;
 
         // The courseDelta should be 2Pi or - 2Pi, unless a pole is enclosed (and then it should be ~ 0)
         // In which case we need to correct the spherical excess by 2Pi
         if (Math.abs(courseDelta) < PI / 4) {
-          sphericalExcess = Math.abs(sphericalExcess) - TWO_PI;
+          _sphericalExcess = Math.abs(_sphericalExcess) - TWO_PI;
         }
-        done = true;
+        _done = true;
       }
 
-      return sphericalExcess;
+      return _sphericalExcess;
     }
   }
 }

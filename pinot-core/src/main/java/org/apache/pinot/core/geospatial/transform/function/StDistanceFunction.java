@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 
@@ -70,10 +71,14 @@ public class StDistanceFunction extends BaseTransformFunction {
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "First argument must be single-valued for transform function: %s", getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
+        "The first argument must be of bytes type");
     _firstArgument = transformFunction;
     transformFunction = arguments.get(1);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
         "Second argument must be single-valued for transform function: %s", getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
+        "The second argument must be of bytes type");
     _secondArgument = transformFunction;
   }
 
@@ -93,8 +98,7 @@ public class StDistanceFunction extends BaseTransformFunction {
       Geometry firstGeometry = GeometrySerializer.deserialize(firstValues[i]);
       Geometry secondGeometry = GeometrySerializer.deserialize(secondValues[i]);
       if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
-        throw new RuntimeException(
-            String.format("The first and second arguments shall either all be geometry" + " or all geography"));
+        throw new RuntimeException("The first and second arguments shall either all be geometry or all geography");
       }
       if (GeometryUtils.isGeography(firstGeometry)) {
         _results[i] = sphericalDistance(firstGeometry, secondGeometry);
@@ -106,31 +110,23 @@ public class StDistanceFunction extends BaseTransformFunction {
     return _results;
   }
 
-  public static void checkLatitude(double latitude) {
-    if (Double.isNaN(latitude) || Double.isInfinite(latitude) || latitude < MIN_LATITUDE || latitude > MAX_LATITUDE) {
-      throw new RuntimeException("Latitude must be between -90 and 90");
-    }
+  private static void checkLatitude(double latitude) {
+    Preconditions
+        .checkArgument(latitude >= MIN_LATITUDE && latitude <= MAX_LATITUDE, "Latitude must be between -90 and 90");
   }
 
-  public static void checkLongitude(double longitude) {
-    if (Double.isNaN(longitude) || Double.isInfinite(longitude) || longitude < MIN_LONGITUDE
-        || longitude > MAX_LONGITUDE) {
-      throw new RuntimeException("Longitude must be between -180 and 180");
-    }
+  private static void checkLongitude(double longitude) {
+    Preconditions
+        .checkArgument(longitude >= MIN_LONGITUDE && longitude <= MAX_LONGITUDE, "Longitude must be between -180 and 180");
   }
 
-  public static Double sphericalDistance(Geometry leftGeometry, Geometry rightGeometry) {
-    if (leftGeometry.isEmpty() || rightGeometry.isEmpty()) {
-      return null;
-    }
-
+  private static double sphericalDistance(Geometry leftGeometry, Geometry rightGeometry) {
     validateGeographyType("ST_Distance", leftGeometry, EnumSet.of(GeometryType.POINT));
     validateGeographyType("ST_Distance", rightGeometry, EnumSet.of(GeometryType.POINT));
     Point leftPoint = (Point) leftGeometry;
     Point rightPoint = (Point) rightGeometry;
 
-    // greatCircleDistance returns distance in KM.
-    return greatCircleDistance(leftPoint.getY(), leftPoint.getX(), rightPoint.getY(), rightPoint.getX()) * 1000;
+    return greatCircleDistance(leftPoint.getY(), leftPoint.getX(), rightPoint.getY(), rightPoint.getX());
   }
 
   /**
@@ -139,7 +135,7 @@ public class StDistanceFunction extends BaseTransformFunction {
    * This assumes a spherical Earth, and uses the Vincenty formula. (https://en.wikipedia
    * .org/wiki/Great-circle_distance)
    */
-  public static double greatCircleDistance(double latitude1, double longitude1, double latitude2, double longitude2) {
+  private static double greatCircleDistance(double latitude1, double longitude1, double latitude2, double longitude2) {
     checkLatitude(latitude1);
     checkLongitude(longitude1);
     checkLatitude(latitude2);
@@ -159,10 +155,10 @@ public class StDistanceFunction extends BaseTransformFunction {
     double t1 = cos2 * sin(deltaLongitude);
     double t2 = cos1 * sin2 - sin1 * cos2 * cosDeltaLongitude;
     double t3 = sin1 * sin2 + cos1 * cos2 * cosDeltaLongitude;
-    return atan2(sqrt(t1 * t1 + t2 * t2), t3) * GeometryUtils.EARTH_RADIUS_KM;
+    return atan2(sqrt(t1 * t1 + t2 * t2), t3) * GeometryUtils.EARTH_RADIUS_M;
   }
 
-  public static void validateGeographyType(String function, Geometry geometry, Set<GeometryType> validTypes) {
+  private static void validateGeographyType(String function, Geometry geometry, Set<GeometryType> validTypes) {
     GeometryType type = GeometryType.valueOf(geometry.getGeometryType().toUpperCase());
     if (!validTypes.contains(type)) {
       throw new RuntimeException(String

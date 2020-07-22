@@ -31,8 +31,7 @@ public enum GeometrySerializationType {
   MULTI_LINE_STRING(3, GeometryType.MULTI_LINE_STRING),
   POLYGON(4, GeometryType.POLYGON),
   MULTI_POLYGON(5, GeometryType.MULTI_POLYGON),
-  GEOMETRY_COLLECTION(6, GeometryType.GEOMETRY_COLLECTION),
-  ENVELOPE(7, GeometryType.POLYGON);
+  GEOMETRY_COLLECTION(6, GeometryType.GEOMETRY_COLLECTION);
 
   private final int _id;
   private final GeometryType _geometryType;
@@ -77,8 +76,6 @@ public enum GeometrySerializationType {
         return MULTI_POLYGON;
       case 6:
         return GEOMETRY_COLLECTION;
-      case 7:
-        return ENVELOPE;
       default:
         throw new IllegalArgumentException("Invalid type id: " + id);
     }
