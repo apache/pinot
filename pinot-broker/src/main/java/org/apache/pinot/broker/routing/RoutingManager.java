@@ -312,7 +312,7 @@ public class RoutingManager implements ClusterChangeHandler {
 
     Set<String> enabledInstances = _enabledServerInstanceMap.keySet();
 
-    SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig);
+    SegmentSelector segmentSelector = SegmentSelectorFactory.getSegmentSelector(tableConfig, _propertyStore);
     segmentSelector.init(externalView, onlineSegments);
     List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
     for (SegmentPruner segmentPruner : segmentPruners) {

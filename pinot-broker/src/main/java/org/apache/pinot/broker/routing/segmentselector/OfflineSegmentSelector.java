@@ -30,10 +30,17 @@ import org.apache.pinot.common.request.BrokerRequest;
  * Segment selector for offline table.
  */
 public class OfflineSegmentSelector implements SegmentSelector {
+  private final SegmentLineageBasedSegmentSelector _segmentLineageBasedSegmentSelector;
+
   private volatile List<String> _segments;
+
+  public OfflineSegmentSelector(SegmentLineageBasedSegmentSelector segmentLineageBasedSegmentSelector) {
+    _segmentLineageBasedSegmentSelector = segmentLineageBasedSegmentSelector;
+  }
 
   @Override
   public void init(ExternalView externalView, Set<String> onlineSegments) {
+    _segmentLineageBasedSegmentSelector.init();
     onExternalViewChange(externalView, onlineSegments);
   }
 
@@ -42,7 +49,14 @@ public class OfflineSegmentSelector implements SegmentSelector {
     // TODO: for new added segments, before all replicas are up, consider not selecting them to avoid causing
     //       hotspot servers
 
-    _segments = Collections.unmodifiableList(new ArrayList<>(onlineSegments));
+
+    // Update segment lineage based segment selector
+    _segmentLineageBasedSegmentSelector.onExternalViewChange();
+
+    // Compute the intersection of segments to process from both offline and segment lineage based segment selectors.
+    List<String> segmentsToProcess =
+        new ArrayList<>(_segmentLineageBasedSegmentSelector.computeSegmentsToProcess(onlineSegments));
+    _segments = Collections.unmodifiableList(segmentsToProcess);
   }
 
   @Override

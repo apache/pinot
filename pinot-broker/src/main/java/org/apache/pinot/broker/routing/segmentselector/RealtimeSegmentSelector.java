@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.segmentselector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,13 +55,23 @@ public class RealtimeSegmentSelector implements SegmentSelector {
   private volatile List<List<String>> _hlcSegments;
   private volatile List<String> _llcSegments;
 
+  private SegmentLineageBasedSegmentSelector _segmentLineageBasedSegmentSelector;
+
+  public RealtimeSegmentSelector(SegmentLineageBasedSegmentSelector segmentLineageBasedSegmentSelector) {
+    _segmentLineageBasedSegmentSelector = segmentLineageBasedSegmentSelector;
+  }
+
   @Override
   public void init(ExternalView externalView, Set<String> onlineSegments) {
+    _segmentLineageBasedSegmentSelector.init();
     onExternalViewChange(externalView, onlineSegments);
   }
 
   @Override
   public void onExternalViewChange(ExternalView externalView, Set<String> onlineSegments) {
+    // Update segment lineage based segment selector
+    _segmentLineageBasedSegmentSelector.onExternalViewChange();
+
     // Group HLC segments by their group id
     // NOTE: Use TreeMap so that group ids are sorted and the result is deterministic
     Map<String, List<String>> groupIdToHLCSegmentsMap = new TreeMap<>();
@@ -114,7 +125,10 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     if (numHLCGroups != 0) {
       List<List<String>> hlcSegments = new ArrayList<>(numHLCGroups);
       for (List<String> hlcSegmentsForGroup : groupIdToHLCSegmentsMap.values()) {
-        hlcSegments.add(Collections.unmodifiableList(hlcSegmentsForGroup));
+        // Compute the intersection of hlc segments for group and selected segments from segment lineage based selector.
+        List<String> segmentsToProcess = new ArrayList<>(
+            _segmentLineageBasedSegmentSelector.computeSegmentsToProcess(new HashSet<>(hlcSegmentsForGroup)));
+        hlcSegments.add(Collections.unmodifiableList(segmentsToProcess));
       }
       _hlcSegments = hlcSegments;
     } else {
@@ -128,7 +142,9 @@ public class RealtimeSegmentSelector implements SegmentSelector {
       for (LLCSegmentName llcSegmentName : partitionIdToFirstConsumingLLCSegmentMap.values()) {
         llcSegments.add(llcSegmentName.getSegmentName());
       }
-      _llcSegments = Collections.unmodifiableList(llcSegments);
+      List<String> segmentsToProcess =
+          new ArrayList<>(_segmentLineageBasedSegmentSelector.computeSegmentsToProcess(new HashSet<>(llcSegments)));
+      _llcSegments = Collections.unmodifiableList(segmentsToProcess);
     } else {
       _llcSegments = null;
     }

@@ -18,16 +18,26 @@
  */
 package org.apache.pinot.broker.routing.segmentselector;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.util.FakePropertyStore;
+import org.apache.pinot.common.lineage.LineageEntry;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.broker.routing.segmentselector.RealtimeSegmentSelector.FORCE_HLC;
@@ -44,13 +54,77 @@ public class SegmentSelectorTest {
 
   @Test
   public void testSegmentSelectorFactory() {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = new FakePropertyStore();
     TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTableName()).thenReturn("testTable");
 
     when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
-    assertTrue(SegmentSelectorFactory.getSegmentSelector(tableConfig) instanceof OfflineSegmentSelector);
+    assertTrue(SegmentSelectorFactory.getSegmentSelector(tableConfig, propertyStore) instanceof OfflineSegmentSelector);
 
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
-    assertTrue(SegmentSelectorFactory.getSegmentSelector(tableConfig) instanceof RealtimeSegmentSelector);
+    assertTrue(SegmentSelectorFactory.getSegmentSelector(tableConfig, propertyStore) instanceof RealtimeSegmentSelector);
+  }
+
+  @Test
+  public void testSegmentLineageBasedSegmentSelector() {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = new FakePropertyStore();
+    String offlineTableName = "testTable_OFFLINE";
+    ExternalView externalView = new ExternalView(offlineTableName);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Map<String, String> onlineInstanceStateMap = Collections.singletonMap("server", ONLINE);
+    Set<String> onlineSegments = new HashSet<>();
+
+    int numOfflineSegments = 5;
+    for (int i = 0 ; i< numOfflineSegments; i++ ) {
+      String segmentName = "segment_" + i;
+      externalView.setStateMap(segmentName, onlineInstanceStateMap);
+      onlineSegments.add(segmentName);
+    }
+
+    SegmentLineageBasedSegmentSelector segmentSelector =
+        new SegmentLineageBasedSegmentSelector(offlineTableName, propertyStore);
+    OfflineSegmentSelector offlineSegmentSelector = new OfflineSegmentSelector(segmentSelector);
+
+    // Check the case where there's no segment lineage metadata for a table
+    offlineSegmentSelector.init(externalView, onlineSegments);
+    Assert.assertEquals(offlineSegmentSelector.select(null), onlineSegments);
+
+    // Update the segment lineage
+    SegmentLineage segmentLineage = new SegmentLineage(offlineTableName);
+    String lineageEntryId = SegmentLineageUtils.generateLineageEntryId();
+    segmentLineage.addLineageEntry(lineageEntryId,
+        new LineageEntry(Arrays.asList("segment_0", "segment_1", "segment_2"), Arrays.asList("merged_0", "merged_1"),
+            LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
+    SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineage, -1);
+
+    offlineSegmentSelector.onExternalViewChange(externalView, onlineSegments);
+    Assert.assertEquals(new HashSet<>(offlineSegmentSelector.select(null)),
+        new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
+
+    // merged_0 is added
+    externalView.setStateMap("merged_0", onlineInstanceStateMap);
+    onlineSegments.add("merged_0");
+    offlineSegmentSelector.onExternalViewChange(externalView, onlineSegments);
+    Assert.assertEquals(new HashSet<>(offlineSegmentSelector.select(null)),
+        new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
+
+    // merged_1 is added
+    externalView.setStateMap("merged_1", onlineInstanceStateMap);
+    onlineSegments.add("merged_1");
+    offlineSegmentSelector.onExternalViewChange(externalView, onlineSegments);
+    Assert.assertEquals(new HashSet<>(offlineSegmentSelector.select(null)),
+        new HashSet<>(Arrays.asList("segment_0", "segment_1", "segment_2", "segment_3", "segment_4")));
+
+    // Lineage entry gets updated to "COMPLETED"
+    LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
+    segmentLineage.updateLineageEntry(lineageEntryId,
+        new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.COMPLETED,
+            System.currentTimeMillis()));
+    SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineage, -1);
+
+    offlineSegmentSelector.onExternalViewChange(externalView, onlineSegments);
+    Assert.assertEquals(new HashSet<>(offlineSegmentSelector.select(null)),
+        new HashSet<>(Arrays.asList("segment_3", "segment_4", "merged_0", "merged_1")));
   }
 
   @Test
@@ -61,9 +135,11 @@ public class SegmentSelectorTest {
     Map<String, String> onlineInstanceStateMap = Collections.singletonMap("server", ONLINE);
     Map<String, String> consumingInstanceStateMap = Collections.singletonMap("server", CONSUMING);
     Set<String> onlineSegments = new HashSet<>();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
 
     // Should return an empty list when there is no segment
-    RealtimeSegmentSelector segmentSelector = new RealtimeSegmentSelector();
+    RealtimeSegmentSelector segmentSelector =
+        new RealtimeSegmentSelector(new SegmentLineageBasedSegmentSelector(realtimeTableName, propertyStore));
     segmentSelector.init(externalView, onlineSegments);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
     assertTrue(segmentSelector.select(brokerRequest).isEmpty());
