@@ -27,8 +27,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AuthResource;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 import static org.apache.pinot.thirdeye.common.constants.rca.MultiDimensionalSummaryConstants.*;
 import static org.apache.pinot.thirdeye.common.constants.rca.RootCauseResourceConstants.*;
@@ -64,12 +62,16 @@ public class ThirdEyeRcaRestClient extends AbstractRestClient {
     this.thirdEyeHost = DEFAULT_THIRDEYE_RCA_SERVICE_HOST;
   }
 
-  public Map<String, Object> getAllHighlights(long anomalyId) throws IOException {
+  /**
+   * Fetch the likely root causes behind an anomaly
+   */
+  public Map<String, Object> getRootCauseHighlights(long anomalyId) throws IOException {
     TreeMap<String, String> queryParameters = new TreeMap<String, String>();
     queryParameters.put("anomalyId", String.valueOf(anomalyId));
 
     Map<String, String> headers = new HashMap<>();
     headers.put("Cookie", AuthResource.AUTH_TOKEN_NAME + "=" + principal.getSessionKey());
+
     return doGet(
         composeUrl(this.thirdEyeHost, THIRDEYE_RCA_HIGHLIGHTS_URI, queryParameters),
         this.thirdEyeHost,
@@ -77,22 +79,22 @@ public class ThirdEyeRcaRestClient extends AbstractRestClient {
         new ResponseToMap());
   }
 
-  public Map<String, Object> getCubeHighlights(long anomalyId) throws IOException {
-    MergedAnomalyResultDTO anomalyDTO = DAORegistry.getInstance().getMergedAnomalyResultDAO().findById(anomalyId);
-
-    long startTime = anomalyDTO.getStartTime();
-    long endTime = anomalyDTO.getEndTime();
+  /**
+   * Retrieve the top dimension slices that explain the anomaly using the Cube Algorithm using wo1w
+   */
+  public Map<String, Object> getDimensionSummaryHighlights(String metricUrn, long startTime, long endTime,
+      long cubeDepth, long cubeSummarySize, boolean isOneSidedError) throws IOException {
     TreeMap<String, String> queryParameters = new TreeMap<String, String>();
-    queryParameters.put(METRIC_URN, anomalyDTO.getMetricUrn());
+    queryParameters.put(METRIC_URN, metricUrn);
     queryParameters.put(BASELINE_START, String.valueOf(startTime - TimeUnit.DAYS.toMillis(7)));
     queryParameters.put(BASELINE_END, String.valueOf(endTime - TimeUnit.DAYS.toMillis(7)));
     queryParameters.put(CURRENT_START, String.valueOf(startTime));
     queryParameters.put(CURRENT_END, String.valueOf(endTime));
 
-    queryParameters.put(CUBE_DEPTH, "3");
-    queryParameters.put(CUBE_ONE_SIDE_ERROR, "false");
+    queryParameters.put(CUBE_DEPTH, Long.toString(cubeDepth));
+    queryParameters.put(CUBE_ONE_SIDE_ERROR, Boolean.toString(isOneSidedError));
+    queryParameters.put(CUBE_SUMMARY_SIZE, Long.toString(cubeSummarySize));
     queryParameters.put(CUBE_ORDER_TYPE, "auto");
-    queryParameters.put(CUBE_SUMMARY_SIZE, "3");
 
     Map<String, String> headers = new HashMap<>();
     headers.put("Cookie", AuthResource.AUTH_TOKEN_NAME + "=" + principal.getSessionKey());
@@ -101,15 +103,5 @@ public class ThirdEyeRcaRestClient extends AbstractRestClient {
         this.thirdEyeHost,
         headers,
         new ResponseToMap());
-  }
-
-  public Map<String, Object> getRelatedEventHighlights(long anomalyId) throws IOException {
-    // TODO: placeholder
-    return new HashMap<>();
-  }
-
-  public Map<String, Object> getRelatedMetricHighlights(long anomalyId) throws IOException {
-    // TODO: placeholder
-    return new HashMap<>();
   }
 }

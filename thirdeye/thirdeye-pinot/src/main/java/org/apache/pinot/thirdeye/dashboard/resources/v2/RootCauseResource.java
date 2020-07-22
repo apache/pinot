@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
+import com.google.common.base.Preconditions;
 import com.google.gson.Gson;
 import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
@@ -33,15 +34,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import joptsimple.internal.Strings;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.common.restclient.ThirdEyeRcaRestClient;
+import org.apache.pinot.thirdeye.dashboard.resources.SummaryResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.rootcause.Entity;
 import org.apache.pinot.thirdeye.rootcause.RCAFramework;
 import org.apache.pinot.thirdeye.rootcause.RCAFrameworkExecutionResult;
@@ -49,6 +56,8 @@ import org.apache.pinot.thirdeye.rootcause.impl.TimeRangeEntity;
 import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.thirdeye.dashboard.resources.SummaryResource.*;
 
 
 @Path(value = "/rootcause")
@@ -62,49 +71,39 @@ public class RootCauseResource {
   private static final long ANALYSIS_RANGE_MAX = TimeUnit.DAYS.toMillis(32);
   private static final long ANOMALY_RANGE_MAX = TimeUnit.DAYS.toMillis(32);
   private static final long BASELINE_RANGE_MAX = ANOMALY_RANGE_MAX;
+  private static final int DEFAULT_HIGHLIGHT_CUBE_SUMMARY_SIZE = 3;
+  private static final int DEFAULT_HIGHLIGHT_CUBE_DEPTH = 3;
 
   private final List<RootCauseEntityFormatter> formatters;
   private final Map<String, RCAFramework> frameworks;
-  private final String dashboardHost;
+  private final SummaryResource summaryResource;
 
-  public RootCauseResource(String dashboardHost, Map<String, RCAFramework> frameworks, List<RootCauseEntityFormatter> formatters) {
-    this.dashboardHost = dashboardHost;
+  public RootCauseResource(Map<String, RCAFramework> frameworks, List<RootCauseEntityFormatter> formatters) {
     this.frameworks = frameworks;
     this.formatters = formatters;
+    this.summaryResource = new SummaryResource();
   }
 
   @GET
   @Path("/highlights")
-  @ApiOperation(value = "Send query")
-  public Map<String, String> highlights(
+  @ApiOperation("Retrieve the likely root causes behind an anomaly")
+  public Map<String, Object> highlights(
       @ApiParam(value = "internal id of the anomaly")
       @QueryParam("anomalyId") long anomalyId,
-      @Auth ThirdEyePrincipal principal) {
-    Map<String, String> responseMessage = new HashMap<>();
-    ThirdEyeRcaRestClient rcaClient = new ThirdEyeRcaRestClient(principal, dashboardHost);
+      @Auth ThirdEyePrincipal principal) throws Exception {
+    Map<String, Object> responseMessage = new HashMap<>();
+    MergedAnomalyResultDTO anomalyDTO = DAORegistry.getInstance().getMergedAnomalyResultDAO().findById(anomalyId);
+    Preconditions.checkNotNull(anomalyDTO, "Anomaly doesn't exist in ThirdEye's repository");
 
-    Map<String, Object> eventHighlights = new HashMap<>();
-    try {
-      eventHighlights = rcaClient.getRelatedEventHighlights(anomalyId);
-    } catch (IOException e) {
-      LOG.error("Failed to retrieve the RCA Event Highlights", e);
-    }
-    responseMessage.put("relatedEvents", new Gson().toJson(eventHighlights));
-
-    Map<String, Object> relatedMetricHighlights = new HashMap<>();
-    try {
-      relatedMetricHighlights = rcaClient.getRelatedMetricHighlights(anomalyId);
-    } catch (IOException e) {
-      LOG.error("Failed to retrieve the RCA Metric Highlights", e);
-    }
-    responseMessage.put("relatedMetrics", new Gson().toJson(relatedMetricHighlights));
-
-    Map<String, Object> cubeHighlights = new HashMap<>();
-    try {
-      cubeHighlights = rcaClient.getCubeHighlights(anomalyId);
-    } catch (IOException e) {
-      LOG.error("Failed to retrieve the RCA Cube Highlights", e);
-    }
+    // In the highlights api we retrieve only the top 3 results across 3 dimensions.
+    // TODO: polish the results to make it more meaningful
+    String cubeHighlights = this.summaryResource.buildSummary(
+        anomalyDTO.getMetricUrn(), anomalyDTO.getCollection(), anomalyDTO.getMetric(),
+        anomalyDTO.getStartTime(), anomalyDTO.getEndTime(),
+        anomalyDTO.getStartTime() - TimeUnit.DAYS.toMillis(7),
+        anomalyDTO.getEndTime() - TimeUnit.DAYS.toMillis(7), Strings.EMPTY, Strings.EMPTY,
+        DEFAULT_HIGHLIGHT_CUBE_SUMMARY_SIZE, DEFAULT_HIGHLIGHT_CUBE_DEPTH, SummaryResource.DEFAULT_HIERARCHIES,
+        false, DEFAULT_EXCLUDED_DIMENSIONS, SummaryResource.DEFAULT_TIMEZONE_ID);
     responseMessage.put("cubeResults", new Gson().toJson(cubeHighlights));
 
     return responseMessage;

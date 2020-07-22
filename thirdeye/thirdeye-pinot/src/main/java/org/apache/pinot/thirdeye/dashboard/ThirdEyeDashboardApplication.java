@@ -273,7 +273,6 @@ public class ThirdEyeDashboardApplication
 
     RootCauseConfiguration rcConfig = config.getRootCause();
     return new RootCauseResource(
-        config.getDashboardHost(),
         makeRootCauseFrameworks(rcConfig, definitionsFile),
         makeRootCauseFormatters(rcConfig));
   }

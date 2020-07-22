@@ -31,7 +31,7 @@ import org.testng.annotations.Test;
 
 public class TestThirdEyeRcaRestClient {
 
-  private static String SAMPLE_RESPONSE = "{ \"relatedMetrics\": \"{}\"," + " \"relatedEvents\": \"{}\"," + " \"cubeResults\": \"{}\"}";
+  private static String SAMPLE_RESPONSE = "{\"cubeResults\": \"{}\"}";
 
   private DAOTestBase testDAOProvider;
   private long anomalyId;
@@ -55,10 +55,8 @@ public class TestThirdEyeRcaRestClient {
     ThirdEyePrincipal principal = new ThirdEyePrincipal();
     principal.setSessionKey("dummy");
     ThirdEyeRcaRestClient client = new ThirdEyeRcaRestClient(factory, principal);
-    Map<String, Object> result = client.getAllHighlights(anomalyId);
+    Map<String, Object> result = client.getRootCauseHighlights(anomalyId);
 
-    Assert.assertTrue(result.containsKey("relatedMetrics"));
-    Assert.assertTrue(result.containsKey("relatedEvents"));
     Assert.assertTrue(result.containsKey("cubeResults"));
   }
 }

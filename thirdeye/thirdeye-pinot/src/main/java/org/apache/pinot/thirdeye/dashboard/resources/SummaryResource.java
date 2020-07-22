@@ -69,11 +69,11 @@ public class SummaryResource {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-  private static final String DEFAULT_TIMEZONE_ID = "UTC";
-  private static final String DEFAULT_DEPTH = "3";
-  private static final String DEFAULT_HIERARCHIES = "[]";
-  private static final String DEFAULT_ONE_SIDE_ERROR = "false";
-  private static final String DEFAULT_EXCLUDED_DIMENSIONS = "";
+  public static final String DEFAULT_TIMEZONE_ID = "UTC";
+  public static final String DEFAULT_DEPTH = "3";
+  public static final String DEFAULT_HIERARCHIES = "[]";
+  public static final String DEFAULT_ONE_SIDE_ERROR = "false";
+  public static final String DEFAULT_EXCLUDED_DIMENSIONS = "";
   private static final String JAVASCRIPT_NULL_STRING = "undefined";
   private static final String HTML_STRING_ENCODING = "UTF-8";
 

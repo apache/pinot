@@ -212,7 +212,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
         principal.setName(this.thirdEyeAnomalyConfig.getThirdEyeRestClientConfiguration().getAdminUser());
         principal.setSessionKey(this.thirdEyeAnomalyConfig.getThirdEyeRestClientConfiguration().getSessionKey());
         rcaHighlights = new ThirdEyeRcaRestClient(principal, this.thirdEyeAnomalyConfig.getDashboardHost())
-            .getAllHighlights(Long.parseLong(anomalyId));
+            .getRootCauseHighlights(Long.parseLong(anomalyId));
       } catch (IOException e) {
         LOG.error("Failed to retrieve the RCA Highlights for anomaly " + anomalyId, e);
       }

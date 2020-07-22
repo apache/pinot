@@ -33,17 +33,18 @@ import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.SortedMap;
+import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * A generic API Rest Client to perform GET and POST
+ * A generic API Rest Client to perform short-lived http GET and POST
  */
 public abstract class AbstractRestClient {
   private final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final HttpURLConnectionFactory connectionFactory;
 
   /**
@@ -257,13 +258,12 @@ public abstract class AbstractRestClient {
   }
 
   /**
-   * Implementation for a single method class that can be used with doGet and doPost in order to parse the response to
-   * a Map<String,Object>
+   * Implementation for a single method class that can be used with doGet and doPost in order to parse a response stream
+   * to a Map<String,Object>
    */
   public class ResponseToMap implements ParseResponseFunction<InputStream, Map<String, Object>> {
     public Map<String, Object> parse(InputStream inputStream) throws IOException {
-      return OBJECT_MAPPER.readValue(inputStream, new TypeReference<Map<String, Object>>() {
-      });
+      return OBJECT_MAPPER.readValue(inputStream, new TypeReference<Map<String, Object>>() {});
     }
   }
 }
