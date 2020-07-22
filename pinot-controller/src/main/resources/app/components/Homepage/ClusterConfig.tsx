@@ -19,9 +19,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { TableData } from 'Models';
-import { getClusterConfig } from '../../requests';
 import AppLoader from '../AppLoader';
 import CustomizedTables from '../Table';
+import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
 const ClusterConfig = () => {
 
@@ -31,21 +31,23 @@ const ClusterConfig = () => {
     records: []
   });
 
+  const fetchData = async () => {
+    const result = await PinotMethodUtils.getClusterConfigData();
+    setTableData(result);
+    setFetching(false);
+  };
   useEffect(() => {
-    getClusterConfig().then(({ data }) => {
-      setTableData({
-        columns: ['Property', 'Value'],
-        records: [
-          ...Object.keys(data).map(key => [key, data[key]])
-        ]
-      });
-      setFetching(false);
-    });
+    fetchData();
   }, []);
 
   return (
     fetching ? <AppLoader /> :
-    <CustomizedTables title="Cluster configuration" data={tableData} />
+    <CustomizedTables
+      title="Cluster configuration"
+      data={tableData}
+      showSearchBox={true}
+      inAccordionFormat={true}
+    />
   );
 };
 

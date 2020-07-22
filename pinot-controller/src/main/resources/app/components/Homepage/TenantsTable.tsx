@@ -19,38 +19,35 @@
 
 import React, { useEffect, useState } from 'react';
 import { TableData } from 'Models';
-import union from 'lodash/union';
-import { getTenants } from '../../requests';
 import AppLoader from '../AppLoader';
 import CustomizedTables from '../Table';
+import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
 const TenantsTable = () => {
   const [fetching, setFetching] = useState(true);
   const [tableData, setTableData] = useState<TableData>({ records: [], columns: [] });
 
+  const fetchData = async () => {
+    const result = await PinotMethodUtils.getTenantsData();
+    setTableData(result);
+    setFetching(false);
+  };
   useEffect(() => {
-    getTenants().then(({ data }) => {
-      const records = union(
-        data.SERVER_TENANTS,
-        data.BROKER_TENANTS
-      );
-      setTableData({
-        columns: ['Name', 'Server', 'Broker', 'Tables'],
-        records: [
-          ...records.map(record => [
-            record,
-            data.SERVER_TENANTS.indexOf(record) > -1 ? 1 : 0,
-            data.BROKER_TENANTS.indexOf(record) > -1 ? 1 : 0,
-            '-'
-          ])
-        ]
-      });
-      setFetching(false);
-    });
+    fetchData();
   }, []);
 
-  return (
-    fetching ? <AppLoader /> : <CustomizedTables title="Tenants" data={tableData} addLinks isPagination baseURL="/tenants/" />
+  return fetching ? (
+    <AppLoader />
+  ) : (
+    <CustomizedTables
+      title="Tenants"
+      data={tableData}
+      addLinks
+      isPagination
+      baseURL="/tenants/"
+      showSearchBox={true}
+      inAccordionFormat={true}
+    />
   );
 };
 

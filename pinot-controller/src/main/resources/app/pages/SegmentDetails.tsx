@@ -22,16 +22,14 @@ import { makeStyles } from '@material-ui/core/styles';
 import { Grid } from '@material-ui/core';
 import { RouteComponentProps } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { TableData } from 'Models';
-import _ from 'lodash';
 import AppLoader from '../components/AppLoader';
-import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
 import 'codemirror/mode/sql/sql';
 import SimpleAccordion from '../components/SimpleAccordion';
+import CustomizedTables from '../components/Table';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 
 const useStyles = makeStyles((theme) => ({
@@ -75,60 +73,41 @@ const jsonoptions = {
 type Props = {
   tenantName: string;
   tableName: string;
+  segmentName: string;
 };
 
 type Summary = {
-  tableName: string;
-  reportedSize: string | number;
-  estimatedSize: string | number;
+  segmentName: string;
+  totalDocs: string | number;
+  createTime: unknown;
 };
 
-const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
-  const { tenantName, tableName } = match.params;
+const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const classes = useStyles();
+  const { tableName, segmentName } = match.params;
+
   const [fetching, setFetching] = useState(true);
-  const [tableSummary, setTableSummary] = useState<Summary>({
-    tableName: match.params.tableName,
-    reportedSize: '',
-    estimatedSize: '',
+  const [segmentSummary, setSegmentSummary] = useState<Summary>({
+    segmentName,
+    totalDocs: '',
+    createTime: '',
   });
 
-  const [segmentList, setSegmentList] = useState<TableData>({
+  const [replica, setReplica] = useState({
     columns: [],
-    records: [],
+    records: []
   });
 
-  const [tableSchema, setTableSchema] = useState<TableData>({
-    columns: [],
-    records: [],
-  });
   const [value, setValue] = useState('');
-
-  const fetchTableData = async () => {
-    const result = await PinotMethodUtils.getTableSummaryData(tableName);
-    setTableSummary(result);
-    fetchSegmentData();
-  };
-
-  const fetchSegmentData = async () => {
-    const result = await PinotMethodUtils.getSegmentList(tableName);
-    setSegmentList(result);
-    fetchTableSchema();
-  };
-
-  const fetchTableSchema = async () => {
-    const result = await PinotMethodUtils.getTableSchemaData(tableName, true);
-    setTableSchema(result);
-    fetchTableJSON();
-  };
-
-  const fetchTableJSON = async () => {
-    const result = await PinotMethodUtils.getTableDetails(tableName);
-    setValue(JSON.stringify(result, null, 2));
+  const fetchData = async () => {
+    const result = await PinotMethodUtils.getSegmentDetails(tableName, segmentName);
+    setSegmentSummary(result.summary);
+    setReplica(result.replicaSet);
+    setValue(JSON.stringify(result.JSON, null, 2));
     setFetching(false);
   };
   useEffect(() => {
-    fetchTableData();
+    fetchData();
   }, []);
   return fetching ? (
     <AppLoader />
@@ -146,24 +125,32 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       <div className={classes.highlightBackground}>
         <TableToolbar name="Summary" showSearchBox={false} />
         <Grid container className={classes.body}>
-          <Grid item xs={4}>
-            <strong>Table Name:</strong> {tableSummary.tableName}
+          <Grid item xs={6}>
+            <strong>Segment Name:</strong> {segmentSummary.segmentName}
           </Grid>
-          <Grid item xs={4}>
-            <strong>Reported Size:</strong> {tableSummary.reportedSize}
+          <Grid item xs={3}>
+            <strong>Total Docs:</strong> {segmentSummary.totalDocs}
           </Grid>
-          <Grid item xs={4}>
-            <strong>Estimated Size: </strong>
-            {tableSummary.estimatedSize}
+          <Grid item xs={3}>
+            <strong>Create Time:</strong>  {segmentSummary.createTime}
           </Grid>
         </Grid>
       </div>
 
       <Grid container spacing={2}>
         <Grid item xs={6}>
+          <CustomizedTables
+            title="Replica Set"
+            data={replica}
+            isPagination={true}
+            showSearchBox={true}
+            inAccordionFormat={true}
+          />
+        </Grid>
+        <Grid item xs={6}>
           <div className={classes.sqlDiv}>
             <SimpleAccordion
-              headerTitle="Table Config"
+              headerTitle="Metadata"
               showSearchBox={false}
             >
               <CodeMirror
@@ -174,30 +161,10 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               />
             </SimpleAccordion>
           </div>
-          <CustomizedTables
-            title="Segments"
-            data={segmentList}
-            isPagination={false}
-            noOfRows={segmentList.records.length}
-            baseURL={`/tenants/${tenantName}/table/${tableName}/`}
-            addLinks
-            showSearchBox={true}
-            inAccordionFormat={true}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <CustomizedTables
-            title="Table Schema"
-            data={tableSchema}
-            isPagination={false}
-            noOfRows={tableSchema.records.length}
-            showSearchBox={true}
-            inAccordionFormat={true}
-          />
         </Grid>
       </Grid>
     </Grid>
   );
 };
 
-export default TenantPageDetails;
+export default SegmentDetails;

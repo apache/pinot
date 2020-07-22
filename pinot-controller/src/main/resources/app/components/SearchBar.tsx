@@ -27,13 +27,17 @@ const useStyles = makeStyles((theme) => ({
   search: {
     position: 'relative',
     borderRadius: theme.shape.borderRadius,
-    marginRight: theme.spacing(2),
-    marginLeft: 0,
     width: '100%',
     [theme.breakpoints.up('sm')]: {
-      marginLeft: theme.spacing(3),
+      // marginLeft: theme.spacing(3),
       width: 'auto',
     },
+  },
+  searchOnRight:{
+    position: 'relative',
+    borderRadius: theme.shape.borderRadius,
+    width: '150px',
+    marginLeft: 'auto',
   },
   searchIcon: {
     padding: theme.spacing(0, 2),
@@ -58,10 +62,10 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const SearchBar = (props: InputBaseProps) => {
+const SearchBar = (props) => {
   const classes = useStyles();
   return (
-    <div className={classes.search}>
+    <div className={props.searchOnRight ? classes.searchOnRight : classes.search}>
       <div className={classes.searchIcon}>
         <SearchIcon />
       </div>
