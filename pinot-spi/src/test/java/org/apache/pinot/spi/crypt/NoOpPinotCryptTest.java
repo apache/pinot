@@ -28,36 +28,35 @@ import org.testng.annotations.Test;
 public class NoOpPinotCryptTest {
 
   PinotCrypter pinotCrypter;
-  File srcFile;
-  File destinationFile;
+  File encryptedFile;
+  File decryptedFile;
   @BeforeTest
   public void init() throws IOException {
     pinotCrypter = new NoOpPinotCrypter();
-    srcFile = File.createTempFile("srcFile","txt");
-    srcFile.deleteOnExit();
-    destinationFile = File.createTempFile("destFile","txt");
-    destinationFile.deleteOnExit();
-    FileUtils.write(srcFile,"testData");
+    encryptedFile = File.createTempFile("encryptedFile","txt");
+    encryptedFile.deleteOnExit();
+    decryptedFile = File.createTempFile("decryptedFile","txt");
+    decryptedFile.deleteOnExit();
+    FileUtils.write(encryptedFile,"testData");
   }
 
   @Test
   public void testEncryption() throws IOException {
-    pinotCrypter.encrypt(srcFile,destinationFile);
-    Assert.assertTrue(FileUtils.contentEquals(srcFile,destinationFile));
-
-    srcFile = new File("fake");
-    pinotCrypter.encrypt(srcFile,destinationFile);
-    Assert.assertFalse(destinationFile.exists());
+    pinotCrypter.encrypt(decryptedFile, encryptedFile);
+    Assert.assertTrue(FileUtils.contentEquals(encryptedFile, decryptedFile));
+    decryptedFile = new File("fake");
+    pinotCrypter.encrypt(decryptedFile, encryptedFile);
+    Assert.assertFalse(encryptedFile.exists());
 
   }
 
   @Test
   public void testDecryption() throws IOException {
-    pinotCrypter.decrypt(destinationFile,srcFile);
-    Assert.assertTrue(FileUtils.contentEquals(srcFile,destinationFile));
-    srcFile = new File("fake");
-    pinotCrypter.decrypt(srcFile,destinationFile);
-    Assert.assertFalse(destinationFile.exists());
+    pinotCrypter.decrypt(encryptedFile, decryptedFile);
+    Assert.assertTrue(FileUtils.contentEquals(encryptedFile, decryptedFile));
+    encryptedFile = new File("fake");
+    pinotCrypter.decrypt(encryptedFile, decryptedFile);
+    Assert.assertFalse(decryptedFile.exists());
   }
 
 }
