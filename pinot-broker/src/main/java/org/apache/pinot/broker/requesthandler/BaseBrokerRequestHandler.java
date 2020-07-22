@@ -202,12 +202,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
     }
     updateQuerySource(brokerRequest);
-    if (_enableCaseInsensitive) {
-      try {
-        handleCaseSensitivity(brokerRequest);
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while rewriting PQL to make it case-insensitive {}: {}, {}", requestId, query, e);
-      }
+    try {
+      updateColumnNames(brokerRequest);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while updating Column names in Query {}: {}, {}", requestId, query, e);
     }
     if (_defaultHllLog2m > 0) {
       handleHyperloglogLog2mOverride(brokerRequest, _defaultHllLog2m);
@@ -450,16 +448,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private void updateQuerySource(BrokerRequest brokerRequest) {
     String tableName = brokerRequest.getQuerySource().getTableName();
     // Check if table is in the format of [database_name].[table_name]
-    String[] tableNameSplits = StringUtils.split(tableName, '.');
-    if (tableNameSplits.length != 2) {
-      return;
-    }
+    String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
     // Update table name if there is no existing table in the format of [database_name].[table_name] but only [table_name]
     if (_enableCaseInsensitive) {
+      if (tableNameSplits.length < 2) {
+        brokerRequest.getQuerySource().setTableName(_tableCache.getActualTableName(tableName));
+        return;
+      }
       if (_tableCache.containsTable(tableNameSplits[1]) && !_tableCache.containsTable(tableName)) {
         // Use TableCache to check case insensitive table name.
-        brokerRequest.getQuerySource().setTableName(tableNameSplits[1]);
+        brokerRequest.getQuerySource().setTableName(_tableCache.getActualTableName(tableNameSplits[1]));
       }
+      return;
+    }
+    if (tableNameSplits.length < 2) {
       return;
     }
     // Use RoutingManager to check case sensitive table name.
@@ -667,19 +669,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
-   * Fixes the case-insensitive column names to the actual column names in the given broker request.
+   * Fixes the column names to the actual column names in the given broker request.
    */
-  private void handleCaseSensitivity(BrokerRequest brokerRequest) {
-    String inputTableName = brokerRequest.getQuerySource().getTableName();
-    String actualTableName = _tableCache.getActualTableName(inputTableName);
-    brokerRequest.getQuerySource().setTableName(actualTableName);
+  private void updateColumnNames(BrokerRequest brokerRequest) {
+    String tableName = brokerRequest.getQuerySource().getTableName();
     //fix columns
     if (brokerRequest.getFilterSubQueryMap() != null) {
       Collection<FilterQuery> values = brokerRequest.getFilterSubQueryMap().getFilterQueryMap().values();
       for (FilterQuery filterQuery : values) {
         if (filterQuery.getNestedFilterQueryIdsSize() == 0) {
           String expression = filterQuery.getColumn();
-          filterQuery.setColumn(fixColumnNameCase(actualTableName, expression));
+          filterQuery.setColumn(fixColumnName(tableName, expression));
         }
       }
     }
@@ -688,14 +688,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         if (!info.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
           // Always read from backward compatible api in AggregationFunctionUtils.
           List<String> arguments = AggregationFunctionUtils.getArguments(info);
-          arguments.replaceAll(e -> fixColumnNameCase(actualTableName, e));
+          arguments.replaceAll(e -> fixColumnName(tableName, e));
           info.setExpressions(arguments);
         }
       }
       if (brokerRequest.isSetGroupBy()) {
         List<String> expressions = brokerRequest.getGroupBy().getExpressions();
         for (int i = 0; i < expressions.size(); i++) {
-          expressions.set(i, fixColumnNameCase(actualTableName, expressions.get(i)));
+          expressions.set(i, fixColumnName(tableName, expressions.get(i)));
         }
       }
     } else {
@@ -704,7 +704,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       for (int i = 0; i < selectionColumns.size(); i++) {
         String expression = selectionColumns.get(i);
         if (!expression.equals("*")) {
-          selectionColumns.set(i, fixColumnNameCase(actualTableName, expression));
+          selectionColumns.set(i, fixColumnName(tableName, expression));
         }
       }
     }
@@ -712,66 +712,86 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       List<SelectionSort> orderBy = brokerRequest.getOrderBy();
       for (SelectionSort selectionSort : orderBy) {
         String expression = selectionSort.getColumn();
-        selectionSort.setColumn(fixColumnNameCase(actualTableName, expression));
+        selectionSort.setColumn(fixColumnName(tableName, expression));
       }
     }
 
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
     if (pinotQuery != null) {
-      pinotQuery.getDataSource().setTableName(actualTableName);
+      pinotQuery.getDataSource().setTableName(tableName);
       for (Expression expression : pinotQuery.getSelectList()) {
-        fixColumnNameCase(actualTableName, expression);
+        fixColumnName(tableName, expression);
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
-        fixColumnNameCase(actualTableName, filterExpression);
+        fixColumnName(tableName, filterExpression);
       }
       List<Expression> groupByList = pinotQuery.getGroupByList();
       if (groupByList != null) {
         for (Expression expression : groupByList) {
-          fixColumnNameCase(actualTableName, expression);
+          fixColumnName(tableName, expression);
         }
       }
       List<Expression> orderByList = pinotQuery.getOrderByList();
       if (orderByList != null) {
         for (Expression expression : orderByList) {
-          fixColumnNameCase(actualTableName, expression);
+          fixColumnName(tableName, expression);
         }
       }
       Expression havingExpression = pinotQuery.getHavingExpression();
       if (havingExpression != null) {
-        fixColumnNameCase(actualTableName, havingExpression);
+        fixColumnName(tableName, havingExpression);
       }
     }
   }
 
-  private String fixColumnNameCase(String tableNameWithType, String expression) {
+  private String fixColumnName(String tableNameWithType, String expression) {
     TransformExpressionTree expressionTree = TransformExpressionTree.compileToExpressionTree(expression);
-    fixColumnNameCase(tableNameWithType, expressionTree);
+    fixColumnName(tableNameWithType, expressionTree);
     return expressionTree.toString();
   }
 
-  private void fixColumnNameCase(String tableNameWithType, TransformExpressionTree expression) {
+  private void fixColumnName(String tableNameWithType, TransformExpressionTree expression) {
     TransformExpressionTree.ExpressionType expressionType = expression.getExpressionType();
     if (expressionType == TransformExpressionTree.ExpressionType.IDENTIFIER) {
-      expression.setValue(_tableCache.getActualColumnName(tableNameWithType, expression.getValue()));
+      String identifier = expression.getValue();
+      expression.setValue(getActualColumnName(tableNameWithType, identifier));
     } else if (expressionType == TransformExpressionTree.ExpressionType.FUNCTION) {
       for (TransformExpressionTree child : expression.getChildren()) {
-        fixColumnNameCase(tableNameWithType, child);
+        fixColumnName(tableNameWithType, child);
       }
     }
   }
 
-  private void fixColumnNameCase(String tableNameWithType, Expression expression) {
+  private void fixColumnName(String tableNameWithType, Expression expression) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
       Identifier identifier = expression.getIdentifier();
-      identifier.setName(_tableCache.getActualColumnName(tableNameWithType, identifier.getName()));
+      identifier.setName(getActualColumnName(tableNameWithType, identifier.getName()));
     } else if (expressionType == ExpressionType.FUNCTION) {
       for (Expression operand : expression.getFunctionCall().getOperands()) {
-        fixColumnNameCase(tableNameWithType, operand);
+        fixColumnName(tableNameWithType, operand);
       }
     }
+  }
+
+  private String getActualColumnName(String tableNameWithType, String columnName) {
+    String[] splits = StringUtils.split(columnName, ".", 2);
+    if (_enableCaseInsensitive) {
+      if (splits.length == 2) {
+        if (TableNameBuilder.extractRawTableName(tableNameWithType).equalsIgnoreCase(splits[0])) {
+          return _tableCache.getActualColumnName(tableNameWithType, splits[1]);
+        }
+      }
+      return _tableCache.getActualColumnName(tableNameWithType, columnName);
+    } else {
+      if (splits.length == 2) {
+        if (TableNameBuilder.extractRawTableName(tableNameWithType).equals(splits[0])) {
+          return splits[1];
+        }
+      }
+    }
+    return columnName;
   }
 
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
