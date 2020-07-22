@@ -18,34 +18,28 @@
  */
 package org.apache.pinot.core.realtime.impl.nullvalue;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class RealtimeNullValueVectorReaderWriterTest {
-  private static RealtimeNullValueVectorReaderWriter readerWriter = null;
-  private static final Random random = new Random(System.currentTimeMillis());
+public class MutableNullValueVectorTest {
+  private static final Random RANDOM = new Random();
+  private static final int NUM_DOCS = 100;
   private static final int MAX_DOC_ID = 10000;
 
-  @BeforeClass
-  public void setup() {
-    readerWriter = new RealtimeNullValueVectorReaderWriter();
-  }
+  private final MutableNullValueVector _nullValueVector = new MutableNullValueVector();
 
   @Test
-  public void testRealtimeNullValueVectorReaderWriter() {
-    List<Integer> randomdocIds = new ArrayList<>();
-    for (int i = 0; i < 100; i++) {
-      int randomDocId = random.nextInt(MAX_DOC_ID);
-      readerWriter.setNull(randomDocId);
-      randomdocIds.add(randomDocId);
+  public void testMutableNullValueVector() {
+    int[] docIds = new int[NUM_DOCS];
+    for (int i = 0; i < NUM_DOCS; i++) {
+      int docId = RANDOM.nextInt(MAX_DOC_ID);
+      _nullValueVector.setNull(docId);
+      docIds[i] = docId;
     }
-    for (int i = 0; i < 100; i++) {
-      Assert.assertTrue(readerWriter.isNull(randomdocIds.get(i)));
+    for (int i = 0; i < NUM_DOCS; i++) {
+      Assert.assertTrue(_nullValueVector.isNull(docIds[i]));
     }
   }
 }
