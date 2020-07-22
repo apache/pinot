@@ -44,12 +44,20 @@ public class NoOpPinotCryptTest {
   public void testEncryption() throws IOException {
     pinotCrypter.encrypt(srcFile,destinationFile);
     Assert.assertTrue(FileUtils.contentEquals(srcFile,destinationFile));
+
+    srcFile = new File("fake");
+    pinotCrypter.encrypt(srcFile,destinationFile);
+    Assert.assertFalse(destinationFile.exists());
+
   }
 
   @Test
   public void testDecryption() throws IOException {
     pinotCrypter.decrypt(destinationFile,srcFile);
     Assert.assertTrue(FileUtils.contentEquals(srcFile,destinationFile));
+    srcFile = new File("fake");
+    pinotCrypter.decrypt(srcFile,destinationFile);
+    Assert.assertFalse(destinationFile.exists());
   }
 
 }
