@@ -1,0 +1,38 @@
+{
+  "executionFrameworkSpec": {
+    "name": "standalone",
+    "segmentGenerationJobRunnerClassName": "org.apache.pinot.plugin.ingestion.batch.standalone.SegmentGenerationJobRunner",
+    "segmentTarPushJobRunnerClassName": "org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner",
+    "segmentUriPushJobRunnerClassName": "org.apache.pinot.plugin.ingestion.batch.standalone.SegmentUriPushJobRunner"
+  },
+  "jobType": "SegmentCreationAndTarPush",
+  "inputDirURI": "file:///path/to/input/${ year }/${ month }/${ day }",
+  "includeFileNamePattern": "glob:**/*.parquet",
+  "excludeFileNamePattern": "glob:**/*.avro",
+  "outputDirURI": "file:///path/to/output/${year}/${month}/${day}",
+  "overwriteOutput": true,
+  "pinotFSSpecs": [
+    {
+      "scheme": "file",
+      "className": "org.apache.pinot.spi.filesystem.LocalPinotFS"
+    }
+  ],
+  "recordReaderSpec": {
+    "dataFormat": "parquet",
+    "className": "org.apache.pinot.parquet.data.readers.ParquetRecordReader"
+  },
+  "tableSpec": {
+    "tableName": "myTable",
+    "schemaURI": "http://localhost:9000/tables/myTable/schema",
+    "tableConfigURI": "http://localhost:9000/tables/myTable"
+  },
+  "pinotClusterSpecs": [
+    {
+      "controllerURI": "localhost:9000"
+    }
+  ],
+  "pushJobSpec": {
+    "pushAttempts": 2,
+    "pushRetryIntervalMillis": 1000
+  }
+}

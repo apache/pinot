@@ -61,4 +61,14 @@ public class IngestionJobLauncherTest {
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/06/07");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/06/07");
   }
+
+  @Test
+  public void testIngestionJobLauncherWithJsonTemplate()
+      throws IOException, ClassNotFoundException {
+    SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
+        GroovyTemplateUtils.class.getClassLoader().getResource("ingestionJobSpecTemplate.json").getFile(),
+        GroovyTemplateUtils.class.getClassLoader().getResource("job_json.config").getFile(), null);
+    Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2019/06/07");
+    Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2019/06/07");
+  }
 }
