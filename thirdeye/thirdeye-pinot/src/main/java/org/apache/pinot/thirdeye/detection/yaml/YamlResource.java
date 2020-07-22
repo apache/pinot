@@ -1067,14 +1067,14 @@ public class YamlResource {
     List<Map<String, Object>> yamls;
     if (dataset == null && metric == null) {
       yamls = this.detectionConfigDAO
-          .findAll()
+          .list(100, 0)
           .parallelStream()
           .map(config -> formatConfigOrNull(config))
           .filter(c -> c!= null)
           .collect(Collectors.toList());
     } else {
       yamls = this.detectionConfigDAO
-          .findAll()
+          .list(100, 0)
           .parallelStream()
           .map(config -> formatConfigOrNull(config))
           .filter(c -> c!= null)
@@ -1096,8 +1096,12 @@ public class YamlResource {
    */
   @GET
   @Path("/list")
-  @ApiOperation("Get the list of all detection YAML configurations as JSON enhanced with additional information, optionally filtered.")
+  @ApiOperation(
+      "Get the list of all detection YAML configurations as JSON enhanced with additional information, optionally filtered."
+          + "IMPORTANT NOTE: This endpoint is deprecated because it is not scalable. Please use the /alerts endpoint instead. "
+          + "For now, it is limited to list and filter the most recent 100 alerts only. ")
   @Produces(MediaType.APPLICATION_JSON)
+  @Deprecated
   public Response listYamls(
       @ApiParam("Dataset the detection configurations should be filtered by") @QueryParam("dataset") String dataset,
       @ApiParam("Metric the detection configurations should be filtered by") @QueryParam("metric") String metric){
