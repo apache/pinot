@@ -1059,10 +1059,13 @@ public class YamlResource {
    * Query all detection yaml configurations and optionally filter, then format as JSON and enhance with
    * detection config id, isActive, and createdBy information
    *
+   * NOTE: it is limited to list and filter the most recent 100 alerts only due to possible OOM issues.
+   *
    * @param dataset The dataset param passed by the client in the REST API call.
    * @param metric The metric param passed by the client in the REST API call.
    * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
+  @Deprecated
   private List<Map<String, Object>> queryDetectionConfigurations(String dataset, String metric) {
     List<Map<String, Object>> yamls;
     if (dataset == null && metric == null) {
